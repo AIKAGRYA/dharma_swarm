@@ -1,7 +1,7 @@
 # Dharma Forge / Hydra Archaeology
 
 Date: 2026-06-11
-Branch carrying this handoff: `qwen/spine-adoption`
+Original source branch for this handoff: `qwen/spine-adoption`
 Audience: remote Devin / roaming agent without access to local `~/.dharma`
 Status: archaeology report, not a launch authorization
 
@@ -14,7 +14,7 @@ This document is self-contained for remote readers. Paths marked `[off-repo]` we
 ## Custody Labels
 
 - `[main]`: file exists on `origin/main`.
-- `[branch: qwen/spine-adoption]`: file exists in this branch after this commit, but is not necessarily on main.
+- `[source branch: qwen/spine-adoption]`: file existed on that source branch when this report was written; if this report is read from main, treat this as historical custody unless the path is also present on main.
 - `[branch: forge/dharma-reward-forge-v0]`: file exists on that branch, not main.
 - `[branch: cashclaw/revenue-hydra-v1]`: file exists on that branch/worktree, not main.
 - `[untracked]`: local file in the current worktree, not committed.

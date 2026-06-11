@@ -12,7 +12,8 @@
 ## 0. Wake sequence (do this verbatim)
 
 ```bash
-cd ~/repos/dharma-swarm && git pull origin main
+cd "${DHARMA_SWARM_REPO:-$HOME/repos/dharma-swarm}" || cd "$HOME/dharma_swarm"
+git pull origin main
 make onboard                       # the single door; trust its output over any prose below
 cat docs/agents/devin-roaming-2987d222/MEMORY.md   # newest entry = your context
 ls inter_agent/devin/inbound/
