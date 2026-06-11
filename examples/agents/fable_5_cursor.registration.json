@@ -68,10 +68,13 @@
       "fleet_cc": "dharma.a2a.fleet"
     },
     "required_first_reads": [
+      "make onboard output",
       "CLAUDE.md",
-      "docs/ops/DEVIN_NATS_PR_JANITOR_PLAYBOOK.md",
-      "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+      "docs/governance/SOVEREIGN_MANIFEST.md",
+      "docs/governance/ACTIVE_TRACK.yaml",
+      "docs/governance/ANTI_SLOP_RULES.md"
     ],
+    "operational_route": "docs/ops/FABLE5_ONBOARDING_MAP.md",
     "summon_phrase": "@FABLE_5_IN_CURSOR",
     "summon_aliases": [
       "@fable_5_cursor",

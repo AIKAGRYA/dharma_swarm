@@ -89,6 +89,19 @@ These contracts must be maintained by any future changes:
 
 ---
 
+## Cross-Repo Tool Contracts (not guardian-cycled — maintained by hand)
+
+### IMM-26 — MITIGATED: dkeys ↔ api_keys.py key-name contract
+
+**Caller:** `~/.dharma/bin/dkeys` (`cmd_add`, `PROVIDERS[*].env`) — vendor-habit names
+**Callee:** `dharma_swarm/api_keys.py` (canonical runtime names, the only sanctioned key reader)
+**Mismatch:** the same physical key has two legitimate env names — `GEMINI_API_KEY` (dkeys/vendor) vs `GOOGLE_AI_API_KEY` (api_keys.py:26 canonical), and `NVIDIA_API_KEY` (dkeys/vendor, api_keys.py:32) vs `NVIDIA_NIM_API_KEY` (api_keys.py:19, used by `PROVIDER_API_KEY_ENV_KEYS["nvidia_nim"]`). A key added under one name was invisible to the other side ("replayed dozens of times" per operator; acute failure 2026-06-06). Old `dkeys add` also wrote non-export `VAR=value` lines and its `^VAR=` regex missed existing `export VAR=` lines, appending duplicates.
+**Mitigation (2026-06-11, system-evolution change 25):** `dkeys add` now (a) always upserts `export VAR=value` (normalizing legacy non-export lines in place), and (b) auto-writes both names of each alias pair via `ALIAS_PAIRS` in `~/.dharma/bin/dkeys`. Verified by sandboxed-HOME tests: pair-write, legacy-line normalization, idempotent re-add, mode 600 preserved.
+**Residual risk:** the contract is duplicated knowledge — `ALIAS_PAIRS` (dkeys) must stay in sync with canonical names in `api_keys.py`. New provider with a vendor-name/runtime-name split ⇒ add the pair to `ALIAS_PAIRS` AND update this entry. Fully resolving would mean api_keys.py accepting fallback aliases (e.g. `GEMINI_API_KEY` for `GOOGLE_AI_API_KEY`); deliberately not done here to keep one canonical reader.
+**Status:** ⚠️ MITIGATED (tool-side). Flip to RESOLVED only if api_keys.py grows alias fallback or the vendor names are retired.
+
+---
+
 ## The Guardian Crew (Future-Proofing)
 
 The old approach was: audit manually every few days, miss things, fix them under fire.

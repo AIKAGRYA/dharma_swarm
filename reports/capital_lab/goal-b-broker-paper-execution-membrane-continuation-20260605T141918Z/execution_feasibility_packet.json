@@ -1,0 +1,58 @@
+{
+  "blockers": [
+    "blocked_live_authority_detected:hyperliquid_live_capable_repo_present",
+    "blocked_live_authority_detected:HYPERLIQUID_PRIVATE_KEY_alias_present",
+    "no_external_broker_paper_order_receipts",
+    "no_external_broker_paper_snapshot_reconciliation",
+    "fixture_route_does_not_certify_live_readiness"
+  ],
+  "broker_write_authority": false,
+  "clean": false,
+  "drills": {
+    "cancel_before_fill_drill": true,
+    "duplicate_order_drill": true,
+    "expire_stale_order_drill": true,
+    "heartbeat_kill_switch": true,
+    "max_loss_or_drawdown_kill_switch": true,
+    "order_rate_or_exposure_kill_switch": true,
+    "reconciliation_mismatch_blocks": true,
+    "rejection_drill": true,
+    "stale_data_kill_switch": true
+  },
+  "external_broker_paper_evidence": false,
+  "fixture_or_internal_only": true,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "lifecycle_parity": {
+    "ack": true,
+    "cancel": true,
+    "expire": true,
+    "full_fill": true,
+    "partial_fill": true,
+    "reject": true,
+    "submit": true
+  },
+  "live_authority": false,
+  "live_readiness": 0,
+  "local_loop_passed": true,
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "packet_type": "ExecutionFeasibilityPacket",
+  "required_next_evidence": [
+    "quarantine_or_governed_fence_for_agni_hyperliquid_live_capable_repo",
+    "external_paper_broker_or_sandbox_order_receipts",
+    "external_paper_broker_snapshot_reconciliation",
+    "operator_lease_before_any_live_authority_change"
+  ],
+  "schema_version": "goal_b.execution_feasibility.v1",
+  "score": 80.0,
+  "score_basis": {
+    "authority_safety": 80,
+    "broker_paper_receipts": 80,
+    "duplicate_prevention": 100,
+    "external_broker_paper_evidence": 0,
+    "kill_switches": 100,
+    "paper_lifecycle_parity": 100,
+    "reconciliation": 90,
+    "report_quality": 80
+  },
+  "status": "fixture_membrane_complete_blocked_live_authority_detected"
+}

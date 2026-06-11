@@ -1,0 +1,122 @@
+{
+  "schema_version": "forge_reality_arena_master_cycle_receipt.v1",
+  "packet_id": "forge-reality-arena-master-cycle-14",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "role": "codex_forgewright_recovery",
+  "agent": "codex",
+  "authority": "evidence-only",
+  "completed_at": "2026-06-02T07:28:00Z",
+  "bounded_packet": "Rung 1 - make 100-episode coordination replay a first-class target and regenerate 104 deterministic local episodes",
+  "result": "Recovered the interrupted cycle-2 packet after the tmux supervisor exited before output capture. The coordination gym now declares a 100-episode long-run target, the status artifact reports the 100-run target explicitly, and the live replay was regenerated at 8 repetitions across 13 scenarios for 104 passed local episodes.",
+  "metrics": {
+    "dense_reps": 100,
+    "transfer_passed_reps": 94,
+    "coordination_scenarios_run": 104,
+    "coordination_unique_scenarios": 13,
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_20_run_target_met": true,
+    "coordination_50_run_target_met": true,
+    "coordination_100_run_target_met": true,
+    "coordination_5x_replay_target_met": true,
+    "coordination_scenarios_passed": 104,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 10,
+    "docker_sandbox_status": "docker_unavailable",
+    "benchmark_adapter_status": "verified",
+    "fitness_eligible_receipts": 0,
+    "actual_fitness_eligible_receipts": 0,
+    "target_missing_count": 0,
+    "authority_scan_violations": 0
+  },
+  "acceptance": {
+    "repo_local_receipt_required": true,
+    "long_run_episode_target_recorded": true,
+    "coordination_100_run_target_met": true,
+    "generated_status_refreshed": true,
+    "external_actions_performed": false,
+    "payment_action": false,
+    "pushed": false,
+    "merged": false,
+    "public_claims_published": false,
+    "external_confirmed_claims_absent": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "fitness_eligible_receipts_zero": true,
+    "actual_fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutation_claims_absent": true
+  },
+  "changed_files": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-14.json"
+  ],
+  "hashes": {
+    "scripts/runtime/forge_swarm_coordination_gym.py": "sha256:31780c1e64b4a996d01baed8978791d936f2a77bd662f8244a9804eee6f81f73",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:6f1e3e54c23fdab5b169b2796514e0a1b76126783e5f73014dcf0fc93fae6c7e",
+    "tests/test_forge_swarm_coordination_gym.py": "sha256:ab3bd2cc2bfac599e7646049c0366ba2abd17b2184ec5154288f7c2597ee245d",
+    "tests/test_forge_reality_arena_status.py": "sha256:63d31225d740abe332b61bf6dbdcdd646464850bbefec748765f7b5a9b495fa3",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:ceccabae0686e996816325b290ecae5810bbac13907575ed3936c5ba1c197676",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:7beaced404f3036ea1aca75ff670b3c6d1b9d3446ae6f68f2556f76a11e6935f",
+    "reports/forge/forge-reality-arena/status.md": "sha256:2d0775df8e68f3996c21f4ed286a84bb05845ad95f617a138a7f7d9990f2f51c",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:a9ae4307367182ee5616d1cec30088cf8bae3e62fcacba72a6cd148c1e751132"
+  },
+  "tests": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed"
+    },
+    {
+      "command": "pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "result": "28 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "result": "passed; coordination artifact regenerated with 104 local episodes"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_dense_eval_normalizer.py && python3 scripts/runtime/forge_docker_sandbox.py && python3 scripts/runtime/forge_benchmark_adapter.py && python3 scripts/runtime/forge_fitness_boundary_dry_run.py && python3 scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed; runtime artifacts refreshed"
+    },
+    {
+      "command": "pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py -q --tb=short",
+      "result": "32 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "pytest tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "result": "7 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "structured authority scan over reports/forge/forge-reality-arena and reports/agentops/work_packets",
+      "result": "0 authority violations"
+    }
+  ],
+  "blockers": [
+    {
+      "blocker": "The cycle-2 codex exec child exited after applying verified edits but before writing cycle_002_last_message.txt or a receipt.",
+      "impact": "Recovery pass manually verified the bounded packet, regenerated artifacts, wrote this receipt, and will relaunch the master Hydra session."
+    },
+    {
+      "blocker": "GitNexus MCP/CLI did not resolve the active /Users/dhyana/dharma_swarm checkout during cycle 2.",
+      "impact": "Impact check was handled by direct file inspection and focused tests."
+    },
+    {
+      "blocker": "Docker sandbox currently reports docker_unavailable.",
+      "impact": "Benchmark adapter remains verified, but Docker isolation is still a local runtime availability blocker."
+    }
+  ],
+  "notes": [
+    "No external actions, payments, pushes, merges, public claims, or archive fitness mutations were performed.",
+    "This receipt uses cycle 14 because cycle 13 already recorded the prior delayed sparse-anchor scenario expansion."
+  ]
+}

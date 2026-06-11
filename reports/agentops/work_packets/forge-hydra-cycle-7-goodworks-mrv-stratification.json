@@ -1,0 +1,29 @@
+{
+  "artifacts": [
+    "reports/forge/v0.1.7-goodworks-mrv-adapter/verifier_artifact.json",
+    "reports/forge/v0.1.7-goodworks-mrv-adapter/goodworks_mrv_probe.json",
+    "reports/forge/goodworks-mrv-stratified-receipt/cycle-7/verifier_artifact.json",
+    "reports/forge/goodworks-mrv-stratified-receipt/cycle-7/completion_audit.md",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md"
+  ],
+  "builder": "codex_forgewright",
+  "created_at_utc": "2026-06-01T07:21:52Z",
+  "cycle": 7,
+  "external_authority_boundary": "no external action performed; real acted receipts remain operator-gated",
+  "packet_id": "forge-hydra-cycle-7-goodworks-mrv-stratification",
+  "schema_version": "agentops_work_packet.v1",
+  "scope": "FQ5 Goodworks MRV stratified receipt quality hardening",
+  "status": "completed_local_verification",
+  "tests": [
+    "py_compile clean",
+    "11 passed, 1 warning",
+    "No issues found",
+    "No issues found",
+    "20 passed, 1 warning",
+    "52 passed, 1 warning",
+    "Forge Hydra status refreshed; 0 real external acted receipts",
+    "goodworks_mrv_probe_json_ok",
+    "forge_hydra_status_json_ok"
+  ]
+}

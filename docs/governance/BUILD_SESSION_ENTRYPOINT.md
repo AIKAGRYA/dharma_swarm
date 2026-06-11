@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -157,6 +157,39 @@ status is main's standing declaration and is left to the operator.
 - Do not change EvidenceReceipt schema; adopt shipped types unchanged.
 - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
 - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
+### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
+
+**Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
+**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
+
+Build A from the composer convergence: merge Verified Composer Command
+Spine v1 with the Sovereign Holon Orchestrator target, bringing
+fable_composer and codex_composer up as the first read-only composer
+holon pair. The track is active as a scoped longrun lane, not as a new
+receipt owner. Command receipts are projections of spine.EvidenceReceipt.
+
+The clean GitHub-main mirror remains the merge target; the active build
+lane currently lives on qwen/spine-adoption because that lane contains
+the holon docs, modules, and verifier tests. The lane must reconcile back
+to main through the normal review path before it is called shipped.
+
+**Next items:**
+
+- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
+- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
+- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
+- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+
+**Non-goals:**
+
+- Do not create a new durable receipt store; project over spine.EvidenceReceipt.
+- Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
+- Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
+- Do not merge holon substrate to main without the frozen verifier runbook passing.
 
 **Recently closed tracks:**
 

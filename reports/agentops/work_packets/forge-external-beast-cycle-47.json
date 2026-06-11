@@ -1,0 +1,251 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-47",
+  "cycle": 47,
+  "recorded_at": "2026-06-02T06:10:00+08:00",
+  "observed_at_utc": "2026-06-01T22:10:00Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "cortexlab_issue_75_implemented_forked_branch_pushed_pr_76_opened_no_external_confirmation",
+  "public_action_taken": true,
+  "new_public_pr_opened": true,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": true,
+  "fork_created": true,
+  "automated_external_services_observed": false,
+  "non_maintainer_human_review_observed": false,
+  "human_maintainer_action_observed": false,
+  "new_pr_accepted_or_merged": false,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-047.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/siddhant-rajhans-cortexlab-75/cycle-047-target-readiness.md",
+      "kind": "target_readiness_packet"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/siddhant-rajhans-cortexlab-75/cycle-047-public-pr.md",
+      "kind": "public_pr_record"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-47.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-047-status/status_artifact.json",
+      "kind": "read_only_status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-047-status/status.md",
+      "kind": "read_only_status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "dharma_impact_analysis_required": false
+  },
+  "public_pr": {
+    "repo": "siddhant-rajhans/cortexlab",
+    "issue_number": 75,
+    "issue_url": "https://github.com/siddhant-rajhans/cortexlab/issues/75",
+    "pr_number": 76,
+    "pr_url": "https://github.com/siddhant-rajhans/cortexlab/pull/76",
+    "fork_url": "https://github.com/AmitabhainArunachala/cortexlab",
+    "base_ref": "master",
+    "head_owner": "AmitabhainArunachala",
+    "head_ref": "codex/issue-75-analysis-doctests",
+    "commit_sha": "3099d29c89e28eae3725c892fc1b43c4c13c7b0b",
+    "patch_sha256": "ca396c29774dc574422057eff90e32645e75f00163e175ef08ea8b690f74d30b",
+    "state": "OPEN",
+    "is_draft": false,
+    "merge_state_status": "BLOCKED",
+    "review_decision": "REVIEW_REQUIRED",
+    "status_checks_summary": "no checks reported",
+    "closing_issue_reference_confirmed": true,
+    "maintainer_action_observed": false,
+    "external_confirmed": false
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "pr_number": 222,
+      "state": "OPEN",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks_summary": "GitGuardian success; CodeRabbit automated comment/check present",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "issue_number": 3,
+      "pr_number": 5,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "issue_number": 4,
+      "pr_number": 6,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 11,
+      "pr_number": 22,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 7,
+      "pr_number": 23,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "issue_number": 42,
+      "pr_number": 43,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "jokiatgithub/AgentKanban",
+      "issue_number": 4,
+      "pr_number": 9,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "siddhant-rajhans/cortexlab",
+      "issue_number": 75,
+      "pr_number": 76,
+      "state": "OPEN",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "target_local_checks": [
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv sync --extra dev --extra analysis",
+      "exit_code": 0
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv run python - <<'PY' ... doctest.testmod(cortexlab.analysis.stats) ... PY",
+      "exit_code": 0,
+      "result": "TestResults(failed=0, attempted=4)"
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv run pytest tests/test_doctests.py -v",
+      "exit_code": 0,
+      "result": "6 passed in 2.88s"
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv run ruff check tests/test_doctests.py",
+      "exit_code": 0
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv sync --extra dev --extra analysis --extra plotting",
+      "exit_code": 0
+    },
+    {
+      "target": "siddhant-rajhans/cortexlab",
+      "command": "uv run pytest tests/ -q",
+      "exit_code": 0,
+      "result": "283 passed, 6 skipped, 3 warnings in 78.64s"
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "target": "r12habh/ActionScope#57",
+      "reason": "competing open PR r12habh/ActionScope#64 already targets the exact regression"
+    },
+    {
+      "target": "harish1120/FirstCall#5",
+      "reason": "requested critical-keyword negation coverage would require changing a safety-critical medical triage gate, not just adding tests"
+    }
+  ],
+  "status_projection": {
+    "acted_receipts": 3,
+    "external_humans_or_orgs_acted": 3,
+    "open_external_prs_tracked": 8,
+    "new_external_proposal_prs_this_cycle": 1,
+    "autonomous_cycle_useful": true,
+    "archive_fitness_authority": "none_from_this_cycle"
+  },
+  "guardrails": {
+    "money_spent_or_requested": false,
+    "bounty_claimed": false,
+    "private_credentials_submitted": false,
+    "protected_branch_pushed_or_merged": false,
+    "broad_performance_claim_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "external_confirmed_true_written": false,
+    "first_external_receipt_witness_created": false,
+    "nonzero_archive_fitness_set": false,
+    "v2_autonomy_escalation": false
+  },
+  "blockers": [
+    "PR #76 and older active external PRs still need maintainer acceptance, merge, approval, requested-change review, or material maintainer comment before any new external acted receipt can be claimed.",
+    "No GitHub checks are reported on siddhant-rajhans/cortexlab#76 at initial recheck; local verification is the current evidence."
+  ]
+}

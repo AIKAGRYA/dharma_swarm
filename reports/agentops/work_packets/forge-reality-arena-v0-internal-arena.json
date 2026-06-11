@@ -1,0 +1,142 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v0-internal-arena",
+  "created_at_utc": "2026-06-02T03:00:50Z",
+  "agent": "codex",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Reality Arena v0",
+  "objective": "Install the dense-eval and Dharma-specific swarm-coordination arena lane under the existing Dharma Reward Forge spine without mutating external receipt custody or archive fitness.",
+  "status": "completed_repo_local_receipt",
+  "outputs": [
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_GOAL.md",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "docs/governance/SOVEREIGN_MANIFEST.md",
+    "scripts/runtime/forge_failure_capsule.py",
+    "scripts/runtime/forge_dense_eval_normalizer.py",
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_failure_capsule.py",
+    "tests/test_forge_dense_eval_normalizer.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-v0-internal-arena.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "goal_brief_exists": true,
+    "dense_eval_events_normalized": true,
+    "coordination_scenarios_run": 10,
+    "coordination_scenarios_passed": 10,
+    "failure_capsule_schema_exists": true,
+    "status_artifact_written": true,
+    "operator_handoff_status_doc_written": true,
+    "preferred_agentops_status_packet_written": true,
+    "docops_integrity_passed": true,
+    "external_actions_performed": false,
+    "archive_fitness_changed": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true
+  },
+  "status_snapshot": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 6,
+    "transfer_passed_reps": 3,
+    "base_memorized_candidates_denied": 4,
+    "coordination_scenarios_run": 10,
+    "coordination_scenarios_passed": 10,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 0,
+    "external_anchors_observed_not_owned": 2,
+    "fitness_eligible_receipts": 0,
+    "blocked_authority_items": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "verification": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_failure_capsule.py scripts/runtime/forge_dense_eval_normalizer.py scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 -m pytest tests/test_forge_failure_capsule.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "outcome": "13 passed, 1 warning"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "20 passed, 1 warning"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 -m pytest tests/test_reward_forge_v0.py tests/test_dharma_eval.py -q --tb=short",
+      "outcome": "27 passed, 1 warning"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 scripts/runtime/forge_swarm_coordination_gym.py",
+      "outcome": "wrote reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "outcome": "wrote reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json"
+    },
+    {
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python3 scripts/runtime/forge_reality_arena_status.py",
+      "outcome": "wrote reports/forge/forge-reality-arena/status_artifact.json and reports/agentops/work_packets/forge-reality-arena-status.json"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "outcome": "pass; dharma-reward-forge-v0 and goodworks-dgm-core both shippable"
+    },
+    {
+      "command": "python3 scripts/governance/render_active_track_includes.py --check",
+      "outcome": "pass"
+    },
+    {
+      "command": "make docops-integrity",
+      "outcome": "pass"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "pass; DRF primary active track, NATS port-open only, tmux ready"
+    }
+  ],
+  "artifact_hashes": {
+    "forge_reality_arena_goal_md_sha256": "209033f7da3dd8c6cdb420f41d0d7bd6ec9334373b6e7717fa94d78cf4fd6cfc",
+    "forge_reality_arena_status_md_sha256": "e2cfb2b462bb231dca9841802e1aa1220f9add3427a9c377556c8d0c91e45bb5",
+    "sovereign_manifest_md_sha256": "6948f897e86574de2abd092e0cd5013f4680a94e28d57a10d1c6cc104818835c",
+    "forge_failure_capsule_py_sha256": "0a39a9ff9291e0bb3c2bc909505eebb10960756c6a71e4c8a0d3c92f38b1271a",
+    "forge_dense_eval_normalizer_py_sha256": "400dac91ccebcbd0b16a79b394881884005d22615adc7e808e77fb2766fb54bb",
+    "forge_swarm_coordination_gym_py_sha256": "0e2faab1314d5773ddede6702fc3826b5a2aeb6d05127d896b4d6dd222abf93b",
+    "forge_reality_arena_status_py_sha256": "92fd6374c77eb649a39e77f79dbb4c9e337d6adcc8176295a902d3fe2118fe39",
+    "test_forge_failure_capsule_py_sha256": "a8577503502395fb91a534924bdd3ae566f341e1966cddf7042b3639a6eed97d",
+    "test_forge_dense_eval_normalizer_py_sha256": "b86b5170eec93c4624908c67e9e5e07fa61a6e4853592985cce6f4c60d26fb7f",
+    "test_forge_swarm_coordination_gym_py_sha256": "b489be9b02ebbb1bbb9b190dc61e167b5b20d5720f901e7a3b068be41ae5f085",
+    "test_forge_reality_arena_status_py_sha256": "4553280460e1a95253c3aea87fe6bfcec97d1292608ecd1d66b7195bb2f15e82",
+    "coordination_gym_artifact_sha256": "7ff4a482da0aff5046c47ae6b72c7028a613d569fc6411b3b90c0a987a63fcc8",
+    "dense_events_artifact_sha256": "d190376c89cebade126749fb8898bb82e9db55e2aeb507fb2865567f338b698f",
+    "status_artifact_sha256": "74c0f0e805a5c77040348351de43407818a0b8c677b2b3810b505a3a88cbabdb",
+    "status_markdown_sha256": "5d38ea1b9fe5f2d27c5016f203914429d0270a3999568735c734617b1c728d84",
+    "agentops_status_packet_sha256": "c8e8e47f2751984f6cc38fbec3ef98ebdb72b55d4ec09424936b8e290e10f19a"
+  },
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "blockers": [
+    "Archive fitness remains ineligible from dense/internal arena artifacts until Guardian countersign and external acted receipt authority exist.",
+    "External acted receipts remain owned by forge-hydra-external-beast and forge-measurement-guardian, not by this lane.",
+    "Repository-wide dirty worktree predates this packet; this receipt is scoped to Forge Reality Arena v0 artifacts only."
+  ]
+}

@@ -13,6 +13,8 @@ from typing import Any
 
 import httpx
 
+from dharma_swarm.api_keys import NVIDIA_NIM_API_KEY_ENV, env_value
+
 
 class NvidiaRagError(RuntimeError):
     """Raised when NVIDIA RAG API requests fail."""
@@ -35,7 +37,7 @@ class NvidiaRagConfig:
                 "DGC_NVIDIA_INGEST_URL", "http://127.0.0.1:8082/v1"
             ),
             timeout_sec=float(os.getenv("DGC_NVIDIA_TIMEOUT_SEC", "30")),
-            api_key=os.getenv("NVIDIA_NIM_API_KEY"),
+            api_key=env_value(NVIDIA_NIM_API_KEY_ENV),
         )
 
 

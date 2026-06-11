@@ -20,6 +20,7 @@ def test_dgc_cli_module_imports():
     """dgc_cli.py can be imported without error."""
     from dharma_swarm import dgc_cli
     assert hasattr(dgc_cli, "main")
+    assert hasattr(dgc_cli, "_bootstrap_env")
     assert hasattr(dgc_cli, "cmd_status")
     assert hasattr(dgc_cli, "cmd_runtime_status")
     assert hasattr(dgc_cli, "cmd_canonical_status")
@@ -28,6 +29,79 @@ def test_dgc_cli_module_imports():
     assert hasattr(dgc_cli, "cmd_gates")
     assert hasattr(dgc_cli, "cmd_health")
     assert hasattr(dgc_cli, "cmd_swarm")
+
+
+def test_bootstrap_env_loads_agent_keys_and_normalizes_aliases(monkeypatch, tmp_path):
+    from dharma_swarm import dgc_cli
+    from dharma_swarm import api_keys
+
+    key_dir = tmp_path / ".dharma"
+    key_dir.mkdir()
+    (key_dir / "agent_keys.env").write_text(
+        "export GEMINI_API_KEY='gemini-test'\n"
+        "export OPENROUTER_API_KEY='openrouter-test'\n"
+        "export NVIDIA_API_KEY='nvidia-test'\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test")
+    monkeypatch.setenv("DGC_TEST_ENABLE_ENV_BOOTSTRAP", "1")
+    for key in (
+        "GEMINI_API_KEY",
+        "GOOGLE_AI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "NVIDIA_API_KEY",
+        "NVIDIA_NIM_API_KEY",
+        "DHARMA_RUNTIME_ENV_LOADED",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(dgc_cli, "_ENV_BOOTSTRAPPED", False)
+    monkeypatch.setattr(api_keys, "_RUNTIME_ENV_BOOTSTRAPPED", False)
+
+    dgc_cli._bootstrap_env()
+
+    assert os.environ["GEMINI_API_KEY"] == "gemini-test"
+    assert os.environ["GOOGLE_AI_API_KEY"] == "gemini-test"
+    assert os.environ["OPENROUTER_API_KEY"] == "openrouter-test"
+    assert os.environ["NVIDIA_NIM_API_KEY"] == "nvidia-test"
+    assert os.environ["DHARMA_RUNTIME_ENV_LOADED"] == "1"
+
+
+def test_bootstrap_env_preserves_existing_canonical_values(monkeypatch, tmp_path):
+    from dharma_swarm import dgc_cli
+    from dharma_swarm import api_keys
+
+    key_dir = tmp_path / ".dharma"
+    key_dir.mkdir()
+    (key_dir / "agent_keys.env").write_text(
+        "export GEMINI_API_KEY='gemini-from-file'\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test")
+    monkeypatch.setenv("DGC_TEST_ENABLE_ENV_BOOTSTRAP", "1")
+    monkeypatch.setenv("GOOGLE_AI_API_KEY", "canonical-existing")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr(dgc_cli, "_ENV_BOOTSTRAPPED", False)
+    monkeypatch.setattr(api_keys, "_RUNTIME_ENV_BOOTSTRAPPED", False)
+
+    dgc_cli._bootstrap_env()
+
+    assert os.environ["GEMINI_API_KEY"] == "gemini-from-file"
+    assert os.environ["GOOGLE_AI_API_KEY"] == "canonical-existing"
+
+
+def test_dgc_cli_main_bootstraps_env_before_dispatch():
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "status"]):
+        with patch("dharma_swarm.dgc_cli._bootstrap_env") as mock_bootstrap:
+            with patch("dharma_swarm.dgc_cli.cmd_status") as mock_status:
+                main()
+                mock_bootstrap.assert_called_once()
+                mock_status.assert_called_once()
 
 
 def test_dgc_cli_main_no_args_tries_tui():
@@ -100,6 +174,47 @@ def test_dgc_cli_status_command():
         with patch("dharma_swarm.dgc_cli.cmd_status") as mock:
             main()
             mock.assert_called_once()
+
+def test_dgc_cli_agent_talk_command_dispatch():
+    """main() dispatches `agent talk` to the holon talk wrapper with explicit routing."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "talk", "opus_composer", "who", "are", "you"]):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_talk") as mock:
+            main()
+            mock.assert_called_once_with(
+                "opus_composer",
+                "who are you",
+                routing_mode="declared-first",
+                max_tokens=400,
+            )
+
+
+def test_dgc_cli_agent_run_command_dispatch():
+    """main() dispatches `agent run` to the governed holon run wrapper."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch(
+        "sys.argv",
+        ["dgc", "agent", "run", "opus_composer", "--cycles", "2", "--mode", "free-first"],
+    ):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_run") as mock:
+            main()
+            mock.assert_called_once_with(
+                "opus_composer",
+                cycles=2,
+                routing_mode="free-first",
+            )
+
+
+def test_dgc_cli_agent_status_command_dispatch():
+    """main() dispatches `agent status` to the read-only holon health wrapper."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "status", "opus_composer", "--json"]):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_status") as mock:
+            main()
+            mock.assert_called_once_with("opus_composer", as_json=True)
 
 
 def test_cmd_status_reports_canonical_pulse_artifacts(monkeypatch, tmp_path, capsys):

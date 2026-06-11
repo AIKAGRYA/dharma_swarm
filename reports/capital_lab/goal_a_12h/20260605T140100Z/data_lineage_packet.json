@@ -1,0 +1,219 @@
+{
+  "authority": "evidence_only",
+  "blockers": [
+    "no_clean_lineage_receipt",
+    "lineage_requires_license_raw_hash_normalized_hash_calendar_corporate_actions_delisting_feature_timestamps"
+  ],
+  "broker_write_authority": false,
+  "capital_permission": "none",
+  "clean": false,
+  "generated_at": "2026-06-05T14:01:00Z",
+  "harness_run_id": "dharma-capital-lab-goal-a-alpha-evidence-12h-20260605T140100Z",
+  "lineage_receipts": [
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "subscription_tier_unproven",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "f3016f4b15e6ce314e85062fef9790accfdbb9bf643c75cd79ecb81d6b298d4b",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "52fa2836f5d21413ef381e3b6a9a7877fb3b0aa9d42d53411a1d8b8cfa322bcc",
+      "provider_id": "alpaca_market_data",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "unproven",
+        "survivor_only_blocked": false
+      }
+    },
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "unverified_public_adjustments",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "9ed6034d89b717e2d127dd2e3c6fa1f0c23b1a389b20a0671f03672ed38b2530",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "cebb4d27d058558912fbb0c4d1fe41114592a53b0ed7a8bf39dab4160beef476",
+      "provider_id": "yfinance_public_fallback",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "survivors_only_risk",
+        "survivor_only_blocked": true
+      }
+    },
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "not_applicable_or_unproven",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "6d240025015ee7e1919e13f64b666c596a6630bb1854b821afd19de45609386a",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "360e3afe7c7673634cdf1387a3eb0b5d3ee6b039984690f2a7182a943bffdf4a",
+      "provider_id": "crypto_exchange_public_cache",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "exchange_symbol_lifecycle_unproven",
+        "survivor_only_blocked": false
+      }
+    },
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "not_applicable",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "f3a06ae4f0dc2f77d516cb4d63101c06ea46cc55dfefbf85393ade6b11c1512b",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "6e0f7604dfcafbf60cabe469d927c116c0743ab85b810cd842b76b19f0e6abd5",
+      "provider_id": "prediction_market_public_cache",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "market_resolution_lifecycle_unproven",
+        "survivor_only_blocked": false
+      }
+    },
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "not_applicable",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "fa8595c814c8a57faee297ca5c819a571b4f45868605407abc7c540b5c70f5ef",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "91eea31e415a0d9ee307352001a1e0ad599060a985c286323ef256e9f7ac7999",
+      "provider_id": "fred_macro_cache",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "not_equity_universe",
+        "survivor_only_blocked": false
+      }
+    },
+    {
+      "as_of_calendar": {
+        "calendar_id": "provider_calendar_or_exchange_calendar_required",
+        "coverage_end": "",
+        "coverage_start": "",
+        "feature_timestamp_policy": "feature_timestamp_must_precede_signal_timestamp"
+      },
+      "corporate_actions": {
+        "adjustment_policy": "requires_point_in_time_event_availability",
+        "available": false
+      },
+      "delisting": {
+        "available": false,
+        "policy": "delisted_symbols_or_event_lifecycle_required"
+      },
+      "feature_timestamp_receipts": [],
+      "license": {
+        "license_ref": "",
+        "redistribution_allowed": false
+      },
+      "lineage_hash": "f1d9b1ec556c3fd485bd609f6faf82ca3575df66a30bb92854d1d34e6f8f7125",
+      "normalized_dataset_hash": "",
+      "point_in_time_safe": false,
+      "provider_hash": "c532c08566b8ae52219b4716f32e5cef7be81fbcd5efb40f639d9ca0d4bb2f53",
+      "provider_id": "insider_signals_cache",
+      "raw_payload_hashes": {},
+      "secret_value_recorded": false,
+      "survivorship": {
+        "policy": "issuer_universe_lineage_unproven",
+        "survivor_only_blocked": false
+      }
+    }
+  ],
+  "live_authority": false,
+  "live_order_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "packet_hash": "35bf1bb6ef373c2550c3ea97b06271bf8f3f15d79e83b88556f01e859a53095f",
+  "paper_only": true,
+  "promotion_grade_lineage_count": 0,
+  "run_id": "20260605T140100Z",
+  "schema_version": "dharma.capital_lab.alpha_evidence.v2.data_lineage_packet",
+  "secret_value_recorded": false,
+  "secret_values_read": false,
+  "status": "blocked_leakage_or_lineage",
+  "withdrawals_or_transfers": false
+}

@@ -402,6 +402,100 @@ active_tracks:
         kind: docs
         blocker: false
 
+  - id: composer-holon-spine-longrun-2026-06
+    name: Composer Holon Spine Longrun — fable/codex pair over verified command receipts
+    status: ACTIVE
+    opened_at: "2026-06-11"
+    verified_at: "2026-06-11"
+    ttl_days: 14
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    depends_on:
+      - runtime-truth-spine-adoption-2026-06
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - runtime-truth-nats-2026-06
+    owned_surfaces:
+      - docs/sovereign_holons/**
+      - reports/sovereign_holons/**
+      - dharma_swarm/holon_*.py
+      - scripts/holon_*.py
+      - tests/test_holon_*.py
+    moves_vital_signs:
+      - quality_gates
+      - tool_coverage
+      - memory_persistence
+
+    description: |
+      Build A from the composer convergence: merge Verified Composer Command
+      Spine v1 with the Sovereign Holon Orchestrator target, bringing
+      fable_composer and codex_composer up as the first read-only composer
+      holon pair. The track is active as a scoped longrun lane, not as a new
+      receipt owner. Command receipts are projections of spine.EvidenceReceipt.
+
+      The clean GitHub-main mirror remains the merge target; the active build
+      lane currently lives on qwen/spine-adoption because that lane contains
+      the holon docs, modules, and verifier tests. The lane must reconcile back
+      to main through the normal review path before it is called shipped.
+
+    prerequisites:
+      - id: evidence_receipt_exists
+        kind: file_contains
+        file: dharma_swarm/spine/receipt.py
+        pattern: "class EvidenceReceipt"
+      - id: holon_orchestrator_spec_exists
+        kind: file_exists
+        file: docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md
+      - id: holon_runtime_exists
+        kind: file_exists
+        file: dharma_swarm/holon_runtime.py
+
+    completion_criteria:
+      - id: readiness_packet_exists
+        kind: file_exists
+        file: reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md
+      - id: receipt_profile_documented
+        kind: file_contains
+        file: reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md
+        pattern: "The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`"
+      - id: frozen_verifier_runbook_present
+        kind: file_contains
+        file: reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md
+        pattern: "Frozen Non-Implementer Verifier Runbook"
+      - id: holon_bridge_verifier_exists
+        kind: file_exists
+        file: tests/test_holon_bridge.py
+      - id: holon_runtime_verifier_exists
+        kind: file_exists
+        file: tests/test_holon_runtime.py
+      - id: composer_wake_witness_pending
+        kind: file_exists
+        file: reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
+
+    non_goals:
+      - Do not create a new durable receipt store; project over spine.EvidenceReceipt.
+      - Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
+      - Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
+      - Do not merge holon substrate to main without the frozen verifier runbook passing.
+
+    next_items:
+      - id: 1
+        what: "Run the frozen Build A verifier set and publish the exact output in convergence."
+        kind: test
+        blocker: true
+      - id: 2
+        what: "Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts."
+        kind: runtime
+        blocker: true
+      - id: 3
+        what: "Merge living_agent_kernel source choice and prove import green."
+        kind: code
+        blocker: true
+      - id: 4
+        what: "Reconcile the holon substrate lane back to GitHub main after verifier green."
+        kind: governance
+        blocker: true
+
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------

@@ -126,7 +126,18 @@ def run_claude_headless(
     permission_mode: str | None = "bypassPermissions",
     tools: str | None = "default",
 ) -> str:
-    """Run Claude Code in headless mode — the REAL agent."""
+    """Run Claude Code in headless mode — the REAL agent.
+
+    NOTE: bare mode requires ANTHROPIC_API_KEY. When it's not set,
+    returns a SKIP message immediately to avoid blocking the daemon
+    process in U state (uninterruptible sleep) on the failed subprocess.
+    """
+    if bare and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        return (
+            "SKIP: ANTHROPIC_API_KEY not set — "
+            "claude bare mode unavailable. Set ANTHROPIC_API_KEY in .env "
+            "or run `dgc orchestrate-live` without --bare once authenticated."
+        )
     return _run_claude_headless_impl(
         prompt,
         timeout=timeout,

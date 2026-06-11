@@ -1,0 +1,158 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-4",
+  "created_at_utc": "2026-06-02T04:29:52Z",
+  "agent": "codex",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "cycle": 4,
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "bounded_packet": "Rung 7 - Fitness Boundary Dry Run",
+  "result": "Added a repo-local fitness-boundary dry run that consumes dense evals, coordination results, sandbox status, and benchmark status, marks transfer-gated candidates as candidate_for_human_review only, and preserves zero actual fitness eligibility.",
+  "changed_files": [
+    "scripts/runtime/forge_fitness_boundary_dry_run.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_fitness_boundary_dry_run.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "docs/architecture/NAVIGATION.md",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-4.json"
+  ],
+  "generated_artifacts": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/sealed_task_manifest.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "new_file_justification": {
+    "scripts/runtime/forge_fitness_boundary_dry_run.py": "Rung 7 needs a bounded local verifier artifact for the future fitness path without creating a second evolution engine.",
+    "tests/test_forge_fitness_boundary_dry_run.py": "The new verifier needs focused tests for review-candidate gating and no-fitness/no-external invariants.",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "Cycle 4 requires a machine-readable receipt of the dry-run boundary result."
+  },
+  "metrics": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "transfer_passed_reps": 3,
+    "coordination_scenarios_run": 20,
+    "coordination_unique_scenarios": 10,
+    "coordination_min_repetitions_per_scenario": 2,
+    "coordination_scenarios_failed": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 3,
+    "fitness_boundary_blocked_candidates": 6,
+    "fitness_eligible_receipts": 0,
+    "external_anchors_observed_not_owned": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "hashes": {
+    "scripts/runtime/forge_fitness_boundary_dry_run.py": "sha256:b033eca4c8e15c9ba990a3e932758d314e4290224b3d627d45a8fd19c29da70c",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:063a7d78f3c99b4c0c80a214c047336bd687ad0d6a0a8a7da50be40ffe71d238",
+    "tests/test_forge_fitness_boundary_dry_run.py": "sha256:e058d28f1d137cb9f7a2f29e43aab87c933a89df00fb29493cc77e07dda9be9a",
+    "tests/test_forge_reality_arena_status.py": "sha256:8e61a4e3f45e2098ac0eb7183ba6cf061908074b4e3e05a8d7108b11c859d896",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:a6965644331648a0c36a587a4b7ed6baacef0681d4930c2e3a150e277ad1798e",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:3f952842536afb276a20fc4796ef1475dfeaf59eb62b7e4e871e3f56895f431c",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:c940a4c6774d2c666e5aaf149e18945c84d07e9cb16a7b87615a5d3ebca4bdb8"
+  },
+  "verification": [
+    {
+      "command": "make onboard",
+      "exit_code": 0
+    },
+    {
+      "command": "npx gitnexus analyze",
+      "exit_code": 0
+    },
+    {
+      "command": "GitNexus MCP impact/detect_changes",
+      "exit_code": 1,
+      "blocker": "MCP registry still rejects /Users/dhyana/dharma_swarm even after CLI analyze; available MCP repos are sibling checkouts."
+    },
+    {
+      "command": "Context+ blast radius for summarize_reality_arena_status, render_markdown, build_agentops_status_packet",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_fitness_boundary_dry_run.py scripts/runtime/forge_reality_arena_status.py tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "13 passed, 1 pytest config warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_benchmark_adapter.py tests/test_forge_docker_sandbox.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "28 passed, 1 pytest config warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 2",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 JSON validation for status, AgentOps, and dry-run artifacts",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m ruff check scripts/runtime/forge_fitness_boundary_dry_run.py scripts/runtime/forge_reality_arena_status.py tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 1,
+      "blocker": "ruff is not installed in the active venv"
+    }
+  ],
+  "acceptance": {
+    "canonical_ds_goal_context_available": false,
+    "repo_local_receipt_required": true,
+    "external_actions_performed": false,
+    "external_contact": false,
+    "external_repo_contact": false,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "merged": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "actual_fitness_eligible_receipts_zero": true,
+    "candidate_for_human_review_only": true,
+    "guardian_countersign_required": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true
+  },
+  "blockers": [
+    "GitNexus MCP registry path mismatch persists for /Users/dhyana/dharma_swarm despite successful CLI index.",
+    "ruff is not installed in the active venv."
+  ],
+  "next_bounded_packet": "Either increase coordination replay volume toward 50 episodes or add the first Rung 2 adversarial scenario expansion family while preserving zero external authority."
+}

@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -128,6 +128,39 @@ status is main's standing declaration and is left to the operator.
 - Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
 - Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
+### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
+
+**Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
+**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
+
+Build A from the composer convergence: merge Verified Composer Command
+Spine v1 with the Sovereign Holon Orchestrator target, bringing
+fable_composer and codex_composer up as the first read-only composer
+holon pair. The track is active as a scoped longrun lane, not as a new
+receipt owner. Command receipts are projections of spine.EvidenceReceipt.
+
+The clean GitHub-main mirror remains the merge target; the active build
+lane currently lives on qwen/spine-adoption because that lane contains
+the holon docs, modules, and verifier tests. The lane must reconcile back
+to main through the normal review path before it is called shipped.
+
+**Next items:**
+
+- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
+- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
+- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
+- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+
+**Non-goals:**
+
+- Do not create a new durable receipt store; project over spine.EvidenceReceipt.
+- Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
+- Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
+- Do not merge holon substrate to main without the frozen verifier runbook passing.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
@@ -148,7 +181,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **392 files at its top level (58.1% of 675 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **26 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -190,16 +223,16 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **675** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **392 (58.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **286,046** | wc -l across dharma_swarm Python modules |
-| Test files | **648** | find tests -name "*.py" -type f |
-| Test functions | **11,101 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **720** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **399 (55.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **286,515** | wc -l across dharma_swarm Python modules |
+| Test files | **670** | find tests -name "*.py" -type f |
+| Test functions | **11,261 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **875** | find . -name "*.md" -type f |
-| Markdown total lines | **217,404** | wc -l across all .md |
-| Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
+| Markdown files | **1,011** | find . -name "*.md" -type f |
+| Markdown total lines | **232,912** | wc -l across all .md |
+| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
@@ -299,7 +332,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**25 bridge files** (V), **11,910 total LOC**:
+**26 bridge files** (V), **11,910 total LOC** (LOC count pre-holon; 26th = holon_bridge.py, added 2026-06-12 under the composer-holon track surfaces):
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -484,13 +517,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **25 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **26 bridge files** (V 2026-06-12) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **25 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **26 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 

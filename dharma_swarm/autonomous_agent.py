@@ -23,7 +23,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -1349,7 +1349,9 @@ async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None
         )
 
     if model:
-        identity.model = model
+        # Copy before overriding: presets are shared module state, and mutating
+        # them leaks the override into every later wake in the same process.
+        identity = replace(identity, model=model)
 
     agent = AutonomousAgent(identity)
     print(f"Waking {agent_name}...")

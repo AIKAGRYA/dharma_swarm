@@ -5,6 +5,8 @@
 
 PYTHON ?= python3
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
+# Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
+VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -112,33 +114,16 @@ live:
 	TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live
 
 test:
-	python -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
 
 test-fast:
-	python -m pytest tests/ -q --tb=line -x --timeout=10
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
 
 lint:
 	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
 
 syntax-check:
-	@python3 -c "\
-import ast; from pathlib import Path; \
-errors = [f'{f.name}:{e.lineno}: {e.msg}' for f in Path('dharma_swarm').glob('*.py') \
-          for e in [None] if (lambda: (lambda e: e)(None))() or True \
-          if (setattr(__builtins__, '_', None) or True)]; \
-[print(f'Checking {len(list(Path(\"dharma_swarm\").glob(\"*.py\")))} files...')] and \
-[print('OK: all clean') if not [print('FAIL:', f) for f in \
-    [f'{p.name}:{e.lineno}: {e.msg}' for p in Path('dharma_swarm').glob('*.py') \
-     for e in [None] if True]] else None]"
-	@python3 -c "\
-import ast; from pathlib import Path; errs=[] ; \
-[errs.append(f'{f.name}:{e.lineno}') for f in Path('dharma_swarm').glob('*.py') \
- for _ in [None] if (lambda f=f: \
-   [errs.append(f'{f.name}') for e in [None] \
-    if not (__import__('builtins').__dict__.update({'_e': None}) or True)])()]; \
-print('syntax check done')"
-	python3 -c "import ast; from pathlib import Path; errs=[]; [errs.append(f.name) or print(f'FAIL: {f.name}') for f in Path('dharma_swarm').glob('*.py') if not __import__('ast').parse(f.read_text()) is not None or False]; print(f'Checked {len(list(Path(\"dharma_swarm\").glob(\"*.py\")))} files, {len(errs)} errors')" || \
-	python3 -c "import ast; from pathlib import Path; [ast.parse(f.read_text()) for f in Path('dharma_swarm').glob('*.py')]; print('All syntax OK')"
+	@$(VENV_PYTHON) -m compileall -q dharma_swarm api scripts && echo "syntax-check: OK (compileall clean)"
 
 gh-auth:
 	gh auth login

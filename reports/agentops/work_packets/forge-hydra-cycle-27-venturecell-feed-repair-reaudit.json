@@ -1,0 +1,32 @@
+{
+  "agent": "codex_forgewright",
+  "blockers": [
+    "existing Opus countersign remains refuted until a separate decorrelated verifier re-audits this packet",
+    "external acted receipt witness remains operator/external-authority gated",
+    "canonical ds-goal receipt unavailable without mission/task identifiers in this runtime"
+  ],
+  "created_at_utc": "2026-06-01T11:38:57.186359Z",
+  "cycle": 27,
+  "files": [
+    "reports/forge/v0.1.8-venturecell-forge-feed/cycle-27/venturecell_feed_reaudit_probe.json",
+    "reports/forge/v0.1.8-venturecell-forge-feed/cycle-27/verifier_artifact.json",
+    "reports/forge/v0.1.8-venturecell-forge-feed/cycle-27/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-27-venturecell-feed-repair-reaudit.json",
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md"
+  ],
+  "objective": "Re-audit Cycle 26 v0.1.8 VentureCell Forge-feed repair evidence without self-clearing the old refuted countersign.",
+  "packet_id": "forge-hydra-cycle-27-venturecell-feed-repair-reaudit",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "schema_version": "agentops_work_packet.v1",
+  "status": "completed_pending_decorrelated_countersign",
+  "tests": [
+    "py_compile clean",
+    "77 passed, 1 warning",
+    "158 passed, 1 warning",
+    "missing/thin/adequate/strong contract grading and external-confirmation guard passed",
+    "pre-v1 audit regenerated: internal_v0x_evidence_complete=true; v0.1.8 still refuted pending decorrelated countersign",
+    "Forge Hydra status regenerated: external acted receipts=0; v1 external threshold not ready"
+  ]
+}

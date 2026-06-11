@@ -1259,9 +1259,9 @@ describe("commandTargetTab", () => {
     expect(commandTargetTab("/permissions")).toBe("approvals");
   });
 
-  test("routes operational and unknown commands away from chat", () => {
+  test("routes operational and unknown commands away from chat while keeping help visible in chat", () => {
     expect(commandTargetTab("/status")).toBe("control");
-    expect(commandTargetTab("/help")).toBe("control");
+    expect(commandTargetTab("/help")).toBe("chat");
     expect(commandTargetTab("/unknown")).toBe("control");
   });
 
@@ -1507,6 +1507,20 @@ describe("eventToTabPatch", () => {
     });
 
     expect(patches).toEqual([]);
+  });
+
+  test("renders help command output in the chat transcript", () => {
+    const patches = eventToTabPatch({
+      type: "command.result",
+      command: "help",
+      output: "Available commands: /status /help",
+    });
+
+    expect(patches).toHaveLength(1);
+    expect(patches[0]?.tabId).toBe("chat");
+    expect(patches[0]?.lines.map((line) => line.text)).toEqual([
+      "Available commands: /status /help",
+    ]);
   });
 
   test("prefers an explicit target pane on command results", () => {
