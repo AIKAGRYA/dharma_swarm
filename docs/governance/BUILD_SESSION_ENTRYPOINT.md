@@ -18,7 +18,7 @@ That command renders the current operating reality (active track, live ops, brok
 
 dharma_swarm is a Python multi-agent orchestration runtime with a typed ontology, an immutable kernel, gated proposal flow, an append-only witness log, and an artifact/value loop. The substrates exist. The current failure mode is that most runtime work bypasses them. Each active build track makes one seam ontology-native end-to-end; the active build portfolio (1–N co-equal, surface-disjoint tracks) is declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not introduce new substrates. Wire existing ones.
 
-Current substrate-nativeness estimate (from audit): **~10–15% of runtime is ontology-native; ~85–90% bypasses substrate.** Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
+Substrate-nativeness is a **measured number, not a prose constant** — different measures give different answers (dispatch-site adoption vs. spine-internal coverage), so do not cite a frozen percentage from any doc, including this one. Get the current dispatch-site measure live: `python3 scripts/governance/spine_bypass_report.py` (as of 2026-06-11: 1/7 `.submit()` sites spine-adopted, 5 on the intentional-bypass migration allowlist). Each track's goal: bring its seam to 100% native and prove it with tests, surface-disjoint from sibling tracks.
 
 ---
 
