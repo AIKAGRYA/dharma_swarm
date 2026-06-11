@@ -1,0 +1,65 @@
+actionResultActionsForBridgeEvent > handles /git through the live bridge listener and keeps the sidebar repo preview stable after refresh
+actionResultActionsForBridgeEvent > handles runtime snapshot refresh through the live bridge listener and keeps the control preview stable
+actionResultActionsForBridgeEvent > normalizes direct dashboard command results through the live bridge listener and persists verification summary
+actionResultActionsForBridgeEvent > persists pane-triggered runtime command snapshots after optimistic activation resolves to the runtime pane
+actionResultActionsForBridgeEvent > projects live repo and runtime refreshes into repo pane and context sidebar pulse rows
+actionResultActionsForBridgeEvent > unwraps alias-envelope command-result runtime snapshots through the live bridge listener without appending raw snapshot text
+snapshotActionsForBridgeEvent > hydrates the initial app boot state from durable repo and control previews
+snapshotActionsForBridgeEvent > normalizes sparse restored repo previews into startup-safe visible context rows
+snapshotActionsForBridgeEvent > persists bootstrap runtime previews into the durable control summary
+snapshotActionsForBridgeEvent > persists normalized repo previews into durable state for boot hydration
+snapshotActionsForBridgeEvent > renders hydrated control and runtime panes with loop and verification state on startup
+snapshotActionsForBridgeEvent > renders hydrated repo and context previews on app startup
+supervisor control persistence > derives durable branch divergence and detached peers from stored topology facts
+supervisor control persistence > derives durable git, warning, and hotspot facts from compact repo truth previews
+supervisor control persistence > derives durable topology peer and pressure facts from sparse compact repo previews
+supervisor control persistence > derives loop and verification detail from compact pulse fields before writing durable state
+supervisor control persistence > derives missing repo preview rows from partial durable repo facts
+supervisor control persistence > derives missing topology peer and drift rows from stored topology preview facts
+supervisor control persistence > derives the verification receipt path from an overridden durable state when the preview omits it
+supervisor control persistence > hydrates control preview from run runtime payload when the durable summary is missing
+supervisor control persistence > hydrates control preview from verification receipt when run preview only has generic placeholders
+supervisor control persistence > hydrates repo preview from run workspace payload when the durable summary is missing
+supervisor control persistence > keeps branch and compact dirty facts in durable repo/control preview when dirty pressure is absent
+supervisor control persistence > loads explicit verification detail rows from durable state when check arrays are absent
+supervisor control persistence > loads loop and verification preview from run.json when summary files are missing after persistence
+supervisor control persistence > loads loop and verification state from the explicit durable state dir
+supervisor control persistence > mirrors normalized verification detail back into verification.json without dropping existing check metadata
+supervisor control persistence > normalizes generic verification placeholders into the detailed durable summary when checks exist
+supervisor control persistence > persists repo alert and hotspot preview facts needed by repo and context surfaces
+supervisor control persistence > prefers persisted runtime payload over stale durable control preview rows
+supervisor control persistence > prefers persisted workspace payload over stale durable repo preview rows
+supervisor control persistence > prefers run loop-decision state over stale verification metadata when loading control state
+supervisor control persistence > prefers the persisted verification updated_at from run.json over the write timestamp when verification.json is missing
+supervisor control persistence > preserves multi-warning topology members from compact repo/control previews
+supervisor control persistence > preserves semicolon-delimited topology warning members from compact repo truth previews
+supervisor control persistence > preserves stored repo preview fields when the durable control summary refreshes later
+supervisor control persistence > preserves stored runtime component rows when a later control refresh only updates loop and verification state
+supervisor control persistence > promotes an explicit verification bundle into durable summary fields when checks are absent
+supervisor control persistence > promotes live preview verification fields into the durable summary payload
+supervisor control persistence > propagates repo-derived compact control preview into durable control snapshots
+supervisor control persistence > rehydrates branch divergence and detached peers from compact repo/control previews alone
+supervisor control persistence > replaces a stored placeholder runtime summary when richer runtime rows arrive
+supervisor control persistence > rewrites stale control truth preview text when persisting normalized control state
+supervisor control persistence > round-trips repo preview fields through durable state without leaking control keys
+supervisor control persistence > round-trips the richer control preview through durable state
+supervisor control persistence > writes a compact operator control summary back into durable state
+supervisor control persistence > writes a derived runtime summary into durable state when only component fields are provided
+supervisor control persistence > writes normalized control and verification receipts from a compact repo/control preview
+surfaceRefreshActionsForBridgeEvent > drops stale loop and verification fields on direct runtime snapshot events
+surfaceRefreshActionsForBridgeEvent > keeps loop rows synchronized when runtime snapshot metadata overrides supervisor preview state
+surfaceRefreshActionsForBridgeEvent > normalizes generic runtime snapshot verification payloads into live previews and durable summary
+surfaceRefreshActionsForBridgeEvent > promotes compact supervisor pulse fields from runtime snapshots into live loop and verification state
+surfaceRefreshActionsForBridgeEvent > replaces a bootstrap placeholder runtime summary when a live runtime snapshot carries detailed rows
+surfaceRefreshActionsForBridgeEvent > replaces control and runtime panes with normalized live runtime preview on control refresh
+surfaceRefreshActionsForBridgeEvent > unwraps nested control refresh runtime snapshots and persists the derived verification bundle
+surfaceRefreshActionsForBridgeEvent > uses typed runtime snapshot control fields directly when supervisor preview metadata is sparse
+typed session bridge handling > cold boot derives persisted repo snapshot rows in visible context from compact repo/control preview before the first live refresh
+typed session bridge handling > cold boot derives topology peer and pressure rows from sparse restored repo previews
+typed session bridge handling > cold boot surfaces restored repo and control previews in visible context before the first live refresh
+typed session bridge handling > first authoritative workspace and runtime refresh replace placeholder authority in visible context while keeping preview rows
+typed session bridge handling > initial bootstrap restores persisted branch divergence and detached peers into repo previews
+typed session bridge handling > markdown workspace snapshots with hotspot detail sections clear repo resync without typed payloads
+typed session bridge handling > reconnect keeps persisted repo and control snapshot rows visible until the first authoritative workspace refresh
+typed session bridge handling > sparse reconnect runtime snapshots keep persisted control preview rows visible until authoritative control fields arrive
+typed session bridge handling > sparse reconnect workspace payloads keep persisted topology and hotspot rows visible until authoritative repo fields arrive

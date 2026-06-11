@@ -1,0 +1,12 @@
+[2026-06-11T21:18Z] S0-INIT complete
+  evidence: typecheck 0 errors; bun test 462 pass / 65 fail / 527 total; baseline-failures.txt = 65 names;
+            boot-smoke frame OK at 80x24; truecolor probe 38;2 captured; 6 golden files written
+  files: spec-forge/baseline-failures.txt, spec-forge/truecolor-preflight.txt,
+         terminal/LESSONS/LESSONS.md, terminal/tests/golden/pre-theme/*, claude-progress.txt
+  note: Step 1 lineage check green (branch helm/worldclass-20260612; a6ad97362 ancestor of HEAD 7f7d98fad).
+  note: Step 6 loop failed when run under the session harness default shell (zsh: `set -- $size` does not
+        word-split, gave "width invalid" + six 0-byte misnamed files, removed). Re-ran the identical script
+        text under bash (the interpreter the ```bash fence declares) — all six goldens captured, line counts
+        24/30/40 match pane heights, all contain "Dharma Terminal". Overnight loop must execute prompt-pack
+        code blocks with bash, not zsh.
+  note: pre-theme SGR goldens carry 16-color ANSI only (no 38;2 RGB) — expected pre-theme; S4 introduces theme.
