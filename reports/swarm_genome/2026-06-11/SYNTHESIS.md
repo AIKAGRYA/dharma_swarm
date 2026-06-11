@@ -2,7 +2,10 @@
 
 Date: 2026-06-11
 Status: report-only synthesis, not canonical authority
-Inputs: six lane receipts in this directory plus cited source files
+Inputs: six lane receipts in this directory plus cited source files.
+Custody note: this synthesis is report-only. Paths without an explicit custody
+label exist on main after PR #570's orientation fix; branch/local-only sources
+are labeled inline.
 
 ## 10-Second Map
 
@@ -52,7 +55,7 @@ Current active tracks serve substrate only. `revenue-external-humans-served` and
 | A2A / NATS | Semi-working | Protocol/server/NATS code exists; readiness gate imports missing module. |
 | MemoryKernel | Working read-only, semi-working write path | Strong adapters/readiness; not default first-token context. |
 | KnowledgeOps | Semi-working | Review/queue/bridge artifacts exist; canon mutation remains gated. |
-| Chetana | Semi-working | CLI/tests and wiki integration exist; MCP graph reach incomplete. |
+| Chetana | Semi-working seed | Main has MemoryKernel/KnowledgeOps; full `dharma_swarm/chetana/` lives on extraction branch `capital-lab/build` and is not main-owned yet. |
 | RevenueSpine / RevenueScout | Semi-working | Offer and loops exist; no customers/payments; scout starved by env/path issues. |
 | CashClaw | Semi-live, unpaid | External PR claims exist; malformed state and no cash receipt. |
 | Agentic Code Governance Sprint | Semi-working wedge | Best sellable service offer; not operationally sold yet. |
@@ -81,7 +84,7 @@ Read in this order for maximum understanding per minute:
 11. `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`
 12. `docs/governance/VENTURE_CELL_REVENUE_WEDGE.md`
 13. `docs/research/self_reference_attractor/RESEARCH_PROGRAM.md`
-14. `dharma_swarm/chetana/README.md`
+14. `dharma_swarm/memory_kernel/` and `dharma_swarm/knowledge_ops/` on main; `dharma_swarm/chetana/README.md` is branch-only on `capital-lab/build`
 15. `docs/loomwork/vision/02_theory_of_change.md`
 16. `docs/plans/2026-06-11-vwrite-v3-refinery-design.md`
 
@@ -94,8 +97,8 @@ Read in this order for maximum understanding per minute:
 5. Read `docs/vision_maps/` newest first, especially 2026-05-30 and 2026-06-10 maps.
 6. Read governance: `ACTIVE_TRACK.yaml`, `CANONICAL_DOC_STACK.md`, `SOVEREIGN_MANIFEST.md`, `BROKEN_REGISTER.md`, `VENTURE_CELL_PORTFOLIO.yaml`.
 7. Inspect revenue code and state: `dharma_swarm/revenue/`, `scripts/revenue/`, `~/.dharma/revenue_spine`, `~/.dharma/revenue_scout`.
-8. Inspect capital: `dharma_swarm/capital_lab/`, `reports/capital_lab/`, `dharma_swarm/ginko_*.py`, `docs/architecture/SHAKTI_GINKO_ORGAN.md`.
-9. Inspect research/memory: `docs/research/`, `dharma_swarm/chetana/`, `dharma_swarm/memory_kernel/`, `dharma_swarm/knowledge_ops/`, `~/.dharma/knowledge/wiki/`.
+8. Inspect capital: `dharma_swarm/ginko_*.py`, `docs/architecture/SHAKTI_GINKO_ORGAN.md`; `dharma_swarm/capital_lab/` and `reports/capital_lab/` are extraction-branch custody, not main-owned.
+9. Inspect research/memory: `docs/research/`, `dharma_swarm/memory_kernel/`, `dharma_swarm/knowledge_ops/`, `~/.dharma/knowledge/wiki/`; `dharma_swarm/chetana/` is extraction-branch custody, not main-owned.
 10. Inspect runtime: `dharma_swarm/runtime_state.py`, `dharma_swarm/operator_core/`, `dharma_swarm/a2a/`, `api/routers/control_surface.py`, `scripts/runtime/live_ops_census.py`.
 11. Inspect media/memetics: `docs/loomwork/`, `docs/telos-engine/04_MEMETIC_ENGINEERING.md`, `docs/plans/2026-06-11-vwrite-v3-refinery-design.md`.
 12. Verify branch status before any edit: `git status -sb`, `git log --oneline --decorate -5`, `git branch -vv`.
@@ -223,8 +226,8 @@ Attack overclaims: revenue alive, live trading, research active, memory canonica
 
 ## Open Questions For Operator
 
-1. Should `foundations/THE_ORGANISM.md` be promoted to main as the root identity file?
-2. Should `reports/anatomy_altitude_2026-06-10/` land on main as recent audit receipts?
+1. After PR #570's orientation fix, should `foundations/THE_ORGANISM.md` stay main-bound as the root identity file?
+2. After PR #570's orientation fix, should `reports/anatomy_altitude_2026-06-10/` stay main-bound as recent audit receipts?
 3. Should `docs/governance/SWARM_GENOME.md` be created as canonical, or should it live under `docs/ops/COMMAND_MAP.md`?
 4. Which objective gets the next active track: revenue or research?
 5. Is Capital Lab destined for main as extracted slices, or kept quarantined until data/broker/capital decisions?
@@ -252,4 +255,3 @@ rg -n "LIVE_READINESS|BROKER_WRITE_AUTHORITY|receipt_json|A2ATaskReceipt|GITHUB_
 - `agent_5_runtime_organs_devops.md`
 - `agent_6_adversarial_synthesis_receipt.md`
 - `SYNTHESIS.md`
-

@@ -151,4 +151,3 @@ find reports/swarm_genome/2026-06-11 -maxdepth 1 -type f -print | sort
 rg -n "Working|Semi-working|Aspirational|Dangerous|revenue|research-depth|Loomwork|Capital Lab|MemoryKernel|A2A" reports/swarm_genome/2026-06-11
 git status --short -- reports/swarm_genome/2026-06-11 docs/governance/ACTIVE_TRACK.yaml CLAUDE.md docs/ops/AGENT_ONBOARDING.md
 ```
-

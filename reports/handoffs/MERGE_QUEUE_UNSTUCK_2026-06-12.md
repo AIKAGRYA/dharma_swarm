@@ -8,6 +8,17 @@ Merges remain operator/Mike-gated.
 
 ---
 
+## Verified end state (2026-06-12 02:35 JST, `gh pr checks` + mergeStateStatus)
+
+| PR | mergeable / state | Checks |
+|---|---|---|
+| #561 | MERGEABLE / **CLEAN** | all pass (Coherence Delta now green) |
+| #562 | MERGEABLE / **CLEAN** | all pass |
+| #567 | MERGEABLE / **CLEAN** | all pass (Devin refreshed its own branch tonight) |
+| #574 | MERGEABLE / UNSTABLE | **23 pass / 1 fail — Rule 10 only** (operator decision, see below) |
+| #564 | MERGEABLE / **CLEAN** | all pass (docs tail) |
+| #568 | MERGEABLE / **CLEAN** | all pass (docs tail; Devin refreshed) |
+
 ## What was done tonight
 
 | PR | Action taken | Result |
@@ -88,9 +99,11 @@ make pr-merge PR=562
 make pr-merge PR=567
 
 # 4. spine-adoption lane (lands fable_5_cursor registration + holon substrate)
+#    FIRST resolve the Rule 10 blocker (pick option 1/2/3 above), then
 #    refresh qwen/spine-adoption per loop above (NOTE: this lane also regenerates
 #    reports/governance/active_track_evidence.{json,md} + track_portfolio.json via
-#    .venv/bin/python scripts/governance/check_track_status.py), CI green, then:
+#    .venv/bin/python scripts/governance/check_track_status.py, and its managed
+#    blocks via scripts/governance/render_active_track_includes.py), CI green, then:
 make pr-merge PR=574
 
 # 5. seat lane (~/dharma_swarm_live, organ/03-seat) — open its two-PR split now;

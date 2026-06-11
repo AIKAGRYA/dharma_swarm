@@ -152,4 +152,3 @@ make docops-integrity
 rg -n "SWARM_GENOME|COMMAND_MAP|Swarm Genome|Command Map" docs reports foundations
 rg -n "serves: revenue-external-humans-served|serves: research-depth" docs/governance/ACTIVE_TRACK.yaml
 ```
-

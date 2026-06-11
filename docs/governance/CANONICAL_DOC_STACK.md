@@ -62,11 +62,13 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
 | Vibe-code and AI-agent hygiene lifecycle | `docs/governance/hygiene/README.md` + `docs/governance/hygiene/AI_AGENT_GOVERNANCE.md` + `docs/governance/hygiene/patterns/*.yaml` | `ANTI_SLOP_RULES.md` and `docs/ops/PR_REVIEW_CONTROL.md` when a pattern is promoted to a hard gate |
+| Vibe-code antipattern catalogue (54 patterns × 12 clusters, scan-backed) | `docs/governance/VIBE_CODE_HYGIENE.md` + `scripts/governance/vibe_code_scan.sh` + `reports/governance/vibe_code_baseline_2026-06-07.txt` | `ANTI_SLOP_RULES.md` (companion); signals promote into enforced rules via PR |
 | Internal live transport decision | `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md` | A2A docs, runtime plans, onboarding output, Live Ops Cockpit |
 | Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
 | Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, control-surface rows, operator travel/restart triage |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
 | PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
+| Merge authority charter (Merge Master Mike) | `docs/governance/MMM_CHARTER.md` | Defers to `docs/ops/PR_REVIEW_CONTROL.md` for operations and to `examples/agents/merge_master_mike.registration.json` for capabilities |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |

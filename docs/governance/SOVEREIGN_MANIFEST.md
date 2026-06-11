@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -90,6 +90,84 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+
+### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+
+**Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+sense->interpret->constrain->act->adapt on real data with receipts to
+its declared owner surface and an automated closure check.
+
+Phase 0 (research dossier, no build code) ships first. Phases proceed
+in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+Invariant that must hold throughout:
+  Internal artifacts never touch archive fitness; only countersigned
+  external acted receipts above quorum do.
+
+**Next items:**
+
+- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
+- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
+- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+
+**Non-goals:**
+
+- Do not weaken, bypass, or hard-code any telos gate to close a loop.
+- Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not commit provider API keys or any credentials.
+- Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
+### Orientation Graph — whole-system view served on token one
+
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
+
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
+
+The track creates NO new truth store and NO authority surface. It
+projects from the existing owners only: foundations/THE_ORGANISM.md
+and docs/vision_maps/NORTH_STAR.md (identity),
+docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
+docs/governance/ACTIVE_TRACK.yaml (tracks),
+docs/docops/assertions.yaml canonical_guard.registered + the worktree
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
+
+Doctrine line that must hold (same as the reconciliation lane's):
+  Read models project truth from owners; they do not become authority.
+
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
+
+**Next items:**
+
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
+- Do not touch operator_core/** or runtime_state.py.
 
 ### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
 
@@ -226,12 +304,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Total Python modules | **720** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **399 (55.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **286,515** | wc -l across dharma_swarm Python modules |
-| Test files | **670** | find tests -name "*.py" -type f |
-| Test functions | **11,261 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **672** | find tests -name "*.py" -type f |
+| Test functions | **11,280 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1,011** | find . -name "*.md" -type f |
-| Markdown total lines | **232,930** | wc -l across all .md |
+| Markdown files | **1,019** | find . -name "*.md" -type f |
+| Markdown total lines | **234,830** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

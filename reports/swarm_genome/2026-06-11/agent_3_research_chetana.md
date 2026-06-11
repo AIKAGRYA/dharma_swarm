@@ -160,4 +160,3 @@ make memory-kernel-readiness-strict
 .venv/bin/python -m dharma_swarm.chetana.cli status
 rg -n "research-depth|R_V|Verified Experiment Loop|MemoryKernel|KnowledgeOps|Chetana" docs dharma_swarm reports
 ```
-

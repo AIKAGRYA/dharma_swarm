@@ -123,4 +123,3 @@ rg -n "revenue-external-humans-served|research-depth" docs/governance/ACTIVE_TRA
 rg -n "Krishna|Arjuna|Sakshi|Drishti|Palantir|Loomwork|Jagat Kalyan" foundations docs reports
 rg -n "receipt_json|Darwin|lineage|applied" docs/vision_maps reports/anatomy_altitude_2026-06-10 dharma_swarm
 ```
-

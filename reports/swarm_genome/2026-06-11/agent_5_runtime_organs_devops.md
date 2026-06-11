@@ -185,4 +185,3 @@ env PYTHONDONTWRITEBYTECODE=1 make onboard
 .venv/bin/python -m pytest tests/test_capital_lab_alpha_evidence.py tests/test_capital_lab_broker_paper_membrane.py tests/test_capital_lab_contracts.py tests/test_capital_lab_risk_governor.py -q
 make memory-kernel-readiness
 ```
-
