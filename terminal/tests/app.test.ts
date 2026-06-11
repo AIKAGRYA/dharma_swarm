@@ -2687,6 +2687,31 @@ test("operator summary prefers non-placeholder control tab preview values over g
     expect(nextState.statusLine).toBe("/reset -> chat");
   });
 
+  test("renders help command results in the chat transcript", () => {
+    const baseState: AppState = {
+      ...initialState,
+      activeTabId: "control",
+      tabs: initialState.tabs.map((tab) =>
+        tab.id === "chat"
+          ? {...tab, lines: [{id: "chat-1", kind: "assistant", text: "existing conversation"}]}
+          : tab,
+      ),
+    };
+
+    const nextState = applyBridgeEvent(baseState, {
+      type: "command.result",
+      command: "help",
+      output: "Available commands: /status /help",
+    });
+
+    expect(nextState.activeTabId).toBe("chat");
+    expect(nextState.tabs.find((tab) => tab.id === "chat")?.lines.map((line) => line.text)).toEqual([
+      "existing conversation",
+      "Available commands: /status /help",
+    ]);
+    expect(nextState.statusLine).toBe("/help -> chat");
+  });
+
   test("normalizes workspace target pane aliases onto the repo pane", () => {
     const baseState: AppState = {
       ...initialState,
@@ -8832,6 +8857,16 @@ Toolchain
 });
 
 describe("slashCommandStartActions", () => {
+  test("keeps typed /help commands on chat so the command output is visible", () => {
+    const actions = slashCommandStartActions({command: "/help"});
+
+    expect(actions).toEqual([
+      {type: "tab.activate", tabId: "chat"},
+      {type: "status.set", value: "command /help -> chat"},
+    ]);
+    expect(actions.some((action) => action.type === "tab.append")).toBe(false);
+  });
+
   test("routes typed /models commands to the models pane without appending chat transcript actions", () => {
     const actions = slashCommandStartActions({command: "/models"});
 
@@ -8914,6 +8949,56 @@ describe("slashCommandStartActions", () => {
       {type: "status.set", value: "command /permissions pending -> approvals"},
     ]);
     expect(actions.some((action) => action.type === "tab.append")).toBe(false);
+  });
+});
+
+describe("App prompt submission", () => {
+  test("returns a plain prompt submitted from the control pane to visible chat output", async () => {
+    const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
+    const originalSend = DharmaBridge.prototype.send;
+    DharmaBridge.prototype.send = function mockedSend(type: string, payload: Record<string, unknown> = {}): string {
+      sentMessages.push({type, payload});
+      return String(sentMessages.length);
+    };
+
+    const stdout = new TestStdout();
+    const stdin = new TestStdin();
+    let rendered = "";
+    stdout.on("data", (chunk) => {
+      rendered += chunk.toString("utf8");
+    });
+
+    const instance = render(React.createElement(App), {
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stdin: stdin as unknown as NodeJS.ReadStream,
+      stderr: new TestStdout() as unknown as NodeJS.WriteStream,
+      debug: true,
+      patchConsole: false,
+      exitOnCtrlC: false,
+    });
+
+    try {
+      await flushRender();
+      stdin.write("\u0014");
+      await flushRender();
+      rendered = "";
+      stdin.write("Reply OK");
+      await flushRender();
+      stdin.write("\r");
+      await flushRender();
+
+      const bootstrap = sentMessages.find((message) => message.type === "session.bootstrap");
+      expect(bootstrap?.payload.prompt).toBe("Reply OK");
+      expect(bootstrap?.payload.active_tab).toBe("control");
+
+      const normalized = normalizeTerminalText(rendered);
+      expect(normalized).toContain("> Reply OK");
+      expect(normalized).toContain("bootstrapping codex:gpt-5.4");
+    } finally {
+      instance.unmount();
+      instance.cleanup();
+      DharmaBridge.prototype.send = originalSend;
+    }
   });
 });
 
