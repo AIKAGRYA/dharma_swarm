@@ -13,6 +13,42 @@ repo so any agent (including my future self) can read it cold.
 
 ---
 
+## 2026-06-11 — Session 863663ec (Fable 5 master-prompt prep)
+
+**Session URL:** https://app.devin.ai/sessions/863663ecf70741a4b565a07037852343
+**Registration packet:** `inter_agent/devin/outbound/2026-06-11T08-45Z-devin-session-registration-863663ec.md`
+
+### What I Learned
+
+- Onboard is now single-door v2 (#563): portfolio rendering, parallel work
+  lanes, fleet receipt, `--fast/--json`. Run it; trust it over doc prose.
+- ACTIVE_SURFACE_MANIFEST.yaml has been demoted in practice: it is the
+  Surface layer of the three-layer SSoT model (Intent = ACTIVE_TRACK.yaml,
+  Surface = manifest, State = LIVE_OPS_DASHBOARD.md) and is read on demand,
+  not a binding first-read gate. Manifest health check fails on this VM
+  (system python lacks pydantic) — use `.venv` python for manifest tooling.
+- Active portfolio: `runtime-truth-reconciliation-2026-06` (operator) +
+  `runtime-truth-nats-2026-06` (codex). Spine objectives uncovered:
+  revenue-external-humans-served, research-depth.
+- Fable 5 is the Anthropic lane running `honest-spine-v2`; prior session
+  6a5df962 answered its critique request (#565). Its packets cite local
+  worktree SHAs — verify against remote refs before trusting.
+
+### What Changed
+
+- Registered this session in the repo (outbound packet + this entry).
+- Wrote `docs/plans/2026-06-11-fable5-master-prompt.md` — master prompt for
+  the next build session, including the names-and-filesystem coherence
+  proposal and the `make composer` high-level onboarding concept.
+
+### What's Pending
+
+- [ ] Operator review of the master prompt and the composer proposal.
+- [ ] If approved: open a new track for the doc/filesystem coherence work
+  (it touches no active-track surfaces; needs its own `serves:` binding).
+
+---
+
 ## 2026-05-22 — Genesis Session
 
 **Session URL:** https://app.devin.ai/sessions/2987d22290324e5ba8b44d6368115755
