@@ -1,5 +1,5 @@
 {
-  "audit_sha": "4b86b8aef52f8df90707e0dbc13efa4b0f2f9ded",
+  "audit_sha": "fc2200758ce608042fe5a68a54a08436b304a483",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,28 +11,29 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "clean",
-  "source_status_entries": [],
+  "source_status": "dirty",
+  "source_status_entries": [
+    " M dharma_swarm/ontology.py"
+  ],
   "summary": {
-    "adapter_ready_count": 4,
+    "adapter_ready_count": 3,
     "adoption_pct": 93.8,
-    "joined_count": 11,
+    "joined_count": 12,
     "joined_or_adapter_ready_count": 15,
     "joined_or_adapter_ready_percent": 93.8,
-    "joined_percent": 68.8,
+    "joined_percent": 75.0,
     "legacy_count": 1,
     "missing_count": 0,
     "non_joined_surface_ids": [
       "tool_registry_dispatch",
-      "ontology_action_tollbooth",
       "self_modification_loop",
       "mcp_tool_access",
       "legacy_no_identity_escape_hatch"
     ],
     "quarantine_count": 0,
     "status_counts": {
-      "adapter-ready": 4,
-      "joined": 11,
+      "adapter-ready": 3,
+      "joined": 12,
       "legacy": 1,
       "missing": 0,
       "quarantine": 0
@@ -917,7 +918,7 @@
           "description": "ActionDef declares typed actions",
           "hits": [
             {
-              "line": 164,
+              "line": 172,
               "path": "dharma_swarm/ontology.py",
               "text": "class ActionDef(BaseModel):"
             }
@@ -930,7 +931,7 @@
           "description": "typed action execution chokepoint exists",
           "hits": [
             {
-              "line": 766,
+              "line": 774,
               "path": "dharma_swarm/ontology.py",
               "text": "def execute_action("
             }
@@ -943,7 +944,7 @@
           "description": "modifies contract is declared",
           "hits": [
             {
-              "line": 175,
+              "line": 183,
               "path": "dharma_swarm/ontology.py",
               "text": "modifies: list[str] = Field(default_factory=list)"
             }
@@ -956,7 +957,7 @@
           "description": "approval contract is declared",
           "hits": [
             {
-              "line": 177,
+              "line": 185,
               "path": "dharma_swarm/ontology.py",
               "text": "requires_approval: bool = False"
             }
@@ -987,18 +988,24 @@
         },
         {
           "description": "ontology actions write to runtime ledger",
-          "hits": [],
+          "hits": [
+            {
+              "line": 47,
+              "path": "dharma_swarm/ontology.py",
+              "text": "# RuntimeStateStore.record_ontology_action_receipt_sync. Declaring the type here"
+            }
+          ],
           "key": "runtime_store",
-          "matched": false,
+          "matched": true,
           "regex": "RuntimeStateStore"
         },
         {
           "description": "ontology action receipts are recorded",
           "hits": [
             {
-              "line": 818,
+              "line": 47,
               "path": "dharma_swarm/ontology.py",
-              "text": "runtime_state.record_ontology_action_receipt_sync("
+              "text": "# RuntimeStateStore.record_ontology_action_receipt_sync. Declaring the type here"
             }
           ],
           "key": "ontology_receipt",
@@ -1009,7 +1016,7 @@
           "description": "ActionDef.modifies is read at execution time",
           "hits": [
             {
-              "line": 826,
+              "line": 834,
               "path": "dharma_swarm/ontology.py",
               "text": "\"modifies\": list(action_def.modifies),"
             }
@@ -1022,7 +1029,7 @@
           "description": "requires_approval is read at execution time",
           "hits": [
             {
-              "line": 828,
+              "line": 836,
               "path": "dharma_swarm/ontology.py",
               "text": "\"requires_approval\": action_def.requires_approval,"
             }
@@ -1034,19 +1041,13 @@
       ],
       "label": "Ontology typed action tollbooth",
       "legacy_evidence": [],
-      "missing_joined_patterns": [
-        {
-          "description": "ontology actions write to runtime ledger",
-          "key": "runtime_store",
-          "regex": "RuntimeStateStore"
-        }
-      ],
+      "missing_joined_patterns": [],
       "path_patterns": [
         "dharma_swarm/ontology.py"
       ],
       "priority": 5,
       "quarantine_evidence": [],
-      "status": "adapter-ready"
+      "status": "joined"
     },
     {
       "adapter_ready_evidence": [
@@ -1687,22 +1688,6 @@
     }
   ],
   "top_saturation_targets": [
-    {
-      "category": "ontology",
-      "files": [
-        "dharma_swarm/ontology.py"
-      ],
-      "id": "ontology_action_tollbooth",
-      "label": "Ontology typed action tollbooth",
-      "missing_joined_patterns": [
-        {
-          "description": "ontology actions write to runtime ledger",
-          "key": "runtime_store",
-          "regex": "RuntimeStateStore"
-        }
-      ],
-      "status": "adapter-ready"
-    },
     {
       "category": "tool",
       "files": [
