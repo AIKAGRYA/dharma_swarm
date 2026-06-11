@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-12T01:56:56+09:00 (schema v2)
+Generated: 2026-06-12T02:25:41+09:00 (schema v2)
 Active tracks: **5** (warn 5, max 10) — shippable 3
 
 ## Spine coverage

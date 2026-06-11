@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 5 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -90,6 +90,43 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
+
+**Next items:**
+
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+
+**Non-goals:**
+
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
@@ -239,7 +276,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **898** | find . -name "*.md" -type f |
-| Markdown total lines | **221,655** | wc -l across all .md |
+| Markdown total lines | **221,692** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
