@@ -1,0 +1,17 @@
+{
+  "id": "VC-A5",
+  "title": "Green CI debt",
+  "cluster": "A",
+  "cluster_title": "Test Theater",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Coverage is high but mutation testing would show weak invariant defense.",
+  "why_it_hurts": "The suite becomes a confidence costume rather than a defect detector.",
+  "detector": {"type": "external", "command": "mutmut or cosmic-ray on critical modules", "target": "mutation kill rate over 60 percent on critical modules"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which critical module would this PR nominate for mutation testing?"]
+}

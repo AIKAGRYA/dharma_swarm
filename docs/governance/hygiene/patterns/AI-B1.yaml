@@ -1,0 +1,17 @@
+{
+  "id": "AI-B1",
+  "title": "Evidence-free verification claim",
+  "cluster": "B",
+  "cluster_title": "Evidence Hierarchy",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "A PR, review, or agent receipt claims success without a command, cwd, exit code, artifact path, git SHA, or raw-output pointer.",
+  "why_it_hurts": "Model self-report becomes indistinguishable from executed verification, so false confidence can pass through review.",
+  "detector": {"type": "command", "command": "rg -n '(?i)(tests passed|verified|green|works|all checks pass)' docs reports .github scripts --glob '*.md' --glob '*.json' --glob '*.yml' | rg -v '(exit|command|receipt|artifact|sha|run|http|https)' || true", "target": "success claims cite command evidence or external run evidence"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://csrc.nist.gov/pubs/sp/800/218/final", "https://csrc.nist.gov/pubs/sp/800/218/a/final"],
+  "audit_questions": ["What is the strongest evidence for this change, and is model self-report excluded from merge evidence?", "Do all verification claims include command, cwd, exit code, artifact path, or GitHub run URL?"]
+}

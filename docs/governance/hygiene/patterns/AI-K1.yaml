@@ -1,0 +1,17 @@
+{
+  "id": "AI-K1",
+  "title": "Subtraction not rewarded",
+  "cluster": "K",
+  "cluster_title": "Deletion and Simplification",
+  "severity": "structural",
+  "stage": "advisory",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Agent work is evaluated only by added functionality, not by deleted code, collapsed duplication, fewer dependencies, or fewer concepts.",
+  "why_it_hurts": "AI systems naturally add; without a simplification reward, repo entropy compounds even when each PR looks useful.",
+  "detector": {"type": "command", "command": "git diff --shortstat origin/main...HEAD || true", "target": "net additions are justified and deletions/simplifications are called out"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["https://arxiv.org/abs/2507.09089", "initial-field-guide"],
+  "audit_questions": ["What code, dependency, workflow, or concept did this PR remove or simplify?", "If the PR is net-additive, why is the new surface worth the future review burden?"]
+}

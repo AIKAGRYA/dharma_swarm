@@ -1,0 +1,236 @@
+{
+  "id": "anti-ai-slop-scan-snapshot-2026-06-08",
+  "status": "local research artifact",
+  "worktree": "/Users/dhyana/dharma_swarm_pr_review_control",
+  "branch": "chore/governance/hygiene-lifecycle-v2",
+  "related_pr": {
+    "number": 551,
+    "url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/551",
+    "state": "OPEN",
+    "draft": true,
+    "merge_state_observed": "UNSTABLE",
+    "head_sha_observed": "38d24f2c88745f1d5e9269dc22c47385a0e3a4e2"
+  },
+  "hygiene_catalogue": {
+    "pattern_count": 70,
+    "namespaces": {
+      "AI": 12,
+      "VC": 58
+    },
+    "stages": {
+      "advisory": 15,
+      "measured": 27,
+      "observed": 28
+    },
+    "severities": {
+      "security": 13,
+      "operational": 13,
+      "correctness": 16,
+      "structural": 19,
+      "performance": 4,
+      "distributed": 4,
+      "informational": 1
+    },
+    "detectors": {
+      "command": 39,
+      "manual": 28,
+      "external": 3
+    },
+    "enforcement_rule_pointer_count": 2,
+    "enforcement_rule_pointers": [
+      {
+        "pattern": "VC-C4",
+        "stage": "advisory",
+        "rule": "docs/governance/ANTI_SLOP_RULES.md#rule-10"
+      },
+      {
+        "pattern": "VC-L1",
+        "stage": "advisory",
+        "rule": ".github/workflows/bot-pr-limit.yml"
+      }
+    ],
+    "source_counts": {
+      "initial-field-guide": 60,
+      "nist.gov": 5,
+      "owasp_llm": 3,
+      "owasp_mcp": 4
+    },
+    "patterns_without_recognized_external_or_initial_source": [
+      "AI-L1"
+    ]
+  },
+  "scan_receipts": {
+    "hygiene_baseline_output": "/private/tmp/dharma_hygiene_research_scan_2026-06-07.txt",
+    "hygiene_check": {
+      "command": "make hygiene-check",
+      "exit_code": 0,
+      "summary": "Hygiene integrity OK"
+    }
+  },
+  "workflow_security_heuristic": {
+    "workflow_count": 20,
+    "missing_permissions": 2,
+    "secrets": 6,
+    "github_token": 6,
+    "pull_request_target": 0,
+    "write_all": 0,
+    "unpinned_actions": 0,
+    "curl_pipe_shell": 0,
+    "flagged_workflows": [
+      {
+        "path": ".github/workflows/pr-collision-detect.yml",
+        "flags": [
+          "github_token",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/merge-master-mike-backlog.yml",
+        "flags": [
+          "github_token",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/codex-mention-router.yml",
+        "flags": [
+          "github_token",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/gitleaks.yml",
+        "flags": [
+          "github_token",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/bot-pr-limit.yml",
+        "flags": [
+          "github_token",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/tests.yml",
+        "flags": [
+          "missing_permissions",
+          "secrets"
+        ]
+      },
+      {
+        "path": ".github/workflows/docops-autorefresh.yml",
+        "flags": [
+          "github_token"
+        ]
+      },
+      {
+        "path": ".github/workflows/manifest-check.yml",
+        "flags": [
+          "missing_permissions"
+        ]
+      }
+    ]
+  },
+  "instruction_surface_heuristic": {
+    "instruction_shaped_files": 142,
+    "trusted_or_skill_like": 9,
+    "untrusted_or_data_like": 133,
+    "interpretation": "Detector is intentionally noisy; next step is an instruction-surface registry and taint labels, not a raw grep blocker."
+  },
+  "architecture_scan": {
+    "python_files_over_1000_loc": 41,
+    "largest_python_files": [
+      {
+        "loc": 5173,
+        "path": "dharma_swarm/thinkodynamic_director.py"
+      },
+      {
+        "loc": 4512,
+        "path": "dharma_swarm/telos_substrate.py"
+      },
+      {
+        "loc": 3796,
+        "path": "dharma_swarm/runtime_state.py"
+      },
+      {
+        "loc": 3465,
+        "path": "dharma_swarm/evolution.py"
+      },
+      {
+        "loc": 3355,
+        "path": "dharma_swarm/agent_runner.py"
+      },
+      {
+        "loc": 3227,
+        "path": "dharma_swarm/swarm.py"
+      },
+      {
+        "loc": 3022,
+        "path": "dharma_swarm/providers.py"
+      },
+      {
+        "loc": 2777,
+        "path": "dharma_swarm/orchestrator.py"
+      },
+      {
+        "loc": 2539,
+        "path": "dharma_swarm/terminal_bridge.py"
+      },
+      {
+        "loc": 2520,
+        "path": "dharma_swarm/tui/app.py"
+      }
+    ]
+  },
+  "sync_in_async": {
+    "site_count": 11,
+    "productionish_sites": [
+      "dharma_swarm/autoresearch_loop.py:507 subprocess.run inside async _revert_module",
+      "dharma_swarm/review_cycle.py:105 subprocess.run inside async _section_tests",
+      "dharma_swarm/roaming_dispatch_daemon.py:142 time.sleep inside async run_loop",
+      "dharma_swarm/thinkodynamic_director.py:1568 subprocess.run inside async invoke_claude_vision",
+      "dharma_swarm/zeitgeist.py:163 subprocess.run inside async _scan_llm"
+    ]
+  },
+  "duplicate_private_helpers": {
+    "examples": [
+      {
+        "name": "_utc_now",
+        "definitions": 73
+      },
+      {
+        "name": "_utc_now_iso",
+        "definitions": 40
+      },
+      {
+        "name": "_new_id",
+        "definitions": 24
+      },
+      {
+        "name": "_read_json",
+        "definitions": 19
+      },
+      {
+        "name": "_clamp01",
+        "definitions": 12
+      },
+      {
+        "name": "_build_prompt",
+        "definitions": 7
+      }
+    ]
+  },
+  "dependency_manifest_ranges": {
+    "dashboard_package_json": 26,
+    "terminal_package_json": 11,
+    "desktop_shell_package_json": 1,
+    "interpretation": "Lockfiles reduce risk; the remaining control is dependency admission provenance for new runtime dependencies."
+  },
+  "tool_side_effect_boundary": {
+    "tool_registry_dispatch_has_execution_identity_hooks": true,
+    "tool_registry_dispatch_has_side_effect_intent_complete_hooks": true,
+    "recommended_next_step": "Saturate side-effect identity/receipt coverage across all dispatch and runtime boundaries, then flip fail-closed in high-risk profiles."
+  }
+}

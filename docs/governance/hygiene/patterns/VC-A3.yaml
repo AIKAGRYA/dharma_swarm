@@ -1,0 +1,17 @@
+{
+  "id": "VC-A3",
+  "title": "Mock-everything isolation theater",
+  "cluster": "A",
+  "cluster_title": "Test Theater",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Dependencies are mocked so heavily that tests exercise scaffolding instead of real integration behavior.",
+  "why_it_hurts": "Broken wiring survives because the test replaced the wiring.",
+  "detector": {"type": "command", "command": "printf 'mock_refs='; rg -n 'MagicMock|patch[(]|mock_' tests | wc -l; printf 'integration_files='; find tests -path '*integration*' -name '*.py' | wc -l", "target": "integration coverage grows with mock count"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What real boundary, adapter, or persistence path is exercised without mocks?"]
+}

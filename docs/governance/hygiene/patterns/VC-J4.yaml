@@ -1,0 +1,17 @@
+{
+  "id": "VC-J4",
+  "title": "Type annotation mismatch",
+  "cluster": "J",
+  "cluster_title": "Spec Implementation Drift",
+  "severity": "correctness",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Annotations describe a type contract the runtime does not honor.",
+  "why_it_hurts": "Static readers and agents plan against a false interface.",
+  "detector": {"type": "external", "command": "mypy --strict on promoted critical modules", "target": "critical module type checks are reviewed before promotion"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What test or type check proves annotations match runtime behavior?"]
+}

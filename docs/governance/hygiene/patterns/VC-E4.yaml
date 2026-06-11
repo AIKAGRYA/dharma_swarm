@@ -1,0 +1,17 @@
+{
+  "id": "VC-E4",
+  "title": "Cryptographic cargo cult",
+  "cluster": "E",
+  "cluster_title": "Security Regressions",
+  "severity": "security",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Weak hashes or cipher modes appear without distinguishing cache use from security use.",
+  "why_it_hurts": "A non-security checksum pattern can be copied into a security context.",
+  "detector": {"type": "command", "command": "rg -n 'hashlib[.]md5|hashlib[.]sha1|DES|ECB' dharma_swarm api scripts | rg -v 'checksum|content-id|integrity|cache_key|etag' | wc -l", "target": "security-context weak crypto is zero"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Is each weak hash use explicitly non-security and named as such?"]
+}

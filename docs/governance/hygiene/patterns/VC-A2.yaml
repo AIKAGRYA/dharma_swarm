@@ -1,0 +1,17 @@
+{
+  "id": "VC-A2",
+  "title": "Trivially true tests",
+  "cluster": "A",
+  "cluster_title": "Test Theater",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Tests assert shapes such as truthiness, non-nullness, or type without checking the computed value.",
+  "why_it_hurts": "The test can pass even when the invariant is wrong.",
+  "detector": {"type": "command", "command": "rg -n 'assert True|assert .* is not None *$|assert result *$|assert response *$' tests | wc -l", "target": "trend down"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Which assertions prove behavior rather than object existence?"]
+}

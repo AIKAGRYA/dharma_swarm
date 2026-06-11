@@ -1,0 +1,17 @@
+{
+  "id": "VC-G1",
+  "title": "Runaway token burn",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "operational",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Many low-value commits or changes accumulate in a short window because the agent loop does not stop.",
+  "why_it_hurts": "Reviewers inherit churn instead of a bounded patch with a clear verification story.",
+  "detector": {"type": "command", "command": "git log --since='14 days ago' --format='%cI' | cut -dT -f1 | sort | uniq -c | sort -rn | head -10", "target": "commit spikes are intentional and explained"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Does this branch have a bounded objective, and did the agent stop after verification?"]
+}

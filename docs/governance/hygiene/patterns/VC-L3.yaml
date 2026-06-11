@@ -1,0 +1,17 @@
+{
+  "id": "VC-L3",
+  "title": "Model collapse risk",
+  "cluster": "L",
+  "cluster_title": "Open-Source and Ecosystem Degradation",
+  "severity": "informational",
+  "stage": "observed",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Generated code trains future generated code unless human review keeps the corpus grounded.",
+  "why_it_hurts": "Low-quality patterns can become self-reinforcing across projects and agents.",
+  "detector": {"type": "manual", "rationale": "Ecosystem-level concern; local counter is grounded review and receipts."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["What human-verifiable receipt or test prevents this generated pattern from becoming folklore?"]
+}

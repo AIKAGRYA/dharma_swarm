@@ -2,15 +2,15 @@
 
 **Purpose**: This document is the absolute ground truth for the dharma_swarm repository. All AI agents, regardless of model or tab, MUST ingest, comprehend, and adhere to this context before outputting a single line of code.
 
-**Generated**: 2026-04-04 | Count refresh: 2026-05-07 filesystem verification
+**Generated**: 2026-04-04 | Count refresh: 2026-06-09 filesystem verification
 **Prior audit**: 2026-04-04 | 5-model convergent audit (Claude, DeepSeek, GPT-OSS, Codex, RUFLO)
 **Authority**: This file + `CLAUDE.md` are the two canonical governance surfaces. When they conflict, `CLAUDE.md` wins on behavioral rules; this file wins on architectural truth.
 
-**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-05-07. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
+**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-06-09. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
-**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 10) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. The single-track default holds whenever the operator has not explicitly opened a second; this amendment authorizes concurrency, it does not mandate it. Rationale: with 10+ agent contributors active on the repo (387 commits in the last 30 days as of 2026-05-31), serializing all work behind one track creates unbounded queueing on the operator and on review capacity. Concurrency is gated on non-overlap, not on agent count.
+**Active build tracks**: declared in [`ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) and surfaced by `make onboard`. Do not duplicate track names in prose here — the YAML is the single source of intent. The governing principle: the operator may run between `min_active` and `max_active` concurrent tracks (default floor 1, ceiling 10) as declared by `track_policy` in `ACTIVE_TRACK.yaml`. Opening additional tracks beyond the floor is operator discretion, not automatic — each concurrent track must have a clear owner, distinct surfaces, and non-overlapping non-goals. A portfolio of one is fine — concurrency is authorized, not mandated — and equally, opening a second co-equal track when the operator proposes new work is the expected response, never a violation of an existing track. **To open a track** (e.g. when the operator proposes a new project — treat that as a new track, never a violation): add an entry under `active_tracks:` in `ACTIVE_TRACK.yaml` with `serves:` a spine objective, `owned_surfaces:`, and acceptance criteria, then run `scripts/governance/render_active_track_includes.py`; `check_track_status.py` enforces WIP limit, spine binding, surface non-overlap, and edge/cycle validity. Rationale: with 10+ agent contributors active on the repo (387 commits in the last 30 days as of 2026-05-31), serializing all work behind one track creates unbounded queueing on the operator and on review capacity. Concurrency is gated on non-overlap, not on agent count.
 
 <!-- ACTIVE_TRACK:START -->
 
@@ -18,13 +18,21 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Reconciliation — operator-visible truth packets
-**Track id:** `runtime-truth-reconciliation-2026-06`
-**Status:** ACTIVE
-**Verified at:** 2026-06-04 (TTL 14 days)
-**Owner:** @AmitabhainArunachala
+**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
-**Description:**
+**Spine objectives (each track serves one):**
+
+- `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
+
+### Runtime Truth Reconciliation — operator-visible truth packets
+
+**Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Relations:** complements: runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
+**Moves vital signs:** quality_gates, memory_persistence
 
 The Runtime Truth Spine substrate is merged and shippable. This track moves
 from substrate existence to read-only reconciliation: operator-visible
@@ -40,13 +48,13 @@ and existing operator/onboard/control-surface rows for read-only rendering.
 Doctrine line that must hold:
   Read models project truth from owners; they do not become authority.
 
-**Next items on this track:**
+**Next items:**
 
 - [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
 - [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
 - [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
-**Non-goals (do not work on these during this track):**
+**Non-goals:**
 
 - Do not create a new daemon, database, event log, truth store, or receipt system.
 - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
@@ -54,6 +62,34 @@ Doctrine line that must hold:
 - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
 - Do not build Verified Experiment Loop runtime in this track.
 - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+
+### Runtime Truth NATS — internal live transport for A2A dispatch
+
+**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
+**Moves vital signs:** tool_coverage
+
+The concurrent Codex transport lane. NATS was scoped out of the global
+prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
+scoped track with non-overlapping surfaces (transport layer only). This
+track wires the internal live transport so A2A dispatch can travel at
+broker speed, distinct from the reconciliation lane's read-model surfaces.
+
+Surface separation is the safety boundary: this track owns the NATS
+transport contact modules and the master spec; it does not touch the
+operator_core read models the reconciliation lane owns.
+
+**Next items:**
+
+- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+
+**Non-goals:**
+
+- Do not introduce Redis or gRPC as part of this track.
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not add a parallel spine-check CI workflow.
 
 **Recently closed tracks:**
 
@@ -111,7 +147,7 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-05 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-09 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
@@ -119,13 +155,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **674** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **391 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,749** | wc -l across dharma_swarm Python modules |
-| Test files | **644** | find tests -name "*.py" -type f |
-| Test functions | **11,053 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **285,830** | wc -l across dharma_swarm Python modules |
+| Test files | **648** | find tests -name "*.py" -type f |
+| Test functions | **11,106 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **863** | find . -name "*.md" -type f |
-| Markdown total lines | **213,315** | wc -l across all .md |
+| Markdown files | **882** | find . -name "*.md" -type f |
+| Markdown total lines | **218,226** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **4** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
@@ -173,6 +209,7 @@ These are the ground-truth metrics. All other documents citing different numbers
   - FORBIDDEN: Must NOT import from Runtime, Intelligence, or Evolution domains
 - **Boundary Status**: **PASS** (V) -- no violations found
 - **Notes for Agents**: `dharma_kernel.py` is SHA-256 signed. Do not modify. Gates are added via `GateRegistry.propose()`, not by editing `telos_gates.py` directly. Parent `~/CLAUDE.md` says "10 axioms" -- this is WRONG; actual count is 25.
+- **Named operator role (merge authority)**: **Merge Master Mike (MMM)** is the registered conditional-merge coordinator agent for this domain. Charter: [`MMM_CHARTER.md`](MMM_CHARTER.md). Operational manual: [`../ops/PR_REVIEW_CONTROL.md`](../ops/PR_REVIEW_CONTROL.md). Registration: [`../../examples/agents/merge_master_mike.registration.json`](../../examples/agents/merge_master_mike.registration.json).
 
 ### Domain 3: Runtime Core (S1 Operations + S2 Coordination)
 

@@ -21,13 +21,21 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active track:** Runtime Truth Reconciliation — operator-visible truth packets
-**Track id:** `runtime-truth-reconciliation-2026-06`
-**Status:** ACTIVE
-**Verified at:** 2026-06-04 (TTL 14 days)
-**Owner:** @AmitabhainArunachala
+**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
-**Description:**
+**Spine objectives (each track serves one):**
+
+- `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
+
+### Runtime Truth Reconciliation — operator-visible truth packets
+
+**Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Relations:** complements: runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
+**Moves vital signs:** quality_gates, memory_persistence
 
 The Runtime Truth Spine substrate is merged and shippable. This track moves
 from substrate existence to read-only reconciliation: operator-visible
@@ -43,13 +51,13 @@ and existing operator/onboard/control-surface rows for read-only rendering.
 Doctrine line that must hold:
   Read models project truth from owners; they do not become authority.
 
-**Next items on this track:**
+**Next items:**
 
 - [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
 - [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
 - [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
-**Non-goals (do not work on these during this track):**
+**Non-goals:**
 
 - Do not create a new daemon, database, event log, truth store, or receipt system.
 - Do not mint a second RuntimeReceipt for A2A or paths with an inner runtime owner.
@@ -57,6 +65,34 @@ Doctrine line that must hold:
 - Do not broadly refactor orchestrator.py, agent_runner.py, swarm.py, providers.py, or SwarmManager.
 - Do not build Verified Experiment Loop runtime in this track.
 - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
+
+### Runtime Truth NATS — internal live transport for A2A dispatch
+
+**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
+**Moves vital signs:** tool_coverage
+
+The concurrent Codex transport lane. NATS was scoped out of the global
+prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
+scoped track with non-overlapping surfaces (transport layer only). This
+track wires the internal live transport so A2A dispatch can travel at
+broker speed, distinct from the reconciliation lane's read-model surfaces.
+
+Surface separation is the safety boundary: this track owns the NATS
+transport contact modules and the master spec; it does not touch the
+operator_core read models the reconciliation lane owns.
+
+**Next items:**
+
+- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+
+**Non-goals:**
+
+- Do not introduce Redis or gRPC as part of this track.
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not add a parallel spine-check CI workflow.
 
 **Recently closed tracks:**
 
@@ -220,7 +256,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 
 ## CRITICAL: Read Before Any Code Changes
 
-**Build-session entrypoint:** Before any build work, read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md). It carries the canonical read order and the current build track. The current track is the ontology-native Operator Brief seam ([`docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md)). Substrate-nativeness is currently estimated at ~10–15% per [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md); the goal is to bring one user-visible seam fully native before opening another.
+**Build-session entrypoint:** Before any build work, read [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](docs/governance/BUILD_SESSION_ENTRYPOINT.md) and run `make onboard`. The current build **portfolio** (1–N co-equal active tracks) is declared in [`docs/governance/ACTIVE_TRACK.yaml`](docs/governance/ACTIVE_TRACK.yaml) and rendered by `make onboard` — do not name a track here in prose. Substrate-nativeness is a measured number, not a prose constant — run `python3 scripts/governance/spine_bypass_report.py` for the live dispatch-site measure instead of citing any doc's frozen percentage. When the operator proposes a new project, **open a new track** in the portfolio (`serves:` a spine objective, `owned_surfaces:`, acceptance criteria) up to the WIP limit — a new project is a new track, not a violation of an existing one.
 
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 

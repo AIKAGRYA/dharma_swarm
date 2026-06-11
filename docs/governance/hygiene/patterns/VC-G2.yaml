@@ -1,0 +1,17 @@
+{
+  "id": "VC-G2",
+  "title": "Workaround accumulation",
+  "cluster": "G",
+  "cluster_title": "Agent-Loop Pathologies",
+  "severity": "correctness",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Suppressions, bare except blocks, skipped tests, and swallowed errors pile up instead of being resolved.",
+  "why_it_hurts": "The codebase learns to hide failures from itself.",
+  "detector": {"type": "command", "command": "printf 'suppressions='; rg -n '# type: ignore|# noqa|# pylint: disable' dharma_swarm api scripts | wc -l; printf 'wide_except='; rg -n 'except:\\s*$|except Exception:\\s*$|except Exception as.*:\\s*$' dharma_swarm api scripts | wc -l; printf 'skips='; rg -n 'pytest[.]mark[.]skip|@skip|@unittest[.]skip|skipTest' tests | wc -l", "target": "suppressions and swallowed errors trend down"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did this PR add any suppression, skip, xfail, or broad except, and why is it temporary?"]
+}

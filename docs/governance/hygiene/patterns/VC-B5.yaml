@@ -1,0 +1,17 @@
+{
+  "id": "VC-B5",
+  "title": "Instruction file bloat",
+  "cluster": "B",
+  "cluster_title": "Documentation Pollution",
+  "severity": "operational",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "Agent instruction files grow until they become unreadable boot sequences.",
+  "why_it_hurts": "Future agents skip or misread the contract under context pressure.",
+  "detector": {"type": "command", "command": "for f in AGENTS.md CLAUDE.md DEVIN.md docs/AGENTS.md; do test -f \"$f\" && printf '%s ' \"$f\" && wc -l < \"$f\"; done", "target": "first-read instruction files stay under 500 lines unless explicitly justified"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did this PR add instructions that could live in a narrower skill, doc, or tool output?"]
+}

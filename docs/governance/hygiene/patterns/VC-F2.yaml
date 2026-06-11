@@ -1,0 +1,17 @@
+{
+  "id": "VC-F2",
+  "title": "Copy-paste duplication cascade",
+  "cluster": "F",
+  "cluster_title": "Context-Window Artifacts",
+  "severity": "structural",
+  "stage": "measured",
+  "created": "2026-06-07",
+  "last_verified": "2026-06-07",
+  "next_review": "2026-09-07",
+  "definition": "The same helper is reimplemented across files because the agent did not discover the existing one.",
+  "why_it_hurts": "Behavior drifts between copies and fixes miss sibling definitions.",
+  "detector": {"type": "command", "command": "rg -h '^def [a-z_][a-z_0-9]*[(]' dharma_swarm api scripts | sort | uniq -c | sort -rn | awk '$1 > 5 {print}' | head -20", "target": "repeated helper names trend down"},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["initial-field-guide"],
+  "audit_questions": ["Did this change reuse an existing helper before adding a local one?"]
+}
