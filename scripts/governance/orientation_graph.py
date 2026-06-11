@@ -29,8 +29,8 @@ Write behavior: never writes. Exit code: always 0 (informational).
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
-import os
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -47,8 +47,25 @@ ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 ASSERTIONS = REPO_ROOT / "docs/docops/assertions.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
 
-_STATE_ROOT = Path(os.environ.get("DHARMA_STATE_ROOT", str(Path.home() / ".dharma")))
-CENSUS_RECEIPT = _STATE_ROOT / "ops" / "live_process_census.json"
+
+def _census_receipt_path() -> Path | None:
+    """Receipt path declared by the census owner (scripts/runtime/live_ops_census.py).
+
+    State-dir knowledge stays in the owner; this view only borrows its
+    DEFAULT_OUTPUT constant (which honors DHARMA_STATE_DIR).
+    """
+    census_src = REPO_ROOT / "scripts/runtime/live_ops_census.py"
+    if not census_src.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("_live_ops_census", census_src)
+    if spec is None or spec.loader is None:
+        return None
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        return None
+    return Path(module.DEFAULT_OUTPUT)
 
 
 @dataclass
@@ -187,14 +204,15 @@ def build_custody() -> CustodyReport:
 
 
 def build_liveness() -> Liveness:
-    if not CENSUS_RECEIPT.exists():
+    receipt_path = _census_receipt_path()
+    if receipt_path is None or not receipt_path.exists():
         return Liveness(receipt=(
             "no census receipt — run "
             "python3 scripts/runtime/live_ops_census.py --write"))
     try:
-        payload = json.loads(CENSUS_RECEIPT.read_text(encoding="utf-8"))
+        payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     except Exception:
-        return Liveness(receipt=f"unreadable receipt at {CENSUS_RECEIPT}")
+        return Liveness(receipt=f"unreadable receipt at {receipt_path}")
     surfaces = []
     for surface in payload.get("surfaces") or []:
         if not isinstance(surface, dict):
@@ -205,7 +223,7 @@ def build_liveness() -> Liveness:
             "status": str(surface.get("status", "")),
         })
     return Liveness(
-        receipt=str(CENSUS_RECEIPT),
+        receipt=str(receipt_path),
         generated_at=str(payload.get("generated_at", "")),
         surfaces=surfaces,
     )
