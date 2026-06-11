@@ -11,11 +11,14 @@
 
 ## Registration
 
-This session operates under the persistent identity
-`devin-roaming-2987d222` (registration manifest pattern:
-`examples/agents/merge_master_mike.registration.json`; Devin nest:
-`docs/agents/devin-roaming-2987d222/`). All work in this session is
-tracked through:
+This is NOT a new agent registration. There is exactly one registered
+Devin agent in the swarm — `devin-roaming-2987d222` (registered at
+genesis 2026-05-22, 58/58 integrity checks; registration artifacts on the
+hub at `~/.dharma/external_agents/devin-roaming-2987d222/registration.json`;
+nest: `docs/agents/devin-roaming-2987d222/`). This session (863663ec) is
+an instance of that same identity and inherits its authority
+(`external_worker_evidence_only`), boundaries, and mailbox unchanged.
+All work in this session is tracked through:
 
 - this outbound packet (session id + URL above),
 - a dated session entry in `docs/agents/devin-roaming-2987d222/MEMORY.md`,

@@ -1,7 +1,7 @@
 # Master Prompt — Coherence Pass (written to self, as Anthropic Fable 5)
 
 **Role:** working_plan (per docs/AGENTS.md doc types — not canon, not authority)
-**Author:** devin-roaming-2987d222, session 863663ec, 2026-06-11
+**Author:** devin-roaming-2987d222 (the one registered Devin agent in the swarm; session 863663ec is an instance of that identity), 2026-06-11
 **Audience:** the next Devin/Fable build session that picks up this work
 **Registration:** `inter_agent/devin/outbound/2026-06-11T08-45Z-devin-session-registration-863663ec.md`
 **Replaces / subordinates to:** nothing — proposes work; owners stay where
