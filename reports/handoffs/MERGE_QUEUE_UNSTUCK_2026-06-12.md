@@ -13,13 +13,29 @@ Merges remain operator/Mike-gated.
 | PR | Action taken | Result |
 |---|---|---|
 | #561 provider-honesty-g6 | Appended an honest 4-field Coherence Delta block to the PR body (`gh pr edit 561 --body-file`); content sourced from the PR's own verification section + pre-review packets. No code change. | **Coherence Delta check: PASS** (run 27363198280). MERGEABLE / CLEAN. |
-| #562 evolution-archive-honesty | Fresh worktree, reset to origin tip, `git merge origin/main`; one conflict (AUTO_INVENTORY.md, generated) resolved via `check_docops_integrity.py --write-auto-sections`; `pytest tests/test_evolution.py tests/test_evolution_runtime_fields.py` → **102 passed**; pushed `f8fb428bc`. | MERGEABLE; CI re-running at write time. |
+| #562 evolution-archive-honesty | Fresh worktree, reset to origin tip, `git merge origin/main`; one conflict (AUTO_INVENTORY.md, generated) resolved via `check_docops_integrity.py --write-auto-sections`; `pytest tests/test_evolution.py tests/test_evolution_runtime_fields.py` → **102 passed**; pushed `f8fb428bc`. The push re-triggered the Coherence Delta gate, which #562's body also failed — appended an honest 4-field block (`gh pr edit 562 --body-file`), validated locally against the checker. | MERGEABLE / CLEAN. |
 | #567 pr-mike make targets | **Not touched** — Devin's janitor refreshed the branch tonight (fba5a5535) and it reads MERGEABLE / CLEAN on its own. | MERGEABLE / CLEAN. |
-| #574 qwen/spine-adoption | Fresh worktree off origin tip (local `~/dharma_swarm` checkout is dirty + behind — deliberately untouched); `git merge origin/main`; 5 conflicts, **all generated files** (AUTO_INVENTORY, SOVEREIGN_MANIFEST, active_track_evidence.{json,md}, track_portfolio.json); resolved via `check_track_status.py` + `--write-auto-sections` + manual SOVEREIGN_MANIFEST row sync (675 modules / 392 top-level / 25 bridges / 11,117 test fns / 898 md files / 221,655 md lines); `pytest -k "holon or spine"` → **116 passed, 3 skipped**; pushed `a041e3f0c`. | MERGEABLE; CI re-running at write time. |
+| #574 qwen/spine-adoption | Fresh worktree off origin tip (local `~/dharma_swarm` checkout is dirty + behind — deliberately untouched); `git merge origin/main`; 5 conflicts, **all generated files** (AUTO_INVENTORY, SOVEREIGN_MANIFEST, active_track_evidence.{json,md}, track_portfolio.json); resolved via `check_track_status.py` + `--write-auto-sections` + manual SOVEREIGN_MANIFEST row sync; `pytest -k "holon or spine"` → **116 passed, 3 skipped**; pushed `a041e3f0c`. Then fixed 3 of 4 pre-existing lane gate failures in `f3c83bb2f`: (a) ACTIVE_TRACK managed-block drift → `render_active_track_includes.py` re-render; (b) DocOps canonical guard → registered `SPINE_ADOPTION_NARRATIVE.md` + `SAB_DHARMIC_AGORA_REMOTE_HANDOFF` authority-term mentions in `docs/docops/assertions.yaml` (precedent: plans/agent docs already in that list); (c) Fourfold Shakti Warrant BLOCK → honest `[impact-checked]` ack appended to PR body (orchestrator change is `DHARMA_SPINE_DISPATCH`-gated; dispatch tests green). | MERGEABLE; **Rule 10 blocker remains — operator decision** (see below). |
 | #564 honest-spine handoff | Same procedure; 2 conflicts (both generated); regen + md-count row sync; pushed `3941d39cd`. | CI re-running at write time. |
 | #568 A2A retention | **Not touched** — Devin refreshed it tonight (ecfa99f9e); MERGEABLE / CLEAN. | MERGEABLE / CLEAN. |
 
 Zero non-generated conflicts were encountered anywhere — the SEAT_REBASE_PREVIEW prediction held exactly.
+
+### ⚠ The one remaining blocker: Rule 10 on #574 (operator decision required)
+
+`Rule 10 — module line budget` fails on #574 because `dharma_swarm/orchestrator.py` is at
+**2,898 lines vs grandfathered ceiling 2,777** (grandfather 2,525 +10%,
+`scripts/governance/check_module_budget.py`). **main is already over the ceiling at 2,858**
+— any PR touching orchestrator.py fails Rule 10 today; the lane only adds +40 (flag-gated
+spine dispatch). This is not mechanically fixable without a governance change, so it was
+NOT touched. Operator options:
+
+1. Bump `GRANDFATHERED["dharma_swarm/orchestrator.py"]` to 2858 (current main) in
+   `check_module_budget.py` with a decomposition-issue link — small governance PR, or fold
+   the one-line bump into #574 itself.
+2. Shrink orchestrator.py by ≥121 lines on the lane (decomposition — not a tonight job).
+3. Operator-override the check at merge time (it is a failing check, not a conflict;
+   `gh pr merge --admin` bypasses if branch protection allows).
 
 ## #579 verdict (Coherence-Delta gate-softening PR)
 

@@ -35,6 +35,8 @@
 | NEW-11: TelicSeam singleton missing signal_bus | — | ✅ FIXED | `get_seam()` now passes `signal_bus=SignalBus.get()` to singleton |
 | BR-007: runtime.db path drift + store split | BLOCKER | ✅ RESOLVED | `_record_memory_fact()` now writes `state/runtime.db`; `engine/store_sync.py` materializes ontology Outcomes into runtime ArtifactRecords; cron + room-health guards wired. |
 | BR-008: VentureCell room/ontology split | BLOCKER | ✅ RESOLVED | `fractal/room_bridge.py` uses deterministic room IDs for ontology objects, updates through `put_object()`, preserves `room_status`, and room-health persists ontology sync. |
+| NEW-12: cross-lane test↔module drift broke suite collection | BLOCKER | ⚠️ GUARDED (2026-06-12) | `tests/test_a2a_readiness_gate.py` (untracked) imports `operator_core.a2a_task_lifecycle` and `tests/test_autonomous_agent.py` (modified) imports `_resolve_agent_model_override` — both exist only on the holon/spine-v1 lane (`946e876e9`/`6b9b51e1b`), not this branch. Collection of the entire suite hard-failed. Guarded with `pytest.importorskip`/`skipif` so they activate when the lane lands. |
+| NEW-13: cli_wake mutates shared PRESET_AGENTS | DEGRADED | ✅ FIXED (2026-06-12) | `cli_wake(model=...)` set `identity.model` directly on the shared preset object, corrupting every later wake of that preset in-process (runtime-proven: reviewer preset became `model="gemini"`). Now copies via `dataclasses.replace`. |
 
 **Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 1 structural degraded remains (message_bus semantics).
 
