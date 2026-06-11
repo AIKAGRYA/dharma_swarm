@@ -15,16 +15,16 @@ Environment facts (apply to every command below):
 - Booting the app rewrites `.dharma-terminal-state.json`. Every boot sets `DHARMA_TERMINAL_STATE_DIR` and `DHARMA_TERMINAL_SUPERVISOR_STATE_DIR` to a fresh `$(mktemp -d)`.
 - Hermetic boots set `DHARMA_PYTHON=/nonexistent/python`; the app degrades gracefully to "backend offline, retrying" without the Python bridge.
 - tmux send-keys races the render. After any send-keys, sleep at least 1.5 seconds before capture-pane.
-- Pre-existing expected dirt at session start: `terminal/.dharma-terminal-state.json` modified, `terminal/bun.lock` and `.parked-fresh-node-modules/` untracked. Restore the state file to HEAD (`git checkout -- terminal/.dharma-terminal-state.json`); leave the other two alone (S0 features own them).
+- Pre-existing expected dirt at session start: `terminal/.dharma-terminal-state.json` modified, `terminal/bun.lock` and `.parked-fresh-node-modules/` untracked. Restore the state file to HEAD content via `git show HEAD:terminal/.dharma-terminal-state.json > terminal/.dharma-terminal-state.json`; leave the other two alone (S0 features own them).
 
 ## Step 1 — Orient
 
 ```bash
 pwd                      # expect /Users/dhyana/dharma_helm_build
-git log --oneline -3     # expect a6ad97362 at HEAD
+git log --oneline -3     # spec-package commits may sit on top of baseline a6ad97362
 ```
 
-If HEAD is not `a6ad97362`, stop and write what you found to `claude-progress.txt` instead of proceeding.
+Verify lineage, not a literal HEAD: `git rev-parse --abbrev-ref HEAD` must print `helm/worldclass-20260612` AND `git merge-base --is-ancestor a6ad97362 HEAD` must exit 0. If either fails, stop and write what you found to `claude-progress.txt` instead of proceeding. (Spec-package and prior-session commits on top of the baseline are expected.)
 
 ## Step 2 — Typecheck baseline
 
@@ -130,9 +130,9 @@ Fill in only numbers you observed in this session's tool output.
 
 ```bash
 cd /Users/dhyana/dharma_helm_build
-git checkout -- terminal/.dharma-terminal-state.json
+git show HEAD:terminal/.dharma-terminal-state.json > terminal/.dharma-terminal-state.json
 git add spec-forge/baseline-failures.txt spec-forge/truecolor-preflight.txt \
-        spec-forge/prompts terminal/LESSONS terminal/tests/golden/pre-theme claude-progress.txt
+        terminal/LESSONS terminal/tests/golden/pre-theme claude-progress.txt
 git status --short    # only the adds above staged; bun.lock and .parked-fresh-node-modules stay untracked
 git commit -m "helm S0-init: baseline characterization (65 red), pre-theme goldens, truecolor preflight, LESSONS seed"
 git log --oneline -2
