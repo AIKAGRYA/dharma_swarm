@@ -24,10 +24,17 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Callable
+
+_GOVERNANCE_DIR = Path(__file__).resolve().parents[1]
+if str(_GOVERNANCE_DIR) not in sys.path:
+    sys.path.insert(0, str(_GOVERNANCE_DIR))
+
+import assurance_boundary  # noqa: E402  (sibling governance module)
 
 _SKIP_DIR_NAMES = {".git", ".venv", "node_modules", "__pycache__"}
 
@@ -213,6 +220,35 @@ def measure_property_test_files(repo_root: Path) -> Reading:
     return Reading(value=len(files), evidence=tuple(_rel(p, repo_root) for p in files))
 
 
+def _boundary_report(repo_root: Path) -> "assurance_boundary.BoundaryReport":
+    try:
+        return assurance_boundary.run_boundary(repo_root)
+    except assurance_boundary.BrokenBoundary as exc:
+        raise BrokenCounter(str(exc)) from exc
+
+
+def _boundary_measured(repo_root: Path, contract: str) -> Reading:
+    violations = _boundary_report(repo_root).measured[contract]
+    return Reading(value=len(violations), evidence=tuple(v.render() for v in violations))
+
+
+def measure_boundary_unfrozen_records(repo_root: Path) -> Reading:
+    return _boundary_measured(repo_root, "AB-01")
+
+
+def measure_boundary_unwitnessed_swallows(repo_root: Path) -> Reading:
+    return _boundary_measured(repo_root, "AB-02")
+
+
+def measure_boundary_unsupervised_spawns(repo_root: Path) -> Reading:
+    return _boundary_measured(repo_root, "AB-03")
+
+
+def measure_boundary_contract_violations(repo_root: Path) -> Reading:
+    violations = _boundary_report(repo_root).hold_at_zero
+    return Reading(value=len(violations), evidence=tuple(v.render() for v in violations))
+
+
 def measure_hygiene_patterns_enforced_or_resolved(repo_root: Path) -> Reading:
     directory = repo_root / "docs" / "governance" / "hygiene" / "patterns"
     if not directory.is_dir():
@@ -302,5 +338,53 @@ COUNTERS: tuple[Counter, ...] = (
             "forward motion. Promotions may not be silently undone."
         ),
         measure=measure_hygiene_patterns_enforced_or_resolved,
+    ),
+    # -- assurance boundary (scripts/governance/assurance_boundary.py) ----
+    # Contract violations measured inside the V0 boundary (spine,
+    # memory_kernel, a2a, runtime_state, runtime_provider). The boundary
+    # gate states the contracts; the ratchet banks the drain.
+    Counter(
+        name="boundary_unfrozen_records",
+        direction=Direction.DOWN,
+        end_target=0,
+        definition=(
+            "AB-01: boundary record/receipt dataclasses that are not frozen "
+            "or lack schema_version — provenance must be structured data."
+        ),
+        measure=measure_boundary_unfrozen_records,
+    ),
+    Counter(
+        name="boundary_unwitnessed_swallows",
+        direction=Direction.DOWN,
+        end_target=0,
+        definition=(
+            "AB-02: broad except handlers inside the boundary that continue "
+            "without re-raise, escalation, or a witness call (the 92% rule)."
+        ),
+        measure=measure_boundary_unwitnessed_swallows,
+    ),
+    Counter(
+        name="boundary_unsupervised_spawns",
+        direction=Direction.DOWN,
+        end_target=0,
+        definition=(
+            "AB-03: fire-and-forget asyncio task spawns inside the boundary — "
+            "a discarded Task handle makes failure unobservable. At zero; "
+            "must stay there."
+        ),
+        measure=measure_boundary_unsupervised_spawns,
+    ),
+    Counter(
+        name="boundary_contract_violations",
+        direction=Direction.DOWN,
+        end_target=0,
+        definition=(
+            "AB-04 + AB-05 hold-at-zero contract violations: direct provider "
+            "imports outside the canonical door, and correlation-spine layers "
+            "whose declared receipt class does not resolve. Known debt: the "
+            "request_response layer's A2ATaskReceipt is declared but defined "
+            "nowhere (reconciliation-track drain)."
+        ),
+        measure=measure_boundary_contract_violations,
     ),
 )

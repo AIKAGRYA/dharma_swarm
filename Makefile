@@ -257,6 +257,12 @@ quality-ratchet:
 quality-ratchet-check:
 	$(PYTHON) scripts/governance/hygiene/ratchet.py
 
+# Assurance boundary V0: contracts (not counts) on spine, memory_kernel,
+# a2a, runtime_state, runtime_provider. Exit 1 lists hold-at-zero
+# violations with file:line evidence; the ratchet banks the drain.
+assurance-boundary:
+	$(PYTHON) scripts/governance/assurance_boundary.py
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
