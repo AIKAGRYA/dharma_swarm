@@ -12,6 +12,7 @@ build/
 .env
 
 # Local runtime state (machine-specific)
+terminal/.dharma-terminal-state.json
 .claude-flow/
 .claude/
 .swarm/
