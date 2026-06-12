@@ -3,7 +3,6 @@ name: docops-integrity
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
-  merge_group:
   schedule:
     # Weekly freshness check for docs/docops/assertions.yaml ttl_days.
     - cron: "37 12 * * 1"

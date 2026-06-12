@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
     types: [opened, edited, reopened, synchronize, ready_for_review]
-  merge_group:
 
 concurrency:
   group: coherence-delta-${{ github.ref }}
@@ -18,9 +17,6 @@ jobs:
   coherence-delta:
     name: Coherence Delta PR body
     runs-on: ubuntu-latest
-    # PR-body validation already passed before a PR can enter the queue.
-    # merge_group has no pull_request body context.
-    if: github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
       - name: Checkout

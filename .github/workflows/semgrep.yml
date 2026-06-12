@@ -3,7 +3,6 @@ name: semgrep
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
-  merge_group:
   push:
     branches: [main]
   schedule:

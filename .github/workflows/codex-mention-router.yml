@@ -16,11 +16,6 @@ on:
         required: false
         default: false
         type: boolean
-      required_reviewers:
-        description: Comma-separated reviewer receipt names; use "none" only for docs-low automation
-        required: false
-        default: codex,claude
-        type: string
 
 permissions:
   checks: read
@@ -135,7 +130,7 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           MERGE_WHEN_CLEAN: ${{ steps.command.outputs.merge_when_clean }}
           BACKLOG_REQUESTED: ${{ steps.command.outputs.backlog_requested }}
-          REQUIRED_REVIEWERS: ${{ inputs.required_reviewers || 'codex,claude' }}
+          REQUIRED_REVIEWERS: copilot,claude,devin
           MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}

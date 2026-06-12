@@ -19,7 +19,6 @@ name: active-track-governance
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
-  merge_group:
   schedule:
     # Weekly TTL freshness check on docs/governance/ACTIVE_TRACK.yaml verified_at.
     - cron: "23 13 * * 1"

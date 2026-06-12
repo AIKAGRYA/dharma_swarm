@@ -39,8 +39,8 @@ jobs:
           limit=""
           pattern=""
           case "$HEAD_REF" in
-            *spine-adoption*)
-              key="spine-adoption-refresh"; limit="1"; pattern="spine-adoption" ;;
+            chore/governance*spine-adoption*)
+              key="spine-adoption-refresh"; limit="1"; pattern="chore/governance.*spine-adoption" ;;
             chore/docops-autorefresh*)
               key="docops-autorefresh";     limit="1"; pattern="chore/docops-autorefresh" ;;
             verdict/inter_agent*)
