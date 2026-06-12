@@ -984,6 +984,12 @@ class OllamaProvider(LLMProvider):
         if self._transport_mode == "cloud_api":
             return await self._complete_openai_compat(model, messages, request)
 
+        # Keyless local transport cannot serve :cloud models (the local daemon
+        # proxies them to ollama.com and gets 401). Degrade to the local
+        # default so frontier-pinned agents stay functional without a key.
+        if model.endswith(":cloud") and not (self._api_key or "").strip():
+            model = OLLAMA_DEFAULT_LOCAL_MODEL
+
         return await self._complete_native(model, messages, request)
 
     async def _complete_openai_compat(

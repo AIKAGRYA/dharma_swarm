@@ -1,6 +1,7 @@
 """Tests for dharma_swarm.providers."""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,6 +16,7 @@ from dharma_swarm.providers import (
     GroqProvider,
     ModelRouter,
     NVIDIANIMProvider,
+    OllamaProvider,
     OpenAIProvider,
     OpenRouterFreeProvider,
     SiliconFlowProvider,
@@ -393,3 +395,24 @@ async def test_model_router_injects_survival_directive():
     await router.complete(ProviderType.ANTHROPIC, request)
     assert captured_request is not None
     assert "CONTEXT WILL BE DESTROYED" in captured_request.system
+
+
+@pytest.mark.asyncio
+async def test_ollama_keyless_local_degrades_cloud_model(monkeypatch):
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    p = OllamaProvider()
+    seen: dict[str, str] = {}
+
+    async def fake_native(model, messages, request):
+        seen["model"] = model
+        return SimpleNamespace(content="ok")
+
+    monkeypatch.setattr(p, "_complete_native", fake_native)
+    request = LLMRequest(
+        model="glm-5:cloud",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    await p.complete(request)
+    assert seen["model"] == p.default_model
+    assert not seen["model"].endswith(":cloud")
