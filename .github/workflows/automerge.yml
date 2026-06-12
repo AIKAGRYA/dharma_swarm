@@ -18,10 +18,17 @@ name: automerge
 # Opting in:
 #   gh pr edit <N> --add-label automerge      # human PRs
 #   Bot lanes should label their PRs `bot-pr` at creation time.
+#
+# Auto-enrollment (no manual labeling needed):
+#   PRs authored by bots (login ends in `[bot]`, is_bot, or `Copilot`) and PRs
+#   whose title carries an automation marker (`[automated]` / `[auto]`) are
+#   automatically given the `bot-pr` label by the enroll step below, so they
+#   enter this lane without anyone remembering to label them. Remove the label
+#   to opt a PR out.
 
 on:
   pull_request:
-    types: [labeled, ready_for_review]
+    types: [opened, reopened, labeled, ready_for_review]
   check_suite:
     types: [completed]
   pull_request_review:
@@ -57,6 +64,31 @@ jobs:
       EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
       CHECK_SUITE_SHA: ${{ github.event.check_suite.head_sha || '' }}
     steps:
+      - name: Auto-enroll bot and automated PRs
+        run: |
+          set -euo pipefail
+          # Apply `bot-pr` to every open PR that is bot-authored or carries an
+          # automation marker in its title but has no opt-in label yet, so the
+          # lane engages without manual labeling. Drafts are still never
+          # dispatched (step below), and removing the label opts a PR out
+          # permanently for that evaluation pass.
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,title,labels,author \
+            --jq '.[]
+              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr") | not)
+              | select(
+                  (.author.is_bot == true)
+                  or (.author.login | test("\\[bot\\]$"))
+                  or (.author.login == "Copilot")
+                  or (.title | ascii_downcase | test("\\[automated\\]|\\[auto\\]"))
+                )
+              | .number' > /tmp/enroll.txt || true
+          while IFS= read -r pr; do
+            [ -z "$pr" ] && continue
+            echo "Auto-enrolling #${pr} with bot-pr label"
+            gh pr edit "$pr" --repo "$GH_REPO" --add-label bot-pr || true
+          done < /tmp/enroll.txt
+
       - name: Build candidate PR list
         id: candidates
         run: |

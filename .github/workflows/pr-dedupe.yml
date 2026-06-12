@@ -19,8 +19,12 @@ name: pr-dedupe
 #
 # What this does NOT do:
 #   - It never touches PRs without an automation marker in the title.
-#   - It never closes draft PRs.
 #   - It never merges anything (Merge Master Mike owns merges).
+#
+# Drafts: duplicate automated PRs are closed even when draft — automation
+# lanes that open refresh PRs as drafts otherwise pile up forever (the
+# #559/#571/#580/#583 spine-refresh pile was all drafts). A draft PR with a
+# unique title is never touched.
 
 on:
   pull_request_target:
@@ -63,7 +67,6 @@ jobs:
           # automation marker are eligible for dedupe.
           jq -c '
             [ .[]
-              | select(.isDraft == false)
               | . + {norm: (.title | ascii_downcase | gsub("\\s+"; " ") | gsub("^ | $"; ""))}
               | select(.norm | test("\\[automated\\]|\\[auto\\]"))
             ]
