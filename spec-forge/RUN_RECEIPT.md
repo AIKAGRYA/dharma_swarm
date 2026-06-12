@@ -53,3 +53,4 @@ RUN_START 2026-06-12T00:22:09Z mode=in-session-conductor caps=8cycles/batch head
 2026-06-12T01:38:34Z F-006 GREEN 947a130ac packageManager bun@1.3.11 grep exit 0, bun test exit 0 527/527 under bun 1.3.11, pty_smoke exit 0 9 keystrokes, ratchets 4064/flat/97, 6/6 pre-theme goldens identical
 2026-06-12T01:48:41Z F-007 GREEN a302ca813 ls-files+frozen-install exit 0, blob 5be52a08b as-is, 527/527 tests 0 fail, ratchets 4064/40/97 flat, 6/6 pre-theme goldens identical
 2026-06-12T02:03:43Z F-008 GREEN 7eba0613d ratchet.sh baseline exit 0 max_file_lines=4064, +50-line probe exit 1 then revert clean, typecheck 0, 527/527 tests 0 fail, ratchets 4064/40/97 flat, 6/6 pre-theme goldens identical
+HARNESS-AMENDED 2026-06-12T02:11:31Z head=c4dfa1ccf (operator-sanctioned batch-boundary spec amendment F-157..F-170 + CONSTITUTION design-truth pointer; evaluator window starts here)

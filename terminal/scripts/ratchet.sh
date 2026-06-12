@@ -8,9 +8,12 @@
 #   max_file_lines — largest source file (lines) across terminal/src
 #                    (*.ts, *.tsx, recursive). Baseline 4064 = protocol.ts;
 #                    end target <=400 per file.
+#   dup_functions  — identically-named top-level function declarations
+#                    shared between Sidebar.tsx and RepoPane.tsx.
+#                    Baseline 40; end target 0.
 #
-# F-009 (dup_functions), F-010 (record_unknown), F-012 (hex_violations)
-# extend this script with their own counters when they land.
+# F-010 (record_unknown) and F-012 (hex_violations) extend this script
+# with their own counters when they land.
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -54,6 +57,27 @@ if [ "$max_file_lines" -gt "$baseline_max_file_lines" ]; then
 fi
 if [ "$max_file_lines" -lt "$baseline_max_file_lines" ]; then
   echo "ratchet: max_file_lines improved ($max_file_lines < baseline $baseline_max_file_lines) — tighten $BASELINES_FILE" >&2
+fi
+
+# Counter: dup_functions (F-009)
+sidebar_file="$TERMINAL_DIR/src/components/Sidebar.tsx"
+repopane_file="$TERMINAL_DIR/src/components/RepoPane.tsx"
+[ -f "$sidebar_file" ] || fail "missing source file: $sidebar_file"
+[ -f "$repopane_file" ] || fail "missing source file: $repopane_file"
+
+top_level_fn_names() {
+  grep -oE '^(export )?function [A-Za-z0-9_]+' "$1" | sed -E 's/^(export )?function //' | sort -u
+}
+
+dup_functions=$(( $(comm -12 <(top_level_fn_names "$sidebar_file") <(top_level_fn_names "$repopane_file") | wc -l) ))
+baseline_dup_functions=$(read_baseline dup_functions)
+echo "dup_functions=$dup_functions"
+
+if [ "$dup_functions" -gt "$baseline_dup_functions" ]; then
+  fail "dup_functions $dup_functions exceeds baseline $baseline_dup_functions (top-level function names shared by Sidebar.tsx and RepoPane.tsx)"
+fi
+if [ "$dup_functions" -lt "$baseline_dup_functions" ]; then
+  echo "ratchet: dup_functions improved ($dup_functions < baseline $baseline_dup_functions) — tighten $BASELINES_FILE" >&2
 fi
 
 echo "ratchet: OK"
