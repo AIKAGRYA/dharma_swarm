@@ -37,10 +37,17 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/evolution.py": 3401,
     "dharma_swarm/swarm.py": 3252,
     "dharma_swarm/providers.py": 3096,
-    "dharma_swarm/orchestrator.py": 2525,
+    # 2026-06-12: re-grandfathered from 2525 — multi-lane rescue (PR #585) folded
+    # spine-dispatch + lane work; decomposition issue #587.
+    "dharma_swarm/orchestrator.py": 2896,
     "dharma_swarm/tui/app.py": 2520,
     "dharma_swarm/terminal_bridge.py": 2539,
     "dharma_swarm/operator_core/control_surface.py": 1001,
+    # 2026-06-12: PR #585 rescue batch — decomposition issue #587.
+    "dharma_swarm/context_compiler.py": 1017,
+    "dharma_swarm/operator_core/control_surface_memory.py": 1240,
+    "dharma_swarm/operator_core/living_agent_kernel.py": 2921,
+    "dharma_swarm/operator_core/runtime_truth.py": 1008,
 }
 
 LINE_BUDGET = 1000  # New modules: hard limit.
