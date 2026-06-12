@@ -86,6 +86,8 @@ export const initialState: AppState = {
     sidebarMode: "toc",
     focusedPaneId: "chat",
     compactMode: false,
+    // F-111: zen is the boot default — never persisted, every boot starts here.
+    layoutMode: "zen",
   },
   bridgeStatus: "booting",
   routePolicy: initialRoutePolicy,
@@ -316,6 +318,14 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           ...state.uiMode,
           sidebarMode: action.mode,
           sidebarVisible: "visible",
+        },
+      };
+    case "layout.mode.set":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          layoutMode: action.mode,
         },
       };
     case "tab.activate":

@@ -154,6 +154,13 @@ async function renderShellAt(
   });
 
   try {
+    // F-111: zen (transcript + composer + status line only) is the boot
+    // default; the compact-shell contract under test is COCKPIT furniture,
+    // so the driver enters cockpit the way an operator would.
+    await Bun.sleep(150);
+    stdin.write("/cockpit");
+    await Bun.sleep(50);
+    stdin.write("\r");
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline && !settled(stripAnsi(rendered))) {
       await Bun.sleep(50);

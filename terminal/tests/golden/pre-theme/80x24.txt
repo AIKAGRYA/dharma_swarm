@@ -1,24 +1,24 @@
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA  OFF | codex:gpt-5.4 | REA | Chat                                     │
-│ tab navigation | responsive                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯
- loop unknown  verify unknown  runtime idle  approvals clear
-[Chat] Mission Repo Commands Models Ontology ▸
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ Chat                                                                         │
-│ Live operator exchange, assistant output, and command spillover that still   │
-│ belongs in chat.                                                             │
-│                                                                              │
-│ Dharma Terminal                                                              │
-│ Keyboard-first operator shell. Backend bridged over stdio.                   │
-│ Use plain prompts or slash commands. Chat carries the conversation; the      │
-│ surrounding tabs expose runtime, tools, and system state.                    │
-╰──────────────────────────────────────────────────────────────────────────────╯
+ Dharma Terminal
+ Keyboard-first operator shell. Backend bridged over stdio.
+ Use plain prompts or slash commands. Chat carries the conversation; the
+ surrounding tabs expose runtime, tools, and system state.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                            │
-│ route  ready | codex:gpt-5.4                                                 │
-│ keys  Tab tabs | Enter send | ^B side | ↑/↓ scroll                           │
-╰──────────────────────────────────────────────────────────────────────────────╯
+ zen  ·  codex:gpt-5.4  ·  offline  ·  backend offline, retrying  ·  F2 cockpi…

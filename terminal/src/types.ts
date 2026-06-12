@@ -448,6 +448,9 @@ export type UIModeOverlay =
 
 export type SidebarVisibility = "visible" | "collapsed" | "hidden";
 
+// F-063: zen is the boot default; deck-focus carries the focused deck name.
+export type LayoutMode = "zen" | "cockpit" | `deck-focus:${string}`;
+
 export type UIModeState = {
   activeTabId: string;
   activeOverlay: UIModeOverlay;
@@ -455,6 +458,7 @@ export type UIModeState = {
   sidebarMode: SidebarMode;
   focusedPaneId: string;
   compactMode: boolean;
+  layoutMode: LayoutMode;
 };
 
 export type RoutePolicyState = {
@@ -543,6 +547,7 @@ export type AppAction =
   | {type: "footer.set"; value: string}
   | {type: "sidebar.toggle"}
   | {type: "sidebar.mode"; mode: SidebarMode}
+  | {type: "layout.mode.set"; mode: LayoutMode}
   | {type: "tab.activate"; tabId: string}
   | {type: "tab.cycle"; direction: 1 | -1}
   | {type: "pane.scroll"; tabId: string; delta: number; maxOffset: number}

@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useReducer, useRef} from "react";
-import {Box, useApp, useInput} from "ink";
+import {Box, Text, useApp, useInput, useStdin} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
@@ -29,6 +29,7 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
+import {matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {focusModeFor, footerHintFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
@@ -2682,12 +2683,106 @@ export function App(): React.ReactElement {
     dispatch({type: "ui.compact.set", compact: compactShell});
   }, [compactShell]);
 
+  // F-065/F-066 + operator word 2026-06-12: layout, pane, model, and tour
+  // intents resolve LOCALLY (offline-capable, instant) with a full transcript
+  // turn — the composer steers the UI in plain language or via slash commands.
+  function runLocalUiAction(submitted: string, intent: UiIntent): void {
+    // The confirmation rides the SAME assistant-event canonicalization as real
+    // backend answers (F-173), so steering the UI reads like a conversation:
+    // you ask, the Helm answers, the turn closes ✓ — multi-line tour included.
+    const respond = (message: string, activateTabId = "chat"): void => {
+      queueAppActions(dispatch, [
+        {
+          type: "execution.events.ingest",
+          events: [
+            userPromptExecutionEvent(submitted),
+            ...canonicalEventsFromBridgeEvent({
+              type: "assistant",
+              request_id: `local-ui-${Date.now()}`,
+              message,
+            }),
+            localCommandResultExecutionEvent(submitted, message.split("\n")[0] ?? message),
+          ],
+        },
+        {type: "tab.activate", tabId: activateTabId},
+        {type: "status.set", value: message.split("\n")[0] ?? message},
+      ]);
+    };
+    if (intent.kind === "layout") {
+      dispatch({type: "layout.mode.set", mode: intent.mode});
+      respond(
+        intent.mode === "zen"
+          ? "Zen — just the conversation. F2 or /cockpit brings the panel back."
+          : "Cockpit — full panel. F2 or /zen returns to the quiet view.",
+      );
+      return;
+    }
+    if (intent.kind === "pane") {
+      respond(
+        `Opened ${intent.title}. Tab cycles panes · ^K opens the switcher · say "open the chat pane" to come back.`,
+        intent.tabId,
+      );
+      return;
+    }
+    if (intent.kind === "model") {
+      if (stateRef.current.bridgeStatus !== "connected") {
+        respond(`Route switch needs the backend — it is ${stateRef.current.bridgeStatus}. Try again once connected.`);
+        return;
+      }
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: intent.target.provider,
+        model: intent.target.model,
+        strategy: stateRef.current.routePolicy.strategy,
+      });
+      respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
+      return;
+    }
+    const panes = stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title}));
+    respond(tourLines(panes).join("\n"));
+  }
+
+  function localUiSlashIntent(submitted: string): UiIntent | null {
+    const text = submitted.trim().toLowerCase();
+    if (text === "/zen") return {kind: "layout", mode: "zen"};
+    if (text === "/cockpit") return {kind: "layout", mode: "cockpit"};
+    if (text === "/tour") return {kind: "tour"};
+    return null;
+  }
+
   function submitPrompt(prompt: string): void {
     const submitted = prompt.trim();
     if (!submitted) {
       return;
     }
     dispatch({type: "prompt.clear"});
+    const deckMatch = submitted.trim().toLowerCase().match(/^\/deck\s+([a-z0-9_-]+)$/);
+    if (deckMatch) {
+      // F-065: /deck <name> enters deck-focus; until decks ship (S6) it focuses
+      // the matching pane inside the cockpit chrome.
+      dispatch({type: "layout.mode.set", mode: `deck-focus:${deckMatch[1]}`});
+      const target = stateRef.current.tabs.find((tab) => tab.id === deckMatch[1]);
+      runLocalUiAction(submitted, target
+        ? {kind: "pane", tabId: target.id, title: target.title}
+        : {kind: "layout", mode: "cockpit"});
+      return;
+    }
+    const slashIntent = localUiSlashIntent(submitted);
+    if (slashIntent) {
+      runLocalUiAction(submitted, slashIntent);
+      return;
+    }
+    if (!isSlashCommandPrompt(submitted)) {
+      const nlIntent = matchUiIntent(
+        submitted,
+        stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title})),
+        selectableRouteTargets(stateRef.current.routePolicy),
+      );
+      if (nlIntent) {
+        runLocalUiAction(submitted, nlIntent);
+        return;
+      }
+    }
     if (isBareModelCommand(submitted)) {
       dispatch({
         type: "modelPicker.open",
@@ -2848,6 +2943,28 @@ export function App(): React.ReactElement {
       {type: "status.set", value: `requesting route -> ${choice.provider}:${choice.model}`},
     ]);
   }
+
+  // F-064: F2 toggles zen <-> cockpit. ink 5 blanks F-key input inside
+  // useInput (f2 is in nonAlphanumericKeys with no key flag), so the toggle
+  // listens on the raw stdin bytes instead: ESC OQ / ESC [12~ / ESC [[B.
+  const {stdin: rawStdin} = useStdin();
+  useEffect(() => {
+    if (!rawStdin) {
+      return;
+    }
+    const onData = (data: Buffer | string): void => {
+      const sequence = data.toString();
+      if (sequence === "OQ" || sequence === "[12~" || sequence === "[[B") {
+        const next = stateRef.current.uiMode.layoutMode === "zen" ? "cockpit" : "zen";
+        dispatch({type: "layout.mode.set", mode: next});
+        dispatch({type: "status.set", value: `${next} layout — F2 toggles`});
+      }
+    };
+    rawStdin.on("data", onData);
+    return () => {
+      rawStdin.off("data", onData);
+    };
+  }, [rawStdin]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
@@ -3167,6 +3284,50 @@ export function App(): React.ReactElement {
       dispatch({type: "prompt.append", value: input});
     }
   });
+
+  // F-111: zen is the boot default and contains exactly the transcript, the
+  // composer, and ONE thin status line (F-110) — the Claude Code-grade main
+  // stage. Tab/^K still navigate: any non-chat pane or overlay falls through
+  // to the full cockpit chrome below; returning to chat restores zen.
+  if (
+    state.uiMode.layoutMode === "zen" &&
+    activeTab?.kind === "chat" &&
+    state.uiMode.activeOverlay.kind === "none"
+  ) {
+    const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    const zenStatus = [
+      "zen",
+      routeLabel(state.routePolicy),
+      state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
+      state.statusLine,
+      "F2 cockpit · /tour",
+    ]
+      .filter(Boolean)
+      .join("  ·  ");
+    return (
+      <Box flexDirection="column" height={terminalHeight}>
+        <Box flexGrow={1} flexDirection="column" overflow="hidden">
+          <Box flexShrink={0} flexDirection="column">
+            <TranscriptPane
+              frameless
+              title="Chat"
+              lines={displayedTranscriptLines}
+              scrollOffset={activeScrollOffset}
+              windowSize={zenWindow}
+              emptyState={transcriptMeta.emptyState}
+              accentColor={transcriptMeta.accentColor}
+            />
+          </Box>
+        </Box>
+        <Box flexDirection="column" flexShrink={0}>
+          <Composer prompt={state.prompt} compact={compactShell} />
+          <Box paddingX={1}>
+            <Text dimColor wrap="truncate-end">{zenStatus}</Text>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     // F-163 fill law: the root owns exactly the terminal's rows — the pane row

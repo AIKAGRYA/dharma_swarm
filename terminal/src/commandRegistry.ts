@@ -48,6 +48,12 @@ export const COMMAND_TAB_REGISTRY: Readonly<Record<string, string>> = {
   permissions: "approvals",
   status: "control",
   dashboard: "control",
+  // F-065 + tour: layout/tour commands are answered locally in submitPrompt
+  // (same pattern as the bare /model picker) — they never reach the bridge.
+  zen: "chat",
+  cockpit: "chat",
+  deck: "chat",
+  tour: "chat",
 };
 
 export const REGISTERED_SLASH_COMMANDS: readonly string[] = Object.keys(COMMAND_TAB_REGISTRY);

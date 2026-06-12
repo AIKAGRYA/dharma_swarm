@@ -1,5 +1,5 @@
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Chat  |  moderoute selection  |  panes 15   │
+│ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.4  |  state READY  |  focus Chat  |  mode route selection  |  panes 15 │
 │                                                                                                                      │
 │ operator shell | route truth | execution trace                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
