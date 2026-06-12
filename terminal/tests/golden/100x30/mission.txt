@@ -7,16 +7,17 @@
 │ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 Chat [Mission] Repo Commands Models Ontology ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Mission                                                                                     │
-│  │ │ Bootstrap framing, intent routing, and session launch context.                              │
-│  │ │                                                                                             │
-│  │ │ ◆ Operator Shell                                                                            │
-│  │ │ ◇ Goal                                                                                      │
-│  │ │ Provide one clean operator shell with continuity, visible execution, and repo-aware state.  │
-│  │ │ ◇ Principles                                                                                │
-│  │ │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate output.            │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Mission                                                             │
+│                          │ │ Bootstrap framing, intent routing, and session launch context.      │
+│ Active                   │ │                                                                     │
+│ Mission | bridge offline │ │ ◆ Operator Shell                                                    │
+│ Model codex gpt-5.4      │ │ ◇ Goal                                                              │
+│ Repo Preview             │ │ Provide one clean operator shell with continuity, visible           │
+│ Git n/a@n/a | n/a | sync │ │ execution, and repo-aware state.                                    │
+│  n/a                     │ │ ◇ Principles                                                        │
+│ Dirty staged n/a |       │ │ One state model. One bridge. Visible tools. Minimal chrome. No      │
+│ unstaged n/a | un… |     │ │ duplicate output.                                                   │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

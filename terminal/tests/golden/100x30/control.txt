@@ -1,22 +1,22 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ DHARMA  OFF | codex:gpt-5.4 | REA | Control                                                      │
+│ pane section focus | responsive                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown   │
 │ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Sessions Approvals [Control] Agents Evolution Thinking ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Control                                                                                     │
-│  │ │ control summary, loop health, and next action | j/k or ↑/↓ move between sections            │
-│  │ │                                                                                             │
-│  │ │ ┌─────────────────────────────┐  ┌─────────────────────────────────────────────────────────┐│
-│  │ │ │ Sections                    │  │ Control Snapshot                                        ││
-│  │ │ │ control loop cards          │  │ selected control card                                   ││
-│  │ │ │                             │  │ Control-plane snapshot loading...                       ││
-│  │ │ │ ╭─────────────────────────╮ │  │                                                         ││
-│  │ │ │ │ ▶ Control Snapshot      │ │  │                                                         ││
-│  │ │ │ │   1 rows                │ │  │                                                         ││
-│  │ │ │ │   Control-plane snapshot  │  │                                                         ││
-│  │ │ │ │ loading...              │ │  │                                                         ││
-│  │ │ │ ╰─────────────────────────╯ │  │                                                         ││
-│  │ │ └─────────────────────────────┘  └─────────────────────────────────────────────────────────┘│
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Control                                                             │
+│                          │ │ control summary, loop health, and next action | j/k or ↑/↓ move     │
+│ Active                   │ │ between sections                                                    │
+│ Control | bridge offline │ │                                                                     │
+│ Model codex gpt-5.4      │ │ ┌─────────────────────┐ ┌─────────────────────────────────────────┐ │
+│ Repo Preview             │ │ │ Sections            │ │ Control Snapshot                        │ │
+│ Git n/a@n/a | n/a | sync │ │ │ control loop cards  │ │ selected control card                   │ │
+│  n/a                     │ │ │                     │ │ Control-plane snapshot loading...       │ │
+│ Dirty staged n/a |       │ │ │ ╭─────────────────╮ │ │                                         │ │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

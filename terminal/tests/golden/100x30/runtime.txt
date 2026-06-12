@@ -1,22 +1,22 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ DHARMA  OFF | codex:gpt-5.4 | REA | Runtime                                                      │
+│ pane section focus | responsive                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown   │
+│ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Models Ontology [Runtime] Sessions Approvals Control ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Runtime                                                                                     │
-│  │ │ runtime pulse, verification, and loop state | j/k or ↑/↓ move between sections              │
-│  │ │                                                                                             │
-│  │ │ ┌─────────────────────────────┐  ┌─────────────────────────────────────────────────────────┐│
-│  │ │ │ Sections                    │  │ Runtime Snapshot                                        ││
-│  │ │ │ runtime state cards         │  │ selected runtime card                                   ││
-│  │ │ │                             │  │ Bridge: booting                                         ││
-│  │ │ │ ╭─────────────────────────╮ │  │ Python runtime: expected 3.11+                          ││
-│  │ │ │ │ ▶ Runtime Snapshot      │ │  │ Frontend runtime: Bun                                   ││
-│  │ │ │ │   3 rows                │ │  │                                                         ││
-│  │ │ │ │   Bridge: booting       │ │  │                                                         ││
-│  │ │ │ │   Python runtime:       │ │  │                                                         ││
-│  │ │ │ │ expected 3.11+          │ │  │                                                         ││
-│  │ │ │ ╰─────────────────────────╯ │  │                                                         ││
-│  │ │ └─────────────────────────────┘  └─────────────────────────────────────────────────────────┘│
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Runtime                                                             │
+│                          │ │ runtime pulse, verification, and loop state | j/k or ↑/↓ move       │
+│ Active                   │ │ between sections                                                    │
+│ Runtime | bridge offline │ │                                                                     │
+│ Model codex gpt-5.4      │ │ ┌─────────────────────┐ ┌─────────────────────────────────────────┐ │
+│ Repo Preview             │ │ │ Sections            │ │ Runtime Snapshot                        │ │
+│ Git n/a@n/a | n/a | sync │ │ │ runtime state cards │ │ selected runtime card                   │ │
+│  n/a                     │ │ │                     │ │ Bridge: booting                         │ │
+│ Dirty staged n/a |       │ │ │ ╭─────────────────╮ │ │ Python runtime: expected 3.11+          │ │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

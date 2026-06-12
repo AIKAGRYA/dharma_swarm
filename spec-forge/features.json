@@ -3,7 +3,7 @@
     "id": "F-001",
     "component": "s0-verifiers",
     "category": "infrastructure",
-    "description": "The test suite shall pass in any checkout path: every hardcoded \"/Users/dhyana/dharma_swarm\" literal in terminal test files (design doc cites 353 across 7 files; baseline a6ad97362 greps 250 across 6 files — the binding criterion is zero remaining, count-agnostic) is replaced with a dynamic REPO_ROOT derived via import.meta.dir, including the resolveSupervisorStateDir run.json.repo_root match against the runtime REPO_ROOT.",
+    "description": "The test suite shall pass in any checkout path: every hardcoded \"/Users/dhyana/dharma_swarm\" literal in terminal test files (design doc cites 353 across 7 files; baseline a6ad97362 greps 250 across 6 files \u2014 the binding criterion is zero remaining, count-agnostic) is replaced with a dynamic REPO_ROOT derived via import.meta.dir, including the resolveSupervisorStateDir run.json.repo_root match against the runtime REPO_ROOT.",
     "steps": [
       "Check out the repo at a path other than /Users/dhyana/dharma_swarm (the build worktree ~/dharma_helm_build qualifies)",
       "Run bun test from terminal/ and observe 527+ pass, 0 fail",
@@ -72,7 +72,7 @@
     "id": "F-005",
     "component": "s0-verifiers",
     "category": "infrastructure",
-    "description": "A PTY input-probe smoke script shall drive the real app through a pseudo-terminal, send at least 5 keystrokes, and assert they echo in the composer — the green-gate for any future Bun version bump.",
+    "description": "A PTY input-probe smoke script shall drive the real app through a pseudo-terminal, send at least 5 keystrokes, and assert they echo in the composer \u2014 the green-gate for any future Bun version bump.",
     "steps": [
       "Run scripts/pty_smoke.sh and observe exit 0 with the sent characters visible in the captured output",
       "Run it under the currently installed Bun and observe green"
@@ -109,7 +109,7 @@
     "id": "F-007",
     "component": "s0-hygiene",
     "category": "infrastructure",
-    "description": "The EXISTING untracked terminal/bun.lock shall be added to git as-is (the lockfile is already on disk — git add it, do not regenerate or modify it), and a frozen-lockfile install shall succeed from it.",
+    "description": "The EXISTING untracked terminal/bun.lock shall be added to git as-is (the lockfile is already on disk \u2014 git add it, do not regenerate or modify it), and a frozen-lockfile install shall succeed from it.",
     "steps": [
       "Run git add terminal/bun.lock on the existing file (no regeneration, no modification), then git ls-files terminal/bun.lock and observe it is tracked",
       "Run bun install --frozen-lockfile in terminal/ and observe success"
@@ -199,7 +199,7 @@
     "id": "F-012",
     "component": "s0-verifiers",
     "category": "infrastructure",
-    "description": "The ratchet script shall enforce the hex-literal law: hex color literals outside theme.ts and ScenicStrip.tsx are banned — colors are consumed via THEME tokens; the counter's end target is 0 violations.",
+    "description": "The ratchet script shall enforce the hex-literal law: hex color literals outside theme.ts and ScenicStrip.tsx are banned \u2014 colors are consumed via THEME tokens; the counter's end target is 0 violations.",
     "steps": [
       "Run the ratchet and observe hex_violations reported with the two allowlisted files excluded",
       "Add a hardcoded hex to a component, run the ratchet, observe exit 1, then revert"
@@ -292,7 +292,7 @@
     "id": "F-017",
     "component": "s0-verifiers",
     "category": "testing",
-    "description": "A baseline golden corpus shall be captured at the current commit and committed under tests/golden/ — the refactor guard for S1-S3: structure-neutral refactors leave frames byte-identical.",
+    "description": "A baseline golden corpus shall be captured at the current commit and committed under tests/golden/ \u2014 the refactor guard for S1-S3: structure-neutral refactors leave frames byte-identical.",
     "steps": [
       "Run the capture script at the baseline tree and commit the output",
       "Re-run capture with no code changes and observe a zero diff (capture is deterministic)"
@@ -329,7 +329,7 @@
     "id": "F-019",
     "component": "s0-verifiers",
     "category": "infrastructure",
-    "description": "A truecolor preflight gate shall assert COLORTERM=truecolor reaches the app, tmux RGB terminal-features are on, and a test capture contains 38;2 escape sequences — exiting 1 otherwise, so overnight aesthetic grading never judges quantized colors.",
+    "description": "A truecolor preflight gate shall assert COLORTERM=truecolor reaches the app, tmux RGB terminal-features are on, and a test capture contains 38;2 escape sequences \u2014 exiting 1 otherwise, so overnight aesthetic grading never judges quantized colors.",
     "steps": [
       "Run scripts/truecolor_preflight.sh in the build tmux environment and observe exit 0",
       "Run it with COLORTERM stripped and observe exit 1 with a diagnostic naming the missing link"
@@ -363,7 +363,7 @@
     "id": "F-021",
     "component": "s4-theme",
     "category": "visual",
-    "description": "The ShellHeader and Operator Summary shall remain on-screen at ALL THREE graded sizes — live calibration found the header scrolled off at 80x24 as well as 120x40: the two-row bordered tab pills (6+ rows of chrome) are replaced by a one-line tab bar at ALL widths. This is grading criterion #1 and lands early. This feature re-captures the golden corpus at all three sizes after the layout change; the re-captured goldens become the new baseline.",
+    "description": "The ShellHeader and Operator Summary shall remain on-screen at ALL THREE graded sizes \u2014 live calibration found the header scrolled off at 80x24 as well as 120x40: the two-row bordered tab pills (6+ rows of chrome) are replaced by a one-line tab bar at ALL widths. This is grading criterion #1 and lands early. This feature re-captures the golden corpus at all three sizes after the layout change; the re-captured goldens become the new baseline.",
     "steps": [
       "Boot the app in tmux at each graded size (80x24, 100x30, 120x40) and capture the frame at each",
       "Observe ShellHeader, Operator Summary, tab bar, and composer are all present in the single frame at every one of the three sizes with no scrolled-off chrome",
@@ -403,7 +403,7 @@
     "id": "F-023",
     "component": "s1-bridge",
     "category": "docs",
-    "description": "An event-vocabulary inventory of dharma_swarm/terminal_bridge.py shall enumerate every event type it emits (name, payload fields, emit site), written to spec-forge/knowledge/bridge_events.md — the union is typed against reality, not guesses.",
+    "description": "An event-vocabulary inventory of dharma_swarm/terminal_bridge.py shall enumerate every event type it emits (name, payload fields, emit site), written to spec-forge/knowledge/bridge_events.md \u2014 the union is typed against reality, not guesses.",
     "steps": [
       "Open the inventory doc and observe one entry per emitted event type with payload field lists",
       "Cross-check: every event-type string emitted in terminal_bridge.py source appears in the doc (grep count equals doc entry count)"
@@ -516,7 +516,7 @@
     "id": "F-029",
     "component": "s1-bridge",
     "category": "functional",
-    "description": "An unrecognized event type shall become a typed UnknownBridgeEvent plus a log entry — the app continues rendering; a bogus-event injection test shows no crash and no frame corruption.",
+    "description": "An unrecognized event type shall become a typed UnknownBridgeEvent plus a log entry \u2014 the app continues rendering; a bogus-event injection test shows no crash and no frame corruption.",
     "steps": [
       "Inject an event with an unknown type through the ingress in a test and observe an UnknownBridgeEvent result",
       "Boot the app, inject a bogus event, capture the frame, and observe normal UI"
@@ -552,7 +552,7 @@
     "id": "F-031",
     "component": "s2-protocol",
     "category": "testing",
-    "description": "tests/app.test.ts (442KB — the choke point) shall be split into per-domain test files with zero tests deleted: total executed test count stays at or above the pre-split count.",
+    "description": "tests/app.test.ts (442KB \u2014 the choke point) shall be split into per-domain test files with zero tests deleted: total executed test count stays at or above the pre-split count.",
     "steps": [
       "Run bun test before the split and record the test count",
       "Run bun test after the split and observe count >= the recorded value with 0 fail",
@@ -1242,7 +1242,7 @@
     "id": "F-068",
     "component": "s4-theme",
     "category": "visual",
-    "description": "Border and text tokens shall swap: river #2D4F67 decorative-border-only (2.13 contrast — never carries meaning), ridge #658594 NEW focused border (4.69), foam #DCD7BA primary text (12.71/10.96), mist #C8C093 (10.02), stone #8992A7 (5.91), ink #727169 decoration-only (3.76 — never information).",
+    "description": "Border and text tokens shall swap: river #2D4F67 decorative-border-only (2.13 contrast \u2014 never carries meaning), ridge #658594 NEW focused border (4.69), foam #DCD7BA primary text (12.71/10.96), mist #C8C093 (10.02), stone #8992A7 (5.91), ink #727169 decoration-only (3.76 \u2014 never information).",
     "steps": [
       "Read theme.ts and observe all six exact hex values",
       "Capture a frame with a focused pane and observe the focused border uses ridge, unfocused decorative borders use river",
@@ -1299,7 +1299,7 @@
     "id": "F-071",
     "component": "s4-theme",
     "category": "functional",
-    "description": "An AGENT_STATES map shall be exported with glyph+color pairs — running crest ▶, thinking wave ◉, spawning iris ◌, blocked persimmon ⚠, error vermilion ✖, done moss ✓, idle stone ·, offline ink ○ — and every status render includes the glyph so color is never the sole signal.",
+    "description": "An AGENT_STATES map shall be exported with glyph+color pairs \u2014 running crest \u25b6, thinking wave \u25c9, spawning iris \u25cc, blocked persimmon \u26a0, error vermilion \u2716, done moss \u2713, idle stone \u00b7, offline ink \u25cb \u2014 and every status render includes the glyph so color is never the sole signal.",
     "steps": [
       "Import AGENT_STATES in a test and observe all 8 states carry both glyph and color",
       "Capture frames showing agent statuses and observe glyphs accompany every colored status"
@@ -1318,7 +1318,7 @@
     "id": "F-072",
     "component": "s4-theme",
     "category": "infrastructure",
-    "description": "The migration rule (gradeable criterion #8) shall be machine-checked in the ratchet: after the value swap, THEME.indigo and THEME.river may appear only as backgroundColor/borderColor — 0 violations.",
+    "description": "The migration rule (gradeable criterion #8) shall be machine-checked in the ratchet: after the value swap, THEME.indigo and THEME.river may appear only as backgroundColor/borderColor \u2014 0 violations.",
     "steps": [
       "Run the ratchet and observe migration_rule_violations=0",
       "Use THEME.river as a text color in a scratch change, run the ratchet, observe exit 1, then revert"
@@ -1354,7 +1354,7 @@
     "id": "F-074",
     "component": "s4-theme",
     "category": "visual",
-    "description": "bengara #8F2D12 shall be used as background fill only with foam text on top (5.67 contrast); raw bengara text (2.24) is banned — the ratchet or a test rejects bengara as a foreground color.",
+    "description": "bengara #8F2D12 shall be used as background fill only with foam text on top (5.67 contrast); raw bengara text (2.24) is banned \u2014 the ratchet or a test rejects bengara as a foreground color.",
     "steps": [
       "Run the check and observe 0 bengara-as-foreground uses",
       "Plant a bengara text color, observe the check fails, then revert"
@@ -1412,7 +1412,7 @@
     "id": "F-077",
     "component": "s4-theme",
     "category": "visual",
-    "description": "Inline motifs shall use the verified single-width glyph set — ∿ streaming, ≈ syncing, ≋ throughput, braille ⣀⣠⣴⣶⣿ sparklines, ▁▂▃▄▅▆▇█ gauges — with tmux captures showing no column drift where they appear.",
+    "description": "Inline motifs shall use the verified single-width glyph set \u2014 \u223f streaming, \u2248 syncing, \u224b throughput, braille \u28c0\u28e0\u28f4\u28f6\u28ff sparklines, \u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588 gauges \u2014 with tmux captures showing no column drift where they appear.",
     "steps": [
       "Render each motif in its surface and capture at 80x24 and 120x40",
       "Observe column alignment of bordered panes is intact on every motif row"
@@ -1430,7 +1430,7 @@
     "id": "F-078",
     "component": "s4-theme",
     "category": "infrastructure",
-    "description": "The ambiguous-width wave characters 〜 (U+301C) and ～ (U+FF5E) are banned in src; the ratchet/lint rejects them — motif needs route to the verified single-width set instead.",
+    "description": "The ambiguous-width wave characters \u301c (U+301C) and \uff5e (U+FF5E) are banned in src; the ratchet/lint rejects them \u2014 motif needs route to the verified single-width set instead.",
     "steps": [
       "Run the check and observe 0 occurrences",
       "Plant one banned character, observe the check fails, then revert"
@@ -1528,7 +1528,7 @@
     "id": "F-083",
     "component": "s4-theme",
     "category": "visual",
-    "description": "Soft-variant tokens (bg #16161D, success #7AA89F — pre-verified) shall be selectable behind an env flag for the morning swap, defaulting OFF.",
+    "description": "Soft-variant tokens (bg #16161D, success #7AA89F \u2014 pre-verified) shall be selectable behind an env flag for the morning swap, defaulting OFF.",
     "steps": [
       "Boot with the flag set and observe the soft background in the capture",
       "Boot without the flag and observe the standard night background"
@@ -1582,7 +1582,7 @@
     "id": "F-086",
     "component": "s5-command",
     "category": "functional",
-    "description": "Every executed command shall produce an EvidenceReceipt {command id, gate verdict, timestamp, outcome} appended to a receipt log that the UI can list — receipts are the audit trail of the helm.",
+    "description": "Every executed command shall produce an EvidenceReceipt {command id, gate verdict, timestamp, outcome} appended to a receipt log that the UI can list \u2014 receipts are the audit trail of the helm.",
     "steps": [
       "Execute 3 commands and observe 3 receipts in order in the log",
       "Open the receipts surface and observe the 3 entries rendered with verdicts"
@@ -1657,7 +1657,7 @@
     "id": "F-090",
     "component": "s5-command",
     "category": "functional",
-    "description": "terminal_bridge.py shall gain a command-execution adapter for the reversible set (within the operator interface plane — orchestrator/swarm/spine files stay untouched): received commands execute and return receipt events.",
+    "description": "terminal_bridge.py shall gain a command-execution adapter for the reversible set (within the operator interface plane \u2014 orchestrator/swarm/spine files stay untouched): received commands execute and return receipt events.",
     "steps": [
       "Send a reversible command (e.g. layout-independent no-op or steer) to the live bridge in a sandboxed run and observe a receipt event",
       "Run git status on dharma_swarm/ and observe only terminal_bridge*.py and the contract module changed"
@@ -1786,7 +1786,7 @@
     "id": "F-097",
     "component": "s5-command",
     "category": "functional",
-    "description": "kill-agent and restart-agent shall be registered as irreversible commands (confirm modal + telos gate + receipt); execution remains sandbox-only until the S6 sandbox harness exists — live invocation is refused with a refusal receipt.",
+    "description": "kill-agent and restart-agent shall be registered as irreversible commands (confirm modal + telos gate + receipt); execution remains sandbox-only until the S6 sandbox harness exists \u2014 live invocation is refused with a refusal receipt.",
     "steps": [
       "Trigger kill-agent and observe the confirm modal + gate path engages",
       "Confirm against a non-sandbox target and observe a refusal receipt and no execution"
@@ -1842,7 +1842,7 @@
     "id": "F-100",
     "component": "s5-projections",
     "category": "functional",
-    "description": "A read-only fleet projection shall derive agent list + statuses from the a2a state files and agent identity files (existing owners — no new truth stores), unit-tested against fixture directories.",
+    "description": "A read-only fleet projection shall derive agent list + statuses from the a2a state files and agent identity files (existing owners \u2014 no new truth stores), unit-tested against fixture directories.",
     "steps": [
       "Point the projection at fixture state/identity dirs and observe the derived fleet roster",
       "Remove a state file and observe the agent degrades to offline in the projection"
@@ -1878,7 +1878,7 @@
     "id": "F-102",
     "component": "s5-projections",
     "category": "functional",
-    "description": "A read-only models projection shall combine the model_hierarchy ladder, routing_memory.sqlite3, and dkeys liveness into one model table (read-only consumers of THE ONE WAY — no model strings hardcoded).",
+    "description": "A read-only models projection shall combine the model_hierarchy ladder, routing_memory.sqlite3, and dkeys liveness into one model table (read-only consumers of THE ONE WAY \u2014 no model strings hardcoded).",
     "steps": [
       "Run the projection against the real local sources in a read-only test and observe a populated ladder with liveness flags",
       "Observe no model name string literals in the projection source (it reads the ladder)"
@@ -2028,7 +2028,7 @@
     "id": "F-110",
     "component": "s5-cockpit",
     "category": "functional",
-    "description": "A ONE-LAW status line shall render as the single bottom line in cockpit and zen: mode, active deck (cockpit), gate state, and provider summary — exactly one row at every size.",
+    "description": "A ONE-LAW status line shall render as the single bottom line in cockpit and zen: mode, active deck (cockpit), gate state, and provider summary \u2014 exactly one row at every size.",
     "steps": [
       "Capture zen and cockpit at 80x24 and 120x40",
       "Observe exactly one status row in each capture carrying mode + gate + provider fields"
@@ -2046,7 +2046,7 @@
     "id": "F-111",
     "component": "s5-cockpit",
     "category": "functional",
-    "description": "Zen mode shall remain the boot default and contain exactly: transcript, composer, and the one thin status line — no deck chrome.",
+    "description": "Zen mode shall remain the boot default and contain exactly: transcript, composer, and the one thin status line \u2014 no deck chrome.",
     "steps": [
       "Boot fresh and capture: observe zen layout with the three elements only",
       "Observe no deck bar or cockpit panes present in the zen frame"
@@ -2221,7 +2221,7 @@
     "id": "F-120",
     "component": "s6-routing",
     "category": "e2e",
-    "description": "Routing-governance E2E (b): a pinned mission shall route to its pin — the resolved provider equals the pinned model and the TUI shows it.",
+    "description": "Routing-governance E2E (b): a pinned mission shall route to its pin \u2014 the resolved provider equals the pinned model and the TUI shows it.",
     "steps": [
       "Pin a model on a mission, dispatch its task",
       "Observe resolution honored the pin and the row displays the pinned model"
@@ -2257,7 +2257,7 @@
     "id": "F-122",
     "component": "s6-routing",
     "category": "e2e",
-    "description": "Routing-governance E2E (d): one delegation hop shall cross A2A and render — the composite governance journey (dispatch -> ladder -> hop -> receipt -> tree) passes end to end.",
+    "description": "Routing-governance E2E (d): one delegation hop shall cross A2A and render \u2014 the composite governance journey (dispatch -> ladder -> hop -> receipt -> tree) passes end to end.",
     "steps": [
       "Run the composite journey in the sandbox",
       "Observe ladder resolution, the A2A hop, the receipt, and the rendered tree in one run's evidence"
@@ -2276,7 +2276,7 @@
     "id": "F-123",
     "component": "s6-sandbox",
     "category": "infrastructure",
-    "description": "A sandbox swarm harness shall boot a throwaway swarm with its own DHARMA_* state dir and ports and throwaway agents, plus a teardown that removes all sandbox state — destructive E2E runs against THIS, never the live daemon.",
+    "description": "A sandbox swarm harness shall boot a throwaway swarm with its own DHARMA_* state dir and ports and throwaway agents, plus a teardown that removes all sandbox state \u2014 destructive E2E runs against THIS, never the live daemon.",
     "steps": [
       "Run the sandbox-up script and observe a swarm on isolated dirs/ports with throwaway agents",
       "Run teardown and observe all sandbox state removed and live ~/.dharma untouched (mtime check)"
@@ -2368,7 +2368,7 @@
     "id": "F-128",
     "component": "s6-sandbox",
     "category": "functional",
-    "description": "The live-daemon guard shall hold: against any non-sandbox target, irreversible commands refuse execution with a refusal receipt — the operator's live fleet is untouchable; reversible and read-only operations remain available.",
+    "description": "The live-daemon guard shall hold: against any non-sandbox target, irreversible commands refuse execution with a refusal receipt \u2014 the operator's live fleet is untouchable; reversible and read-only operations remain available.",
     "steps": [
       "Point the TUI at the live daemon (read-only) and trigger kill-agent: observe refusal + receipt, no execution",
       "Execute a reversible command against live and observe it succeeds",
@@ -2425,7 +2425,7 @@
     "id": "F-131",
     "component": "s7-ux",
     "category": "functional",
-    "description": "Each pane shall render per-pane key hints from the registry — at minimum the 3 highest-value bindings for the focused pane.",
+    "description": "Each pane shall render per-pane key hints from the registry \u2014 at minimum the 3 highest-value bindings for the focused pane.",
     "steps": [
       "Focus each major pane and capture",
       "Observe a hint row per focused pane whose keys exist in the registry"
@@ -2481,7 +2481,7 @@
     "id": "F-134",
     "component": "s7-parity1",
     "category": "e2e",
-    "description": "Parity 1.1 — instant echo under load: with the event stream flooding (>=50 events/s simulated), 20 characters sent via tmux shall all appear in the composer.",
+    "description": "Parity 1.1 \u2014 instant echo under load: with the event stream flooding (>=50 events/s simulated), 20 characters sent via tmux shall all appear in the composer.",
     "steps": [
       "Start a simulated event flood",
       "Send 20 characters via tmux send-keys",
@@ -2500,7 +2500,7 @@
     "id": "F-135",
     "component": "s7-parity1",
     "category": "e2e",
-    "description": "Parity 1.2 — multi-line paste: a bracketed paste of a 10-line block shall land intact in the composer with no line lost and no command misfire.",
+    "description": "Parity 1.2 \u2014 multi-line paste: a bracketed paste of a 10-line block shall land intact in the composer with no line lost and no command misfire.",
     "steps": [
       "Paste a 10-line block via tmux bracketed paste",
       "Capture and observe all 10 lines in the composer and no commands executed"
@@ -2518,7 +2518,7 @@
     "id": "F-136",
     "component": "s7-parity1",
     "category": "e2e",
-    "description": "Parity 1.3 — input history: Up/Down shall walk through at least the last 20 submitted inputs, restoring each into the composer; Down past the newest restores the empty draft.",
+    "description": "Parity 1.3 \u2014 input history: Up/Down shall walk through at least the last 20 submitted inputs, restoring each into the composer; Down past the newest restores the empty draft.",
     "steps": [
       "Submit 3 distinct messages",
       "Press Up 3 times and observe each message restored newest-first",
@@ -2537,7 +2537,7 @@
     "id": "F-137",
     "component": "s7-parity1",
     "category": "e2e",
-    "description": "Parity 1.4 — Esc shall cleanly interrupt streaming: the stream stops within one capture interval, the transcript keeps all received tokens, and the composer accepts input immediately.",
+    "description": "Parity 1.4 \u2014 Esc shall cleanly interrupt streaming: the stream stops within one capture interval, the transcript keeps all received tokens, and the composer accepts input immediately.",
     "steps": [
       "Start a streaming response, press Esc mid-stream",
       "Observe streaming stops, partial content remains, and typed characters echo immediately after"
@@ -2555,7 +2555,7 @@
     "id": "F-138",
     "component": "s7-parity1",
     "category": "e2e",
-    "description": "Parity 1.5 — Ctrl+C shall exit without terminal corruption: the alternate screen is released, the cursor restored, and a subsequent shell command renders normally in the same tmux pane.",
+    "description": "Parity 1.5 \u2014 Ctrl+C shall exit without terminal corruption: the alternate screen is released, the cursor restored, and a subsequent shell command renders normally in the same tmux pane.",
     "steps": [
       "Press Ctrl+C in the running app",
       "Run ls in the same pane and capture",
@@ -2574,7 +2574,7 @@
     "id": "F-139",
     "component": "s7-parity2",
     "category": "e2e",
-    "description": "Parity 2.1 — token streaming shall render incrementally: across 3 consecutive captures during one response, the rendered text grows each time (no freeze-then-dump).",
+    "description": "Parity 2.1 \u2014 token streaming shall render incrementally: across 3 consecutive captures during one response, the rendered text grows each time (no freeze-then-dump).",
     "steps": [
       "Trigger a streaming response",
       "Capture 3 times at ~1s intervals",
@@ -2593,7 +2593,7 @@
     "id": "F-140",
     "component": "s7-parity2",
     "category": "e2e",
-    "description": "Parity 2.2 — markdown and code blocks shall render in the transcript: headings, bold, lists, and fenced code with the parchment/sunlit accent treatment and intact alignment.",
+    "description": "Parity 2.2 \u2014 markdown and code blocks shall render in the transcript: headings, bold, lists, and fenced code with the parchment/sunlit accent treatment and intact alignment.",
     "steps": [
       "Receive a response containing headings, a list, and a fenced code block",
       "Capture and observe distinct rendering for each element with intact pane borders"
@@ -2612,7 +2612,7 @@
     "id": "F-141",
     "component": "s7-parity2",
     "category": "e2e",
-    "description": "Parity 2.3 — Static-region discipline: a 500-line output shall never wipe scrollback — history is emitted via the static region, the dynamic region never exceeds the viewport, and tmux scrollback contains the full output.",
+    "description": "Parity 2.3 \u2014 Static-region discipline: a 500-line output shall never wipe scrollback \u2014 history is emitted via the static region, the dynamic region never exceeds the viewport, and tmux scrollback contains the full output.",
     "steps": [
       "Trigger a 500-line response",
       "Scroll tmux history and observe the full output present",
@@ -2631,7 +2631,7 @@
     "id": "F-142",
     "component": "s7-parity2",
     "category": "e2e",
-    "description": "Parity 2.4 — transcript stability while streaming: previously rendered transcript lines shall not shift or duplicate between consecutive captures during a stream.",
+    "description": "Parity 2.4 \u2014 transcript stability while streaming: previously rendered transcript lines shall not shift or duplicate between consecutive captures during a stream.",
     "steps": [
       "Stream a response while earlier transcript content is visible",
       "Diff consecutive captures' overlapping regions",
@@ -2650,7 +2650,7 @@
     "id": "F-143",
     "component": "s7-parity3",
     "category": "e2e",
-    "description": "Parity 3.1 — flicker gate: a /usr/bin/script raw escape capture over 30s of steady-state operation shall contain no [2K[1A erase-storm patterns.",
+    "description": "Parity 3.1 \u2014 flicker gate: a /usr/bin/script raw escape capture over 30s of steady-state operation shall contain no [2K[1A erase-storm patterns.",
     "steps": [
       "Record 30s of steady-state operation with /usr/bin/script",
       "Scan the raw capture for repeated erase-line+cursor-up storm sequences",
@@ -2669,7 +2669,7 @@
     "id": "F-144",
     "component": "s7-parity3",
     "category": "e2e",
-    "description": "Parity 3.2 — resize integrity: resizing 80x24 -> 120x40 -> 80x24 shall leave no duplicated UI and no stale artifacts in either direction.",
+    "description": "Parity 3.2 \u2014 resize integrity: resizing 80x24 -> 120x40 -> 80x24 shall leave no duplicated UI and no stale artifacts in either direction.",
     "steps": [
       "Resize the tmux pane up and capture; resize back down and capture",
       "Diff each capture against its size's golden frame",
@@ -2708,7 +2708,7 @@
     "id": "F-146",
     "component": "s7-grading",
     "category": "e2e",
-    "description": "Parity contracts 1-4 shall grade green at all 3 sizes through the L4 harness — the composite UX gate for the S7 bar.",
+    "description": "Parity contracts 1-4 shall grade green at all 3 sizes through the L4 harness \u2014 the composite UX gate for the S7 bar.",
     "steps": [
       "Run the grading harness across contracts 1-4 at 80x24, 100x30, 120x40",
       "Observe PASS on every criterion at every size"
@@ -2777,7 +2777,7 @@
     "id": "F-149",
     "component": "s8-ci",
     "category": "testing",
-    "description": "An e2e replay layer (node-pty + xterm-headless or tui-test) shall script one full operator journey — boot, mode switch, command with receipt, exit — replayable headlessly in CI.",
+    "description": "An e2e replay layer (node-pty + xterm-headless or tui-test) shall script one full operator journey \u2014 boot, mode switch, command with receipt, exit \u2014 replayable headlessly in CI.",
     "steps": [
       "Run the replay locally and observe the journey assertions pass",
       "Run it in CI and observe the same"
@@ -2902,7 +2902,7 @@
     "id": "F-156",
     "component": "s8-polish",
     "category": "infrastructure",
-    "description": "Final lock: all ratchets shall sit at end targets (max_file_lines <= 400, dup_functions=0, record_unknown <= 1, hex_violations=0, banned glyphs 0), verify:all green, 527+ tests green, working tree clean — the environment left appropriate for merging to a main branch.",
+    "description": "Final lock: all ratchets shall sit at end targets (max_file_lines <= 400, dup_functions=0, record_unknown <= 1, hex_violations=0, banned glyphs 0), verify:all green, 527+ tests green, working tree clean \u2014 the environment left appropriate for merging to a main branch.",
     "steps": [
       "Run bun run verify:all from a clean shell and observe exit 0",
       "Read the ratchet baseline file and observe every metric at its end target",
@@ -2923,11 +2923,11 @@
     "id": "F-157",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "A prompt sent while the bridge is down shall render as `queued (backend offline)` within 2 seconds and shall NEVER display a perpetual `running` state (live tour finding 2: Turn 1 showed `running` plus optimistic trace steps forever while offline); when the bridge connects, queued turns shall either dispatch or be marked failed — no third silent state.",
+    "description": "A prompt sent while the bridge is down shall render as `queued (backend offline)` within 2 seconds and shall NEVER display a perpetual `running` state (live tour finding 2: Turn 1 showed `running` plus optimistic trace steps forever while offline); when the bridge connects, queued turns shall either dispatch or be marked failed \u2014 no third silent state.",
     "steps": [
       "Boot the app hermetically offline (DHARMA_PYTHON=/nonexistent, temp state dirs) in tmux at 120x40 per the tour frames 02/03 pattern",
       "Type a prompt into the composer and press Enter; poll-capture within 2s and observe the turn status reads queued (backend offline), not running",
-      "Wait 10s and re-capture; observe the turn still shows queued — no perpetual running and no optimistic trace steps (bootstrapping context / selecting route) on an offline turn",
+      "Wait 10s and re-capture; observe the turn still shows queued \u2014 no perpetual running and no optimistic trace steps (bootstrapping context / selecting route) on an offline turn",
       "Start or simulate a bridge connection and observe each queued turn transitions to dispatched or failed"
     ],
     "verification": "tmux offline hermetic boot at 120x40; send-keys a prompt + Enter; poll-capture (no fixed-sleep-only race): frame within 2s contains 'queued (backend offline)' on the turn row; a capture at +10s contains no 'running' status on that turn; a unit test covers the queued->dispatched/failed transition on bridge connect",
@@ -2943,11 +2943,11 @@
     "id": "F-158",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Every slash command shall produce visible feedback in the transcript — an echoed turn plus a result, or an explicit queued/failed status; zero-visible-feedback command handling is banned (live tour finding 3: /help offline was silently swallowed — no echo, no response, no error). Graded by /help offline producing a visible response.",
+    "description": "Every slash command shall produce visible feedback in the transcript \u2014 an echoed turn plus a result, or an explicit queued/failed status; zero-visible-feedback command handling is banned (live tour finding 3: /help offline was silently swallowed \u2014 no echo, no response, no error). Graded by /help offline producing a visible response.",
     "steps": [
       "Boot the app hermetically offline in tmux per the tour frames 02/03 pattern",
-      "Type /help and press Enter; poll-capture and observe the command echoed as a turn in the transcript with a visible response, or an explicit queued/failed status — never an unchanged frame",
-      "Add a test over the slash-command registry asserting every registered command path produces a transcript entry (result, queued, or failed) — no silent-swallow branch survives"
+      "Type /help and press Enter; poll-capture and observe the command echoed as a turn in the transcript with a visible response, or an explicit queued/failed status \u2014 never an unchanged frame",
+      "Add a test over the slash-command registry asserting every registered command path produces a transcript entry (result, queued, or failed) \u2014 no silent-swallow branch survives"
     ],
     "verification": "tmux offline hermetic boot; send-keys '/help' + Enter; poll-capture: frame contains the echoed /help turn AND a visible response or 'queued (backend offline)'/'failed' status; script exits nonzero if the transcript is unchanged after the send; registry-coverage test green in bun test",
     "dependencies": [
@@ -2963,7 +2963,7 @@
     "id": "F-159",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "BTab (Shift-Tab) shall move focus to the PREVIOUS tab — reverse of Tab (live tour finding 4: from Repo, BTab x2 landed FORWARD on Models while the keys line advertised reverse navigation); forward-then-back shall return to the origin tab.",
+    "description": "BTab (Shift-Tab) shall move focus to the PREVIOUS tab \u2014 reverse of Tab (live tour finding 4: from Repo, BTab x2 landed FORWARD on Models while the keys line advertised reverse navigation); forward-then-back shall return to the origin tab.",
     "steps": [
       "Boot the app in tmux and capture the active tab marker per the tour frames 05/06 pattern",
       "Send Tab; poll-capture and observe the NEXT tab active",
@@ -2983,7 +2983,7 @@
     "id": "F-160",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Every pane's description string shall describe THAT pane (live tour finding 5: the Models pane currently describes itself as 'Structured operator transcript' — copy-pasted from Chat); all 15 pane registry descriptions audited, accurate, and mutually unique.",
+    "description": "Every pane's description string shall describe THAT pane (live tour finding 5: the Models pane currently describes itself as 'Structured operator transcript' \u2014 copy-pasted from Chat); all 15 pane registry descriptions audited, accurate, and mutually unique.",
     "steps": [
       "Locate the pane registry holding the 15 pane description strings",
       "Audit each description against its pane's actual content and rewrite the copy-pasted ones (Models first)",
@@ -3000,7 +3000,7 @@
     "id": "F-161",
     "component": "s5-projections",
     "category": "functional",
-    "description": "No pane shall display a perpetual 'loading...' while the bridge is down (live tour finding 6: perpetual 'Model policy loading...' in the Models pane offline — same dishonest-pending class as the lying turn); offline panes shall show `no signal (backend offline)` instead.",
+    "description": "No pane shall display a perpetual 'loading...' while the bridge is down (live tour finding 6: perpetual 'Model policy loading...' in the Models pane offline \u2014 same dishonest-pending class as the lying turn); offline panes shall show `no signal (backend offline)` instead.",
     "steps": [
       "Boot the app hermetically offline in tmux",
       "Navigate to the Models pane (and each data-backed pane) and poll-capture after 5s",
@@ -3020,7 +3020,7 @@
     "id": "F-162",
     "component": "s3-interaction",
     "category": "visual",
-    "description": "The collapsed sidebar shall render zero-width or a clean rail — NEVER a 3-column bordered box containing a lone 'T' (the 'T' sliver, confirmed live in every pane at all widths, tour finding 10); boot frames at all three graded sizes contain no 2-4-column bordered fragment.",
+    "description": "The collapsed sidebar shall render zero-width or a clean rail \u2014 NEVER a 3-column bordered box containing a lone 'T' (the 'T' sliver, confirmed live in every pane at all widths, tour finding 10); boot frames at all three graded sizes contain no 2-4-column bordered fragment.",
     "steps": [
       "Reproduce the sliver in boot captures at 80x24, 100x30, and 120x40",
       "Fix the collapsed-pane rendering so the collapsed state is zero-width or a clean unbordered rail",
@@ -3039,7 +3039,7 @@
     "id": "F-163",
     "component": "s7-ux",
     "category": "visual",
-    "description": "Fill law: the transcript shall flexGrow to claim all spare vertical height, the composer shall be pinned directly beneath it, and the status line shall be bottom-anchored — zero dead rows below the status line at a 120x40 capture (and graded at larger sizes, e.g. 244x68, when available); the stack is height-blind in neither direction.",
+    "description": "Fill law: the transcript shall flexGrow to claim all spare vertical height, the composer shall be pinned directly beneath it, and the status line shall be bottom-anchored \u2014 zero dead rows below the status line at a 120x40 capture (and graded at larger sizes, e.g. 244x68, when available); the stack is height-blind in neither direction.",
     "steps": [
       "Make the transcript container flexGrow to absorb spare height in zen mode",
       "Pin the composer immediately beneath the transcript and bottom-anchor the status line",
@@ -3053,7 +3053,7 @@
     ],
     "estimated_minutes": 30,
     "priority": "P1",
-    "status": "not_started",
+    "status": "done",
     "verified": false
   },
   {
@@ -3081,7 +3081,7 @@
     "id": "F-165",
     "component": "s7-ux",
     "category": "visual",
-    "description": "De-border: at most 2 bordered containers shall render per frame — the focused composer plus at most one focused pane (pixel review counted 21 bordered containers: container soup, shipped); header, operator summary, and footer shall become unbordered lines separated by spacing — borders are not separators, space is.",
+    "description": "De-border: at most 2 bordered containers shall render per frame \u2014 the focused composer plus at most one focused pane (pixel review counted 21 bordered containers: container soup, shipped); header, operator summary, and footer shall become unbordered lines separated by spacing \u2014 borders are not separators, space is.",
     "steps": [
       "Remove per-widget borders from header, operator summary, footer, and unfocused panes",
       "Keep the accent border on the focused composer and the ridge border on at most one focused pane",
@@ -3100,7 +3100,7 @@
     "id": "F-166",
     "component": "s7-ux",
     "category": "visual",
-    "description": "Max-width measure: prose/transcript content shall clamp to ~100 columns at wide terminals — no full-width border rules; surplus width becomes gutter (or cockpit side panes), eliminating the 74%-dead-band failure mode at 244 columns.",
+    "description": "Max-width measure: prose/transcript content shall clamp to ~100 columns at wide terminals \u2014 no full-width border rules; surplus width becomes gutter (or cockpit side panes), eliminating the 74%-dead-band failure mode at 244 columns.",
     "steps": [
       "Clamp the transcript/prose measure to ~100 columns when the terminal is wider",
       "Remove any horizontal border rule that spans the full terminal width",
@@ -3119,14 +3119,14 @@
     "id": "F-167",
     "component": "s7-ux",
     "category": "functional",
-    "description": "Offline that breathes: while the bridge is down the status line shall show `○ bridge offline — retry N in Ns · ^R now · input queued` with a LIVE retry counter and countdown; ^R shall trigger an immediate retry; the ink ○ glyph replaces vermilion for expected hermetic-offline.",
+    "description": "Offline that breathes: while the bridge is down the status line shall show `\u25cb bridge offline \u2014 retry N in Ns \u00b7 ^R now \u00b7 input queued` with a LIVE retry counter and countdown; ^R shall trigger an immediate retry; the ink \u25cb glyph replaces vermilion for expected hermetic-offline.",
     "steps": [
       "Render the offline status line from live retry state: attempt counter, countdown seconds, ^R hint, input-queued promise",
       "Capture twice ~3s apart while offline and observe the countdown/counter values CHANGED between captures",
       "Press ^R and observe an immediate retry attempt reflected in the status line",
-      "Observe the ○ glyph (not vermilion text) carries the offline state"
+      "Observe the \u25cb glyph (not vermilion text) carries the offline state"
     ],
-    "verification": "tmux offline hermetic boot: two captures 3s apart both match '○ bridge offline' with 'retry' counter, '^R' hint, and 'input queued'; the countdown/counter value differs between the two captures (live, not frozen); send-keys C-r produces a visible immediate retry within one poll interval",
+    "verification": "tmux offline hermetic boot: two captures 3s apart both match '\u25cb bridge offline' with 'retry' counter, '^R' hint, and 'input queued'; the countdown/counter value differs between the two captures (live, not frozen); send-keys C-r produces a visible immediate retry within one poll interval",
     "dependencies": [
       "F-110",
       "F-157"
@@ -3140,7 +3140,7 @@
     "id": "F-168",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Keymap collision fix: ^I, ^M, and ^H shall be removed from advertised chords (byte-identical to Tab, Enter, and Backspace in legacy encoding — three live collisions in the footer); the footer keys line shall be <= 1 row containing <= 5 contextual hints plus a permanent `? help`; all remaining bindings live only behind the (separately planned) ? overlay.",
+    "description": "Keymap collision fix: ^I, ^M, and ^H shall be removed from advertised chords (byte-identical to Tab, Enter, and Backspace in legacy encoding \u2014 three live collisions in the footer); the footer keys line shall be <= 1 row containing <= 5 contextual hints plus a permanent `? help`; all remaining bindings live only behind the (separately planned) ? overlay.",
     "steps": [
       "Remove ^I/^M/^H from the advertised binding set in the keybinding registry (the underlying Tab/Enter/Backspace actions keep working)",
       "Cap the footer to one row: <= 5 contextual hints for the focused pane plus a permanent '? help'",
@@ -3182,11 +3182,11 @@
     "id": "F-170",
     "component": "s7-ux",
     "category": "functional",
-    "description": "Boot row discipline: the first rendered frame row shall be app-owned via the alternate screen (or equivalent) — no shell echo, command echo, or prompt text shall appear above the UI in boot captures at any graded size (or an explicit accepted-inline decision is recorded in its place).",
+    "description": "Boot row discipline: the first rendered frame row shall be app-owned via the alternate screen (or equivalent) \u2014 no shell echo, command echo, or prompt text shall appear above the UI in boot captures at any graded size (or an explicit accepted-inline decision is recorded in its place).",
     "steps": [
       "Enter the alternate screen (or equivalent first-row ownership) before the first paint on boot",
       "Capture boot frames at 80x24, 100x30, and 120x40",
-      "Observe row 1 of every capture belongs to the app shell — no shell prompt, no echoed launch command above the UI",
+      "Observe row 1 of every capture belongs to the app shell \u2014 no shell prompt, no echoed launch command above the UI",
       "Confirm Ctrl+C exit still releases the alternate screen cleanly (no regression of the exit contract)"
     ],
     "verification": "boot captures at all 3 graded sizes: line 1 of each frame is app chrome (header/canvas), matching no shell-echo patterns (e.g. 'bun run start', '$ ', '% '); script exits nonzero on shell text above the UI; boot smoke and exit-cleanliness checks remain green",
@@ -3202,15 +3202,15 @@
     "id": "F-171",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Multi-line paste shall land in the composer as a multi-line draft (or an explicit visible line-join) — NEVER dropped (abuse round 2 finding 12, NEW P0: a bracketed paste of 3 lines including unicode ∿≋仏 produced ZERO occurrences anywhere — not in the composer, not in the transcript, no error; isolation showed single-line paste works both bracketed and raw, so the bug is newline handling in paste input). Complements parity contract 1.2 (F-135), which later grades a 10-line block; this feature fixes the input path the parity grade depends on.",
+    "description": "Multi-line paste shall land in the composer as a multi-line draft (or an explicit visible line-join) \u2014 NEVER dropped (abuse round 2 finding 12, NEW P0: a bracketed paste of 3 lines including unicode \u223f\u224b\u4ecf produced ZERO occurrences anywhere \u2014 not in the composer, not in the transcript, no error; isolation showed single-line paste works both bracketed and raw, so the bug is newline handling in paste input). Complements parity contract 1.2 (F-135), which later grades a 10-line block; this feature fixes the input path the parity grade depends on.",
     "steps": [
       "Boot the app hermetically offline in tmux per the boot-smoke pattern (paste handling is client-side; no backend needed)",
-      "Load a 3-line payload including unicode (e.g. paste-line-one ∿ / paste-line-two ≋ / paste-line-three 仏) via tmux load-buffer and deliver it with paste-buffer -p (bracketed paste) targeting the composer",
-      "Poll-capture and observe all 3 line markers present in the composer as a multi-line draft (or joined with an explicit visible separator) — zero dropped lines, zero dropped unicode",
+      "Load a 3-line payload including unicode (e.g. paste-line-one \u223f / paste-line-two \u224b / paste-line-three \u4ecf) via tmux load-buffer and deliver it with paste-buffer -p (bracketed paste) targeting the composer",
+      "Poll-capture and observe all 3 line markers present in the composer as a multi-line draft (or joined with an explicit visible separator) \u2014 zero dropped lines, zero dropped unicode",
       "Repeat with raw (non-bracketed) paste-buffer and observe the same no-loss guarantee",
       "Add a unit test over the composer input path asserting newline-bearing input is preserved in the draft, never discarded"
     ],
-    "verification": "tmux hermetic boot; printf 'paste-line-one ∿\\npaste-line-two ≋\\npaste-line-three 仏\\n' | tmux load-buffer - ; tmux paste-buffer -p into the composer; poll-capture: all three line markers (including the unicode chars) occur in the captured frame; script exits nonzero if any marker is absent; bun test green on the newline-paste preservation unit test",
+    "verification": "tmux hermetic boot; printf 'paste-line-one \u223f\\npaste-line-two \u224b\\npaste-line-three \u4ecf\\n' | tmux load-buffer - ; tmux paste-buffer -p into the composer; poll-capture: all three line markers (including the unicode chars) occur in the captured frame; script exits nonzero if any marker is absent; bun test green on the newline-paste preservation unit test",
     "dependencies": [
       "F-002"
     ],
@@ -3223,15 +3223,15 @@
     "id": "F-172",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Trace collapse by default: a completed turn shall render response-first with exactly ONE collapsed trace summary line beneath it (e.g. `✓ 4 steps · codex:gpt-5.4 · ^T expand`), with ^T toggling trace expansion; raw session/request hex IDs shall NEVER render in the transcript at any expansion state (operator flunk verdict finding 15: 'hello?' produced 11 lines of plumbing — trace expanded by default, raw session hex IDs, request numbers, 'Turn completed' — with the actual reply buried beneath; operator-facing rule: the response is the star, the trace is one collapsed line).",
+    "description": "Trace collapse by default: a completed turn shall render response-first with exactly ONE collapsed trace summary line beneath it (e.g. `\u2713 4 steps \u00b7 codex:gpt-5.4 \u00b7 ^T expand`), with ^T toggling trace expansion; raw session/request hex IDs shall NEVER render in the transcript at any expansion state (operator flunk verdict finding 15: 'hello?' produced 11 lines of plumbing \u2014 trace expanded by default, raw session hex IDs, request numbers, 'Turn completed' \u2014 with the actual reply buried beneath; operator-facing rule: the response is the star, the trace is one collapsed line).",
     "steps": [
       "Boot the app with DHARMA_PYTHON pointed at a minimal scripted stub bridge (speaks the wire protocol on stdio, per bridge_events.md shapes) that completes one turn with response text and at least 2 trace steps",
-      "Send a prompt; poll-capture; observe the response text rendered ABOVE a single collapsed trace summary line carrying step count, route label, and the ^T hint — no expanded trace steps on first paint",
+      "Send a prompt; poll-capture; observe the response text rendered ABOVE a single collapsed trace summary line carrying step count, route label, and the ^T hint \u2014 no expanded trace steps on first paint",
       "Assert no session/request hex-id token (12+ consecutive hex chars) appears anywhere in the transcript region",
-      "Send ^T; capture; observe trace detail expanded (steps visible); send ^T again; observe it collapsed back — hex IDs absent in BOTH states",
+      "Send ^T; capture; observe trace detail expanded (steps visible); send ^T again; observe it collapsed back \u2014 hex IDs absent in BOTH states",
       "Add a unit test asserting the completed-turn transcript patch contains exactly one trace summary line and zero raw id fields"
     ],
-    "verification": "tmux + stub-bridge turn: post-completion capture contains the response text above exactly one line matching '✓ .* · .* · \\^T' and zero matches of a hex-id pattern [0-9a-f]{12,} in the transcript region; trace step detail absent before ^T, present after ^T, absent after a second ^T; script exits nonzero on any violation; unit test green in bun test",
+    "verification": "tmux + stub-bridge turn: post-completion capture contains the response text above exactly one line matching '\u2713 .* \u00b7 .* \u00b7 \\^T' and zero matches of a hex-id pattern [0-9a-f]{12,} in the transcript region; trace step detail absent before ^T, present after ^T, absent after a second ^T; script exits nonzero on any violation; unit test green in bun test",
     "dependencies": [
       "F-002"
     ],
@@ -3244,12 +3244,12 @@
     "id": "F-173",
     "component": "s5-projections",
     "category": "functional",
-    "description": "The TS layer shall handle the `assistant` bridge event — {type:'assistant', request_id, message} emitted by terminal_bridge.py:760-765 (identity intents) and :776-781 (memory intents) per bridge_events.md §1.16 — and render its message as the turn's response text in the chat transcript. Today eventToTabPatch has NO assistant branch and identity/memory answers are DISCARDED silently (operator flunk verdict finding 16, CONFIRMED LIVE: the real backend answered 'who are you and what can you do?' via an assistant event; the TUI threw the words away and stamped '◇ Turn 1 | complete' with no response text — the worst bug). Additionally, a turn that ends without ANY response-bearing event shall NOT render as complete-with-empty-body: it renders an explicit no-response/failed marker instead (complements F-157's turn honesty). This is a targeted handler landed ahead of the full F-026 union work, which later subsumes it.",
+    "description": "The TS layer shall handle the `assistant` bridge event \u2014 {type:'assistant', request_id, message} emitted by terminal_bridge.py:760-765 (identity intents) and :776-781 (memory intents) per bridge_events.md \u00a71.16 \u2014 and render its message as the turn's response text in the chat transcript. Today eventToTabPatch has NO assistant branch and identity/memory answers are DISCARDED silently (operator flunk verdict finding 16, CONFIRMED LIVE: the real backend answered 'who are you and what can you do?' via an assistant event; the TUI threw the words away and stamped '\u25c7 Turn 1 | complete' with no response text \u2014 the worst bug). Additionally, a turn that ends without ANY response-bearing event shall NOT render as complete-with-empty-body: it renders an explicit no-response/failed marker instead (complements F-157's turn honesty). This is a targeted handler landed ahead of the full F-026 union work, which later subsumes it.",
     "steps": [
-      "Add an assistant branch to the event-to-transcript path so {type:'assistant', message} renders as the turn's response on the chat tab, per the bridge_events.md §1.16 shape",
+      "Add an assistant branch to the event-to-transcript path so {type:'assistant', message} renders as the turn's response on the chat tab, per the bridge_events.md \u00a71.16 shape",
       "Boot with a scripted stub bridge that answers a turn via assistant + synthesized session_end (the identity-intent shortcut response shape from bridge_events.md)",
       "Send a prompt; poll-capture; observe the assistant message text rendered as the turn's response in the transcript",
-      "Stub a second turn that ends with session_end and NO response-bearing event; observe the turn renders an explicit no-response or failed marker — never a bare complete with empty body",
+      "Stub a second turn that ends with session_end and NO response-bearing event; observe the turn renders an explicit no-response or failed marker \u2014 never a bare complete with empty body",
       "Add a unit test feeding an assistant event fixture through the event ingress and asserting the chat transcript patch carries the message text"
     ],
     "verification": "tmux + stub bridge emitting {type:'assistant', request_id, message:'<sentinel text>'} then session_end: capture contains the sentinel text as the turn's response in the transcript; a second stub turn with no response-bearing event renders an explicit no-response/failed marker and does NOT show a completed turn with zero response text; script exits nonzero on either violation; assistant-fixture unit test green in bun test",
@@ -3265,7 +3265,7 @@
     "id": "F-174",
     "component": "s1-bridge",
     "category": "functional",
-    "description": "Session continuity: terminal_bridge.py shall honor the conversation history TS already sends in session.start.messages — today Python builds messages=[{role:'user',content:prompt}] only (terminal_bridge.py:807-814) and IGNORES the messages array app.tsx sends at :2091-2123 (bridge_events.md wire mismatch #1), so every turn cold-bootstraps a fresh session (operator flunk verdict finding 17: full bootstrap→session-ended per message, the same canned router monologue twice, and multi-second-to-minutes turn latency dominated by session startup — the operator's 'not even interactive'). When session.start carries messages, the bridge shall build the outbound completion request from that history with the prompt as the final user message (appended only if not already last); when messages is absent, today's prompt-only behavior is preserved. SCOPE: terminal_bridge.py + the bridge_events.md contract doc ONLY — do NOT touch orchestrator/spine surfaces.",
+    "description": "Session continuity: terminal_bridge.py shall honor the conversation history TS already sends in session.start.messages \u2014 today Python builds messages=[{role:'user',content:prompt}] only (terminal_bridge.py:807-814) and IGNORES the messages array app.tsx sends at :2091-2123 (bridge_events.md wire mismatch #1), so every turn cold-bootstraps a fresh session (operator flunk verdict finding 17: full bootstrap\u2192session-ended per message, the same canned router monologue twice, and multi-second-to-minutes turn latency dominated by session startup \u2014 the operator's 'not even interactive'). When session.start carries messages, the bridge shall build the outbound completion request from that history with the prompt as the final user message (appended only if not already last); when messages is absent, today's prompt-only behavior is preserved. SCOPE: terminal_bridge.py + the bridge_events.md contract doc ONLY \u2014 do NOT touch orchestrator/spine surfaces.",
     "steps": [
       "Read bridge_events.md wire-mismatch #1 and terminal_bridge.py:807-814; implement messages consumption in the session.start handler (history passthrough + final-prompt rule), leaving behavior unchanged when messages is absent",
       "Update bridge_events.md to mark wire mismatch #1 resolved, documenting the history-passthrough and prompt-precedence rule",
@@ -3273,7 +3273,7 @@
       "Add a python-side test: session.start with a 3-entry messages array yields a completion request containing all 3 entries plus the prompt as final user message; session.start without messages yields the prompt-only request",
       "Confirm the diff is confined to terminal_bridge.py + bridge_events.md (no orchestrator/spine files touched)"
     ],
-    "verification": "two-turn exchange (stub or live) with outbound completion-request logging: turn 2's outbound messages array contains turn 1's user content ahead of turn 2's prompt; python-side test covering messages passthrough + prompt-only fallback passes; git diff for the feature touches only terminal_bridge.py and bridge_events.md — script exits nonzero if any orchestrator/spine surface appears in the diff",
+    "verification": "two-turn exchange (stub or live) with outbound completion-request logging: turn 2's outbound messages array contains turn 1's user content ahead of turn 2's prompt; python-side test covering messages passthrough + prompt-only fallback passes; git diff for the feature touches only terminal_bridge.py and bridge_events.md \u2014 script exits nonzero if any orchestrator/spine surface appears in the diff",
     "dependencies": [
       "F-002"
     ],
@@ -3286,15 +3286,15 @@
     "id": "F-175",
     "component": "s3-interaction",
     "category": "functional",
-    "description": "Error rendering honesty: bridge errors shall render in the transcript as exactly ONE human-readable line with status color and a glyph matching semantics — ✖ for failure, NEVER a ✓ on a failed state — and raw JSON blobs shall never render in the transcript (operator flunk verdict finding 18: a full pretty-printed error object including schema_version and timestamps rendered in the conversation, AND the failure carried a ✓ checkmark — '✓ Status | session failed' — with 'Turn failed' as a buried sub-bullet). The failed turn's own row carries ✖; the full error payload goes to a debug surface/log, not the chat.",
+    "description": "Error rendering honesty: bridge errors shall render in the transcript as exactly ONE human-readable line with status color and a glyph matching semantics \u2014 \u2716 for failure, NEVER a \u2713 on a failed state \u2014 and raw JSON blobs shall never render in the transcript (operator flunk verdict finding 18: a full pretty-printed error object including schema_version and timestamps rendered in the conversation, AND the failure carried a \u2713 checkmark \u2014 '\u2713 Status | session failed' \u2014 with 'Turn failed' as a buried sub-bullet). The failed turn's own row carries \u2716; the full error payload goes to a debug surface/log, not the chat.",
     "steps": [
       "Route bridge error events (and turn-failing outcomes) through a one-line humanizer: status glyph + short human-readable message; the full payload is preserved on a debug surface/log only",
-      "Audit status-glyph selection so glyph and semantics always agree — no ✓ may render adjacent to failed/error text",
+      "Audit status-glyph selection so glyph and semantics always agree \u2014 no \u2713 may render adjacent to failed/error text",
       "Boot with a stub bridge that emits an error event carrying a nested JSON payload; send a prompt; poll-capture",
-      "Observe exactly one human-readable error line with ✖, zero '{' or '}' characters in the transcript region, and the turn row showing ✖ failed (not ✓)",
-      "Add a unit test: error event fixture → transcript patch is a single line, contains no brace characters, and the turn status glyph is ✖"
+      "Observe exactly one human-readable error line with \u2716, zero '{' or '}' characters in the transcript region, and the turn row showing \u2716 failed (not \u2713)",
+      "Add a unit test: error event fixture \u2192 transcript patch is a single line, contains no brace characters, and the turn status glyph is \u2716"
     ],
-    "verification": "tmux + stub bridge emitting an error event with a JSON-object payload: capture shows exactly one error line containing ✖, zero '{'/'}' characters in the transcript region, and no ✓ glyph on the failed turn row; script exits nonzero on any violation; one-line brace-free error-render + glyph/semantics unit test green in bun test",
+    "verification": "tmux + stub bridge emitting an error event with a JSON-object payload: capture shows exactly one error line containing \u2716, zero '{'/'}' characters in the transcript region, and no \u2713 glyph on the failed turn row; script exits nonzero on any violation; one-line brace-free error-render + glyph/semantics unit test green in bun test",
     "dependencies": [
       "F-002",
       "F-157"
@@ -3308,13 +3308,13 @@
     "id": "F-176",
     "component": "s4-theme",
     "category": "visual",
-    "description": "ScenicStrip glyph-coverage fallback: when the terminal/font cannot render the block-art glyphs, the strip shall degrade gracefully — a simple wave rule or full suppression — never broken confetti (operator flunk verdict finding 19: the strip shattered into confetti blocks on the operator's actual terminal font). Implementation: a runtime opt-out env DHARMA_NO_SCENIC=1 suppresses the strip entirely, plus boot-default (zen) suppression so the default chat layout renders no art rows. HONEST LIMIT: font/glyph coverage is NOT reliably detectable from inside a TUI — the contract is graded on the opt-out and default-suppression paths, not on auto-detection (which this feature explicitly does not claim). The 25 hand-tuned art constants remain byte-identical per F-081 — suppression wraps rendering, never edits the art.",
+    "description": "ScenicStrip glyph-coverage fallback: when the terminal/font cannot render the block-art glyphs, the strip shall degrade gracefully \u2014 a simple wave rule or full suppression \u2014 never broken confetti (operator flunk verdict finding 19: the strip shattered into confetti blocks on the operator's actual terminal font). Implementation: a runtime opt-out env DHARMA_NO_SCENIC=1 suppresses the strip entirely, plus boot-default (zen) suppression so the default chat layout renders no art rows. HONEST LIMIT: font/glyph coverage is NOT reliably detectable from inside a TUI \u2014 the contract is graded on the opt-out and default-suppression paths, not on auto-detection (which this feature explicitly does not claim). The 25 hand-tuned art constants remain byte-identical per F-081 \u2014 suppression wraps rendering, never edits the art.",
     "steps": [
       "Add DHARMA_NO_SCENIC=1 handling: when set, the strip renders nothing (or a single plain rule line) and the layout reclaims the rows with no empty bordered band left behind",
       "Make the boot-default (zen) layout suppress the scenic strip by default; cockpit or an explicit opt-in surface may still show it",
       "Boot with DHARMA_NO_SCENIC=1 and capture at 80x24 and 120x40: zero block-art/shade glyph characters in the frames and no gap artifact where the strip was",
       "Boot the default layout WITHOUT the env and observe no scenic art rows render by default (suppression is the default, not just the opt-out)",
-      "Record the font-detection limitation honestly in terminal/LESSONS/ — no auto-detect claim anywhere in code comments or docs"
+      "Record the font-detection limitation honestly in terminal/LESSONS/ \u2014 no auto-detect claim anywhere in code comments or docs"
     ],
     "verification": "tmux boot with DHARMA_NO_SCENIC=1: captures at 80x24 and 120x40 contain zero ScenicStrip block-art/shade glyphs and no empty bordered band at the strip's former position; default boot without the env also renders zero scenic art rows; unit/snapshot test covers the env-gated suppression branch; script exits nonzero on any art glyph under the opt-out; ScenicStrip.tsx art constants byte-identical (F-081 law)",
     "dependencies": [

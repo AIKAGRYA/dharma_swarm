@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLIN  |  route codex:gpt-5.  |  state READY  |  focus Evolutio  |  mode tab navigation  |  panes15 │
 │                                                                                                                      │
@@ -9,12 +8,25 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Control Agents [Evolution] Thinking Tools Timeline
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Evolution                                                                                                       │
-│  │ │ Forward-loop, swarm evolution, and shell continuation surface.                                                  │
-│  │ │                                                                                                                 │
-│  │ │ Cascade and self-improvement surface loading...                                                                 │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Evolution                                                                               │
+│                          │ │ Forward-loop, swarm evolution, and shell continuation surface.                          │
+│ Active                   │ │                                                                                         │
+│ Evolution | bridge       │ │ Cascade and self-improvement surface loading...                                         │
+│ offline                  │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ Model codex gpt-5.4      │
+│ Repo Preview             │
+│ Git n/a@n/a | n/a | sync │
+│  n/a                     │
+│ Dirty staged n/a |       │
+│ unstaged n/a | un… |     │
+│ topo n/a | lead n/a      │
+│ Snapshot branch n/a@n/a  │
+│ | n/a                    │
+│ Snapshot sync n/a |      │
+│ +n/a/-n/a | n/a          │
+│ Snapshot branch sync n/a │
+│  | +n/a/-n/a | n/a       │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

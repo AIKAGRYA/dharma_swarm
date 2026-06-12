@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Rep  |  mode pane section focus  |  panes15 │
 │                                                                                                                      │
@@ -9,22 +8,26 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Chat Mission [Repo] Commands Models Ontology ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Repo                                                                                                            │
-│  │ │ section focus active | j/k or ↑/↓ move between repo sections                                                    │
-│  │ │                                                                                                                 │
-│  │ │ ┌────────────────────────────────────┐  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │ │ │ Sections                           │  │ Repo Snapshot                                                        ││
-│  │ │ │ repo posture and live risk         │  │ selected repo card                                                   ││
-│  │ │ │                                    │  │ Workspace snapshot loading...                                        ││
-│  │ │ │ ╭────────────────────────────────╮ │  │ The terminal should know what repo it is standing in.                ││
-│  │ │ │ │ ▶ Repo Snapshot                │ │  │                                                                      ││
-│  │ │ │ │   2 rows                       │ │  │                                                                      ││
-│  │ │ │ │   Workspace snapshot loading...│ │  │                                                                      ││
-│  │ │ │ │                                │ │  │                                                                      ││
-│  │ │ │ ╰────────────────────────────────╯ │  │                                                                      ││
-│  │ │ └────────────────────────────────────┘  └──────────────────────────────────────────────────────────────────────┘│
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Repo                                                                                    │
+│                          │ │ section focus active | j/k or ↑/↓ move between repo sections                            │
+│ Active                   │ │                                                                                         │
+│ Repo | bridge offline    │ │ ┌────────────────────────────┐ ┌──────────────────────────────────────────────────────┐ │
+│ Model codex gpt-5.4      │ │ │ Sections                   │ │ Repo Snapshot                                        │ │
+│ Repo Preview             │ │ │ repo posture and live risk │ │ selected repo card                                   │ │
+│ Git n/a@n/a | n/a | sync │ │ │                            │ │ Workspace snapshot loading...                        │ │
+│  n/a                     │ │ │ ╭────────────────────────╮ │ │ The terminal should know what repo it is standing    │ │
+│ Dirty staged n/a |       │ │ │ │ ▶ Repo Snapshot        │ │ │ in.                                                  │ │
+│ unstaged n/a | un… |     │ │ │ │   2 rows               │ │ │                                                      │ │
+│ topo n/a | lead n/a      │ │ │ │   Workspace snapshot   │ │ │                                                      │ │
+│ Snapshot branch n/a@n/a  │ │ │ │ loading...             │ │ │                                                      │ │
+│ | n/a                    │ │ │ ╰────────────────────────╯ │ │                                                      │ │
+│ Snapshot sync n/a |      │ │ └────────────────────────────┘ └──────────────────────────────────────────────────────┘ │
+│ +n/a/-n/a | n/a          │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ Snapshot branch sync n/a │
+│  | +n/a/-n/a | n/a       │
+│ Snapshot dirty n/a |     │
+│ staged n/a | unstaged    │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

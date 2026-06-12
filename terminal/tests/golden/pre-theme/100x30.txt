@@ -7,15 +7,16 @@
 │ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 [Chat] Mission Repo Commands Models Ontology ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Chat                                                                                        │
-│  │ │ Live operator exchange, assistant output, and command spillover that still belongs in chat. │
-│  │ │                                                                                             │
-│  │ │ Dharma Terminal                                                                             │
-│  │ │ Keyboard-first operator shell. Backend bridged over stdio.                                  │
-│  │ │ Use plain prompts or slash commands. Chat carries the conversation; the surrounding tabs    │
-│  │ │ expose runtime, tools, and system state.                                                    │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Chat                                                                │
+│                          │ │ Live operator exchange, assistant output, and command spillover     │
+│ Active                   │ │ that still belongs in chat.                                         │
+│ Chat | bridge offline    │ │                                                                     │
+│ Model codex gpt-5.4      │ │ Dharma Terminal                                                     │
+│ Repo Preview             │ │ Keyboard-first operator shell. Backend bridged over stdio.          │
+│ Git n/a@n/a | n/a | sync │ │ Use plain prompts or slash commands. Chat carries the conversation; │
+│  n/a                     │ │  the surrounding tabs expose runtime, tools, and system state.      │
+│ Dirty staged n/a |       │ ╰─────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -27,4 +28,3 @@
 │  ^O ^M ^A ^P ^E ^T ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh shell | ^U compact │
 │  trace | ^I raw on                                                                               │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-

@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLIN  |  route codex:gpt-5.  |  stateREADY  |  focus Runtim  |  mode pane section focu  |  panes15 │
 │                                                                                                                      │
@@ -9,23 +8,25 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Models Ontology [Runtime] Sessions Approvals Control ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Runtime                                                                                                         │
-│  │ │ runtime pulse, verification, and loop state | j/k or ↑/↓ move between sections                                  │
-│  │ │                                                                                                                 │
-│  │ │ ┌────────────────────────────────────┐  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │ │ │ Sections                           │  │ Runtime Snapshot                                                     ││
-│  │ │ │ runtime state cards                │  │ selected runtime card                                                ││
-│  │ │ │                                    │  │ Bridge: booting                                                      ││
-│  │ │ │ ╭────────────────────────────────╮ │  │ Python runtime: expected 3.11+                                       ││
-│  │ │ │ │ ▶ Runtime Snapshot             │ │  │ Frontend runtime: Bun                                                ││
-│  │ │ │ │   3 rows                       │ │  │                                                                      ││
-│  │ │ │ │   Bridge: booting              │ │  │                                                                      ││
-│  │ │ │ │   Python runtime: expected 3.11+ │  │                                                                      ││
-│  │ │ │ │                                │ │  │                                                                      ││
-│  │ │ │ ╰────────────────────────────────╯ │  │                                                                      ││
-│  │ │ └────────────────────────────────────┘  └──────────────────────────────────────────────────────────────────────┘│
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Runtime                                                                                 │
+│                          │ │ runtime pulse, verification, and loop state | j/k or ↑/↓ move between sections          │
+│ Active                   │ │                                                                                         │
+│ Runtime | bridge offline │ │ ┌────────────────────────────┐ ┌──────────────────────────────────────────────────────┐ │
+│ Model codex gpt-5.4      │ │ │ Sections                   │ │ Runtime Snapshot                                     │ │
+│ Repo Preview             │ │ │ runtime state cards        │ │ selected runtime card                                │ │
+│ Git n/a@n/a | n/a | sync │ │ │                            │ │ Bridge: booting                                      │ │
+│  n/a                     │ │ │ ╭────────────────────────╮ │ │ Python runtime: expected 3.11+                       │ │
+│ Dirty staged n/a |       │ │ │ │ ▶ Runtime Snapshot     │ │ │ Frontend runtime: Bun                                │ │
+│ unstaged n/a | un… |     │ │ │ │   3 rows               │ │ │                                                      │ │
+│ topo n/a | lead n/a      │ │ │ │   Bridge: booting      │ │ │                                                      │ │
+│ Snapshot branch n/a@n/a  │ │ │ │   Python runtime:      │ │ │                                                      │ │
+│ | n/a                    │ │ │ │ expected 3.11+         │ │ │                                                      │ │
+│ Snapshot sync n/a |      │ │ │ ╰────────────────────────╯ │ │                                                      │ │
+│ +n/a/-n/a | n/a          │ │ └────────────────────────────┘ └──────────────────────────────────────────────────────┘ │
+│ Snapshot branch sync n/a │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│  | +n/a/-n/a | n/a       │
+│ Snapshot dirty n/a |     │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Command  |  mode tab navigation  |  panes15 │
 │                                                                                                                      │
@@ -9,13 +8,26 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Mission Repo [Commands] Models Ontology Runtime ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Commands                                                                                                        │
-│  │ │ Registered command graph and operational affordances.                                                           │
-│  │ │                                                                                                                 │
-│  │ │ Command graph loading...                                                                                        │
-│  │ │ Plain language should resolve into Dharma-native commands when confidence is high.                              │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Commands                                                                                │
+│                          │ │ Registered command graph and operational affordances.                                   │
+│ Active                   │ │                                                                                         │
+│ Commands | bridge        │ │ Command graph loading...                                                                │
+│ offline                  │ │ Plain language should resolve into Dharma-native commands when confidence is high.      │
+│ Model codex gpt-5.4      │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ Repo Preview             │
+│ Git n/a@n/a | n/a | sync │
+│  n/a                     │
+│ Dirty staged n/a |       │
+│ unstaged n/a | un… |     │
+│ topo n/a | lead n/a      │
+│ Snapshot branch n/a@n/a  │
+│ | n/a                    │
+│ Snapshot sync n/a |      │
+│ +n/a/-n/a | n/a          │
+│ Snapshot branch sync n/a │
+│  | +n/a/-n/a | n/a       │
+│ Snapshot dirty n/a |     │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

@@ -7,13 +7,16 @@
 │ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Mission Repo [Commands] Models Ontology Runtime ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Commands                                                                                    │
-│  │ │ Registered command graph and operational affordances.                                       │
-│  │ │                                                                                             │
-│  │ │ Command graph loading...                                                                    │
-│  │ │ Plain language should resolve into Dharma-native commands when confidence is high.          │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Commands                                                            │
+│                          │ │ Registered command graph and operational affordances.               │
+│ Active                   │ │                                                                     │
+│ Commands | bridge        │ │ Command graph loading...                                            │
+│ offline                  │ │ Plain language should resolve into Dharma-native commands when      │
+│ Model codex gpt-5.4      │ │ confidence is high.                                                 │
+│ Repo Preview             │ ╰─────────────────────────────────────────────────────────────────────╯
+│ Git n/a@n/a | n/a | sync │
+│  n/a                     │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

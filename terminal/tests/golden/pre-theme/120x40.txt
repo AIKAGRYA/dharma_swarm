@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINAL  OFFLINE  |  route codex:gpt-5.4  |  state READY  |  focus Chat  |  mode tab navigation  |  panes 15 │
 │ operator shell | route truth | execution trace                                                                       │
@@ -17,15 +16,18 @@ $ bun run src/index.tsx
  ≋ ≋ ≋ ≋    ▐███████ ███████▌        ▐█▟██▙
  ▂▃▄▂▃▄▂▃▄▂▃▄▂▃▄   ▀███▄▄███▀        ▜████▛
 ▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅▆▅ ▔▔▔   ▆▅▆▅▆▅▆▅▆▅▆▅
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Chat                                                                                                            │
-│  │ │ Live operator exchange, assistant output, and command spillover that still belongs in chat.                     │
-│  │ │                                                                                                                 │
-│  │ │ Dharma Terminal                                                                                                 │
-│  │ │ Keyboard-first operator shell. Backend bridged over stdio.                                                      │
-│  │ │ Use plain prompts or slash commands. Chat carries the conversation; the surrounding tabs expose runtime, tools, │
-│  │ │ and system state.                                                                                               │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Chat                                                                                    │
+│                          │ │ Live operator exchange, assistant output, and command spillover that still belongs in   │
+│ Active                   │ │ chat.                                                                                   │
+│ Chat | bridge offline    │ │                                                                                         │
+│ Model codex gpt-5.4      │ │ Dharma Terminal                                                                         │
+│ Repo Preview             │ │ Keyboard-first operator shell. Backend bridged over stdio.                              │
+│ Git n/a@n/a | n/a | sync │ │ Use plain prompts or slash commands. Chat carries the conversation; the surrounding     │
+│  n/a                     │ │ tabs expose runtime, tools, and system state.                                           │
+│ Dirty staged n/a |       │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ unstaged n/a | un… |     │
+│ topo n/a | lead n/a      │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -36,5 +38,3 @@ $ bun run src/index.tsx
 │ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T   │
 │ ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh shell | ^U compact trace | ^I raw on                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-

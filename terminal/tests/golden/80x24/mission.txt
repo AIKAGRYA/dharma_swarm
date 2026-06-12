@@ -1,3 +1,5 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ DHARMA  OFF | codex:gpt-5.4 | REA | Mission                                  │
 │ tab navigation | responsive                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  loop unknown  verify unknown  runtime idle  approvals clear
@@ -12,8 +14,6 @@ Chat [Mission] Repo Commands Models Ontology ▸
 │ repo-aware state.                                                            │
 │ ◇ Principles                                                                 │
 │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate     │
-│ output.                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯

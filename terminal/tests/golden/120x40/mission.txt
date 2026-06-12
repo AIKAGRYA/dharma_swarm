@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Missio  |  mode tab navigation  |  panes 15 │
 │                                                                                                                      │
@@ -9,16 +8,26 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 Chat [Mission] Repo Commands Models Ontology ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Mission                                                                                                         │
-│  │ │ Bootstrap framing, intent routing, and session launch context.                                                  │
-│  │ │                                                                                                                 │
-│  │ │ ◆ Operator Shell                                                                                                │
-│  │ │ ◇ Goal                                                                                                          │
-│  │ │ Provide one clean operator shell with continuity, visible execution, and repo-aware state.                      │
-│  │ │ ◇ Principles                                                                                                    │
-│  │ │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate output.                                │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Mission                                                                                 │
+│                          │ │ Bootstrap framing, intent routing, and session launch context.                          │
+│ Active                   │ │                                                                                         │
+│ Mission | bridge offline │ │ ◆ Operator Shell                                                                        │
+│ Model codex gpt-5.4      │ │ ◇ Goal                                                                                  │
+│ Repo Preview             │ │ Provide one clean operator shell with continuity, visible execution, and repo-aware     │
+│ Git n/a@n/a | n/a | sync │ │ state.                                                                                  │
+│  n/a                     │ │ ◇ Principles                                                                            │
+│ Dirty staged n/a |       │ │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate output.        │
+│ unstaged n/a | un… |     │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ topo n/a | lead n/a      │
+│ Snapshot branch n/a@n/a  │
+│ | n/a                    │
+│ Snapshot sync n/a |      │
+│ +n/a/-n/a | n/a          │
+│ Snapshot branch sync n/a │
+│  | +n/a/-n/a | n/a       │
+│ Snapshot dirty n/a |     │
+│ staged n/a | unstaged    │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

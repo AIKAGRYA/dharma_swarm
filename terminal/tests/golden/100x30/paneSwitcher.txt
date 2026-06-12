@@ -1,24 +1,24 @@
-│  │ ║   commands                                                                                  ║
-│  │ ║                                                                                             ║
-│  │ ║ • 5. Models                                                                                 ║
-│  │ ║   models                                                                                    ║
-│  │ ║                                                                                             ║
-│  │ ║ • 6. Ontology                                                                               ║
-│  │ ║   ontology                                                                                  ║
-│  │ ║                                                                                             ║
-│  │ ║ • 7. Runtime                                                                                ║
-│  │ ║   runtime                                                                                   ║
-│  │ ║                                                                                             ║
-│  │ ║ • 8. Sessions                                                                               ║
-│  │ ║   sessions                                                                                  ║
-│  │ ║                                                                                             ║
-│  │ ║ • 9. Approvals                                                                              ║
-│  │ ║   approvals                                                                                 ║
-│  │ ║                                                                                             ║
-│  │ ║ • 10. Control                                                                               ║
-│  │ ║   control                                                                                   ║
-│  │ ║                                                                                             ║
-╰──╯ ╚═════════════════════════════════════════════════════════════════════════════════════════════╝
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ DHARMA  OFF | codex:gpt-5.4 | REA | Chat                                                         │
+│ pane switcher | responsive                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown   │
+│ runtime idle  approvals clear  sessions 0                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+[Chat] Mission Repo Commands Models Ontology ▸
+╭──────────────────────────╮ ╔═════════════════════════════════════════════════════════════════════╗
+│ Context                  │ ║ Pane Switcher                                                       ║
+│                          │ ║ Enter jump | Esc close | j/k or arrows move | 15 panes              ║
+│ Active                   │ ║                                                                     ║
+│ Chat | bridge offline    │ ║ ▶ 1. Chat                                                           ║
+│ Model codex gpt-5.4      │ ║   chat                                                              ║
+│ Repo Preview             │ ║                                                                     ║
+│ Git n/a@n/a | n/a | sync │ ║ • 2. Mission                                                        ║
+│  n/a                     │ ║   mission                                                           ║
+│ Dirty staged n/a |       │ ║                                                                     ║
+│ unstaged n/a | un… |     │ ║ • 3. Repo                                                           ║
+│ topo n/a | lead n/a      │ ║   repo                                                              ║
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

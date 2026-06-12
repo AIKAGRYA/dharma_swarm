@@ -3169,41 +3169,60 @@ export function App(): React.ReactElement {
   });
 
   return (
-    <Box flexDirection="column">
-      <ShellHeader
-        routePolicy={state.routePolicy}
-        bridgeStatus={state.bridgeStatus}
-        activeTitle={activeTab?.title ?? "Workspace"}
-        focusMode={focusModeFor(activeTab, state)}
-        activeCount={state.tabs.length}
-        // F-021: the full header line needs ~118 cols; below that Yoga
-        // squeezes its segments into garble — fall back to the compact copy.
-        compact={compactShell || terminalWidth < 118}
-      />
-      <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-      <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
-      {/* F-021: the 8-row wave renders only when the height budget affords it
-          (>= 40 rows) and the chat is still quiet — once real turns arrive the
-          transcript window owns those rows and the strip recedes. */}
-      {activeTab?.kind === "chat" && !compactShell && terminalHeight >= 40 && displayedTranscriptLines.length <= 4 ? (
-        <ScenicStrip />
-      ) : null}
-      <Box>
-        {state.uiMode.sidebarVisible !== "hidden" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
-          <Sidebar
-            mode={state.uiMode.sidebarMode}
-            outline={outline}
-            activeTabTitle={activeTab?.title ?? "Workspace"}
-            provider={state.routePolicy.provider}
-            model={state.routePolicy.model}
-            bridgeStatus={state.bridgeStatus}
-            tabs={state.tabs}
-            repoPreview={decorateSurfacePreview(state.liveRepoPreview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
-            controlPreview={decorateSurfacePreview(state.liveControlPreview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
-            compact={compactShell}
-            collapsed={state.uiMode.sidebarVisible === "collapsed"}
-          />
+    // F-163 fill law: the root owns exactly the terminal's rows — the pane row
+    // flexGrows into the spare height and CLIPS overgrown content (live sidebar
+    // telemetry previously inflated the layout past the terminal, scrolling the
+    // header, tab bar, and the entire conversation off-screen — operator live
+    // verdict 2026-06-12). Header/tab bar at top and composer/footer at bottom
+    // are now unconditionally visible at every size.
+    <Box flexDirection="column" height={terminalHeight}>
+      {/* flexShrink 0 on all fixed chrome: only the pane row below may flex.
+          Without it Yoga crushes the header/footer when pane content overflows. */}
+      <Box flexDirection="column" flexShrink={0}>
+        <ShellHeader
+          routePolicy={state.routePolicy}
+          bridgeStatus={state.bridgeStatus}
+          activeTitle={activeTab?.title ?? "Workspace"}
+          focusMode={focusModeFor(activeTab, state)}
+          activeCount={state.tabs.length}
+          // F-021: the full header line needs ~118 cols; below that Yoga
+          // squeezes its segments into garble — fall back to the compact copy.
+          compact={compactShell || terminalWidth < 118}
+        />
+        <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
+        <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
+        {/* F-021: the 8-row wave renders only when the height budget affords it
+            (>= 40 rows) and the chat is still quiet — once real turns arrive the
+            transcript window owns those rows and the strip recedes. */}
+        {activeTab?.kind === "chat" && !compactShell && terminalHeight >= 40 && displayedTranscriptLines.length <= 4 ? (
+          <ScenicStrip />
         ) : null}
+      </Box>
+      <Box flexGrow={1} overflow="hidden">
+        {state.uiMode.sidebarVisible !== "hidden" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
+          // clip-don't-squeeze: the row stretches children to its height, and
+          // Yoga then crushes their inner columns into overlapping rows. The
+          // wrapper clips at natural height instead.
+          <Box flexDirection="column" overflow="hidden" flexShrink={0}>
+            <Box flexShrink={0} flexDirection="column">
+              <Sidebar
+                mode={state.uiMode.sidebarMode}
+                outline={outline}
+                activeTabTitle={activeTab?.title ?? "Workspace"}
+                provider={state.routePolicy.provider}
+                model={state.routePolicy.model}
+                bridgeStatus={state.bridgeStatus}
+                tabs={state.tabs}
+                repoPreview={decorateSurfacePreview(state.liveRepoPreview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
+                controlPreview={decorateSurfacePreview(state.liveControlPreview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
+                compact={compactShell}
+                collapsed={state.uiMode.sidebarVisible === "collapsed"}
+              />
+            </Box>
+          </Box>
+        ) : null}
+        <Box flexGrow={1} flexDirection="column" overflow="hidden">
+        <Box flexShrink={0} flexDirection="column">
         {state.uiMode.activeOverlay.kind === "paneSwitcher" ? (
           <PaneSwitcher
             tabs={state.tabs}
@@ -3282,15 +3301,19 @@ export function App(): React.ReactElement {
             accentColor={transcriptMeta.accentColor}
           />
         )}
+        </Box>
+        </Box>
       </Box>
-      <Composer prompt={state.prompt} compact={compactShell} />
-      <StatusFooter
-        statusLine={state.statusLine}
-        routeSummary={routeSummary(state.routePolicy)}
-        focusMode={focusModeFor(activeTab, state)}
-        footerHint={footerHintFor(activeTab?.id ?? "chat", state, shellControlOptions, compactShell)}
-        compact={compactShell}
-      />
+      <Box flexDirection="column" flexShrink={0}>
+        <Composer prompt={state.prompt} compact={compactShell} />
+        <StatusFooter
+          statusLine={state.statusLine}
+          routeSummary={routeSummary(state.routePolicy)}
+          focusMode={focusModeFor(activeTab, state)}
+          footerHint={footerHintFor(activeTab?.id ?? "chat", state, shellControlOptions, compactShell)}
+          compact={compactShell}
+        />
+      </Box>
     </Box>
   );
 }

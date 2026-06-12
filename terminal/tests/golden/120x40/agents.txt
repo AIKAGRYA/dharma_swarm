@@ -1,4 +1,3 @@
-$ bun run src/index.tsx
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA TERMINA  OFFLIN  |  routecodex:gpt-5.4  |  stateREADY  |  focusAgents  |  modeagent route selectio  |  panes15│
 │                                                                                                                      │
@@ -9,19 +8,25 @@ $ bun run src/index.tsx
 │ approvals clear  sessions 0                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Approvals Control [Agents] Evolution Thinking Tools ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Agents                                                                                                          │
-│  │ │ route profiles and execution posture | j/k or ↑/↓ select route                                                  │
-│  │ │                                                                                                                 │
-│  │ │ ┌────────────────────────────────────┐  ┌──────────────────────────────────────────────────────────────────────┐│
-│  │ │ │ Routes                             │  │ Route brief                                                          ││
-│  │ │ │ typed routing intents              │  │ selected route plus OpenClaw envelope                                ││
-│  │ │ │ No typed agent routes yet.         │  │ No selected route.                                                   ││
-│  │ │ │                                    │  │ OpenClaw                                                             ││
-│  │ │ │                                    │  │ present n/a | readable n/a                                           ││
-│  │ │ │                                    │  │ agents n/a | providers n/a                                           ││
-│  │ │ └────────────────────────────────────┘  └──────────────────────────────────────────────────────────────────────┘│
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Agents                                                                                  │
+│                          │ │ route profiles and execution posture | j/k or ↑/↓ select route                          │
+│ Active                   │ │                                                                                         │
+│ Agents | bridge offline  │ │ ┌────────────────────────────┐ ┌──────────────────────────────────────────────────────┐ │
+│ Model codex gpt-5.4      │ │ │ Routes                     │ │ Route brief                                          │ │
+│ Repo Preview             │ │ │ typed routing intents      │ │ selected route plus OpenClaw envelope                │ │
+│ Git n/a@n/a | n/a | sync │ │ │ No typed agent routes yet. │ │ No selected route.                                   │ │
+│  n/a                     │ │ │                            │ │ OpenClaw                                             │ │
+│ Dirty staged n/a |       │ │ │                            │ │ present n/a | readable n/a                           │ │
+│ unstaged n/a | un… |     │ │ │                            │ │ agents n/a | providers n/a                           │ │
+│ topo n/a | lead n/a      │ │ └────────────────────────────┘ └──────────────────────────────────────────────────────┘ │
+│ Snapshot branch n/a@n/a  │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
+│ | n/a                    │
+│ Snapshot sync n/a |      │
+│ +n/a/-n/a | n/a          │
+│ Snapshot branch sync n/a │
+│  | +n/a/-n/a | n/a       │
+│ Snapshot dirty n/a |     │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

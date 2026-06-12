@@ -7,13 +7,16 @@
 │ runtime idle  approvals clear  sessions 0                                                        │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ◂ Commands Models [Ontology] Runtime Sessions Approvals ▸
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
-│T │ │ Ontology                                                                                    │
-│  │ │ Shared world model, foundations, and semantic frame updates.                                │
-│  │ │                                                                                             │
-│  │ │ Ontology snapshot loading...                                                                │
-│  │ │ The shell should surface DHARMA concepts, not just provider chat.                           │
-╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────╮
+│ Context                  │ │ Ontology                                                            │
+│                          │ │ Shared world model, foundations, and semantic frame updates.        │
+│ Active                   │ │                                                                     │
+│ Ontology | bridge        │ │ Ontology snapshot loading...                                        │
+│ offline                  │ │ The shell should surface DHARMA concepts, not just provider chat.   │
+│ Model codex gpt-5.4      │ ╰─────────────────────────────────────────────────────────────────────╯
+│ Repo Preview             │
+│ Git n/a@n/a | n/a | sync │
+│  n/a                     │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

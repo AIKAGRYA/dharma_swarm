@@ -106,3 +106,4 @@ results/*/
 
 # Paper drafts (kept local until promoted to a tracked branch).
 paper/
+.parked-fresh-node-modules/

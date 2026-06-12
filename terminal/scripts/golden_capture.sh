@@ -55,14 +55,14 @@ marker_for() {
     commands) printf 'Command graph loading' ;;
     models) printf 'Model policy loading' ;;
     ontology) printf 'Ontology snapshot loading' ;;
-    runtime) printf 'Frontend runtime: Bun' ;;
+    runtime) printf 'selected runtime card' ;;  # F-163 clamp: 'Frontend runtime: Bun' sits below the 80x24 clip line now
     sessions) printf 'No selected session.' ;;
     approvals) printf 'No selected approval.' ;;
     control) printf 'Control-plane snapshot loading' ;;
     agents) printf 'No selected route.' ;;
     evolution) printf 'Cascade and self-improvement surface loading' ;;
     modelPicker) printf 'No model targets loaded.' ;;
-    paneSwitcher) printf '10. Control' ;;
+    paneSwitcher) printf '1. Chat' ;;  # F-163 clamp: deep list rows clip at 80x24; switcher needs selection-windowing (logged)
     *) return 1 ;;
   esac
 }
