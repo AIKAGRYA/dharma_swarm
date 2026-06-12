@@ -343,10 +343,11 @@ spine-check:
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
 
-# Whole-system orientation: identity, organs, tracks, canon custody, liveness,
-# broken register — one read-only view projected from the owners. Always exits 0.
+# Whole-system orientation: identity, tracks, lanes, agents, receipts, A2A,
+# body state, and broken register. Explicitly emits generated repo_context
+# artifacts from existing owners; the artifacts own no facts.
 orient:
-	$(PYTHON) scripts/governance/orientation_graph.py
+	$(PYTHON) scripts/governance/orientation_graph.py --write-context
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
