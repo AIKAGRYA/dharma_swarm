@@ -3,7 +3,7 @@ import {Box, useApp, useInput} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, localStatusExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -2456,6 +2456,19 @@ export function App(): React.ReactElement {
   );
   const stateRef = useRef(state);
   const pendingBootstraps = useRef<Record<string, {prompt: string; provider: string; model: string; messages: Array<{role: "user" | "assistant" | "system"; content: string}>; resumeSessionId?: string}>>({});
+  // F-157: prompts submitted while the bridge is offline wait here; the connect
+  // effect below drains the queue — every entry is dispatched or marked failed.
+  const queuedOfflinePrompts = useRef<Array<{
+    queueId: string;
+    prompt: string;
+    provider: string;
+    model: string;
+    strategy: string;
+    activeTabId: string;
+    messages: Array<{role: "user" | "assistant" | "system"; content: string}>;
+    resumeSessionId?: string;
+  }>>([]);
+  const queuedOfflineCounter = useRef(0);
   const pendingCommandStream = useRef<PendingCommandStream | null>(null);
   const bridgeRef = useRef<DharmaBridge | null>(null);
   const handshakeBackoffRef = useRef({attempt: 0, nextAllowedAt: 0});
@@ -2557,6 +2570,42 @@ export function App(): React.ReactElement {
     stateRef.current = state;
   }, [state]);
 
+  // F-157: bridge connect drains the offline prompt queue — each queued turn is
+  // dispatched (session.bootstrap) or marked failed; no third silent state.
+  useEffect(() => {
+    if (state.bridgeStatus !== "connected" || queuedOfflinePrompts.current.length === 0) {
+      return;
+    }
+    const entries = queuedOfflinePrompts.current.splice(0, queuedOfflinePrompts.current.length);
+    for (const entry of entries) {
+      try {
+        const requestId = bridge.send("session.bootstrap", {
+          provider: entry.provider,
+          model: entry.model,
+          strategy: entry.strategy,
+          prompt: entry.prompt,
+          active_tab: entry.activeTabId,
+          resume_session_id: entry.resumeSessionId,
+        });
+        pendingBootstraps.current[requestId] = {
+          prompt: entry.prompt,
+          provider: entry.provider,
+          model: entry.model,
+          messages: entry.messages,
+          resumeSessionId: entry.resumeSessionId,
+        };
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "dispatched")]},
+        ]);
+      } catch {
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "failed")]},
+        ]);
+      }
+    }
+    dispatch({type: "status.set", value: `dispatched ${entries.length} queued prompt${entries.length === 1 ? "" : "s"}`});
+  }, [bridge, state.bridgeStatus]);
+
   useEffect(() => {
     const selectedDetail = state.sessionPane.selectedSessionId
       ? state.sessionPane.detailsBySessionId[state.sessionPane.selectedSessionId]
@@ -2627,6 +2676,32 @@ export function App(): React.ReactElement {
         kind: "user",
         text: `> ${submitted}`,
       };
+      // F-157: while the bridge is offline the turn queues explicitly — no optimistic
+      // trace steps, no session.bootstrap into the void, never a perpetual running state.
+      if (state.bridgeStatus === "offline") {
+        queuedOfflineCounter.current += 1;
+        const queueId = `q${queuedOfflineCounter.current}-${Date.now().toString(36)}`;
+        queuedOfflinePrompts.current.push({
+          queueId,
+          prompt: submitted,
+          provider: state.routePolicy.provider,
+          model: state.routePolicy.model,
+          strategy: state.routePolicy.strategy,
+          activeTabId: state.uiMode.activeTabId,
+          messages,
+          resumeSessionId: state.sessionContinuity.resumeSessionId,
+        });
+        queueAppActions(dispatch, [
+          {type: "tab.activate", tabId: "chat"},
+          {type: "tab.append", tabId: "chat", lines: [userLine]},
+          {
+            type: "execution.events.ingest",
+            events: [userPromptExecutionEvent(submitted), queuedPromptExecutionEvent(queueId)],
+          },
+          {type: "status.set", value: "prompt queued (backend offline)"},
+        ]);
+        return;
+      }
       const route = routeLabel(state.routePolicy);
       queueAppActions(dispatch, [
         {type: "tab.activate", tabId: "chat"},

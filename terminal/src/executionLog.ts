@@ -122,6 +122,35 @@ export function localStatusExecutionEvent(
   };
 }
 
+// F-157: a prompt submitted while the bridge is offline renders as an explicit queued
+// state — no optimistic trace steps, never a perpetual running glyph. The stable id
+// (status:queued:<queueId>) lets the dispatch/failure resolution replace the queued
+// event in place once the bridge connects, so the turn never holds a third silent state.
+export type QueuedPromptResolution = "dispatched" | "failed";
+
+export function queuedPromptExecutionEvent(
+  queueId: string,
+  resolution?: QueuedPromptResolution,
+  timestamp = new Date().toISOString(),
+): CanonicalExecutionEvent {
+  const phase: ActivityPhase = resolution === "dispatched" ? "complete" : resolution === "failed" ? "failed" : "queued";
+  const title =
+    resolution === "dispatched"
+      ? "dispatched to backend"
+      : resolution === "failed"
+        ? "dispatch failed after reconnect"
+        : "queued (backend offline)";
+  return {
+    id: `status:queued:${queueId}`,
+    sourceEventType: "local_status",
+    kind: "status",
+    phase,
+    title,
+    timestamp,
+    raw: {title, created_at: timestamp, source: "local", queued_offline: true, queue_resolution: resolution ?? "pending"},
+  };
+}
+
 export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
   const type = String(event.type ?? "");
 
@@ -550,6 +579,17 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
     if (event.sourceEventType === "session.ack" && event.summary) {
       activeTurn.route = event.summary;
     }
+    // F-157: queued-offline lifecycle — pending holds the turn in the explicit queued
+    // state; dispatched releases it back to running (real bridge events take over);
+    // failed flows through the generic failed-phase rule below.
+    if (event.kind === "status" && event.raw?.queued_offline === true) {
+      const resolution = String(event.raw.queue_resolution ?? "pending");
+      if (resolution === "pending") {
+        activeTurn.phase = "queued";
+      } else if (resolution === "dispatched" && activeTurn.phase === "queued") {
+        activeTurn.phase = "running";
+      }
+    }
     const nextStep = traceStepFromEvent(event);
     if (nextStep) {
       const existing = activeTurn.steps.find((step) => step.key === nextStep.key);
@@ -590,6 +630,9 @@ function turnGlyph(phase: ActivityPhase): string {
   if (phase === "complete") {
     return "✓";
   }
+  if (phase === "queued") {
+    return "○";
+  }
   return "▶";
 }
 
@@ -613,10 +656,16 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
 
     const stepCount = turn.steps.length;
     const route = scrubRawIdentifiers(turn.route ?? options.routeLabel ?? "route pending");
+    // F-157: a queued-offline turn names its state on the turn row — never a running
+    // glyph or step count while nothing has been dispatched.
+    const summaryBody =
+      turn.phase === "queued"
+        ? "queued (backend offline)"
+        : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`;
     projected.push(
       line(
         turn.phase === "failed" ? "error" : "system",
-        `${turnGlyph(turn.phase)} ${stepCount} ${stepCount === 1 ? "step" : "steps"} · ${route} · ^T ${expanded ? "collapse" : "expand"}`,
+        `${turnGlyph(turn.phase)} ${summaryBody} · ${route} · ^T ${expanded ? "collapse" : "expand"}`,
         turn.assistantTimestamp ?? turn.steps.at(-1)?.timestamp,
       ),
     );

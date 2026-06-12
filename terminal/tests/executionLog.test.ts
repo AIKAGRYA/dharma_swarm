@@ -6,6 +6,7 @@ import {
   projectActivityEntries,
   projectChatTraceLines,
   projectPaneLines,
+  queuedPromptExecutionEvent,
   userPromptExecutionEvent,
 } from "../src/executionLog";
 
@@ -232,6 +233,56 @@ describe("canonicalEventsFromBridgeEvent", () => {
     const commandCollapsed = projectChatTraceLines(commandTurn);
     expect(commandCollapsed.some((line) => line.text.includes("no response"))).toBe(false);
     expect(commandCollapsed.filter((line) => /^✓ \d+ steps? · /.test(line.text))).toHaveLength(1);
+  });
+
+  test("F-157: a prompt queued while the bridge is offline renders the explicit queued state, never running", () => {
+    const events = [
+      userPromptExecutionEvent("what is the helm", "2026-06-12T12:00:00Z"),
+      queuedPromptExecutionEvent("q1-test", undefined, "2026-06-12T12:00:00Z"),
+    ];
+
+    const collapsed = projectChatTraceLines(events, {routeLabel: "codex:gpt-5.4"});
+    // The turn row names the queued state explicitly.
+    expect(collapsed.filter((line) => /^○ queued \(backend offline\) · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    // Never a running glyph, the word running, or optimistic local steps on an offline turn.
+    expect(collapsed.some((line) => line.text.includes("▶"))).toBe(false);
+    expect(collapsed.some((line) => /running/i.test(line.text))).toBe(false);
+    expect(collapsed.some((line) => line.text.includes("bootstrapping context") || line.text.includes("selecting route"))).toBe(false);
+
+    const expanded = projectChatTraceLines(events, {expanded: true, routeLabel: "codex:gpt-5.4"});
+    expect(expanded.some((line) => line.text.includes("Status | queued (backend offline)"))).toBe(true);
+    expect(expanded.some((line) => line.text.includes("bootstrapping context") || line.text.includes("selecting route"))).toBe(false);
+  });
+
+  test("F-157: bridge connect resolves a queued turn to dispatched or failed — no third silent state", () => {
+    const base = [
+      userPromptExecutionEvent("what is the helm", "2026-06-12T12:00:00Z"),
+      queuedPromptExecutionEvent("q1-test", undefined, "2026-06-12T12:00:00Z"),
+    ];
+
+    // Dispatched: the queued event is replaced in place (stable id) and the turn returns to running.
+    const dispatched = mergeExecutionEvents(base, [queuedPromptExecutionEvent("q1-test", "dispatched", "2026-06-12T12:00:30Z")]);
+    expect(dispatched).toHaveLength(2);
+    const dispatchedLines = projectChatTraceLines(dispatched, {routeLabel: "codex:gpt-5.4"});
+    expect(dispatchedLines.some((line) => line.text.includes("queued (backend offline)"))).toBe(false);
+    expect(dispatchedLines.filter((line) => /^▶ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+
+    // The dispatched turn then completes normally once real bridge events stream in.
+    const completed = mergeExecutionEvents(dispatched, [
+      ...canonicalEventsFromBridgeEvent({type: "text_complete", content: "The Helm hears you.", created_at: "2026-06-12T12:00:31Z"}),
+      ...canonicalEventsFromBridgeEvent({type: "session_end", session_id: "s", success: true, request_id: "3", created_at: "2026-06-12T12:00:32Z"}),
+    ]);
+    const completedLines = projectChatTraceLines(completed, {routeLabel: "codex:gpt-5.4"});
+    expect(completedLines.some((line) => line.kind === "assistant" && line.text === "The Helm hears you.")).toBe(true);
+    expect(completedLines.filter((line) => /^✓ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+
+    // Failed: explicit ✖ on the turn row, never a silent state.
+    const failed = mergeExecutionEvents(base, [queuedPromptExecutionEvent("q1-test", "failed", "2026-06-12T12:00:30Z")]);
+    const failedLines = projectChatTraceLines(failed, {routeLabel: "codex:gpt-5.4"});
+    expect(failedLines.some((line) => line.text.includes("queued (backend offline)"))).toBe(false);
+    expect(failedLines.filter((line) => /^✖ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    const failedExpanded = projectChatTraceLines(failed, {expanded: true, routeLabel: "codex:gpt-5.4"});
+    expect(failedExpanded.some((line) => line.text.includes("dispatch failed after reconnect"))).toBe(true);
   });
 
   test("deduplicates canonical execution events by id during merges", () => {
