@@ -1,0 +1,39 @@
+{
+  "broadcast_disabled": false,
+  "created_at": "2026-06-12T19:27:41+00:00",
+  "filesystem_inbox_authority_claim": false,
+  "interpretation": "This disables Hermes alert-router file-bus broadcast amplification. It does not prove AGNI handler contact, peer review, domain receipt, or production readiness.",
+  "mutation_applied": false,
+  "operation": "disable_hermes_alert_router_legacy_file_bus_broadcast",
+  "production_claim": false,
+  "result": {
+    "after": {
+      "a2a_bus_exists": true,
+      "a2a_bus_path": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+      "alert_router_exists": true,
+      "alert_router_path": "/Users/dhyana/.hermes/scripts/alert_router.py",
+      "flag_file_present": false,
+      "flag_path": "/Users/dhyana/.hermes/comms/DISABLE_A2A_BROADCAST",
+      "guard_present": false,
+      "hermes_home": "/Users/dhyana/.hermes",
+      "legacy_broadcast_call_present": true
+    },
+    "backup_path": null,
+    "before": {
+      "a2a_bus_exists": true,
+      "a2a_bus_path": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+      "alert_router_exists": true,
+      "alert_router_path": "/Users/dhyana/.hermes/scripts/alert_router.py",
+      "flag_file_present": false,
+      "flag_path": "/Users/dhyana/.hermes/comms/DISABLE_A2A_BROADCAST",
+      "guard_present": false,
+      "hermes_home": "/Users/dhyana/.hermes",
+      "legacy_broadcast_call_present": true
+    },
+    "errors": [],
+    "patched": false,
+    "status": "DRY_RUN"
+  },
+  "schema_version": "dharma.a2a.hermes_broadcast_guard.v1",
+  "status": "DRY_RUN"
+}

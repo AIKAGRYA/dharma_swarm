@@ -1,0 +1,38 @@
+{
+  "schema_version": "dharma.a2a.consumer_provision_receipt.v1",
+  "created_at": "2026-06-13T01:34:36+09:00",
+  "status": "APPLIED",
+  "context": "agni-wss",
+  "stream": "DHARMA_A2A",
+  "consumer": "fable_composer_inbox",
+  "filter_subject": "dharma.a2a.fable_composer",
+  "reason": "fable_composer had local identity address a42b313fc7e15cba and stream subject traffic, but no declared AGNI durable consumer.",
+  "command": "nats --context agni-wss consumer add DHARMA_A2A fable_composer_inbox --pull --filter dharma.a2a.fable_composer --deliver new --ack explicit --max-deliver 5 --max-pending 1000 --defaults",
+  "verified_by": [
+    "nats --context agni-wss consumer info DHARMA_A2A fable_composer_inbox --json",
+    "nats --context agni-wss consumer ls DHARMA_A2A",
+    "nats --context agni-wss stream info DHARMA_A2A --json"
+  ],
+  "consumer_config": {
+    "ack_policy": "explicit",
+    "deliver_policy": "new",
+    "filter_subject": "dharma.a2a.fable_composer",
+    "max_ack_pending": 1000,
+    "max_deliver": 5,
+    "pull_mode": true,
+    "replay_policy": "instant"
+  },
+  "after_state": {
+    "num_ack_pending": 0,
+    "num_pending": 0,
+    "delivered_stream_seq": 8106912,
+    "stream_consumer_count": 12
+  },
+  "production_claim": false,
+  "remaining_blockers": [
+    "AGNI DHARMA_A2A broker stream still has unbounded retention",
+    "AGNI DHARMA_A2A still retains historical 8.1M messages",
+    "usable full stream backup is still missing",
+    "production readiness quorum is not yet collected"
+  ]
+}

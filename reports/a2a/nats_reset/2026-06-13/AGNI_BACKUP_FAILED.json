@@ -1,0 +1,44 @@
+{
+  "schema_version": "dharma.a2a.agni_backup_attempt_receipt.v1",
+  "created_at": "2026-06-13T01:02:17+09:00",
+  "status": "BACKUP_FAILED",
+  "stream": "DHARMA_A2A",
+  "context": "agni-wss",
+  "mutation_applied": false,
+  "purge_applied": false,
+  "retention_edit_applied": false,
+  "attempts": [
+    {
+      "command": "nats --context agni-wss stream backup DHARMA_A2A /Users/dhyana/.dharma/a2a_bus/quarantine/nats/DHARMA_A2A_20260612T160000Z",
+      "exit_code": 1,
+      "error": "snapshot failed: backup timed out after receiving no data for a long period",
+      "artifact_path": "/Users/dhyana/.dharma/a2a_bus/quarantine/nats/DHARMA_A2A_20260612T160000Z",
+      "artifact_size": "208K",
+      "usable_backup": false
+    },
+    {
+      "command": "nats --context agni-wss --timeout=120s stream backup --no-progress --chunk-size=1MB DHARMA_A2A /Users/dhyana/.dharma/a2a_bus/quarantine/nats/DHARMA_A2A_20260612T160200Z",
+      "exit_code": 1,
+      "error": "snapshot failed: backup timed out after receiving no data for a long period",
+      "artifact_path": "/Users/dhyana/.dharma/a2a_bus/quarantine/nats/DHARMA_A2A_20260612T160200Z",
+      "artifact_size": "360K",
+      "usable_backup": false
+    }
+  ],
+  "post_attempt_stream_state": {
+    "messages": 8106912,
+    "bytes": 1427133017,
+    "max_msgs": -1,
+    "max_bytes": -1,
+    "max_age": 0,
+    "max_msgs_per_subject": -1,
+    "last_seq": 8106912,
+    "last_ts": "2026-06-12T15:10:01.971852618Z"
+  },
+  "decision": "Do not purge AGNI until a usable backup exists or the operator explicitly authorizes purge without full stream backup.",
+  "next_safe_options": [
+    "Retry backup from the AGNI host or with server-side filesystem access.",
+    "Export only the recent keep window and purge the two runaway subjects by explicit operator decision.",
+    "First apply retention limits without purging, then collect a fresh backup/readiness receipt."
+  ]
+}

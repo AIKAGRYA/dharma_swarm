@@ -93,33 +93,51 @@ Doctrine line that must hold:
 - Do not build Verified Experiment Loop runtime in this track.
 - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
 
-### Runtime Truth NATS — internal live transport for A2A dispatch
+### A2A Runtime Spine — NATS, hot contact, graph state, and quorum
 
-**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-07 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06
-**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, dharma_swarm/a2a/a2a_nats_contact.py, dharma_swarm/a2a/a2a_core_contact.py
-**Moves vital signs:** tool_coverage
+**Track id:** `runtime-truth-nats-2026-06` · **Status:** ACTIVE · **Owner:** @codex_composer
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-13 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, orientation-graph-2026-06, composer-holon-spine-longrun-2026-06
+**Owns surfaces:** docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md, docs/governance/active_tracks/a2a-runtime-spine-2026-06/**, docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml, docs/plans/2026-06-11-dharma-a2a-stream-retention-proposal.md, dharma_swarm/a2a/**, dharma_swarm/operator_core/nats_live_contact.py, dharma_swarm/operator_core/nats_substrate_status.py, scripts/runtime/a2a_send.py, scripts/runtime/a2a_inbox_bridge.py, scripts/runtime/a2a_inbox_quarantine.py, scripts/runtime/a2a_file_bus_guard.py, scripts/runtime/a2a_hermes_broadcast_guard.py, scripts/runtime/a2a_daemon_wiring_audit.py, scripts/runtime/a2a_launchagent_quarantine.py, scripts/runtime/a2a_live_handler_repair_plan.py, scripts/runtime/a2a_reset_quorum_consumers.py, scripts/runtime/a2a_reply_capture.py, scripts/runtime/a2a_domain_reply_worker.py, scripts/runtime/a2a_prod_readiness_quorum.py, scripts/runtime/a2a_prod_readiness_solicit.py, scripts/runtime/a2a_prod_readiness_delivery_status.py, scripts/runtime/a2a_quorum_blocker_status.py, scripts/runtime/a2a_reviewer_route_health.py, reports/a2a/**, reports/a2a/hermes_broadcast_guard/**
+**Moves vital signs:** tool_coverage, memory_persistence, eval_coverage, quality_gates
 
-The concurrent Codex transport lane. NATS was scoped out of the global
-prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
-scoped track with non-overlapping surfaces (transport layer only). This
-track wires the internal live transport so A2A dispatch can travel at
-broker speed, distinct from the reconciliation lane's read-model surfaces.
+This track owns the A2A runtime seam as a production system, not only a
+NATS transport sketch. It consolidates internal JetStream topology,
+A2A protocol semantics, file-inbox bridge compatibility, domain receipts,
+shared graph/vector/board state, and persistent-agent readiness quorum.
 
-Surface separation is the safety boundary: this track owns the NATS
-transport contact modules and the master spec; it does not touch the
-operator_core read models the reconciliation lane owns.
+The active-track subtree is:
+  docs/governance/active_tracks/a2a-runtime-spine-2026-06/
+
+The operator-facing invariant is strict:
+  Publish accepted is not contact. Handler ack is not semantic reply.
+  Domain receipt requires a typed target-owned artifact. Shared graph,
+  board, vector, and orientation projections are read models, not
+  authority.
+
+This track intentionally folds the old proposed cloud-agent bridge and
+the existing retention proposal into one A2A Runtime Spine lane. External
+cloud agents may enter through a gateway, but they do not get a separate
+active track unless the gateway exceeds this track's five-subtrack budget.
 
 **Next items:**
 
-- [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
+- [runtime] Keep Hermes alert-router legacy `a2a_bus.py broadcast` disabled by receipt and keep `scripts/runtime/a2a_file_bus_guard.py --json --check` green.
+- [runtime] Keep the live-handler repair plan at `status: READY_TO_MUTATE`; do not treat missing Fable/Hermes reviewer records as peer review.
+- [test] (blocker) Run fresh AGNI target-owned handler drills for real `fable_composer` and `hermes_m5` routes until reviewer records or typed domain receipts are written by the target-owned handlers.
+- [runtime] (blocker) Clear production readiness quorum: blocker-status and route-health receipts now separate stale blockers from current route failure; target-owned Fable/Hermes records, median readiness, and red-blocker refresh remain required.
+- [runtime] Keep LaunchAgent cleanup witnessed: cite `reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json`, keep the pointer README in `~/Library/LaunchAgents`, and rerun the daemon audit before any production claim.
+- [runtime] Keep AGNI retention and file-inbox quarantine baselines fresh before any production claim: cite `reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json`, the latest zero-candidate quarantine dry-run, and current AGNI stream info.
+- [docs] Fold truth-graph/orientation-graph PR work into the shared-state subtrack without making graph/vector retrieval authoritative.
 
 **Non-goals:**
 
 - Do not introduce Redis or gRPC as part of this track.
-- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
-- Do not add a parallel spine-check CI workflow.
+- Do not represent filesystem inbox files as proof of live agent reachability.
+- Do not claim semantic collaboration from publish ack or bridge ack alone.
+- Do not create a second message bus, second receipt substrate, or second command ledger.
+- Do not let orientation graph, truth graph, vector memory, or board cards become authority.
+- Do not purge broker or inbox state without backup, before/after counts, and a receipt.
 
 ### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
 

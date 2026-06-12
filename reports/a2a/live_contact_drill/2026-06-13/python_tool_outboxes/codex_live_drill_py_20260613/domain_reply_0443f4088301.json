@@ -1,0 +1,16 @@
+{
+  "schema_version": "dharma.a2a.domain_reply_artifact.v1",
+  "authored_by": "codex_live_drill_py_20260613",
+  "agent_uid": "codex_live_drill_py_20260613",
+  "packet_id": "0443f4088301",
+  "reply_subject": "dharma.agent.codex_live_drill_py_20260613.inbox.reply.0443f4088301",
+  "send_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts/20260612T172252Z-codex_live_drill_py_20260613-0443f4088301.json",
+  "verdict": "received",
+  "summary": "Python A2A runtime tools delivered the drill packet to the target inbox and produced a handler ack.",
+  "semantic_reply_claim": false,
+  "peer_model_processed_claim": false,
+  "evidence_refs": [
+    "reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts/20260612T172252Z-codex_live_drill_py_20260613-0443f4088301.json",
+    "reports/a2a/live_contact_drill/2026-06-13/python_tool_bridge_receipts/20260612T172247Z-codex_live_drill_py_20260613-0443f4088301.json"
+  ]
+}

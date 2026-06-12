@@ -1,0 +1,64 @@
+{
+  "schema_version": "dharma.a2a.advisory_request.v1",
+  "created_at": "2026-06-12T17:10:00+00:00",
+  "requested_by": "codex_composer",
+  "target_agent_id": "fable_composer",
+  "target_address_hint": "a42b313fc7e15cba",
+  "subject": "active-track architecture, A2A runtime spine, and cross-agent production governance",
+  "context": {
+    "operator_intent": [
+      "A2A/NATS should be a production-grade active track, not a scattered transport sketch.",
+      "Active tracks should be clickable/findable and may have up to five subtracks, each with up to three seams.",
+      "Runtime Truth naming is currently confusing; related runtime truth, spine, reconciliation, and loop work should fold under coherent owners.",
+      "TAM, A2A, and HOLON are strong candidates for active-track promotion or consolidation.",
+      "There should be a code-quality/coherence track inside the active-track portfolio that cross-checks all tracks.",
+      "Production readiness should require at least two persistent agent IDs and three model families reporting readiness percentages with evidence."
+    ],
+    "current_a2a_track": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/",
+    "current_a2a_status": "26/27 criteria passing; production quorum remains NOT_READY",
+    "known_blockers": [
+      "fable_composer quorum solicitation is PUBLISH_ACCEPTED only, with no handler ack or reviewer JSON yet.",
+      "post-reset production AGNI live drill has not yet proven handler ack plus target-owned DOMAIN_RECEIPTED artifact.",
+      "Hermes legacy alert_router.py can still broadcast into filesystem inboxes outside repo governance.",
+      "repo default a2a_send.py config points to local nats://127.0.0.1:4222 unless AGNI env/context is explicit."
+    ]
+  },
+  "requested_review_stance": [
+    "complex systems engineer",
+    "devops/governance architect",
+    "repo cartographer",
+    "A2A agentic harness specialist",
+    "adversarial reviewer"
+  ],
+  "questions": [
+    "Does the five-subtrack / three-seam active-track structure make sense from a complex-systems and devops-management standpoint?",
+    "Should A2A Runtime Spine own NATS topology, A2A logistics, ack/domain receipts, shared graph/vector state, and quorum, or should any piece split out?",
+    "How should Runtime Truth Reconciliation, Runtime Truth Spine Adoption, loops, and loop-closure be renamed or folded so operators can understand one coherent production path?",
+    "Should TAM and HOLON become independent active tracks now, or fold into existing tracks until shippable tracks close?",
+    "What is the cleanest way to make active-track history, receipts, branches, and PRs clickable/queryable under each track subtree?",
+    "What exact invariants should gate production readiness and prevent publish-ack, handler-ack, and domain-receipt confusion?",
+    "What would you change in Codex's current A2A active-track plan before merge?"
+  ],
+  "response_request": {
+    "preferred_subject": "dharma.a2a.codex_composer",
+    "preferred_artifact": "reports/a2a/advisory_responses/2026-06-13/fable_composer_active_track_architecture_review.json",
+    "also_write_quorum_record_if_ready": "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+    "minimum_response": [
+      "verdict",
+      "recommended_track_structure",
+      "risks",
+      "merge_or_promote_advice",
+      "readiness_percent_if_applicable",
+      "evidence_refs"
+    ]
+  },
+  "evidence_refs": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/README.md",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/SUBTRACKS.yaml",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md",
+    "reports/a2a/nats_reset/2026-06-13/NATS_COMMON_FAILURES.md",
+    "reports/a2a/prod_readiness_quorum/latest.json",
+    "reports/a2a/prod_readiness_quorum/2026-06-13/FABLE_COMPOSER_SOLICITATION_NATS_SEND.json"
+  ]
+}

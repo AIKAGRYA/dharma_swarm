@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T10:49:47+09:00",
+  "generated_at": "2026-06-13T05:40:54+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 6,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 4
+    "shippable": 3
   },
   "spine_objectives": [
     {
@@ -256,30 +256,57 @@
     },
     {
       "id": "runtime-truth-nats-2026-06",
-      "name": "Runtime Truth NATS \u2014 internal live transport for A2A dispatch",
+      "name": "A2A Runtime Spine \u2014 NATS, hot contact, graph state, and quorum",
       "status": "ACTIVE",
       "serves": "substrate-nativeness",
       "complements": [
-        "runtime-truth-reconciliation-2026-06"
+        "runtime-truth-reconciliation-2026-06",
+        "orientation-graph-2026-06",
+        "composer-holon-spine-longrun-2026-06"
       ],
       "depends_on": [],
       "conflicts_with": [],
       "owned_surfaces": [
         "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
-        "dharma_swarm/a2a/a2a_nats_contact.py",
-        "dharma_swarm/a2a/a2a_core_contact.py"
+        "docs/governance/active_tracks/a2a-runtime-spine-2026-06/**",
+        "docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml",
+        "docs/plans/2026-06-11-dharma-a2a-stream-retention-proposal.md",
+        "dharma_swarm/a2a/**",
+        "dharma_swarm/operator_core/nats_live_contact.py",
+        "dharma_swarm/operator_core/nats_substrate_status.py",
+        "scripts/runtime/a2a_send.py",
+        "scripts/runtime/a2a_inbox_bridge.py",
+        "scripts/runtime/a2a_inbox_quarantine.py",
+        "scripts/runtime/a2a_file_bus_guard.py",
+        "scripts/runtime/a2a_hermes_broadcast_guard.py",
+        "scripts/runtime/a2a_daemon_wiring_audit.py",
+        "scripts/runtime/a2a_launchagent_quarantine.py",
+        "scripts/runtime/a2a_live_handler_repair_plan.py",
+        "scripts/runtime/a2a_reset_quorum_consumers.py",
+        "scripts/runtime/a2a_reply_capture.py",
+        "scripts/runtime/a2a_domain_reply_worker.py",
+        "scripts/runtime/a2a_prod_readiness_quorum.py",
+        "scripts/runtime/a2a_prod_readiness_solicit.py",
+        "scripts/runtime/a2a_prod_readiness_delivery_status.py",
+        "scripts/runtime/a2a_quorum_blocker_status.py",
+        "scripts/runtime/a2a_reviewer_route_health.py",
+        "reports/a2a/**",
+        "reports/a2a/hermes_broadcast_guard/**"
       ],
       "moves_vital_signs": [
-        "tool_coverage"
+        "tool_coverage",
+        "memory_persistence",
+        "eval_coverage",
+        "quality_gates"
       ],
-      "verified_at": "2026-06-07",
+      "verified_at": "2026-06-13",
       "ttl_days": 21,
-      "owner": "@codex",
-      "shippable": true,
+      "owner": "@codex_composer",
+      "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 2,
-        "total": 2
+        "passed": 59,
+        "total": 60
       },
       "criteria": [
         {
@@ -289,16 +316,394 @@
           "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
         },
         {
+          "id": "a2a_send_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_send.py present"
+        },
+        {
+          "id": "inbox_bridge_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_inbox_bridge.py present"
+        },
+        {
+          "id": "reply_capture_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_reply_capture.py present"
+        },
+        {
+          "id": "inbox_quarantine_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_inbox_quarantine.py present"
+        },
+        {
+          "id": "file_bus_guard_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_file_bus_guard.py present"
+        },
+        {
           "id": "nats_master_spec_present",
           "kind": "file_exists",
           "passed": true,
           "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
         },
         {
-          "id": "nats_transport_landed",
+          "id": "active_track_subtree_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/README.md present"
+        },
+        {
+          "id": "subtrack_map_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/SUBTRACKS.yaml present"
+        },
+        {
+          "id": "no_more_than_five_subtracks_declared",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+          "detail": "pattern 'max_subtracks: 5' found in docs/governance/active_tracks/a2a-runtime-spine-2026-06/SUBTRACKS.yaml"
+        },
+        {
+          "id": "publish_only_not_live_contact",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'live_contact_claim' found in tests/test_a2a_send.py"
+        },
+        {
+          "id": "inbox_bridge_denies_semantic_claim",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'peer_model_processed_claim' found in tests/test_a2a_inbox_bridge.py"
+        },
+        {
+          "id": "reply_capture_domain_receipt_guard",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'DOMAIN_RECEIPTED' found in tests/test_a2a_reply_capture.py"
+        },
+        {
+          "id": "drain_reset_runbook_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/NATS_DRAIN_AND_RESET_RUNBOOK.md present"
+        },
+        {
+          "id": "inbox_quarantine_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_inbox_quarantine.py present"
+        },
+        {
+          "id": "inbox_quarantine_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_apply_moves_files_and_leaves_readme' found in tests/test_a2a_inbox_quarantine.py"
+        },
+        {
+          "id": "file_bus_broadcast_guard_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_file_bus_guard.py present"
+        },
+        {
+          "id": "file_bus_broadcast_guard_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_broadcast_copied_into_many_inboxes_fails' found in tests/test_a2a_file_bus_guard.py"
+        },
+        {
+          "id": "file_bus_guard_after_hermes_disable_passes",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"PASS\"' found in reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json"
+        },
+        {
+          "id": "hermes_broadcast_guard_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_hermes_broadcast_guard.py present"
+        },
+        {
+          "id": "hermes_broadcast_guard_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_apply_patches_router_creates_backup_and_disable_flag' found in tests/test_a2a_hermes_broadcast_guard.py"
+        },
+        {
+          "id": "hermes_broadcast_guard_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"broadcast_disabled\": true' found in reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json"
+        },
+        {
+          "id": "daemon_wiring_audit_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_daemon_wiring_audit.py present"
+        },
+        {
+          "id": "daemon_wiring_audit_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_missing_module_and_local_broker_fail' found in tests/test_a2a_daemon_wiring_audit.py"
+        },
+        {
+          "id": "launchagent_quarantine_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_launchagent_quarantine.py present"
+        },
+        {
+          "id": "launchagent_quarantine_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_apply_moves_plist_and_leaves_pointer' found in tests/test_a2a_launchagent_quarantine.py"
+        },
+        {
+          "id": "launchagent_quarantine_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json present"
+        },
+        {
+          "id": "daemon_wiring_audit_top_level_passes",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '(?m)^  \"status\": \"PASS\"' found in reports/a2a/nats_reset/2026-06-13/A2A_DAEMON_WIRING_AUDIT.json"
+        },
+        {
+          "id": "live_handler_repair_plan_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_live_handler_repair_plan.py present"
+        },
+        {
+          "id": "live_handler_repair_plan_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_build_plan_reports_daemon_and_delivery_gaps' found in tests/test_a2a_live_handler_repair_plan.py"
+        },
+        {
+          "id": "live_handler_repair_plan_ready",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"READY_TO_MUTATE\"' found in reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+        },
+        {
+          "id": "quorum_consumer_reset_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_reset_quorum_consumers.py present"
+        },
+        {
+          "id": "quorum_consumer_reset_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_build_reset_receipt_applies_delete_and_recreate' found in tests/test_a2a_reset_quorum_consumers.py"
+        },
+        {
+          "id": "quorum_consumer_reset_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"APPLIED\"' found in reports/a2a/nats_reset/2026-06-13/A2A_QUORUM_CONSUMER_RESET_APPLIED.json"
+        },
+        {
+          "id": "broker_scope_guard_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_require_agni_broker_scope_blocks_local_publish' found in tests/test_a2a_send.py"
+        },
+        {
+          "id": "broker_scope_guard_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/routing_scope_receipts/2026-06-13/AGNI_SCOPE_GUARD_LOCAL_MISMATCH.json present"
+        },
+        {
+          "id": "file_inbox_quarantine_applied",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_APPLIED.json present"
+        },
+        {
+          "id": "ds_goal_mission_created",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/DS_GOAL_MISSION.json present"
+        },
+        {
+          "id": "live_baseline_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/BASELINE.json present"
+        },
+        {
+          "id": "nats_consumer_inbox_reset_applied",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/NATS_CONSUMER_INBOX_RESET_APPLIED.json present"
+        },
+        {
+          "id": "fable_composer_consumer_provisioned",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/FABLE_COMPOSER_CONSUMER_PROVISIONED.json present"
+        },
+        {
+          "id": "production_quorum_rule_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md present"
+        },
+        {
+          "id": "production_quorum_validator_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_prod_readiness_quorum.py present"
+        },
+        {
+          "id": "production_quorum_validator_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_ready_quorum_requires_two_agents_three_models_and_median_80' found in tests/test_a2a_prod_readiness_quorum.py"
+        },
+        {
+          "id": "production_quorum_evidence_refs_verified",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_missing_evidence_ref_is_schema_error' found in tests/test_a2a_prod_readiness_quorum.py"
+        },
+        {
+          "id": "production_quorum_solicitor_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_prod_readiness_solicit.py present"
+        },
+        {
+          "id": "production_quorum_solicitor_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_write_solicitations_creates_request_files_and_receipt' found in tests/test_a2a_prod_readiness_solicit.py"
+        },
+        {
+          "id": "production_quorum_delivery_status_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_prod_readiness_delivery_status.py present"
+        },
+        {
+          "id": "production_quorum_delivery_status_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_live_probe_marks_pending_delivery' found in tests/test_a2a_prod_readiness_delivery_status.py"
+        },
+        {
+          "id": "production_quorum_delivery_status_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"PENDING_REVIEWER_RECORDS\"' found in reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_DELIVERY_STATUS.json"
+        },
+        {
+          "id": "production_quorum_blocker_status_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_quorum_blocker_status.py present"
+        },
+        {
+          "id": "production_quorum_blocker_status_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_pending_delivery_claim_becomes_partially_resolved_when_consumers_empty' found in tests/test_a2a_quorum_blocker_status.py"
+        },
+        {
+          "id": "production_quorum_blocker_status_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"BLOCKED_BY_CURRENT_EVIDENCE\"' found in reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_BLOCKER_STATUS.json"
+        },
+        {
+          "id": "production_quorum_route_health_tool_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/runtime/a2a_reviewer_route_health.py present"
+        },
+        {
+          "id": "production_quorum_route_health_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_provider_credit_blocks_missing_fable_record' found in tests/test_a2a_reviewer_route_health.py"
+        },
+        {
+          "id": "production_quorum_route_health_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"ROUTE_HEALTH_BLOCKED\"' found in reports/a2a/prod_readiness_quorum/2026-06-13/REVIEWER_ROUTE_HEALTH.json"
+        },
+        {
+          "id": "production_quorum_solicitation_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/prod_readiness_quorum/2026-06-13/SOLICITATION_RECEIPT.json present"
+        },
+        {
+          "id": "fable_composer_solicitation_sent",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/prod_readiness_quorum/2026-06-13/FABLE_COMPOSER_SOLICITATION_NATS_SEND.json present"
+        },
+        {
+          "id": "local_live_contact_drill_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"LOCAL_DOMAIN_RECEIPTED\"' found in reports/a2a/live_contact_drill/2026-06-13/LOCAL_LIVE_CONTACT_DRILL_RECEIPT.json"
+        },
+        {
+          "id": "nats_py_runtime_dependency_declared",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'nats-py' found in pyproject.toml"
+        },
+        {
+          "id": "python_tool_live_contact_drill_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"LOCAL_PYTHON_TOOLS_DOMAIN_RECEIPTED\"' found in reports/a2a/live_contact_drill/2026-06-13/PYTHON_TOOL_LIVE_CONTACT_DRILL_RECEIPT.json"
+        },
+        {
+          "id": "agni_context_sender_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_main_nats_context_publish_uses_cli_context' found in tests/test_a2a_send.py"
+        },
+        {
+          "id": "agni_a2a_live_contact_drill_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '\"status\": \"AGNI_SYNTHETIC_DOMAIN_RECEIPTED\"' found in reports/a2a/agni_live_contact_drill/2026-06-13/AGNI_A2A_LIVE_CONTACT_DRILL_RECEIPT.json"
+        },
+        {
+          "id": "production_quorum_collected",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '\"status\": \"READY\"' NOT FOUND in reports/a2a/prod_readiness_quorum/latest.json"
+        },
+        {
+          "id": "drain_applied_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json present"
+        },
+        {
+          "id": "post_reset_receipt_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/a2a/nats_reset/2026-06-13/AFTER.json present"
         }
       ]
     },
@@ -664,8 +1069,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-in-progress:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] 59/60 completion criteria pass.",
       "criterion_id": null
     },
     {

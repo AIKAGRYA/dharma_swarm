@@ -1,0 +1,65 @@
+{
+  "audit_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_DAEMON_WIRING_AUDIT.json",
+  "check_commands": [
+    "python3 scripts/runtime/a2a_daemon_wiring_audit.py --write --json",
+    "python3 scripts/runtime/a2a_prod_readiness_delivery_status.py --date 2026-06-13 --probe-live --write --write-latest --json",
+    "python3 scripts/runtime/a2a_live_handler_repair_plan.py --write --json"
+  ],
+  "created_at": "2026-06-12T20:00:17+00:00",
+  "daemon_audit_status": "PASS",
+  "delivery_gaps": [],
+  "delivery_status": "PENDING_REVIEWER_RECORDS",
+  "delivery_status_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_DELIVERY_STATUS.json",
+  "failing_daemons": [],
+  "interpretation": "This receipt is a repair plan only. It is not proof of peer review, handler ack, domain receipt, or production readiness.",
+  "missing_reviewer_records": [
+    {
+      "blocks_production_quorum": true,
+      "consumer": "fable_composer_inbox",
+      "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+      "must_not_claim": [
+        "An empty durable consumer is not a target-owned reviewer record.",
+        "READY_TO_MUTATE is not production readiness."
+      ],
+      "next_required_receipt": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+      "num_ack_pending": 0,
+      "num_pending": 0,
+      "subject": "dharma.a2a.fable_composer",
+      "target_agent_id": "fable_composer"
+    },
+    {
+      "blocks_production_quorum": true,
+      "consumer": "claude_from_hermes",
+      "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+      "must_not_claim": [
+        "An empty durable consumer is not a target-owned reviewer record.",
+        "READY_TO_MUTATE is not production readiness."
+      ],
+      "next_required_receipt": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json",
+      "num_ack_pending": 0,
+      "num_pending": 0,
+      "subject": "dharma.a2a.hermes",
+      "target_agent_id": "hermes_m5"
+    }
+  ],
+  "production_claim": false,
+  "safe_execution_order": [
+    "Back up current LaunchAgent plists and current AGNI consumer info.",
+    "Decide for each pending consumer whether the target-owned handler exists now or whether this is a reset.",
+    "If resetting, reset consumers with an explicit reset receipt and no peer-review claim.",
+    "If repairing handlers, repoint LaunchAgents to repo-owned AGNI-aware handlers and rerun the daemon audit.",
+    "When daemon audit passes and delivery gaps are empty, attach or re-solicit target-owned handlers.",
+    "Do not claim production readiness until reviewer/domain receipts exist and quorum validates READY."
+  ],
+  "schema_version": "dharma.a2a.live_handler_repair_plan.v1",
+  "status": "READY_TO_MUTATE",
+  "summary": {
+    "daemon_issue_counts": {},
+    "delivery_gap_count": 0,
+    "delivery_status_counts": {
+      "CONSUMER_EMPTY_NO_DELIVERY": 2
+    },
+    "failing_daemon_count": 0,
+    "missing_reviewer_record_count": 2
+  }
+}

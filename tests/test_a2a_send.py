@@ -399,7 +399,129 @@ def test_main_publish_only_is_not_live_collaboration(tmp_path, monkeypatch):
     assert receipt["contact_evidence_tier"] == "PUBLISH_ACCEPTED"
     assert receipt["live_contact_claim"] is False
     assert receipt["collaboration_claim"] == "publish_only"
+    assert receipt["broker_scope"] == "local"
+    assert receipt["production_broker_claim"] is False
     assert receipt["runtime_truth_ref"]["spine_evidence_receipt_ref"]["operation"] == "a2a_send.publish"
+
+
+def test_known_agni_endpoint_classifies_as_production_broker():
+    config = a2a_send.NATSConfig(
+        endpoint="wss://157.245.193.15:8443",
+        user="",
+        credential="",
+        missing=(),
+    )
+
+    scope = a2a_send.classify_broker_scope(config, {})
+
+    assert scope["broker_scope"] == "agni"
+    assert scope["production_broker_claim"] is True
+
+
+def test_agni_context_classifies_as_production_broker():
+    config = a2a_send._nats_context_config("agni-wss")  # noqa: SLF001
+
+    scope = a2a_send.classify_broker_scope(config, {})
+
+    assert scope["broker_scope"] == "agni"
+    assert scope["broker_scope_source"] == "nats_context"
+    assert scope["production_broker_claim"] is True
+
+
+def test_main_nats_context_publish_uses_cli_context(tmp_path, monkeypatch):
+    for name in list(os.environ):
+        if "NATS" in name:
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(a2a_send.shutil, "which", lambda name: "/opt/homebrew/bin/nats")
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append({"cmd": cmd, **kwargs})
+
+        class Proc:
+            returncode = 0
+            stdout = (
+                "Published 424 bytes to \"dharma.agent.worker.inbox\"\n"
+                "Stored in Stream: DHARMA_A2A Sequence: 101\n"
+            )
+            stderr = ""
+
+        return Proc()
+
+    monkeypatch.setattr(a2a_send.subprocess, "run", fake_run)
+    packet = _write_packet(tmp_path)
+
+    code = a2a_send.main(
+        [
+            "--to",
+            "worker",
+            "--route",
+            "agent-inbox",
+            "--agent-uid",
+            "worker",
+            "--file",
+            str(packet),
+            "--receipt-dir",
+            str(tmp_path / "r"),
+            "--nats-context",
+            "agni-wss",
+            "--require-broker-scope",
+            "agni",
+        ]
+    )
+
+    assert code == 0
+    assert calls
+    call = calls[0]
+    assert call["cmd"][:3] == ["nats", "--context", "agni-wss"]
+    assert call["cmd"][-1] == "dharma.agent.worker.inbox"
+    assert "--jetstream" in call["cmd"]
+    assert "--force-stdin" in call["cmd"]
+    receipt = json.loads(next((tmp_path / "r").glob("*.json")).read_text(encoding="utf-8"))
+    assert receipt["status"] == "PUBLISH_ACKED"
+    assert receipt["transport_ack"] == "NATS_CONTEXT_CLI_JETSTREAM_PUB_ACK"
+    assert receipt["nats_context"] == "agni-wss"
+    assert receipt["broker_scope"] == "agni"
+    assert receipt["production_broker_claim"] is True
+    assert receipt["live_contact_claim"] is False
+
+
+def test_require_agni_broker_scope_blocks_local_publish(tmp_path, monkeypatch):
+    monkeypatch.setenv("NATS_URL", "nats://127.0.0.1:4222")
+    calls = 0
+
+    async def publish_only(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return {
+            "status": a2a_send.STATUS_PUBLISH_ACKED,
+            "ack_tier": a2a_send.ACK_TIER_PUBLISH_ACCEPTED,
+        }
+
+    monkeypatch.setattr(a2a_send, "_publish_and_wait", publish_only)
+    packet = _write_packet(tmp_path)
+
+    code = a2a_send.main(
+        [
+            "--to",
+            "devin",
+            "--file",
+            str(packet),
+            "--receipt-dir",
+            str(tmp_path / "r"),
+            "--require-broker-scope",
+            "agni",
+        ]
+    )
+
+    assert code == 5
+    assert calls == 0
+    receipt = json.loads(next((tmp_path / "r").glob("*.json")).read_text(encoding="utf-8"))
+    assert receipt["status"] == "BROKER_SCOPE_MISMATCH"
+    assert receipt["broker_scope"] == "local"
+    assert receipt["contact_evidence_tier"] == "NO_CONTACT"
+    assert receipt["live_contact_claim"] is False
+    assert receipt["collaboration_claim"] == "none"
 
 
 def test_main_publish_runtime_receipt_associates_spine_evidence_receipt(tmp_path, monkeypatch):

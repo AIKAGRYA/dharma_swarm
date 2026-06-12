@@ -1,0 +1,89 @@
+{
+  "schema_version": "dharma.a2a.nats_drain_receipt.v1",
+  "created_at": "2026-06-13T01:38:57+09:00",
+  "status": "APPLIED",
+  "context": "agni-wss",
+  "stream": "DHARMA_A2A",
+  "backup_manifest": "reports/a2a/nats_reset/2026-06-13/BACKUP_MANIFEST.json",
+  "before": {
+    "messages": 8106912,
+    "bytes": 1427133017,
+    "max_msgs": -1,
+    "max_bytes": -1,
+    "max_age": 0,
+    "max_msgs_per_subject": -1,
+    "consumer_count": 11,
+    "top_subjects": {
+      "dharma.a2a.fleet": 4053354,
+      "dharma.a2a.devin": 4053353,
+      "dharma.a2a.perplexity": 91,
+      "dharma.a2a.claude": 45,
+      "dharma.a2a.merge_master_mike": 31
+    }
+  },
+  "actions": [
+    {
+      "kind": "fallback_backup",
+      "command": "ssh agni tar -C /root/.dharma/nats/jetstream/jetstream/$G/streams -cf /root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar DHARMA_A2A",
+      "result": "remote fallback backup created and sha256 verified"
+    },
+    {
+      "kind": "consumer_provision",
+      "command": "nats --context agni-wss consumer add DHARMA_A2A fable_composer_inbox --pull --filter dharma.a2a.fable_composer --deliver new --ack explicit --max-deliver 5 --max-pending 1000 --defaults",
+      "result": "fable_composer_inbox created with num_pending=0"
+    },
+    {
+      "kind": "retention_edit",
+      "dry_run_command": "nats --context agni-wss stream edit DHARMA_A2A --max-age=72h --max-msgs-per-subject=10000 --max-bytes=268435456 --discard=old --dry-run --json",
+      "apply_command": "nats --context agni-wss stream edit DHARMA_A2A --max-age=72h --max-msgs-per-subject=10000 --max-bytes=268435456 --discard=old --force --json",
+      "result": "apply command timed out after showing the intended diff; subsequent stream info verified the new config"
+    },
+    {
+      "kind": "subject_purge",
+      "command": "nats --context agni-wss --timeout=60s stream purge DHARMA_A2A --subject dharma.a2a.devin --keep 1000 --force --json",
+      "result": "purged 0 messages because retention compaction had already reduced the stream"
+    },
+    {
+      "kind": "subject_purge",
+      "command": "nats --context agni-wss --timeout=60s stream purge DHARMA_A2A --subject dharma.a2a.fleet --keep 1000 --force --json",
+      "result": "purged 0 messages because retention compaction had already reduced the stream"
+    }
+  ],
+  "after": {
+    "messages": 43,
+    "bytes": 92812,
+    "first_seq": 8106870,
+    "first_ts": "2026-06-10T22:27:04.282427844Z",
+    "last_seq": 8106912,
+    "last_ts": "2026-06-12T15:10:01.971852618Z",
+    "num_subjects": 17,
+    "consumer_count": 12,
+    "max_msgs": -1,
+    "max_bytes": 268435456,
+    "max_age_ns": 259200000000000,
+    "max_age": "72h",
+    "max_msgs_per_subject": 10000,
+    "top_subjects": {
+      "dharma.a2a.devin": 15,
+      "dharma.a2a.fleet": 9,
+      "dharma.a2a.fable_5_cursor": 4,
+      "dharma.a2a.codex": 2,
+      "dharma.a2a.fable_composer": 1
+    }
+  },
+  "consumer_after_invariant": {
+    "consumer_count": 12,
+    "all_ack_pending_zero": true,
+    "all_unprocessed_zero": true,
+    "fable_composer_inbox_present": true
+  },
+  "file_inbox_after_invariant": {
+    "candidate_count": 0,
+    "non_readme_count": 0
+  },
+  "production_claim": false,
+  "remaining_blockers": [
+    "production readiness quorum is not yet collected",
+    "limited operator-supervised live-contact/domain-receipt drill still needs to be run for confidence beyond governance criteria"
+  ]
+}

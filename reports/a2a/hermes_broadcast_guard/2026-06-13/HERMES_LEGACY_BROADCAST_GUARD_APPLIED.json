@@ -1,0 +1,61 @@
+{
+  "broadcast_disabled": true,
+  "created_at": "2026-06-12T20:33:10+00:00",
+  "filesystem_inbox_authority_claim": false,
+  "interpretation": "This disables known Hermes legacy file-bus broadcast amplification. It does not prove AGNI handler contact, peer review, domain receipt, or production readiness.",
+  "mutation_applied": true,
+  "operation": "disable_hermes_legacy_file_bus_broadcast",
+  "production_claim": false,
+  "result": {
+    "after": {
+      "a2a_bus_exists": true,
+      "a2a_bus_path": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+      "alert_router_exists": true,
+      "alert_router_guard_present": true,
+      "alert_router_legacy_broadcast_call_present": true,
+      "alert_router_path": "/Users/dhyana/.hermes/scripts/alert_router.py",
+      "dharma_bridge_exists": true,
+      "dharma_bridge_guard_present": true,
+      "dharma_bridge_legacy_broadcast_call_present": true,
+      "dharma_bridge_path": "/Users/dhyana/.hermes/scripts/dharma_bridge.py",
+      "flag_file_present": true,
+      "flag_path": "/Users/dhyana/.hermes/comms/DISABLE_A2A_BROADCAST",
+      "guard_present": true,
+      "hermes_home": "/Users/dhyana/.hermes",
+      "legacy_broadcast_call_present": true,
+      "unguarded_legacy_broadcast_sources": []
+    },
+    "backup_path": "/Users/dhyana/.dharma/a2a_bus/quarantine/hermes_broadcast_guard/2026-06-12T203310Z0000/dharma_bridge.py",
+    "backup_paths": [
+      "/Users/dhyana/.dharma/a2a_bus/quarantine/hermes_broadcast_guard/2026-06-12T203310Z0000/dharma_bridge.py"
+    ],
+    "before": {
+      "a2a_bus_exists": true,
+      "a2a_bus_path": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+      "alert_router_exists": true,
+      "alert_router_guard_present": true,
+      "alert_router_legacy_broadcast_call_present": true,
+      "alert_router_path": "/Users/dhyana/.hermes/scripts/alert_router.py",
+      "dharma_bridge_exists": true,
+      "dharma_bridge_guard_present": false,
+      "dharma_bridge_legacy_broadcast_call_present": true,
+      "dharma_bridge_path": "/Users/dhyana/.hermes/scripts/dharma_bridge.py",
+      "flag_file_present": true,
+      "flag_path": "/Users/dhyana/.hermes/comms/DISABLE_A2A_BROADCAST",
+      "guard_present": false,
+      "hermes_home": "/Users/dhyana/.hermes",
+      "legacy_broadcast_call_present": true,
+      "unguarded_legacy_broadcast_sources": [
+        "dharma_bridge.py"
+      ]
+    },
+    "errors": [],
+    "patched": true,
+    "patched_files": [
+      "/Users/dhyana/.hermes/scripts/dharma_bridge.py"
+    ],
+    "status": "APPLIED"
+  },
+  "schema_version": "dharma.a2a.hermes_broadcast_guard.v1",
+  "status": "APPLIED"
+}

@@ -1,0 +1,13 @@
+{
+  "agent_id": "hermes_m5",
+  "attempted_at": "2026-06-12T19:08:26Z",
+  "command_surface": "hermes -z",
+  "model_family_hint": "hermes",
+  "production_claim": false,
+  "reviewer_record_written": false,
+  "role": "agent_harness_reviewer",
+  "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+  "status": "FAILED",
+  "stderr_summary": "timed out after 45s waiting for provider response",
+  "target_record_path": "reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json"
+}

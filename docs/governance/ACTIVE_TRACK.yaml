@@ -238,56 +238,347 @@ active_tracks:
         blocker: false
 
   - id: runtime-truth-nats-2026-06
-    name: Runtime Truth NATS — internal live transport for A2A dispatch
+    name: A2A Runtime Spine — NATS, hot contact, graph state, and quorum
     status: ACTIVE
     opened_at: "2026-06-06"
-    verified_at: "2026-06-07"
+    verified_at: "2026-06-13"
     ttl_days: 21
-    owner: "@codex"
+    owner: "@codex_composer"
     serves: substrate-nativeness
     complements:
       - runtime-truth-reconciliation-2026-06
+      - orientation-graph-2026-06
+      - composer-holon-spine-longrun-2026-06
     owned_surfaces:
       - docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-      - dharma_swarm/a2a/a2a_nats_contact.py
-      - dharma_swarm/a2a/a2a_core_contact.py
+      - docs/governance/active_tracks/a2a-runtime-spine-2026-06/**
+      - docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml
+      - docs/plans/2026-06-11-dharma-a2a-stream-retention-proposal.md
+      - dharma_swarm/a2a/**
+      - dharma_swarm/operator_core/nats_live_contact.py
+      - dharma_swarm/operator_core/nats_substrate_status.py
+      - scripts/runtime/a2a_send.py
+      - scripts/runtime/a2a_inbox_bridge.py
+      - scripts/runtime/a2a_inbox_quarantine.py
+      - scripts/runtime/a2a_file_bus_guard.py
+      - scripts/runtime/a2a_hermes_broadcast_guard.py
+      - scripts/runtime/a2a_daemon_wiring_audit.py
+      - scripts/runtime/a2a_launchagent_quarantine.py
+      - scripts/runtime/a2a_live_handler_repair_plan.py
+      - scripts/runtime/a2a_reset_quorum_consumers.py
+      - scripts/runtime/a2a_reply_capture.py
+      - scripts/runtime/a2a_domain_reply_worker.py
+      - scripts/runtime/a2a_prod_readiness_quorum.py
+      - scripts/runtime/a2a_prod_readiness_solicit.py
+      - scripts/runtime/a2a_prod_readiness_delivery_status.py
+      - scripts/runtime/a2a_quorum_blocker_status.py
+      - scripts/runtime/a2a_reviewer_route_health.py
+      - reports/a2a/**
+      - reports/a2a/hermes_broadcast_guard/**
     moves_vital_signs:
       - tool_coverage
+      - memory_persistence
+      - eval_coverage
+      - quality_gates
+
+    track_path: docs/governance/active_tracks/a2a-runtime-spine-2026-06
+    subtracks:
+      - 01-canonical-nats-topology
+      - 02-hot-contact-ack-and-domain-receipts
+      - 03-inbox-drain-reset-and-retention
+      - 04-shared-state-graph-and-vector-memory
+      - 05-persistent-agent-workflow-and-quorum
 
     description: |
-      The concurrent Codex transport lane. NATS was scoped out of the global
-      prohibition by the 2026-05-31 doctrine amendment and runs as a concurrent
-      scoped track with non-overlapping surfaces (transport layer only). This
-      track wires the internal live transport so A2A dispatch can travel at
-      broker speed, distinct from the reconciliation lane's read-model surfaces.
+      This track owns the A2A runtime seam as a production system, not only a
+      NATS transport sketch. It consolidates internal JetStream topology,
+      A2A protocol semantics, file-inbox bridge compatibility, domain receipts,
+      shared graph/vector/board state, and persistent-agent readiness quorum.
 
-      Surface separation is the safety boundary: this track owns the NATS
-      transport contact modules and the master spec; it does not touch the
-      operator_core read models the reconciliation lane owns.
+      The active-track subtree is:
+        docs/governance/active_tracks/a2a-runtime-spine-2026-06/
+
+      The operator-facing invariant is strict:
+        Publish accepted is not contact. Handler ack is not semantic reply.
+        Domain receipt requires a typed target-owned artifact. Shared graph,
+        board, vector, and orientation projections are read models, not
+        authority.
+
+      This track intentionally folds the old proposed cloud-agent bridge and
+      the existing retention proposal into one A2A Runtime Spine lane. External
+      cloud agents may enter through a gateway, but they do not get a separate
+      active track unless the gateway exceeds this track's five-subtrack budget.
 
     prerequisites:
       - id: nats_master_spec_exists
         kind: file_exists
         file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+      - id: a2a_send_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_send.py
+      - id: inbox_bridge_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_inbox_bridge.py
+      - id: reply_capture_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_reply_capture.py
+      - id: inbox_quarantine_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_inbox_quarantine.py
+      - id: file_bus_guard_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_file_bus_guard.py
 
     completion_criteria:
       - id: nats_master_spec_present
         kind: file_exists
         file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-      - id: nats_transport_landed
+      - id: active_track_subtree_exists
+        kind: file_exists
+        file: docs/governance/active_tracks/a2a-runtime-spine-2026-06/README.md
+      - id: subtrack_map_exists
+        kind: file_exists
+        file: docs/governance/active_tracks/a2a-runtime-spine-2026-06/SUBTRACKS.yaml
+      - id: no_more_than_five_subtracks_declared
         kind: file_contains
-        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-        pattern: "NATS"
+        file: docs/governance/active_tracks/a2a-runtime-spine-2026-06/SUBTRACKS.yaml
+        pattern: "max_subtracks: 5"
+      - id: publish_only_not_live_contact
+        kind: file_contains
+        file: tests/test_a2a_send.py
+        pattern: "live_contact_claim"
+      - id: inbox_bridge_denies_semantic_claim
+        kind: file_contains
+        file: tests/test_a2a_inbox_bridge.py
+        pattern: "peer_model_processed_claim"
+      - id: reply_capture_domain_receipt_guard
+        kind: file_contains
+        file: tests/test_a2a_reply_capture.py
+        pattern: "DOMAIN_RECEIPTED"
+      - id: drain_reset_runbook_exists
+        kind: file_exists
+        file: docs/governance/active_tracks/a2a-runtime-spine-2026-06/NATS_DRAIN_AND_RESET_RUNBOOK.md
+      - id: inbox_quarantine_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_inbox_quarantine.py
+      - id: inbox_quarantine_test_exists
+        kind: file_contains
+        file: tests/test_a2a_inbox_quarantine.py
+        pattern: "test_apply_moves_files_and_leaves_readme"
+      - id: file_bus_broadcast_guard_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_file_bus_guard.py
+      - id: file_bus_broadcast_guard_test_exists
+        kind: file_contains
+        file: tests/test_a2a_file_bus_guard.py
+        pattern: "test_broadcast_copied_into_many_inboxes_fails"
+      - id: file_bus_guard_after_hermes_disable_passes
+        kind: file_contains
+        file: reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json
+        pattern: "\"status\": \"PASS\""
+      - id: hermes_broadcast_guard_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_hermes_broadcast_guard.py
+      - id: hermes_broadcast_guard_test_exists
+        kind: file_contains
+        file: tests/test_a2a_hermes_broadcast_guard.py
+        pattern: "test_apply_patches_router_creates_backup_and_disable_flag"
+      - id: hermes_broadcast_guard_receipt_exists
+        kind: file_contains
+        file: reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json
+        pattern: "\"broadcast_disabled\": true"
+      - id: daemon_wiring_audit_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_daemon_wiring_audit.py
+      - id: daemon_wiring_audit_test_exists
+        kind: file_contains
+        file: tests/test_a2a_daemon_wiring_audit.py
+        pattern: "test_missing_module_and_local_broker_fail"
+      - id: launchagent_quarantine_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_launchagent_quarantine.py
+      - id: launchagent_quarantine_test_exists
+        kind: file_contains
+        file: tests/test_a2a_launchagent_quarantine.py
+        pattern: "test_apply_moves_plist_and_leaves_pointer"
+      - id: launchagent_quarantine_receipt_exists
+        kind: file_exists
+        file: reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json
+      - id: daemon_wiring_audit_top_level_passes
+        kind: file_contains
+        file: reports/a2a/nats_reset/2026-06-13/A2A_DAEMON_WIRING_AUDIT.json
+        pattern: "(?m)^  \"status\": \"PASS\""
+      - id: live_handler_repair_plan_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_live_handler_repair_plan.py
+      - id: live_handler_repair_plan_test_exists
+        kind: file_contains
+        file: tests/test_a2a_live_handler_repair_plan.py
+        pattern: "test_build_plan_reports_daemon_and_delivery_gaps"
+      - id: live_handler_repair_plan_ready
+        kind: file_contains
+        file: reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json
+        pattern: "\"status\": \"READY_TO_MUTATE\""
+      - id: quorum_consumer_reset_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_reset_quorum_consumers.py
+      - id: quorum_consumer_reset_test_exists
+        kind: file_contains
+        file: tests/test_a2a_reset_quorum_consumers.py
+        pattern: "test_build_reset_receipt_applies_delete_and_recreate"
+      - id: quorum_consumer_reset_receipt_exists
+        kind: file_contains
+        file: reports/a2a/nats_reset/2026-06-13/A2A_QUORUM_CONSUMER_RESET_APPLIED.json
+        pattern: "\"status\": \"APPLIED\""
+      - id: broker_scope_guard_test_exists
+        kind: file_contains
+        file: tests/test_a2a_send.py
+        pattern: "test_require_agni_broker_scope_blocks_local_publish"
+      - id: broker_scope_guard_receipt_exists
+        kind: file_exists
+        file: reports/a2a/routing_scope_receipts/2026-06-13/AGNI_SCOPE_GUARD_LOCAL_MISMATCH.json
+      - id: file_inbox_quarantine_applied
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_APPLIED.json
+      - id: ds_goal_mission_created
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/DS_GOAL_MISSION.json
+      - id: live_baseline_receipt_exists
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/BASELINE.json
+      - id: nats_consumer_inbox_reset_applied
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/NATS_CONSUMER_INBOX_RESET_APPLIED.json
+      - id: fable_composer_consumer_provisioned
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/FABLE_COMPOSER_CONSUMER_PROVISIONED.json
+      - id: production_quorum_rule_exists
+        kind: file_exists
+        file: docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md
+      - id: production_quorum_validator_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_prod_readiness_quorum.py
+      - id: production_quorum_validator_test_exists
+        kind: file_contains
+        file: tests/test_a2a_prod_readiness_quorum.py
+        pattern: "test_ready_quorum_requires_two_agents_three_models_and_median_80"
+      - id: production_quorum_evidence_refs_verified
+        kind: file_contains
+        file: tests/test_a2a_prod_readiness_quorum.py
+        pattern: "test_missing_evidence_ref_is_schema_error"
+      - id: production_quorum_solicitor_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_prod_readiness_solicit.py
+      - id: production_quorum_solicitor_test_exists
+        kind: file_contains
+        file: tests/test_a2a_prod_readiness_solicit.py
+        pattern: "test_write_solicitations_creates_request_files_and_receipt"
+      - id: production_quorum_delivery_status_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_prod_readiness_delivery_status.py
+      - id: production_quorum_delivery_status_test_exists
+        kind: file_contains
+        file: tests/test_a2a_prod_readiness_delivery_status.py
+        pattern: "test_live_probe_marks_pending_delivery"
+      - id: production_quorum_delivery_status_receipt_exists
+        kind: file_contains
+        file: reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_DELIVERY_STATUS.json
+        pattern: "\"status\": \"PENDING_REVIEWER_RECORDS\""
+      - id: production_quorum_blocker_status_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_quorum_blocker_status.py
+      - id: production_quorum_blocker_status_test_exists
+        kind: file_contains
+        file: tests/test_a2a_quorum_blocker_status.py
+        pattern: "test_pending_delivery_claim_becomes_partially_resolved_when_consumers_empty"
+      - id: production_quorum_blocker_status_receipt_exists
+        kind: file_contains
+        file: reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_BLOCKER_STATUS.json
+        pattern: "\"status\": \"BLOCKED_BY_CURRENT_EVIDENCE\""
+      - id: production_quorum_route_health_tool_exists
+        kind: file_exists
+        file: scripts/runtime/a2a_reviewer_route_health.py
+      - id: production_quorum_route_health_test_exists
+        kind: file_contains
+        file: tests/test_a2a_reviewer_route_health.py
+        pattern: "test_provider_credit_blocks_missing_fable_record"
+      - id: production_quorum_route_health_receipt_exists
+        kind: file_contains
+        file: reports/a2a/prod_readiness_quorum/2026-06-13/REVIEWER_ROUTE_HEALTH.json
+        pattern: "\"status\": \"ROUTE_HEALTH_BLOCKED\""
+      - id: production_quorum_solicitation_receipt_exists
+        kind: file_exists
+        file: reports/a2a/prod_readiness_quorum/2026-06-13/SOLICITATION_RECEIPT.json
+      - id: fable_composer_solicitation_sent
+        kind: file_exists
+        file: reports/a2a/prod_readiness_quorum/2026-06-13/FABLE_COMPOSER_SOLICITATION_NATS_SEND.json
+      - id: local_live_contact_drill_receipt_exists
+        kind: file_contains
+        file: reports/a2a/live_contact_drill/2026-06-13/LOCAL_LIVE_CONTACT_DRILL_RECEIPT.json
+        pattern: "\"status\": \"LOCAL_DOMAIN_RECEIPTED\""
+      - id: nats_py_runtime_dependency_declared
+        kind: file_contains
+        file: pyproject.toml
+        pattern: "nats-py"
+      - id: python_tool_live_contact_drill_receipt_exists
+        kind: file_contains
+        file: reports/a2a/live_contact_drill/2026-06-13/PYTHON_TOOL_LIVE_CONTACT_DRILL_RECEIPT.json
+        pattern: "\"status\": \"LOCAL_PYTHON_TOOLS_DOMAIN_RECEIPTED\""
+      - id: agni_context_sender_test_exists
+        kind: file_contains
+        file: tests/test_a2a_send.py
+        pattern: "test_main_nats_context_publish_uses_cli_context"
+      - id: agni_a2a_live_contact_drill_receipt_exists
+        kind: file_contains
+        file: reports/a2a/agni_live_contact_drill/2026-06-13/AGNI_A2A_LIVE_CONTACT_DRILL_RECEIPT.json
+        pattern: "\"status\": \"AGNI_SYNTHETIC_DOMAIN_RECEIPTED\""
+      - id: production_quorum_collected
+        kind: file_contains
+        file: reports/a2a/prod_readiness_quorum/latest.json
+        pattern: "\"status\": \"READY\""
+      - id: drain_applied_receipt_exists
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json
+      - id: post_reset_receipt_exists
+        kind: file_exists
+        file: reports/a2a/nats_reset/2026-06-13/AFTER.json
 
     non_goals:
       - Do not introduce Redis or gRPC as part of this track.
-      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
-      - Do not add a parallel spine-check CI workflow.
+      - Do not represent filesystem inbox files as proof of live agent reachability.
+      - Do not claim semantic collaboration from publish ack or bridge ack alone.
+      - Do not create a second message bus, second receipt substrate, or second command ledger.
+      - Do not let orientation graph, truth graph, vector memory, or board cards become authority.
+      - Do not purge broker or inbox state without backup, before/after counts, and a receipt.
 
     next_items:
       - id: 1
-        what: "Confirm NATS transport contact modules are wired and receipted end-to-end."
-        kind: code
+        what: "Keep Hermes alert-router legacy `a2a_bus.py broadcast` disabled by receipt and keep `scripts/runtime/a2a_file_bus_guard.py --json --check` green."
+        kind: runtime
+        blocker: false
+      - id: 2
+        what: "Keep the live-handler repair plan at `status: READY_TO_MUTATE`; do not treat missing Fable/Hermes reviewer records as peer review."
+        kind: runtime
+        blocker: false
+      - id: 3
+        what: "Run fresh AGNI target-owned handler drills for real `fable_composer` and `hermes_m5` routes until reviewer records or typed domain receipts are written by the target-owned handlers."
+        kind: test
+        blocker: true
+      - id: 4
+        what: "Clear production readiness quorum: blocker-status and route-health receipts now separate stale blockers from current route failure; target-owned Fable/Hermes records, median readiness, and red-blocker refresh remain required."
+        kind: runtime
+        blocker: true
+      - id: 5
+        what: "Keep LaunchAgent cleanup witnessed: cite `reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json`, keep the pointer README in `~/Library/LaunchAgents`, and rerun the daemon audit before any production claim."
+        kind: runtime
+        blocker: false
+      - id: 6
+        what: "Keep AGNI retention and file-inbox quarantine baselines fresh before any production claim: cite `reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json`, the latest zero-candidate quarantine dry-run, and current AGNI stream info."
+        kind: runtime
+        blocker: false
+      - id: 7
+        what: "Fold truth-graph/orientation-graph PR work into the shared-state subtrack without making graph/vector retrieval authoritative."
+        kind: docs
         blocker: false
 
   - id: runtime-truth-spine-adoption-2026-06

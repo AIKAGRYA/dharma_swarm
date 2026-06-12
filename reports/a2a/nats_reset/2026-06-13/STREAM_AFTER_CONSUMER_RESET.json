@@ -1,0 +1,41 @@
+{
+  "config": {
+    "name": "DHARMA_A2A",
+    "subjects": [
+      "dharma.a2a.\u003e"
+    ],
+    "retention": "limits",
+    "max_consumers": -1,
+    "max_msgs_per_subject": -1,
+    "max_msgs": -1,
+    "max_bytes": -1,
+    "max_age": 0,
+    "max_msg_size": -1,
+    "storage": "file",
+    "discard": "old",
+    "num_replicas": 1,
+    "duplicate_window": 120000000000,
+    "sealed": false,
+    "deny_delete": false,
+    "deny_purge": false,
+    "allow_rollup_hdrs": false,
+    "allow_direct": true,
+    "mirror_direct": false,
+    "consumer_limits": {}
+  },
+  "created": "2026-05-31T10:15:23.701196683Z",
+  "state": {
+    "messages": 8106912,
+    "bytes": 1427133017,
+    "first_seq": 1,
+    "first_ts": "2026-05-31T10:46:40.296108445Z",
+    "last_seq": 8106912,
+    "last_ts": "2026-06-12T15:10:01.971852618Z",
+    "num_subjects": 22,
+    "consumer_count": 11
+  },
+  "cluster": {
+    "leader": "NDDTCZCDW5B3DIGJIDHPQSVT2H2XVWZHI3GVOXPMZGPD37VLIFKDEO66"
+  },
+  "ts": "2026-06-12T16:21:41.599814485Z"
+}

@@ -1,0 +1,95 @@
+{
+  "schema_version": "dharma.a2a.nats_reset_baseline.v1",
+  "created_at": "2026-06-13T00:49:09+09:00",
+  "worktree": "/Users/dhyana/dharma_swarm_a2a_active",
+  "branch": "codex/a2a-active-track-20260613",
+  "base": "origin/main@9c76b2106",
+  "status": "NOT_PRODUCTION_READY",
+  "agni": {
+    "context": "agni-wss",
+    "stream": "DHARMA_A2A",
+    "subjects": [
+      "dharma.a2a.>"
+    ],
+    "retention": "limits",
+    "storage": "file",
+    "discard": "old",
+    "max_msgs": -1,
+    "max_bytes": -1,
+    "max_age": 0,
+    "max_msgs_per_subject": -1,
+    "messages": 8106912,
+    "bytes": 1427133017,
+    "first_seq": 1,
+    "last_seq": 8106912,
+    "num_subjects": 22,
+    "consumer_count": 11,
+    "top_subjects": [
+      {
+        "subject": "dharma.a2a.fleet",
+        "count": 4053354
+      },
+      {
+        "subject": "dharma.a2a.devin",
+        "count": 4053353
+      },
+      {
+        "subject": "dharma.a2a.perplexity",
+        "count": 91
+      },
+      {
+        "subject": "dharma.a2a.claude",
+        "count": 45
+      },
+      {
+        "subject": "dharma.a2a.merge_master_mike",
+        "count": 31
+      }
+    ],
+    "largest_consumer_backlogs": [
+      {
+        "consumer": "claude_from_devin",
+        "unprocessed": 4053238,
+        "last_delivery": "never"
+      },
+      {
+        "consumer": "merge_master_mike_fleet",
+        "unprocessed": 4053346,
+        "last_delivery": "never"
+      },
+      {
+        "consumer": "devin_inbox",
+        "unprocessed": 10,
+        "last_delivery": "never"
+      },
+      {
+        "consumer": "fable_5_cursor_inbox",
+        "unprocessed": 1,
+        "last_delivery": "22h56m57s"
+      }
+    ]
+  },
+  "local": {
+    "stream": "DHARMA_FLEET",
+    "subjects": [
+      "dharma.>"
+    ],
+    "retention": "limits",
+    "storage": "file",
+    "discard": "old",
+    "max_msgs": 5000,
+    "max_age": 604800000000000,
+    "max_msgs_per_subject": 50,
+    "messages": 64,
+    "bytes": 114076,
+    "num_subjects": 20,
+    "consumer_count": 1
+  },
+  "production_blockers": [
+    "AGNI stream retention is unbounded",
+    "AGNI contains 8.1M retained messages",
+    "two stale consumers have multi-million unprocessed backlogs",
+    "file inboxes and NATS routing are not yet one governed route",
+    "production readiness quorum has not been collected"
+  ]
+}

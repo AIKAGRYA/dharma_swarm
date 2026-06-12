@@ -1,0 +1,32 @@
+{
+  "stream_name": "DHARMA_A2A",
+  "name": "claude_from_mike",
+  "config": {
+    "ack_policy": "explicit",
+    "ack_wait": 30000000000,
+    "deliver_policy": "all",
+    "durable_name": "claude_from_mike",
+    "name": "claude_from_mike",
+    "filter_subject": "dharma.a2a.merge_master_mike",
+    "max_ack_pending": 1000,
+    "max_deliver": -1,
+    "max_waiting": 512,
+    "replay_policy": "instant",
+    "num_replicas": 0,
+    "pause_until": "0001-01-01T00:00:00Z"
+  },
+  "created": "2026-05-31T20:04:11.427683875Z",
+  "delivered": {
+    "consumer_seq": 6,
+    "stream_seq": 162
+  },
+  "ack_floor": {
+    "consumer_seq": 6,
+    "stream_seq": 162
+  },
+  "num_ack_pending": 0,
+  "num_redelivered": 0,
+  "num_waiting": 0,
+  "num_pending": 25,
+  "ts": "2026-06-12T16:10:16.654363557Z"
+}

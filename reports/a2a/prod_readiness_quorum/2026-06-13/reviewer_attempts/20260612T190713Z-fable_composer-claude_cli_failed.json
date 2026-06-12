@@ -1,0 +1,13 @@
+{
+  "agent_id": "fable_composer",
+  "attempted_at": "2026-06-12T19:07:13Z",
+  "command_surface": "claude -p",
+  "model_family_hint": "anthropic",
+  "production_claim": false,
+  "reviewer_record_written": false,
+  "role": "adversarial_security_reviewer",
+  "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+  "status": "FAILED",
+  "stderr_summary": "Credit balance is too low",
+  "target_record_path": "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json"
+}

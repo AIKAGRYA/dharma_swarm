@@ -1,0 +1,14 @@
+{
+  "schema_version": "dharma.a2a.inbox_bridge_ack.v1",
+  "timestamp": "2026-06-12T17:30:10+00:00",
+  "agent_uid": "codex_agni_drill_20260613",
+  "packet_id": "6b6a6de35b46",
+  "subject": "dharma.a2a.codex_agni_drill_20260613",
+  "delivered_to": "reports/a2a/agni_live_contact_drill/2026-06-13/inbox/6b6a6de35b46.json",
+  "ack_tier": "HANDLER_ACKED",
+  "bridge_kind": "agni_nats_cli_pull_handler_drill",
+  "broker_scope": "agni",
+  "production_broker_claim": true,
+  "semantic_reply_claim": false,
+  "peer_model_processed_claim": false
+}

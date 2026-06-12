@@ -1,0 +1,41 @@
+{
+  "agent_filter": [],
+  "candidate_count": 34713,
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "include_recent": true,
+  "mode": "dry_run",
+  "moved": [],
+  "moved_bytes": 0,
+  "moved_count": 0,
+  "quarantine_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T155637Z",
+  "receipt_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/inbox_quarantine_receipts/20260612T155638Z-a2a-inbox-quarantine.json",
+  "recent_hours": 24.0,
+  "schema_version": "dharma.a2a.inbox_quarantine_receipt.v1",
+  "skipped": [
+    {
+      "agent": "opus_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/.acks",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "opus_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/claimed",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "opus_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/codex",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "opus_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/receipt",
+      "reason": "not_candidate_file"
+    }
+  ],
+  "skipped_count": 4,
+  "status": "DRY_RUN",
+  "timestamp": "2026-06-12T15:56:37+00:00",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/"
+}

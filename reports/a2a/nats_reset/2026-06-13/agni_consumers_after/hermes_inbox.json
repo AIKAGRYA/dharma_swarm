@@ -1,0 +1,32 @@
+{
+  "stream_name": "DHARMA_A2A",
+  "name": "hermes_inbox",
+  "config": {
+    "ack_policy": "explicit",
+    "ack_wait": 30000000000,
+    "deliver_policy": "new",
+    "durable_name": "hermes_inbox",
+    "name": "hermes_inbox",
+    "filter_subject": "dharma.a2a.claude",
+    "max_ack_pending": 1000,
+    "max_deliver": 5,
+    "max_waiting": 512,
+    "replay_policy": "instant",
+    "num_replicas": 0,
+    "pause_until": "0001-01-01T00:00:00Z"
+  },
+  "created": "2026-06-12T16:11:42.190107823Z",
+  "delivered": {
+    "consumer_seq": 0,
+    "stream_seq": 8106912
+  },
+  "ack_floor": {
+    "consumer_seq": 0,
+    "stream_seq": 0
+  },
+  "num_ack_pending": 0,
+  "num_redelivered": 0,
+  "num_waiting": 0,
+  "num_pending": 0,
+  "ts": "2026-06-12T16:20:30.529015661Z"
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "dharma.a2a.nats_backup_manifest.v1",
+  "created_at": "2026-06-13T01:38:17+09:00",
+  "status": "FALLBACK_BACKUP_AVAILABLE",
+  "stream": "DHARMA_A2A",
+  "backup_kind": "server_side_filesystem_tar_live_server",
+  "backup_strength": "fallback_not_broker_native_snapshot",
+  "native_backup_attempt_receipt": "reports/a2a/nats_reset/2026-06-13/AGNI_BACKUP_FAILED.json",
+  "remote_path": "/root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar",
+  "remote_size": "1.4G",
+  "sha256": "524a2ca3ff51b42589a19055e7ca9ae834ad8d0f8233398178dd6dbaa8ce2412",
+  "source_path": "/root/.dharma/nats/jetstream/jetstream/$G/streams/DHARMA_A2A",
+  "created_by": "ssh agni tar -C /root/.dharma/nats/jetstream/jetstream/$G/streams -cf /root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar DHARMA_A2A",
+  "verified_by": [
+    "ssh agni sha256sum /root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar",
+    "ssh agni du -h /root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar",
+    "ssh agni tar -tf /root/.dharma/nats/backups/DHARMA_A2A_filesystem_20260612T1638Z.tar"
+  ],
+  "included_paths_observed": [
+    "DHARMA_A2A/meta.inf",
+    "DHARMA_A2A/meta.sum",
+    "DHARMA_A2A/msgs/index.db",
+    "DHARMA_A2A/msgs/*.blk",
+    "DHARMA_A2A/obs/*/meta.inf",
+    "DHARMA_A2A/obs/*/o.dat"
+  ],
+  "limitations": [
+    "The broker-native nats stream backup command failed twice before this fallback.",
+    "The AGNI host does not have the nats CLI on PATH.",
+    "The fallback backup was taken while nats-server was running; it is evidence-preserving but weaker than a broker-native snapshot."
+  ],
+  "operator_context": "The operator explicitly requested stale NATS inbox state to be drained and the system to start fresh. This fallback backup preserves the pre-drain JetStream files before retention and purge mutations."
+}

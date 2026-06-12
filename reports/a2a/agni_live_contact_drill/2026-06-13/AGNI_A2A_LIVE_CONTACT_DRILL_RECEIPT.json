@@ -1,0 +1,89 @@
+{
+  "schema_version": "dharma.a2a.agni_live_contact_drill_receipt.v1",
+  "created_at": "2026-06-12T17:31:20+00:00",
+  "status": "AGNI_SYNTHETIC_DOMAIN_RECEIPTED",
+  "production_status": "PARTIAL_NOT_QUORUM_READY",
+  "broker_scope": "agni",
+  "production_broker_claim": true,
+  "stream": "DHARMA_A2A",
+  "nats_context": "agni-wss",
+  "target_agent_uid": "codex_agni_drill_20260613",
+  "packet_id": "6b6a6de35b46",
+  "route": "a2a",
+  "subject": "dharma.a2a.codex_agni_drill_20260613",
+  "send_receipt_path": "reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts/20260612T172950Z-codex_agni_drill_20260613-6b6a6de35b46.json",
+  "delivery_record_path": "reports/a2a/agni_live_contact_drill/2026-06-13/inbox/6b6a6de35b46.json",
+  "handler_ack_payload_path": "reports/a2a/agni_live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json",
+  "domain_receipt_payload_path": "reports/a2a/agni_live_contact_drill/2026-06-13/outboxes/codex_agni_drill_20260613/domain_reply_6b6a6de35b46.json",
+  "reply_capture_receipt_path": "reports/a2a/agni_live_contact_drill/2026-06-13/REPLY_CAPTURE_RECEIPT.json",
+  "topology_observations": [
+    {
+      "subject_family": "dharma.agent.*",
+      "status": "NOT_LIVE_ON_AGNI_DHARMA_A2A",
+      "evidence": "reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts/20260612T172911Z-codex_agni_drill_20260613-d40bc1e91355.json",
+      "observed_error": "direct NATS CLI publish to dharma.agent.codex_agni_drill_20260613.inbox returned no responders"
+    },
+    {
+      "subject_family": "dharma.a2a.*",
+      "status": "LIVE_ON_AGNI_DHARMA_A2A",
+      "evidence": "reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts/20260612T172950Z-codex_agni_drill_20260613-6b6a6de35b46.json"
+    }
+  ],
+  "steps": [
+    {
+      "step": "provision_a2a_consumer",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s consumer add DHARMA_A2A codex_agni_drill_a2a_20260613 --pull --filter dharma.a2a.codex_agni_drill_20260613 --deliver new --ack explicit --max-deliver 5 --max-pending 100 --defaults",
+      "observed": "consumer created with Unprocessed Messages: 0"
+    },
+    {
+      "step": "governed_agni_send",
+      "status": "PASS",
+      "command": ".venv/bin/python scripts/runtime/a2a_send.py --to codex_agni_drill_20260613 --route a2a --file reports/a2a/agni_live_contact_drill/2026-06-13/PACKET.md --receipt-dir reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts --nats-context agni-wss --require-broker-scope agni --wait 0 --timeout 30 --json",
+      "observed": "PUBLISH_ACKED with broker_scope=agni and production_broker_claim=true"
+    },
+    {
+      "step": "pull_and_ack_agni_message",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s consumer next DHARMA_A2A codex_agni_drill_a2a_20260613 --raw --ack",
+      "observed": "envelope packet_id=6b6a6de35b46 was pulled and broker-acked"
+    },
+    {
+      "step": "publish_handler_ack",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s pub --jetstream dharma.a2a.codex_agni_drill_20260613.ack.6b6a6de35b46 --force-stdin < reports/a2a/agni_live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json",
+      "observed": "handler ack stored in DHARMA_A2A sequence 8106916"
+    },
+    {
+      "step": "provision_reply_consumer",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s consumer add DHARMA_A2A codex_agni_drill_reply_20260613 --pull --filter dharma.a2a.codex_agni_drill_20260613.reply.6b6a6de35b46 --deliver new --ack explicit --max-deliver 5 --max-pending 100 --defaults",
+      "observed": "reply consumer created with Unprocessed Messages: 0"
+    },
+    {
+      "step": "publish_domain_receipt",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s pub --jetstream dharma.a2a.codex_agni_drill_20260613.reply.6b6a6de35b46 --force-stdin < reports/a2a/agni_live_contact_drill/2026-06-13/outboxes/codex_agni_drill_20260613/domain_reply_6b6a6de35b46.json",
+      "observed": "domain receipt stored in DHARMA_A2A sequence 8106917"
+    },
+    {
+      "step": "pull_and_ack_domain_receipt",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s consumer next DHARMA_A2A codex_agni_drill_reply_20260613 --raw --ack",
+      "observed": "dharma.a2a.domain_receipt.v1 was pulled and broker-acked"
+    },
+    {
+      "step": "verify_consumers_drained",
+      "status": "PASS",
+      "command": "nats --context agni-wss --timeout=30s consumer info DHARMA_A2A codex_agni_drill_a2a_20260613 && nats --context agni-wss --timeout=30s consumer info DHARMA_A2A codex_agni_drill_reply_20260613",
+      "observed": "both drill consumers show Outstanding Acks: 0 and Unprocessed Messages: 0"
+    }
+  ],
+  "production_interpretation": "This proves a Codex-owned synthetic AGNI A2A route can publish through the governed sender, be pulled from a fresh durable consumer, publish a handler ack payload, publish a typed target-owned domain receipt, capture that receipt from a reply consumer, and drain both consumers to zero. It does not prove Fable/Composer has read its two pending messages and does not satisfy the multi-agent/model production-readiness quorum.",
+  "next_required_receipts": [
+    "fable_composer pulls/responds to its pending AGNI messages",
+    "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+    "at least one additional non-OpenAI/non-Anthropic reviewer record",
+    "reports/a2a/prod_readiness_quorum/latest.json with status READY"
+  ]
+}

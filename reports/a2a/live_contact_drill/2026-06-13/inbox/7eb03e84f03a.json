@@ -1,0 +1,28 @@
+{
+  "schema_version": "dharma.a2a.inbox_delivery.v1",
+  "delivered_at": "2026-06-12T17:18:30+00:00",
+  "agent_uid": "codex_live_drill_20260613",
+  "bridge_kind": "nats_cli_pull_handler_drill",
+  "source_subject": "dharma.agent.codex_live_drill_20260613.inbox",
+  "stream": "DHARMA_FLEET",
+  "consumer": "codex_live_drill_20260613",
+  "broker_ack": true,
+  "semantic_reply_claim": false,
+  "peer_model_processed_claim": false,
+  "envelope": {
+    "ack_subject": "dharma.agent.codex_live_drill_20260613.inbox.ack.7eb03e84f03a",
+    "content": "# A2A Local Live Contact Drill Packet\n\nsender: codex_composer\ntarget: codex_live_drill_20260613\npurpose: prove local send -> bridge handler ack -> target-owned domain receipt -> reply capture.\n\nThis packet is a local broker drill artifact. It is not a production AGNI\ncontact claim.\n",
+    "file": "reports/a2a/live_contact_drill/2026-06-13/PACKET.md",
+    "from": "operator",
+    "kind": "fleet.packet",
+    "packet_id": "7eb03e84f03a",
+    "reply_subject": "dharma.agent.codex_live_drill_20260613.inbox.reply.7eb03e84f03a",
+    "route": "agent-inbox",
+    "schema_version": "dharma.a2a.send.v1",
+    "sha256": "6964a76be228a6171a93c9acca7e92a52e6b24da0927e5fb82adba9417f00283",
+    "subject": "dharma.agent.codex_live_drill_20260613.inbox",
+    "target_uid": "codex_live_drill_20260613",
+    "timestamp": "2026-06-12T17:18:16Z",
+    "to": "codex_live_drill_20260613"
+  }
+}

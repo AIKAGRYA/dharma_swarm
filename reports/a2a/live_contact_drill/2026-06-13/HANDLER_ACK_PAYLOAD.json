@@ -1,0 +1,12 @@
+{
+  "schema_version": "dharma.a2a.inbox_bridge_ack.v1",
+  "timestamp": "2026-06-12T17:18:35+00:00",
+  "agent_uid": "codex_live_drill_20260613",
+  "packet_id": "7eb03e84f03a",
+  "subject": "dharma.agent.codex_live_drill_20260613.inbox",
+  "delivered_to": "reports/a2a/live_contact_drill/2026-06-13/inbox/7eb03e84f03a.json",
+  "ack_tier": "HANDLER_ACKED",
+  "bridge_kind": "nats_cli_pull_handler_drill",
+  "semantic_reply_claim": false,
+  "peer_model_processed_claim": false
+}

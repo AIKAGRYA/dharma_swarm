@@ -1,0 +1,66 @@
+{
+  "schema_version": "dharma.a2a.python_tool_live_contact_drill_receipt.v1",
+  "created_at": "2026-06-12T17:23:30+00:00",
+  "status": "LOCAL_PYTHON_TOOLS_DOMAIN_RECEIPTED",
+  "production_status": "NOT_PRODUCTION_READY",
+  "broker_scope": "local",
+  "production_broker_claim": false,
+  "dependency_repair": {
+    "status": "APPLIED",
+    "package": "nats-py",
+    "version": "2.15.0",
+    "reason": "a2a_inbox_bridge.py, a2a_domain_reply_worker.py, and a2a_reply_capture.py import nats for live runtime behavior"
+  },
+  "stream": "DHARMA_FLEET",
+  "endpoint": "nats://127.0.0.1:4222",
+  "target_agent_uid": "codex_live_drill_py_20260613",
+  "packet_id": "0443f4088301",
+  "send_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts/20260612T172252Z-codex_live_drill_py_20260613-0443f4088301.json",
+  "bridge_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/python_tool_bridge_receipts/20260612T172247Z-codex_live_drill_py_20260613-0443f4088301.json",
+  "domain_reply_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/python_tool_domain_reply_receipts/20260612T172317Z-codex_live_drill_py_20260613-0443f4088301.json",
+  "reply_capture_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/python_tool_reply_receipts/20260612T172325Z-codex_live_drill_py_20260613-0443f4088301.json",
+  "steps": [
+    {
+      "step": "provision_inbox_consumer",
+      "status": "PASS",
+      "observed": "codex_live_drill_py_20260613 created with Unprocessed Messages: 0"
+    },
+    {
+      "step": "bridge_loop",
+      "status": "PASS",
+      "command": ".venv/bin/python scripts/runtime/a2a_inbox_bridge.py --agent-uid codex_live_drill_py_20260613 --consumer codex_live_drill_py_20260613 --stream DHARMA_FLEET --endpoint nats://127.0.0.1:4222 --inbox-dir reports/a2a/live_contact_drill/2026-06-13/python_tool_inbox --receipt-dir reports/a2a/live_contact_drill/2026-06-13/python_tool_bridge_receipts --loop --max-cycles 12 --poll-interval 0.2 --fetch-timeout 1 --suppress-no-messages",
+      "observed": "DELIVERED_AND_ACKED"
+    },
+    {
+      "step": "send_wait_for_handler_ack",
+      "status": "PASS",
+      "command": ".venv/bin/python scripts/runtime/a2a_send.py --to codex_live_drill_py_20260613 --route agent-inbox --agent-uid codex_live_drill_py_20260613 --file reports/a2a/live_contact_drill/2026-06-13/PYTHON_TOOL_PACKET.md --receipt-dir reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts --wait 5 --timeout 5 --json",
+      "observed": "CODEX_LIVE_DRILL_PY_20260613_CONSUMED with ack_tier=HANDLER_ACKED"
+    },
+    {
+      "step": "publish_target_owned_domain_reply",
+      "status": "PASS",
+      "command": ".venv/bin/python scripts/runtime/a2a_domain_reply_worker.py --send-receipt reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts/20260612T172252Z-codex_live_drill_py_20260613-0443f4088301.json --reply-artifact reports/a2a/live_contact_drill/2026-06-13/python_tool_outboxes/codex_live_drill_py_20260613/domain_reply_0443f4088301.json --outbox-root reports/a2a/live_contact_drill/2026-06-13/python_tool_outboxes --receipt-dir reports/a2a/live_contact_drill/2026-06-13/python_tool_domain_reply_receipts --stream DHARMA_FLEET --timeout 5 --json",
+      "observed": "DOMAIN_REPLY_PUBLISHED with contact_evidence_tier=DOMAIN_RECEIPTED"
+    },
+    {
+      "step": "capture_domain_receipt",
+      "status": "PASS",
+      "command": ".venv/bin/python scripts/runtime/a2a_reply_capture.py --send-receipt reports/a2a/live_contact_drill/2026-06-13/python_tool_send_receipts/20260612T172252Z-codex_live_drill_py_20260613-0443f4088301.json --receipt-root reports/a2a/live_contact_drill/2026-06-13/python_tool_reply_receipts --endpoint nats://127.0.0.1:4222 --stream DHARMA_FLEET --timeout 5 --json",
+      "observed": "DOMAIN_RECEIPTED"
+    },
+    {
+      "step": "verify_inbox_consumer_drained",
+      "status": "PASS",
+      "observed": "codex_live_drill_py_20260613 showed Outstanding Acks: 0 and Unprocessed Messages: 0"
+    }
+  ],
+  "production_interpretation": "This proves the repo Python A2A runtime tools can execute the full local broker chain through handler ack and DOMAIN_RECEIPTED capture. It does not satisfy production AGNI contact or readiness quorum.",
+  "next_required_receipts": [
+    "AGNI broker_scope=agni send receipt",
+    "AGNI target-owned handler ack",
+    "AGNI DOMAIN_RECEIPTED capture",
+    "fable_composer reviewer record",
+    "at least one more non-OpenAI model-family reviewer record"
+  ]
+}

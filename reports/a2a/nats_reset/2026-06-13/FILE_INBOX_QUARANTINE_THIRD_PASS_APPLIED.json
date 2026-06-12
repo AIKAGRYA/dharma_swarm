@@ -1,0 +1,61 @@
+{
+  "schema_version": "dharma.a2a.file_inbox_quarantine_summary.v1",
+  "created_at": "2026-06-13T01:54:30+09:00",
+  "status": "APPLIED",
+  "worktree": "/Users/dhyana/dharma_swarm_a2a_active",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/",
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T164901Z",
+  "detailed_receipt": "reports/a2a/inbox_quarantine_receipts/20260612T164901Z-a2a-inbox-quarantine.json",
+  "moved_count": 76,
+  "moved_bytes": 50768,
+  "skipped_count": 76,
+  "readme_pointer_count": 76,
+  "post_reset_candidate_count": 0,
+  "post_reset_non_readme_count": 0,
+  "file_bus_guard_status": "PASS",
+  "trigger": "Hermes alert-router broadcast mirrored one to: all alert into every filesystem inbox after the second quarantine.",
+  "payloads_observed": [
+    {
+      "id": "97ae3152f3a94abf",
+      "from": "hermes-m5",
+      "to": "all",
+      "type": "alert",
+      "schema": "hermes.alert_router.a2a.v1",
+      "route_status": {
+        "platform": "slack",
+        "queued": "alerts_2026-06-13_0045.json",
+        "sent": false
+      },
+      "timestamp_utc": "2026-06-12T16:45:03.596991+00:00"
+    }
+  ],
+  "source_trace": {
+    "queued_alert": "/Users/dhyana/.hermes/comms/pending/alerts_2026-06-13_0045.json",
+    "producer_script": "/Users/dhyana/.hermes/scripts/alert_router.py",
+    "legacy_broadcast_script": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+    "producer_behavior": "alert_router.py calls broadcast_a2a(), which shells out to a2a_bus.py broadcast; a2a_bus.py copies to every existing inbox when to_agent == all.",
+    "repo_side_guard": "scripts/runtime/a2a_file_bus_guard.py --json --check"
+  },
+  "agni_split_evidence": {
+    "agni_stream": "DHARMA_A2A",
+    "agni_last_ts_before_file_alert": "2026-06-12T15:10:01.971852618Z",
+    "file_alert_timestamp": "2026-06-12T16:45:03.596991+00:00",
+    "conclusion": "The new file-bus alert was not observed as a later AGNI DHARMA_A2A stream event; treat it as legacy filesystem-bus mirror/fallback noise, not NATS live contact."
+  },
+  "verification": {
+    "dry_run_after_apply": "python3 scripts/runtime/a2a_inbox_quarantine.py --include-recent --json",
+    "dry_run_timestamp_utc": "2026-06-12T16:54:30+00:00",
+    "dry_run_candidate_count": 0,
+    "file_bus_guard_command": "python3 scripts/runtime/a2a_file_bus_guard.py --json --check",
+    "file_bus_guard_status": "PASS",
+    "non_readme_count_command": "find /Users/dhyana/.dharma/a2a_bus/inboxes -mindepth 2 ! -name README.md -print",
+    "non_readme_count": 0
+  },
+  "production_claim": false,
+  "remaining_blockers": [
+    "Hermes alert-router legacy filesystem broadcast source remains outside this repo and can repopulate file inboxes on the next alert cycle unless rerouted or disabled.",
+    "production readiness quorum is not yet collected",
+    "limited operator-supervised live-contact/domain-receipt drill still needs to run for confidence beyond governance criteria"
+  ]
+}

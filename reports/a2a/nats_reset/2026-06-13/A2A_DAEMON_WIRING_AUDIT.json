@@ -1,0 +1,53 @@
+{
+  "candidate_count": 2,
+  "candidates": [
+    {
+      "broker_scope": "missing",
+      "issue_count": 0,
+      "issues": [],
+      "label": "com.dhyana.loop.a2a-fleet",
+      "module_target": null,
+      "nats_url": null,
+      "path": "/Users/dhyana/Library/LaunchAgents/com.dhyana.loop.a2a-fleet.plist",
+      "program_arguments": [
+        "/bin/bash",
+        "/Users/dhyana/.dharma/cron/loops/loop_runner.sh",
+        "a2a_fleet"
+      ],
+      "script_targets": [],
+      "status": "PASS",
+      "working_directory": null
+    },
+    {
+      "broker_scope": "missing",
+      "issue_count": 0,
+      "issues": [],
+      "label": "com.dhyana.nats",
+      "module_target": null,
+      "nats_url": null,
+      "path": "/Users/dhyana/Library/LaunchAgents/com.dhyana.nats.plist",
+      "program_arguments": [
+        "/opt/homebrew/bin/nats-server",
+        "-c",
+        "/Users/dhyana/.dharma/nats/local-nats.conf",
+        "-l",
+        "/Users/dhyana/.dharma/nats/nats-server.log"
+      ],
+      "script_targets": [],
+      "status": "PASS",
+      "working_directory": "/Users/dhyana/.dharma/nats"
+    }
+  ],
+  "created_at": "2026-06-12T18:47:25+00:00",
+  "expected_broker_scope": "agni",
+  "interpretation": "PASS means declared local A2A/NATS daemons point at existing targets and do not contradict the expected broker scope. It does not prove peer-agent semantic work, production readiness, or NATS delivery.",
+  "issue_counts": {},
+  "launch_agents_dir": "/Users/dhyana/Library/LaunchAgents",
+  "parse_errors": [],
+  "production_claim": false,
+  "schema_version": "dharma.a2a.daemon_wiring_audit.v1",
+  "status": "PASS",
+  "status_counts": {
+    "PASS": 2
+  }
+}

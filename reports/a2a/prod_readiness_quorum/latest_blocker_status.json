@@ -1,0 +1,226 @@
+{
+  "created_at": "2026-06-12T20:15:32+00:00",
+  "current_facts": {
+    "agent_id_count": 3,
+    "fable_delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+    "fable_record_present": false,
+    "file_bus_guard_pass": true,
+    "hermes_broadcast_disabled": true,
+    "hermes_delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+    "hermes_record_present": false,
+    "median_readiness": 62.0,
+    "missing_reviewer_targets": [
+      "fable_composer",
+      "hermes_m5"
+    ],
+    "model_family_count": 3,
+    "pending_delivery_targets": [],
+    "red_blocker_records": [
+      "codex_composer",
+      "gemini_reviewer",
+      "qwen_code"
+    ],
+    "repair_plan_ready_to_mutate": true,
+    "zero_red_blockers": false
+  },
+  "inputs": {
+    "delivery_status": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+    "file_bus_guard": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json",
+    "hermes_guard": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json",
+    "quorum": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json",
+    "repair_plan": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+  },
+  "interpretation": "This receipt classifies old reviewer red blockers against current machine receipts. It does not clear the quorum gate and does not claim production readiness.",
+  "production_claim": false,
+  "recommended_next_actions": [
+    "Produce target-owned reviewer records for: fable_composer, hermes_m5",
+    "Ask reviewers with stale blockers to refresh records; do not hand-edit old reviewer JSON.",
+    "Collect fresh readiness percentages after target-owned handler/domain receipts exist.",
+    "Keep latest.json NOT_READY until all reviewer red_blockers are cleared by fresh records."
+  ],
+  "record_dir": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13",
+  "reviewer_records": [
+    {
+      "agent_id": "codex_composer",
+      "blockers": [
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json"
+          ],
+          "next_action": "Do not preserve this as a current blocker; ask reviewers to refresh against latest quorum.",
+          "reason": "Current quorum aggregate has at least two agent IDs and three model families.",
+          "status": "resolved",
+          "text": "Only one reviewer record exists; the required two persistent agent IDs and three model families have not reported."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Attach or wake target-owned Fable/Hermes handlers and produce the missing reviewer JSON receipts.",
+          "reason": "The old pending/backlog claim is resolved, but target-owned Fable/Hermes reviewer records are still missing.",
+          "status": "partially_resolved",
+          "text": "The fable_composer solicitation is only PUBLISH_ACCEPTED in AGNI JetStream and remains unprocessed in fable_composer_inbox; no handler ack, semantic reply, or reviewer JSON has been received."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json"
+          ],
+          "next_action": "Keep both guards green; ask reviewers to refresh this stale blocker.",
+          "reason": "Hermes legacy broadcast is disabled and the file-bus guard currently passes.",
+          "status": "resolved",
+          "text": "The out-of-repo Hermes alert_router.py -> a2a_bus.py broadcast path can still repopulate legacy filesystem inboxes until rerouted or disabled."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Collect target-owned reviewer/domain receipts before claiming production readiness.",
+          "reason": "Independent target-owned Fable/Hermes evidence is still missing.",
+          "status": "current",
+          "text": "The AGNI domain-receipt proof is synthetic and Codex-owned; it does not prove independent persistent-agent handling or model-family quorum."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Produce fable_composer.json and hermes_m5.json from target-owned handlers or reviewers.",
+          "reason": "Target-owned Fable/Hermes reviewer records are still missing.",
+          "status": "current",
+          "text": "The Hermes-model-family solicitation is broker-accepted but no hermes_m5 reviewer JSON has been received."
+        }
+      ],
+      "classification_counts": {
+        "current": 2,
+        "partially_resolved": 1,
+        "resolved": 2
+      },
+      "model_family": "openai",
+      "readiness_percent": 82,
+      "red_blocker_count": 5,
+      "role": "ops_verifier",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/codex_composer.json"
+    },
+    {
+      "agent_id": "gemini_reviewer",
+      "blockers": [
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Produce fable_composer.json and hermes_m5.json from target-owned handlers or reviewers.",
+          "reason": "Target-owned Fable/Hermes reviewer records are still missing.",
+          "status": "current",
+          "text": "Target-owned Fable and Hermes reviewer records are missing; consumers exist but are empty."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json"
+          ],
+          "next_action": "Collect fresh reviewer records after target-owned handler evidence exists.",
+          "reason": "Current quorum median readiness is below 80.",
+          "status": "current",
+          "text": "Quorum median readiness is 62%, which is below the 80% threshold."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json"
+          ],
+          "next_action": "Do not edit old reviews; collect fresh reviews after current blockers are cleared.",
+          "reason": "Current quorum aggregate still lists reviewer records with red blockers.",
+          "status": "current",
+          "text": "Other reviewers (codex_composer, qwen_code) have reported red blockers."
+        }
+      ],
+      "classification_counts": {
+        "current": 3
+      },
+      "model_family": "google",
+      "readiness_percent": 62,
+      "red_blocker_count": 3,
+      "role": "independent_production_reviewer",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/gemini_reviewer.json"
+    },
+    {
+      "agent_id": "qwen_code",
+      "blockers": [
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Attach or wake target-owned Fable/Hermes handlers and produce the missing reviewer JSON receipts.",
+          "reason": "The old pending/backlog claim is resolved, but target-owned Fable/Hermes reviewer records are still missing.",
+          "status": "partially_resolved",
+          "text": "Fable/Hermes target-owned handler receipts missing: fable_composer and hermes_m5 reviewer records do not exist; both solicitation messages sit PENDING_DELIVERY in AGNI with no handler ack, domain receipt, or semantic reply from the target agents."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json"
+          ],
+          "next_action": "Do not preserve this as a current blocker; ask reviewers to refresh against latest quorum.",
+          "reason": "Current quorum aggregate has at least two agent IDs and three model families.",
+          "status": "resolved",
+          "text": "Quorum composition still fails without Fable/Hermes: before this Qwen review only codex_composer existed; the track still lacks the requested target-owned Fable/Hermes reviewer receipts."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest.json"
+          ],
+          "next_action": "Do not edit old reviews; collect fresh reviews after current blockers are cleared.",
+          "reason": "Current quorum aggregate still lists reviewer records with red blockers.",
+          "status": "current",
+          "text": "The sole prior reviewer, codex_composer, returned NOT_READY with red blockers; quorum requires zero red blockers across all reviewers."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json"
+          ],
+          "next_action": "Require handler/domain/reviewer receipts; do not treat publish ack as live contact.",
+          "reason": "The system still has publish-only evidence for missing target-owned reviewer records.",
+          "status": "current",
+          "text": "Publish ack is present for quorum solicitation messages but no target-owned agent has consumed them; PUBLISH_ACCEPTED cannot satisfy handler ack, domain receipt, or production readiness."
+        },
+        {
+          "evidence_refs": [
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json",
+            "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json"
+          ],
+          "next_action": "Keep both guards green; ask reviewers to refresh this stale blocker.",
+          "reason": "Hermes legacy broadcast is disabled and the file-bus guard currently passes.",
+          "status": "resolved",
+          "text": "The out-of-repo Hermes alert-router broadcast source can still repopulate file inboxes unless rerouted or suppressed."
+        }
+      ],
+      "classification_counts": {
+        "current": 2,
+        "partially_resolved": 1,
+        "resolved": 2
+      },
+      "model_family": "alibaba",
+      "readiness_percent": 42,
+      "red_blocker_count": 5,
+      "role": "adversarial_security_reviewer",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/qwen_code.json"
+    }
+  ],
+  "schema_version": "dharma.a2a.quorum_blocker_status.v1",
+  "status": "BLOCKED_BY_CURRENT_EVIDENCE",
+  "summary": {
+    "classification_counts": {
+      "current": 7,
+      "partially_resolved": 2,
+      "resolved": 4
+    },
+    "current_or_unclassified_blocker_count": 9,
+    "red_blocker_count": 13,
+    "resolved_stale_blocker_count": 4,
+    "reviewer_record_count": 3,
+    "reviewer_record_errors": []
+  }
+}

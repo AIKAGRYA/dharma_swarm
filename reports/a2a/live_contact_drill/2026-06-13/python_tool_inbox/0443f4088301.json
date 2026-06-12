@@ -1,0 +1,28 @@
+{
+  "agent_uid": "codex_live_drill_py_20260613",
+  "bridge_kind": "filesystem_delivery_handler",
+  "consumer": "codex_live_drill_py_20260613",
+  "delivered_at": "2026-06-12T17:22:47Z",
+  "envelope": {
+    "ack_subject": "dharma.agent.codex_live_drill_py_20260613.inbox.ack.0443f4088301",
+    "content": "# A2A Python Tool Live Contact Drill Packet\n\nsender: codex_composer\ntarget: codex_live_drill_py_20260613\npurpose: prove the repo Python runtime tools can perform send -> bridge handler ack -> target-owned domain receipt -> reply capture.\n\nThis packet is still a local broker drill artifact. It is not a production AGNI\ncontact claim.\n",
+    "file": "reports/a2a/live_contact_drill/2026-06-13/PYTHON_TOOL_PACKET.md",
+    "from": "operator",
+    "kind": "fleet.packet",
+    "packet_id": "0443f4088301",
+    "reply_subject": "dharma.agent.codex_live_drill_py_20260613.inbox.reply.0443f4088301",
+    "route": "agent-inbox",
+    "schema_version": "dharma.a2a.send.v1",
+    "sha256": "939289981c999ed092ce1d3ddac7511df843df3693d584f26f74be66fa9a9e37",
+    "subject": "dharma.agent.codex_live_drill_py_20260613.inbox",
+    "target_uid": "codex_live_drill_py_20260613",
+    "timestamp": "2026-06-12T17:22:47Z",
+    "to": "codex_live_drill_py_20260613"
+  },
+  "envelope_sha256": "e6ca532584c99a8a6eb301ae3f8f3ae7245e8d4b93662bed2cc205e2f5904221",
+  "peer_model_processed_claim": false,
+  "schema_version": "dharma.a2a.inbox_delivery.v1",
+  "semantic_reply_claim": false,
+  "source_subject": "dharma.agent.codex_live_drill_py_20260613.inbox",
+  "stream": "DHARMA_FLEET"
+}

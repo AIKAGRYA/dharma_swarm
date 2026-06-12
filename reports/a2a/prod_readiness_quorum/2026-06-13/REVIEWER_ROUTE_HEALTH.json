@@ -1,0 +1,362 @@
+{
+  "created_at": "2026-06-12T20:22:46+00:00",
+  "inputs": {
+    "agents_root": "/Users/dhyana/.dharma/agents",
+    "delivery_status": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+    "repair_plan": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json",
+    "state_root": "/Users/dhyana/.dharma/a2a_bus/state"
+  },
+  "interpretation": "This receipt explains whether requested reviewer routes can currently produce target-owned records. It does not replace reviewer records, clear red blockers, or claim A2A production readiness.",
+  "production_claim": false,
+  "recommended_next_actions": [
+    "Restore provider/credit/auth route, then rerun the target-owned reviewer.",
+    "Rerun with a bounded receipt or repair the live handler before claiming review."
+  ],
+  "record_dir": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13",
+  "routes": [
+    {
+      "agent_state": {
+        "agent_files": [
+          {
+            "observed_fields": {
+              "agent_uid": "codex_composer",
+              "harness": "codex_cli_tmux",
+              "model": "gpt-5.5",
+              "provider": "codex",
+              "route_status": "seeded_from_capability_card; runtime_route_smoke_pending",
+              "status": "registered_operator_candidate",
+              "wake_loop_active": false
+            },
+            "path": "/Users/dhyana/.dharma/agents/codex_composer/identity.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "codex_composer",
+              "harness": "codex_cli",
+              "model": "openai/codex-5.5",
+              "status": "active"
+            },
+            "path": "/Users/dhyana/.dharma/agents/codex_composer/living_agent.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "codex_composer",
+              "last_heartbeat": "2026-06-12T03:40:21Z",
+              "wake_loop_active": false
+            },
+            "path": "/Users/dhyana/.dharma/a2a_bus/state/codex_composer.json"
+          }
+        ],
+        "agent_files_found": 3,
+        "read_errors": []
+      },
+      "blocks_production_quorum": false,
+      "command_health": [
+        {
+          "available": true,
+          "command": "codex",
+          "path": "/Users/dhyana/.npm-global/bin/codex"
+        }
+      ],
+      "consumer": null,
+      "delivery_status": "REVIEW_RECORD_PRESENT",
+      "latest_attempt": null,
+      "model_family_hint": "openai",
+      "next_action": "Rerun the production quorum aggregate.",
+      "reason": "Target reviewer record exists; route health no longer blocks quorum.",
+      "repair_plan_entry": null,
+      "request_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/codex_composer.json",
+      "requested_role": "ops_verifier",
+      "reviewer_record_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/codex_composer.json",
+      "reviewer_record_present": true,
+      "route": "a2a",
+      "route_classification": "REVIEW_RECORD_PRESENT",
+      "subject": null,
+      "target_agent_id": "codex_composer",
+      "target_owned_attempt_count": 0
+    },
+    {
+      "agent_state": {
+        "agent_files": [
+          {
+            "observed_fields": {
+              "address": "a42b313fc7e15cba",
+              "agent_uid": "fable_composer",
+              "harness": "claude_code_headless",
+              "model": "claude-fable-5",
+              "provider": "anthropic_max",
+              "route_status": "session_borne; standing wake loop pending build #1 (Verified Composer Command Spine v1, deliverable 1)",
+              "status": "session_alive_standing_loop_pending",
+              "wake_loop_active": false
+            },
+            "path": "/Users/dhyana/.dharma/agents/fable_composer/identity.json"
+          },
+          {
+            "observed_fields": {
+              "address": "a42b313fc7e15cba",
+              "agent_uid": "fable_composer",
+              "last_heartbeat": "2026-06-12T15:14:30Z",
+              "model": "anthropic/claude-fable-5",
+              "process_running": false,
+              "process_status": "session_alive_interactive",
+              "provider": "anthropic_max",
+              "wake_loop_active": false
+            },
+            "path": "/Users/dhyana/.dharma/a2a_bus/state/fable_composer.json"
+          }
+        ],
+        "agent_files_found": 2,
+        "read_errors": []
+      },
+      "blocks_production_quorum": true,
+      "command_health": [
+        {
+          "available": true,
+          "command": "claude",
+          "path": "/usr/local/bin/claude"
+        }
+      ],
+      "consumer": "fable_composer_inbox",
+      "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+      "latest_attempt": {
+        "_sort_key": "2026-06-12T20:18:43Z",
+        "_source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/reviewer_attempts/20260612T201843Z-fable_composer-claude_cli_smoke_credit_failed.json",
+        "agent_id": "fable_composer",
+        "command_family": "claude -p",
+        "created_at": "2026-06-12T20:18:43Z",
+        "expected_output": "FABLE_ROUTE_SMOKE_OK",
+        "failure_class": "PROVIDER_CREDIT_EXHAUSTED",
+        "harness": "claude_code_headless",
+        "interpretation": "A minimal documented fable_composer headless route smoke probe failed before any reviewer prompt could run. This does not satisfy production quorum.",
+        "production_claim": false,
+        "reviewer_record_written": false,
+        "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+        "status": "FAILED",
+        "stderr_summary": "Credit balance is too low"
+      },
+      "model_family_hint": "anthropic",
+      "next_action": "Restore provider/credit/auth route, then rerun the target-owned reviewer.",
+      "reason": "Latest target-owned attempt failed with PROVIDER_CREDIT_EXHAUSTED.",
+      "repair_plan_entry": {
+        "blocks_production_quorum": true,
+        "consumer": "fable_composer_inbox",
+        "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+        "must_not_claim": [
+          "An empty durable consumer is not a target-owned reviewer record.",
+          "READY_TO_MUTATE is not production readiness."
+        ],
+        "next_required_receipt": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+        "num_ack_pending": 0,
+        "num_pending": 0,
+        "subject": "dharma.a2a.fable_composer",
+        "target_agent_id": "fable_composer"
+      },
+      "request_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/fable_composer.json",
+      "requested_role": "adversarial_security_reviewer",
+      "reviewer_record_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+      "reviewer_record_present": false,
+      "route": "a2a",
+      "route_classification": "PROVIDER_BLOCKED",
+      "subject": "dharma.a2a.fable_composer",
+      "target_agent_id": "fable_composer",
+      "target_owned_attempt_count": 3
+    },
+    {
+      "agent_state": {
+        "agent_files": [],
+        "agent_files_found": 0,
+        "read_errors": []
+      },
+      "blocks_production_quorum": false,
+      "command_health": [
+        {
+          "available": true,
+          "command": "gemini",
+          "path": "/Users/dhyana/.npm-global/bin/gemini"
+        }
+      ],
+      "consumer": null,
+      "delivery_status": "REVIEW_RECORD_PRESENT",
+      "latest_attempt": null,
+      "model_family_hint": "google",
+      "next_action": "Rerun the production quorum aggregate.",
+      "reason": "Target reviewer record exists; route health no longer blocks quorum.",
+      "repair_plan_entry": null,
+      "request_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/gemini_reviewer.json",
+      "requested_role": "independent_production_reviewer",
+      "reviewer_record_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/gemini_reviewer.json",
+      "reviewer_record_present": true,
+      "route": "cli",
+      "route_classification": "REVIEW_RECORD_PRESENT",
+      "subject": null,
+      "target_agent_id": "gemini_reviewer",
+      "target_owned_attempt_count": 0
+    },
+    {
+      "agent_state": {
+        "agent_files": [
+          {
+            "observed_fields": {
+              "agent_uid": "hermes_m5",
+              "harness": "hermes_slack",
+              "model": "copilot/claude-sonnet-4.5",
+              "status": "starting"
+            },
+            "path": "/Users/dhyana/.dharma/agents/hermes_m5/living_agent.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "hermes_m5"
+            },
+            "path": "/Users/dhyana/.dharma/agents/hermes_m5/identity_invariant.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "hermes-m5",
+              "harness": "hermes_cli",
+              "last_heartbeat": "2026-06-12T19:53:36.219403+00:00",
+              "model": "glm-5.1",
+              "preferred_channel": "for-hermes: wiki atoms + hermes -z for sync; a2a_bus/tasks/queue.jsonl",
+              "provider": "zai",
+              "status": "operational"
+            },
+            "path": "/Users/dhyana/.dharma/a2a_bus/state/hermes-m5.json"
+          }
+        ],
+        "agent_files_found": 3,
+        "read_errors": []
+      },
+      "blocks_production_quorum": true,
+      "command_health": [
+        {
+          "available": true,
+          "command": "hermes",
+          "path": "/Users/dhyana/.local/bin/hermes"
+        }
+      ],
+      "consumer": "claude_from_hermes",
+      "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+      "latest_attempt": {
+        "_sort_key": "2026-06-12T20:22:30Z",
+        "_source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/reviewer_attempts/20260612T202230Z-hermes_m5-hermes_cli_timeout.json",
+        "agent_id": "hermes_m5",
+        "attempted_at": "2026-06-12T20:22:30Z",
+        "command_surface": "hermes -z",
+        "failure_class": "PROVIDER_TIMEOUT",
+        "model_family_hint": "hermes",
+        "production_claim": false,
+        "prompt_summary": "Asked hermes_m5 to read its production-readiness request packet and write exactly one reviewer record to reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json.",
+        "reviewer_record_written": false,
+        "role": "agent_harness_reviewer",
+        "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+        "status": "FAILED",
+        "stderr_summary": "timed out after 45s waiting for provider response",
+        "target_record_path": "reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json"
+      },
+      "model_family_hint": "hermes",
+      "next_action": "Rerun with a bounded receipt or repair the live handler before claiming review.",
+      "reason": "Latest target-owned attempt failed with PROVIDER_TIMEOUT.",
+      "repair_plan_entry": {
+        "blocks_production_quorum": true,
+        "consumer": "claude_from_hermes",
+        "delivery_status": "CONSUMER_EMPTY_NO_DELIVERY",
+        "must_not_claim": [
+          "An empty durable consumer is not a target-owned reviewer record.",
+          "READY_TO_MUTATE is not production readiness."
+        ],
+        "next_required_receipt": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json",
+        "num_ack_pending": 0,
+        "num_pending": 0,
+        "subject": "dharma.a2a.hermes",
+        "target_agent_id": "hermes_m5"
+      },
+      "request_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/hermes_m5.json",
+      "requested_role": "agent_harness_reviewer",
+      "reviewer_record_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/hermes_m5.json",
+      "reviewer_record_present": false,
+      "route": "a2a",
+      "route_classification": "PROVIDER_TIMEOUT_OR_HANDLER_STALLED",
+      "subject": "dharma.a2a.hermes",
+      "target_agent_id": "hermes_m5",
+      "target_owned_attempt_count": 2
+    },
+    {
+      "agent_state": {
+        "agent_files": [
+          {
+            "observed_fields": {
+              "agent_uid": "qwen_code",
+              "harness": "qwen_code_cli",
+              "model": "alibaba/qwen-code-runtime",
+              "status": "starting"
+            },
+            "path": "/Users/dhyana/.dharma/agents/qwen_code/living_agent.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "qwen_code"
+            },
+            "path": "/Users/dhyana/.dharma/agents/qwen_code/identity_invariant.json"
+          },
+          {
+            "observed_fields": {
+              "agent_uid": "qwen_code",
+              "harness": "qwen_code_cli",
+              "last_heartbeat": "2026-06-06T04:16:42.237752+00:00",
+              "model": "alibaba/qwen-code-runtime",
+              "status": "active_evidence_only"
+            },
+            "path": "/Users/dhyana/.dharma/a2a_bus/state/qwen_code.json"
+          }
+        ],
+        "agent_files_found": 3,
+        "read_errors": []
+      },
+      "blocks_production_quorum": false,
+      "command_health": [
+        {
+          "available": true,
+          "command": "qwen",
+          "path": "/Users/dhyana/.npm-global/bin/qwen"
+        },
+        {
+          "available": false,
+          "command": "qwen-code",
+          "path": null
+        }
+      ],
+      "consumer": null,
+      "delivery_status": "REVIEW_RECORD_PRESENT",
+      "latest_attempt": null,
+      "model_family_hint": "alibaba",
+      "next_action": "Rerun the production quorum aggregate.",
+      "reason": "Target reviewer record exists; route health no longer blocks quorum.",
+      "repair_plan_entry": null,
+      "request_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/qwen_code.json",
+      "requested_role": "adversarial_security_reviewer",
+      "reviewer_record_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/qwen_code.json",
+      "reviewer_record_present": true,
+      "route": "a2a",
+      "route_classification": "REVIEW_RECORD_PRESENT",
+      "subject": null,
+      "target_agent_id": "qwen_code",
+      "target_owned_attempt_count": 0
+    }
+  ],
+  "schema_version": "dharma.a2a.reviewer_route_health.v1",
+  "status": "ROUTE_HEALTH_BLOCKED",
+  "summary": {
+    "blocking_targets": [
+      "fable_composer",
+      "hermes_m5"
+    ],
+    "request_count": 5,
+    "reviewer_records_missing": 2,
+    "reviewer_records_present": 3,
+    "route_classification_counts": {
+      "PROVIDER_BLOCKED": 1,
+      "PROVIDER_TIMEOUT_OR_HANDLER_STALLED": 1,
+      "REVIEW_RECORD_PRESENT": 3
+    }
+  }
+}

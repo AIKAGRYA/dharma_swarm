@@ -1,0 +1,61 @@
+{
+  "agent_ids": [
+    "codex_composer",
+    "gemini_reviewer",
+    "qwen_code"
+  ],
+  "created_at": "2026-06-12T20:15:32+00:00",
+  "errors": [],
+  "missing_requirements": [
+    "median readiness >= 80",
+    "zero red blockers"
+  ],
+  "model_families": [
+    "alibaba",
+    "google",
+    "openai"
+  ],
+  "readiness_percent_median": 62.0,
+  "ready": false,
+  "record_dir": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13",
+  "red_blocker_records": [
+    "codex_composer",
+    "gemini_reviewer",
+    "qwen_code"
+  ],
+  "reviewer_count": 3,
+  "reviewers": [
+    {
+      "agent_id": "codex_composer",
+      "evidence_ref_count": 14,
+      "model_family": "openai",
+      "readiness_percent": 82,
+      "red_blocker_count": 5,
+      "role": "ops_verifier",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/codex_composer.json",
+      "verdict": "not_ready"
+    },
+    {
+      "agent_id": "gemini_reviewer",
+      "evidence_ref_count": 9,
+      "model_family": "google",
+      "readiness_percent": 62,
+      "red_blocker_count": 3,
+      "role": "independent_production_reviewer",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/gemini_reviewer.json",
+      "verdict": "not_ready"
+    },
+    {
+      "agent_id": "qwen_code",
+      "evidence_ref_count": 8,
+      "model_family": "alibaba",
+      "readiness_percent": 42,
+      "red_blocker_count": 5,
+      "role": "adversarial_security_reviewer",
+      "source": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/qwen_code.json",
+      "verdict": "not_ready"
+    }
+  ],
+  "schema_version": "dharma.a2a.prod_readiness_quorum.v1",
+  "status": "NOT_READY"
+}

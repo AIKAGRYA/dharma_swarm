@@ -1,0 +1,14 @@
+{
+  "agent_id": "fable_composer",
+  "command_family": "claude -p",
+  "created_at": "2026-06-12T20:18:43Z",
+  "expected_output": "FABLE_ROUTE_SMOKE_OK",
+  "failure_class": "PROVIDER_CREDIT_EXHAUSTED",
+  "harness": "claude_code_headless",
+  "interpretation": "A minimal documented fable_composer headless route smoke probe failed before any reviewer prompt could run. This does not satisfy production quorum.",
+  "production_claim": false,
+  "reviewer_record_written": false,
+  "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+  "status": "FAILED",
+  "stderr_summary": "Credit balance is too low"
+}

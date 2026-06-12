@@ -1,0 +1,19 @@
+{
+  "candidate_count": 34717,
+  "full_receipt_backup_path": "/tmp/dharma_a2a_large_receipts_20260613/20260612T155740Z-a2a-inbox-quarantine.full.json",
+  "full_receipt_bytes": 11623938,
+  "full_receipt_omitted_from_repo": true,
+  "full_receipt_sha256": "a47d804f1c5adac15a8dc688f3662e9aa35e479d69bba3a27036e4ae4fca479d",
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "mode": "apply",
+  "moved_count": 34717,
+  "production_claim": false,
+  "quarantine_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T155736Z",
+  "reason": "Raw per-file quarantine receipt is too large for repo history; committed artifact preserves machine summary and pointer to salvaged full local artifact.",
+  "schema_version": "dharma.a2a.inbox_quarantine_receipt.v1",
+  "skipped_count": 0,
+  "status": "APPLIED",
+  "timestamp": "2026-06-12T15:57:36+00:00",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/"
+}

@@ -1,0 +1,182 @@
+{
+  "all_consumers_deliver_new": true,
+  "all_consumers_pending_zero": true,
+  "consumer_ack_pending_total": 0,
+  "consumer_count": 12,
+  "consumer_pending_total": 0,
+  "consumer_reset_receipt": "reports/a2a/nats_reset/2026-06-13/NATS_CONSUMER_INBOX_RESET_APPLIED.json",
+  "consumers": [
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.devin",
+      "max_deliver": 5,
+      "name": "claude_from_devin",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.hermes",
+      "max_deliver": 5,
+      "name": "claude_from_hermes",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.merge_master_mike",
+      "max_deliver": 5,
+      "name": "claude_from_mike",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.perplexity",
+      "max_deliver": 5,
+      "name": "claude_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.devin",
+      "max_deliver": 5,
+      "name": "devin_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.fable_5_cursor",
+      "max_deliver": 5,
+      "name": "fable_5_cursor_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.fable_composer",
+      "max_deliver": 5,
+      "name": "fable_composer_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.claude",
+      "max_deliver": 5,
+      "name": "hermes_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.fleet",
+      "max_deliver": 5,
+      "name": "merge_master_mike_fleet",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.merge_master_mike",
+      "max_deliver": 5,
+      "name": "merge_master_mike_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.claude",
+      "max_deliver": 5,
+      "name": "perplexity_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    },
+    {
+      "ack_policy": "explicit",
+      "deliver_policy": "new",
+      "delivered_stream_seq": 8106912,
+      "filter_subject": "dharma.a2a.warp_oz",
+      "max_deliver": 5,
+      "name": "warp_oz_inbox",
+      "num_ack_pending": 0,
+      "num_pending": 0
+    }
+  ],
+  "context": "agni-wss",
+  "created_at": "2026-06-13T01:38:57+09:00",
+  "max_age": 259200000000000,
+  "max_age_human": "72h",
+  "max_bytes": 268435456,
+  "max_msgs": -1,
+  "max_msgs_per_subject": 10000,
+  "production_readiness_verdict": "NOT_PRODUCTION_READY",
+  "retention": "limits",
+  "schema_version": "dharma.a2a.nats_after_state.v1",
+  "status": "AFTER_DRAIN_RETENTION_AND_CONSUMER_RESET",
+  "stream": "DHARMA_A2A",
+  "stream_after_receipt": "reports/a2a/nats_reset/2026-06-13/STREAM_AFTER_CONSUMER_RESET.json",
+  "fable_composer_consumer_receipt": "reports/a2a/nats_reset/2026-06-13/FABLE_COMPOSER_CONSUMER_PROVISIONED.json",
+  "backup_manifest": "reports/a2a/nats_reset/2026-06-13/BACKUP_MANIFEST.json",
+  "drain_applied_receipt": "reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json",
+  "file_inbox_quarantine_receipts": [
+    "reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_APPLIED.json",
+    "reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_SECOND_PASS_APPLIED.json",
+    "reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_THIRD_PASS_APPLIED.json"
+  ],
+  "file_bus_guard": {
+    "script": "scripts/runtime/a2a_file_bus_guard.py",
+    "last_command": "python3 scripts/runtime/a2a_file_bus_guard.py --json --check",
+    "last_status": "PASS",
+    "entry_count": 0,
+    "broadcast_group_count": 0
+  },
+  "legacy_file_bus_source": {
+    "producer_script": "/Users/dhyana/.hermes/scripts/alert_router.py",
+    "broadcast_script": "/Users/dhyana/.hermes/scripts/a2a_bus.py",
+    "producer_behavior": "alert_router.py calls a2a_bus.py broadcast; a2a_bus.py copies to every existing inbox when to_agent == all",
+    "status": "outside_repo_not_modified"
+  },
+  "stream_bytes": 92812,
+  "stream_first_seq": 8106870,
+  "stream_first_ts": "2026-06-10T22:27:04.282427844Z",
+  "stream_last_seq": 8106912,
+  "stream_last_ts": "2026-06-12T15:10:01.971852618Z",
+  "stream_messages": 43,
+  "stream_subject_count": 17,
+  "top_subjects_after": {
+    "dharma.a2a.devin": 15,
+    "dharma.a2a.fleet": 9,
+    "dharma.a2a.fable_5_cursor": 4,
+    "dharma.a2a.codex": 2,
+    "dharma.a2a.fable_composer": 1
+  },
+  "why_not_production_ready": [
+    "production readiness quorum is not collected",
+    "limited operator-supervised live-contact/domain-receipt drill still needs to be run for confidence beyond governance criteria"
+  ]
+}

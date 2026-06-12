@@ -1,0 +1,13 @@
+{
+  "broadcast_candidate_count": 0,
+  "broadcast_group_count": 0,
+  "broadcast_groups": [],
+  "broadcast_mirror_threshold": 5,
+  "entry_count": 0,
+  "group_count": 0,
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "production_claim": false,
+  "production_interpretation": "no amplified legacy filesystem broadcast detected",
+  "schema_version": "dharma.a2a.file_bus_guard.v1",
+  "status": "PASS"
+}

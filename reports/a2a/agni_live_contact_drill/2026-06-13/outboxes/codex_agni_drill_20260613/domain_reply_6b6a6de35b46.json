@@ -1,0 +1,23 @@
+{
+  "schema_version": "dharma.a2a.domain_receipt.v1",
+  "timestamp": "2026-06-12T17:30:45+00:00",
+  "from_agent": "codex_agni_drill_20260613",
+  "to_agent": "operator",
+  "packet_id": "6b6a6de35b46",
+  "reply_subject": "dharma.a2a.codex_agni_drill_20260613.reply.6b6a6de35b46",
+  "domain_receipt": true,
+  "semantic_reply_claim": false,
+  "target_owned_artifact_claim": true,
+  "peer_model_processed_claim": false,
+  "author_kind": "target_outbox_artifact",
+  "verdict": "received",
+  "summary": "AGNI drill packet was pulled from a durable DHARMA_A2A consumer and acknowledged through a typed target-owned receipt.",
+  "broker_scope": "agni",
+  "production_broker_claim": true,
+  "evidence_refs": [
+    "reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts/20260612T172950Z-codex_agni_drill_20260613-6b6a6de35b46.json",
+    "reports/a2a/agni_live_contact_drill/2026-06-13/inbox/6b6a6de35b46.json",
+    "reports/a2a/agni_live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json"
+  ],
+  "operator_contact_note": "typed AGNI domain receipt for a Codex-owned synthetic drill target; this does not claim Fable/Composer review or external model consensus"
+}

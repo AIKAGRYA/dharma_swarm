@@ -1,0 +1,21 @@
+{
+  "schema_version": "dharma.a2a.domain_receipt.v1",
+  "timestamp": "2026-06-12T17:19:10+00:00",
+  "from_agent": "codex_live_drill_20260613",
+  "to_agent": "operator",
+  "packet_id": "7eb03e84f03a",
+  "reply_subject": "dharma.agent.codex_live_drill_20260613.inbox.reply.7eb03e84f03a",
+  "domain_receipt": true,
+  "semantic_reply_claim": false,
+  "target_owned_artifact_claim": true,
+  "peer_model_processed_claim": false,
+  "author_kind": "target_outbox_artifact",
+  "verdict": "received",
+  "summary": "Local NATS drill packet was pulled from the durable consumer and acknowledged through a typed target-owned receipt.",
+  "evidence_refs": [
+    "reports/a2a/live_contact_drill/2026-06-13/send_receipts/20260612T171816Z-codex_live_drill_20260613-7eb03e84f03a.json",
+    "reports/a2a/live_contact_drill/2026-06-13/inbox/7eb03e84f03a.json",
+    "reports/a2a/live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json"
+  ],
+  "operator_contact_note": "typed local domain receipt for a drill target; this does not claim production AGNI contact"
+}

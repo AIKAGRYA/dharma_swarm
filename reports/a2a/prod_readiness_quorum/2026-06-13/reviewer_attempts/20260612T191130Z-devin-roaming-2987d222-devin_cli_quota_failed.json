@@ -1,0 +1,14 @@
+{
+  "agent_id": "devin-roaming-2987d222",
+  "attempted_at": "2026-06-12T19:11:30Z",
+  "command_surface": "devin -p",
+  "model_family_hint": "cognition",
+  "production_claim": false,
+  "reviewer_record_written": false,
+  "role": "operations_devops_reviewer",
+  "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+  "status": "FAILED",
+  "stderr_summary": "weekly usage quota exhausted",
+  "target_record_path": "reports/a2a/prod_readiness_quorum/2026-06-13/devin-roaming-2987d222.json",
+  "trace_id": "0143042f852cbb58e48f013aeb1139d7"
+}

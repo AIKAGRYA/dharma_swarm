@@ -1,0 +1,79 @@
+{
+  "ack_subject": "dharma.agent.codex_agni_drill_20260613.inbox.ack.d40bc1e91355",
+  "ack_tier": null,
+  "broker_scope": "agni",
+  "broker_scope_note": "NATS CLI context agni-wss",
+  "broker_scope_source": "nats_context",
+  "collaboration_claim": "none",
+  "contact_evidence_tier": "NO_CONTACT",
+  "error": "RuntimeError",
+  "file": "reports/a2a/agni_live_contact_drill/2026-06-13/PACKET.md",
+  "live_contact_claim": false,
+  "nats": {
+    "credential_family": "nats_context",
+    "endpoint": "context:agni-wss",
+    "has_auth_credential": false,
+    "has_ca_pem": false,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "system_ca_store"
+  },
+  "operator_contact_note": "no live A2A collaboration proven",
+  "packet_id": "d40bc1e91355",
+  "production_broker_claim": true,
+  "receipt_path": "reports/a2a/agni_live_contact_drill/2026-06-13/send_receipts/20260612T172911Z-codex_agni_drill_20260613-d40bc1e91355.json",
+  "reply_subject": "dharma.agent.codex_agni_drill_20260613.inbox.reply.d40bc1e91355",
+  "route": "agent-inbox",
+  "runtime_truth_ref": {
+    "claim_id": "claim_a2a_send_452b99b24a52287c",
+    "correlation_id": "a2a_send:codex_agni_drill_20260613:d40bc1e91355",
+    "idempotency_inserted": true,
+    "idempotency_key": "idem_a2a_send:dharma.agent.codex_agni_drill_20260613.inbox:d40bc1e91355",
+    "receipt_id": "rr_run_a2a_send_452b99b24a52287c_a2a_send_publish_failed",
+    "run_id": "run_a2a_send_452b99b24a52287c",
+    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
+    "side_effect_key": "a2a_send.publish:dharma.agent.codex_agni_drill_20260613.inbox:d40bc1e91355",
+    "spine_evidence_receipt_ref": {
+      "operation": "a2a_send.publish",
+      "receipt_id": "63659289-0837-45e6-af3d-b4e0e73824ea",
+      "span_id": "run_a2a_send_452b99b24a52287c",
+      "status": "failed",
+      "task_id": "a2a-send-d40bc1e91355",
+      "trace_id": "trace_a2a_send_452b99b24a52287c"
+    },
+    "task_id": "a2a-send-d40bc1e91355",
+    "trace_id": "trace_a2a_send_452b99b24a52287c"
+  },
+  "runtime_warrant_ref": {
+    "action": "publish",
+    "allowed_claims": [
+      "a2a_publish_attempt",
+      "broker_publish_attempt",
+      "publish_only",
+      "runtime_receipt_pending"
+    ],
+    "blocked_claims": [],
+    "idempotency_record_ref": "idempotency_records:idem_a2a_send:dharma.agent.codex_agni_drill_20260613.inbox:d40bc1e91355:a2a_send.publish:dharma.agent.codex_agni_drill_20260613.inbox:d40bc1e91355",
+    "receipt_id": "rr_run_a2a_send_452b99b24a52287c_warrant_5bcbd152efdf5a36faa631c8_granted",
+    "side_effect_key": "a2a_send.publish:dharma.agent.codex_agni_drill_20260613.inbox:d40bc1e91355",
+    "status": "granted",
+    "surface": "scripts/runtime/a2a_send.py",
+    "warrant_id": "warrant_5bcbd152efdf5a36faa631c8"
+  },
+  "schema_version": "dharma.a2a.send_receipt.v1",
+  "sha256": "87234b9914694d548288e53f63e35a3e9ef3451a16c7085bc9896e7b94c98fd3",
+  "spine_evidence_receipt_ref": {
+    "operation": "a2a_send.publish",
+    "receipt_id": "63659289-0837-45e6-af3d-b4e0e73824ea",
+    "span_id": "run_a2a_send_452b99b24a52287c",
+    "status": "failed",
+    "task_id": "a2a-send-d40bc1e91355",
+    "trace_id": "trace_a2a_send_452b99b24a52287c"
+  },
+  "status": "PUBLISH_FAILED",
+  "subject": "dharma.agent.codex_agni_drill_20260613.inbox",
+  "target_uid": "codex_agni_drill_20260613",
+  "timestamp": "2026-06-12T17:29:10Z",
+  "to": "codex_agni_drill_20260613"
+}

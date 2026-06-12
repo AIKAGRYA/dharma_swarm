@@ -1,0 +1,30 @@
+{
+  "schema_version": "dharma.a2a.prod_readiness_solicitation_send_receipt.v1",
+  "created_at": "2026-06-12T17:06:30+00:00",
+  "status": "PUBLISH_ACKED",
+  "ack_tier": "PUBLISH_ACCEPTED",
+  "transport": "nats-cli",
+  "nats_context": "agni-wss",
+  "stream": "DHARMA_A2A",
+  "stream_sequence": 8106913,
+  "subject": "dharma.a2a.fable_composer",
+  "target_agent_id": "fable_composer",
+  "request_path": "reports/a2a/prod_readiness_quorum/2026-06-13/requests/fable_composer.json",
+  "publish_command": "nats --context agni-wss --timeout=30s pub --jetstream dharma.a2a.fable_composer --force-stdin < reports/a2a/prod_readiness_quorum/2026-06-13/requests/fable_composer.json",
+  "publish_output": [
+    "02:06:30 Reading payload from STDIN",
+    "02:06:30 Published 2314 bytes to \"dharma.a2a.fable_composer\"",
+    "02:06:30 Stored in Stream: DHARMA_A2A Sequence: 8,106,913"
+  ],
+  "consumer_witness": {
+    "consumer": "fable_composer_inbox",
+    "filter_subject": "dharma.a2a.fable_composer",
+    "last_delivered_consumer_sequence": 0,
+    "last_delivered_stream_sequence": 8106912,
+    "outstanding_acks": 0,
+    "unprocessed_messages": 1,
+    "redelivered_messages": 0
+  },
+  "production_interpretation": "The request was stored in AGNI JetStream and is pending for the fable_composer pull consumer. This is not handler ack, semantic reply, or production-readiness quorum.",
+  "next_required_receipt": "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json"
+}

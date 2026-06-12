@@ -1,0 +1,96 @@
+{
+  "active_track": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/",
+  "audit_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/nats_reset/2026-06-13/A2A_DAEMON_WIRING_AUDIT.json",
+  "candidate_count": 5,
+  "candidate_labels": [
+    "com.dharma.a2a.hermes-m5",
+    "com.dhyana.a2a-core-contact",
+    "com.dhyana.nats-a2a-bridge",
+    "com.dhyana.nats-receipt",
+    "com.hermes.a2a-server"
+  ],
+  "interpretation": "APPLIED means stale LaunchAgent plist files were moved out of the LaunchAgents directory with backups. It does not prove that live A2A handlers or production quorum are ready.",
+  "launch_agents_dir": "/Users/dhyana/Library/LaunchAgents",
+  "launchctl_mutated": false,
+  "mode": "apply",
+  "moved": [
+    {
+      "bytes": 1658,
+      "from": "/Users/dhyana/Library/LaunchAgents/com.dharma.a2a.hermes-m5.plist",
+      "issue_types": [
+        "missing_module_target",
+        "missing_python_module"
+      ],
+      "label": "com.dharma.a2a.hermes-m5",
+      "to": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/com.dharma.a2a.hermes-m5.plist"
+    },
+    {
+      "bytes": 1004,
+      "from": "/Users/dhyana/Library/LaunchAgents/com.dhyana.a2a-core-contact.plist",
+      "issue_types": [
+        "missing_script_target",
+        "broker_scope_mismatch",
+        "missing_script_file"
+      ],
+      "label": "com.dhyana.a2a-core-contact",
+      "to": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/com.dhyana.a2a-core-contact.plist"
+    },
+    {
+      "bytes": 910,
+      "from": "/Users/dhyana/Library/LaunchAgents/com.dhyana.nats-a2a-bridge.plist",
+      "issue_types": [
+        "missing_module_target",
+        "broker_scope_mismatch",
+        "missing_python_module"
+      ],
+      "label": "com.dhyana.nats-a2a-bridge",
+      "to": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/com.dhyana.nats-a2a-bridge.plist"
+    },
+    {
+      "bytes": 936,
+      "from": "/Users/dhyana/Library/LaunchAgents/com.dhyana.nats-receipt.plist",
+      "issue_types": [
+        "broker_scope_mismatch",
+        "missing_python_module"
+      ],
+      "label": "com.dhyana.nats-receipt",
+      "to": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/com.dhyana.nats-receipt.plist"
+    },
+    {
+      "bytes": 1125,
+      "from": "/Users/dhyana/Library/LaunchAgents/com.hermes.a2a-server.plist",
+      "issue_types": [
+        "import_error"
+      ],
+      "label": "com.hermes.a2a-server",
+      "to": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/com.hermes.a2a-server.plist"
+    }
+  ],
+  "moved_count": 5,
+  "pointer_path": "/Users/dhyana/Library/LaunchAgents/DHARMA_A2A_RUNTIME_SPINE_README.md",
+  "production_claim": false,
+  "quarantine_readme_path": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z/README.md",
+  "quarantine_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/launch_agents/20260612T184702Z",
+  "receipt_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json",
+  "schema_version": "dharma.a2a.launchagent_quarantine_receipt.v1",
+  "selected_labels": [],
+  "selected_statuses": [
+    "FAIL"
+  ],
+  "skipped": [
+    {
+      "label": "com.dhyana.loop.a2a-fleet",
+      "path": "/Users/dhyana/Library/LaunchAgents/com.dhyana.loop.a2a-fleet.plist",
+      "reason": "status_not_selected"
+    },
+    {
+      "label": "com.dhyana.nats",
+      "path": "/Users/dhyana/Library/LaunchAgents/com.dhyana.nats.plist",
+      "reason": "status_not_selected"
+    }
+  ],
+  "skipped_count": 2,
+  "status": "APPLIED",
+  "timestamp": "2026-06-12T18:47:02+00:00"
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": "dharma.a2a.prod_readiness_reviewer_attempt.v1",
+  "agent_id": "fable_composer",
+  "created_at": "2026-06-12T19:59:38Z",
+  "harness": "claude_code_headless",
+  "command_family": "claude -p",
+  "status": "FAILED",
+  "failure_class": "PROVIDER_CREDIT_EXHAUSTED",
+  "stderr_summary": "Credit balance is too low",
+  "reviewer_record_written": false,
+  "expected_record_path": "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json",
+  "production_claim": false,
+  "interpretation": "The documented fable_composer headless route was attempted, but no target-owned reviewer record was produced. This attempt does not satisfy production quorum."
+}

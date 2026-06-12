@@ -1,0 +1,63 @@
+{
+  "created_at": "2026-06-12T19:41:19+00:00",
+  "date": "2026-06-13",
+  "evidence_refs": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/README.md",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/NATS_DRAIN_AND_RESET_RUNBOOK.md",
+    "reports/a2a/nats_reset/2026-06-13/AFTER.json",
+    "reports/a2a/nats_reset/2026-06-13/DRAIN_APPLIED_RECEIPT.json",
+    "reports/a2a/nats_reset/2026-06-13/A2A_DAEMON_WIRING_AUDIT.json",
+    "reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json",
+    "reports/a2a/nats_reset/2026-06-13/NATS_COMMON_FAILURES.md",
+    "reports/a2a/nats_reset/2026-06-13/NATS_INTERACTION_HISTORY_72H.json",
+    "reports/a2a/nats_reset/2026-06-13/FILE_INBOX_QUARANTINE_THIRD_PASS_APPLIED.json",
+    "reports/a2a/nats_reset/2026-06-13/FILE_BUS_GUARD_AFTER_HERMES_DISABLE.json",
+    "reports/a2a/hermes_broadcast_guard/2026-06-13/HERMES_ALERT_ROUTER_BROADCAST_GUARD_APPLIED.json",
+    "reports/a2a/inbox_quarantine_receipts/20260612T182948Z-a2a-inbox-quarantine.json",
+    "reports/a2a/inbox_quarantine_receipts/20260612T183000Z-a2a-inbox-quarantine.json",
+    "reports/a2a/inbox_quarantine_receipts/20260612T192816Z-a2a-inbox-quarantine.json",
+    "reports/a2a/launchagent_quarantine_receipts/20260612T184702Z-a2a-launchagent-quarantine.json",
+    "reports/a2a/agni_live_contact_drill/2026-06-13/AGNI_A2A_LIVE_CONTACT_DRILL_RECEIPT.json",
+    "reports/a2a/prod_readiness_quorum/latest_delivery_status.json",
+    "reports/a2a/prod_readiness_quorum/latest.json"
+  ],
+  "model_family_hints": [
+    "alibaba",
+    "anthropic",
+    "google",
+    "hermes",
+    "openai"
+  ],
+  "next_command": "python3 scripts/runtime/a2a_prod_readiness_quorum.py --date 2026-06-13 --allow-not-ready --write-latest",
+  "request_count": 5,
+  "request_dir": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests",
+  "request_paths": [
+    "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/codex_composer.json",
+    "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/fable_composer.json",
+    "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/hermes_m5.json",
+    "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/qwen_code.json",
+    "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum/2026-06-13/requests/gemini_reviewer.json"
+  ],
+  "requested_by": "codex_composer",
+  "roles": [
+    "ops_verifier",
+    "adversarial_security_reviewer",
+    "agent_harness_reviewer",
+    "adversarial_security_reviewer",
+    "independent_production_reviewer"
+  ],
+  "root": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/prod_readiness_quorum",
+  "schema_version": "dharma.a2a.prod_readiness_solicitation_receipt.v1",
+  "status": "SOLICITATION_WRITTEN",
+  "target_agent_ids": [
+    "codex_composer",
+    "fable_composer",
+    "hermes_m5",
+    "qwen_code",
+    "gemini_reviewer"
+  ],
+  "transport_note": "Request packets are durable repo artifacts only. Send them through scripts/runtime/a2a_send.py or another governed A2A route to prove delivery.",
+  "transport_status": "NOT_SENT"
+}

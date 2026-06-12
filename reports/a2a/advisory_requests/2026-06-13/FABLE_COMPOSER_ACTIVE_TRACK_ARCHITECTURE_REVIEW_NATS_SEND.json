@@ -1,0 +1,33 @@
+{
+  "schema_version": "dharma.a2a.advisory_request_send_receipt.v1",
+  "created_at": "2026-06-12T17:10:49+00:00",
+  "status": "PUBLISH_ACKED",
+  "ack_tier": "PUBLISH_ACCEPTED",
+  "transport": "nats-cli",
+  "nats_context": "agni-wss",
+  "stream": "DHARMA_A2A",
+  "stream_sequence": 8106914,
+  "subject": "dharma.a2a.fable_composer",
+  "target_agent_id": "fable_composer",
+  "request_path": "reports/a2a/advisory_requests/2026-06-13/FABLE_COMPOSER_ACTIVE_TRACK_ARCHITECTURE_REVIEW.json",
+  "publish_command": "nats --context agni-wss --timeout=30s pub --jetstream dharma.a2a.fable_composer --force-stdin < reports/a2a/advisory_requests/2026-06-13/FABLE_COMPOSER_ACTIVE_TRACK_ARCHITECTURE_REVIEW.json",
+  "publish_output": [
+    "02:10:49 Reading payload from STDIN",
+    "02:10:49 Published 3960 bytes to \"dharma.a2a.fable_composer\"",
+    "02:10:49 Stored in Stream: DHARMA_A2A Sequence: 8,106,914"
+  ],
+  "consumer_witness": {
+    "consumer": "fable_composer_inbox",
+    "filter_subject": "dharma.a2a.fable_composer",
+    "last_delivered_consumer_sequence": 0,
+    "last_delivered_stream_sequence": 8106912,
+    "outstanding_acks": 0,
+    "unprocessed_messages": 2,
+    "redelivered_messages": 0
+  },
+  "production_interpretation": "The architecture-review request was stored in AGNI JetStream and is pending for the fable_composer pull consumer. This is not handler ack, semantic reply, or active-track approval.",
+  "next_expected_artifacts": [
+    "reports/a2a/advisory_responses/2026-06-13/fable_composer_active_track_architecture_review.json",
+    "reports/a2a/prod_readiness_quorum/2026-06-13/fable_composer.json"
+  ]
+}

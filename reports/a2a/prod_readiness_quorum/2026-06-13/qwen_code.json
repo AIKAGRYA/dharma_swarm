@@ -1,0 +1,26 @@
+{
+  "schema_version": "dharma.a2a.prod_readiness_reviewer.v1",
+  "agent_id": "qwen_code",
+  "model_family": "alibaba",
+  "role": "adversarial_security_reviewer",
+  "readiness_percent": 42,
+  "verdict": "not_ready",
+  "red_blockers": [
+    "Fable/Hermes target-owned handler receipts missing: fable_composer and hermes_m5 reviewer records do not exist; both solicitation messages sit PENDING_DELIVERY in AGNI with no handler ack, domain receipt, or semantic reply from the target agents.",
+    "Quorum composition still fails without Fable/Hermes: before this Qwen review only codex_composer existed; the track still lacks the requested target-owned Fable/Hermes reviewer receipts.",
+    "The sole prior reviewer, codex_composer, returned NOT_READY with red blockers; quorum requires zero red blockers across all reviewers.",
+    "Publish ack is present for quorum solicitation messages but no target-owned agent has consumed them; PUBLISH_ACCEPTED cannot satisfy handler ack, domain receipt, or production readiness.",
+    "The out-of-repo Hermes alert-router broadcast source can still repopulate file inboxes unless rerouted or suppressed."
+  ],
+  "evidence_refs": [
+    "docs/governance/ACTIVE_TRACK.yaml",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/README.md",
+    "docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md",
+    "reports/a2a/nats_reset/2026-06-13/NATS_COMMON_FAILURES.md",
+    "reports/a2a/nats_reset/2026-06-13/A2A_LIVE_HANDLER_REPAIR_PLAN.json",
+    "reports/a2a/prod_readiness_quorum/2026-06-13/QUORUM_DELIVERY_STATUS.json",
+    "reports/a2a/prod_readiness_quorum/latest.json",
+    "reports/a2a/prod_readiness_quorum/2026-06-13/reviewer_attempts/20260612T191012Z-qwen_code-qwen_cli_raw.md"
+  ],
+  "created_at": "2026-06-12T19:10:12Z"
+}

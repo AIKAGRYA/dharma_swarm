@@ -1,0 +1,778 @@
+{
+  "agent_filter": [],
+  "candidate_bytes_by_agent": {
+    "00162fcf95434dd1.json": 114147,
+    "00162fcf95434dd1.json_composer": 32647,
+    "00460d124b4d4588.json": 114147,
+    "00460d124b4d4588.json_composer": 32647,
+    "00625be51d2f41f3.json": 114147,
+    "00625be51d2f41f3.json_composer": 32647,
+    "00657241a5c04432.json": 114147,
+    "00657241a5c04432.json_composer": 32647,
+    "006ace220098cd60.json": 99849,
+    "006ace220098cd60.json_composer": 32647,
+    "0074e0a0a37ff3ae.json": 113639,
+    "128664a2f87e85df": 83202,
+    "163ffce72e05f83b.json": 4145,
+    "2e46f6867acc44cb": 72553,
+    "2e46f6867acc44cb.json": 67447,
+    "5e4aee58d018f97a.json": 187682,
+    "6830ab35b9cc418d": 72553,
+    "6830ab35b9cc418d.json": 67216,
+    "a2a_supervisor": 536026,
+    "ack_from": 67218,
+    "b74fdabd46b049f4": 72553,
+    "b74fdabd46b049f4.json": 236998,
+    "claimed": 111278,
+    "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 95383,
+    "claude-opus": 506091,
+    "codex": 485896,
+    "codex\ncodex\nhermes\nhermes_composer": 67922,
+    "codex-hardening-smoke": 506696,
+    "codex_5_5_cli": 542290,
+    "codex_a2a": 95273,
+    "codex_a2a_lifecycle_contract": 27414,
+    "codex_composer": 1115595,
+    "codex_conjunction": 95267,
+    "codex_conjunction_live": 27414,
+    "codex_forgewright": 403981,
+    "codex_runtime": 237535,
+    "codex_worker_spine": 57507,
+    "collab": 92261,
+    "collab_loop": 115849,
+    "collaboration_packet": 519041,
+    "collaboration_packet_retry": 508205,
+    "d1449e6558194a62": 72553,
+    "d1449e6558194a62.json": 67216,
+    "devin-roaming": 431575,
+    "devin-roaming-2987d222": 517166,
+    "drishti": 506438,
+    "e2d6c8df42bb413a": 72553,
+    "e2d6c8df42bb413a.json": 67216,
+    "ebda731b8835e7b8.json": 187014,
+    "fable_composer": 193202,
+    "fleet-coordinator": 508132,
+    "forge_measurement_guardian": 371964,
+    "generic_sender": 96476,
+    "hermes": 307788,
+    "hermes-m5": 1074106,
+    "hermes_m5": 53739,
+    "karya": 506438,
+    "loop_h_revenue_wedge_gate_monitor": 70388,
+    "loop_repair": 92030,
+    "loop_repair_codex": 508557,
+    "merge_master_mike": 382844,
+    "operator": 244545,
+    "opus_composer": 1177843,
+    "opus_forge_architect": 371958,
+    "perplexity-computer": 339696,
+    "qwen_code": 229691,
+    "receipt": 87888,
+    "receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 95383,
+    "receipt_ts-bb486356": 95270,
+    "receipt_ts-bb486356_from_loop_repair": 27414,
+    "revenue_wedge_gate_loop": 90771,
+    "smriti": 505770,
+    "unknown": 494769,
+    "viveka": 506438,
+    "warp_fable_weaver": 17323,
+    "warp_oz": 342130
+  },
+  "candidate_count": 34717,
+  "candidate_counts_by_agent": {
+    "00162fcf95434dd1.json": 211,
+    "00162fcf95434dd1.json_composer": 59,
+    "00460d124b4d4588.json": 211,
+    "00460d124b4d4588.json_composer": 59,
+    "00625be51d2f41f3.json": 211,
+    "00625be51d2f41f3.json_composer": 59,
+    "00657241a5c04432.json": 211,
+    "00657241a5c04432.json_composer": 59,
+    "006ace220098cd60.json": 185,
+    "006ace220098cd60.json_composer": 59,
+    "0074e0a0a37ff3ae.json": 207,
+    "128664a2f87e85df": 151,
+    "163ffce72e05f83b.json": 8,
+    "2e46f6867acc44cb": 131,
+    "2e46f6867acc44cb.json": 122,
+    "5e4aee58d018f97a.json": 339,
+    "6830ab35b9cc418d": 131,
+    "6830ab35b9cc418d.json": 121,
+    "a2a_supervisor": 945,
+    "ack_from": 121,
+    "b74fdabd46b049f4": 131,
+    "b74fdabd46b049f4.json": 429,
+    "claimed": 207,
+    "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 174,
+    "claude-opus": 924,
+    "codex": 907,
+    "codex\ncodex\nhermes\nhermes_composer": 122,
+    "codex-hardening-smoke": 926,
+    "codex_5_5_cli": 951,
+    "codex_a2a": 173,
+    "codex_a2a_lifecycle_contract": 50,
+    "codex_composer": 2323,
+    "codex_conjunction": 173,
+    "codex_conjunction_live": 50,
+    "codex_forgewright": 686,
+    "codex_runtime": 435,
+    "codex_worker_spine": 104,
+    "collab": 168,
+    "collab_loop": 212,
+    "collaboration_packet": 936,
+    "collaboration_packet_retry": 925,
+    "d1449e6558194a62": 131,
+    "d1449e6558194a62.json": 121,
+    "devin-roaming": 786,
+    "devin-roaming-2987d222": 934,
+    "drishti": 925,
+    "e2d6c8df42bb413a": 131,
+    "e2d6c8df42bb413a.json": 121,
+    "ebda731b8835e7b8.json": 338,
+    "fable_composer": 171,
+    "fleet-coordinator": 928,
+    "forge_measurement_guardian": 672,
+    "generic_sender": 177,
+    "hermes": 558,
+    "hermes-m5": 2394,
+    "hermes_m5": 100,
+    "karya": 925,
+    "loop_h_revenue_wedge_gate_monitor": 127,
+    "loop_repair": 167,
+    "loop_repair_codex": 926,
+    "merge_master_mike": 685,
+    "operator": 465,
+    "opus_composer": 2504,
+    "opus_forge_architect": 672,
+    "perplexity-computer": 606,
+    "qwen_code": 411,
+    "receipt": 161,
+    "receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 174,
+    "receipt_ts-bb486356": 173,
+    "receipt_ts-bb486356_from_loop_repair": 50,
+    "revenue_wedge_gate_loop": 165,
+    "smriti": 924,
+    "unknown": 922,
+    "viveka": 925,
+    "warp_fable_weaver": 31,
+    "warp_oz": 611
+  },
+  "candidate_preview": [
+    {
+      "age_hours": 26.96,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/023417eec75028ce.json"
+    },
+    {
+      "age_hours": 61.588,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/02486d83b27df873.json"
+    },
+    {
+      "age_hours": 47.344,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/02bd87fd882c01a2.json"
+    },
+    {
+      "age_hours": 23.874,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/06345b8811e240f9.json"
+    },
+    {
+      "age_hours": 18.744,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/06dacda5f0c2798c.json"
+    },
+    {
+      "age_hours": 38.927,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/0897c1b1119cb126.json"
+    },
+    {
+      "age_hours": 32.561,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/08c2aed17921e8d9.json"
+    },
+    {
+      "age_hours": 71.156,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/0b349a7f427360d5.json"
+    },
+    {
+      "age_hours": 32.587,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/0bb9c4f9eeb0cc33.json"
+    },
+    {
+      "age_hours": 53.216,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/0d2ac546683921ca.json"
+    },
+    {
+      "age_hours": 16.697,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/0f3ba98353bff531.json"
+    },
+    {
+      "age_hours": 52.198,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/107649e28882f4e8.json"
+    },
+    {
+      "age_hours": 52.715,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/11e76ac324a6ddab.json"
+    },
+    {
+      "age_hours": 57.792,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/1227fef761204417.json"
+    },
+    {
+      "age_hours": 53.694,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/128664a2f87e85df.json"
+    },
+    {
+      "age_hours": 8.987,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/13b3ce0b34d38b51.json"
+    },
+    {
+      "age_hours": 36.847,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/159a1cb5ecdfb77e.json"
+    },
+    {
+      "age_hours": 19.754,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/163ffce72e05f83b.json"
+    },
+    {
+      "age_hours": 44.748,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/182deef067ff6eaf.json"
+    },
+    {
+      "age_hours": 67.086,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/18dc814ef869bf3f.json"
+    },
+    {
+      "age_hours": 24.51,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/19f808e8586520c6.json"
+    },
+    {
+      "age_hours": 14.264,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/1af068466a8c810f.json"
+    },
+    {
+      "age_hours": 31.04,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/1c7d35db1e617c64.json"
+    },
+    {
+      "age_hours": 63.004,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/1d8918cfbb59420c.json"
+    },
+    {
+      "age_hours": 40.521,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/1ee01163301219af.json"
+    },
+    {
+      "age_hours": 12.115,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/221658089b0f699a.json"
+    },
+    {
+      "age_hours": 2.811,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/233726cdac27bb6c.json"
+    },
+    {
+      "age_hours": 0.734,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/234ed72c2085ca4b.json"
+    },
+    {
+      "age_hours": 38.424,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/25dd85d3b75bdfc9.json"
+    },
+    {
+      "age_hours": 10.066,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/261c6e61c075055e.json"
+    },
+    {
+      "age_hours": 60.028,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/26e4c99f1195de8c.json"
+    },
+    {
+      "age_hours": 54.708,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/27bb87755f789847.json"
+    },
+    {
+      "age_hours": 10.085,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/2ce9160ef690d8c5.json"
+    },
+    {
+      "age_hours": 20.809,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/2d8f6185fe087fef.json"
+    },
+    {
+      "age_hours": 43.129,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/2e96b08c4fcdcd4b.json"
+    },
+    {
+      "age_hours": 3.863,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/301bb8f3d9036fa9.json"
+    },
+    {
+      "age_hours": 15.673,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/3166db35ca78d358.json"
+    },
+    {
+      "age_hours": 41.568,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/330ca744fa474fa7.json"
+    },
+    {
+      "age_hours": 34.603,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/34a0e4e57e7fb9b2.json"
+    },
+    {
+      "age_hours": 53.72,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/34c2eb7755467f98.json"
+    },
+    {
+      "age_hours": 20.295,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/35df0cd2a3c54d15.json"
+    },
+    {
+      "age_hours": 0.224,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/360bc23f0c89eac0.json"
+    },
+    {
+      "age_hours": 4.867,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/36d9793b449d427b.json"
+    },
+    {
+      "age_hours": 58.468,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/3910fe366bc692f0.json"
+    },
+    {
+      "age_hours": 11.614,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/3c43795cf094c5d1.json"
+    },
+    {
+      "age_hours": 33.071,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/3d458a84dc4f5977.json"
+    },
+    {
+      "age_hours": 65.51,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/3d4a839a4124f665.json"
+    },
+    {
+      "age_hours": 69.135,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/401edbc0dc980893.json"
+    },
+    {
+      "age_hours": 26.451,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/40d3eee35951a96b.json"
+    },
+    {
+      "age_hours": 17.332,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/4108dd8665e68f12.json"
+    },
+    {
+      "age_hours": 62.789,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/444c7e2113747cc5.json"
+    },
+    {
+      "age_hours": 65.007,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/450f55b84f49b680.json"
+    },
+    {
+      "age_hours": 63.807,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/45331536d9b71ed0.json"
+    },
+    {
+      "age_hours": 9.545,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/45c46f486ec3b80a.json"
+    },
+    {
+      "age_hours": 45.251,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/47807391a394ebd0.json"
+    },
+    {
+      "age_hours": 28.545,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/48cfa60b546ce49f.json"
+    },
+    {
+      "age_hours": 50.568,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/4a64a959a4251729.json"
+    },
+    {
+      "age_hours": 10.585,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/4a8fea74c9626ec4.json"
+    },
+    {
+      "age_hours": 67.103,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/4e33379bf0a061b5.json"
+    },
+    {
+      "age_hours": 41.024,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/4f5288394a9de507.json"
+    },
+    {
+      "age_hours": 43.13,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/505367cd1fe917e2.json"
+    },
+    {
+      "age_hours": 27.473,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/510cc33f5417ae53.json"
+    },
+    {
+      "age_hours": 69.62,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/52704a0251dbcb37.json"
+    },
+    {
+      "age_hours": 14.141,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/52e68b91d5c57b4a.json"
+    },
+    {
+      "age_hours": 0.735,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/536ccfefbb283afb.json"
+    },
+    {
+      "age_hours": 31.581,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/53acb7cbf7fcbd00.json"
+    },
+    {
+      "age_hours": 55.738,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5a76fc09caab9c3c.json"
+    },
+    {
+      "age_hours": 36.334,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5b2e792f322317a1.json"
+    },
+    {
+      "age_hours": 35.832,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5b7efa1875cf3d93.json"
+    },
+    {
+      "age_hours": 30.575,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5c39929544eca604.json"
+    },
+    {
+      "age_hours": 48.461,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5c865ce77b0badac.json"
+    },
+    {
+      "age_hours": 13.179,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5cb31dad16a661e9.json"
+    },
+    {
+      "age_hours": 6.912,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5d12c84f0eeff70d.json"
+    },
+    {
+      "age_hours": 60.564,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5de6228cbd9420f5.json"
+    },
+    {
+      "age_hours": 44.24,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5e550640e4b1f82a.json"
+    },
+    {
+      "age_hours": 3.335,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/5f588f75e5ce233e.json"
+    },
+    {
+      "age_hours": 54.771,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/647b500b7eaa6626.json"
+    },
+    {
+      "age_hours": 57.34,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/65755644d8b3d9b1.json"
+    },
+    {
+      "age_hours": 48.998,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/66c5016fdace00e4.json"
+    },
+    {
+      "age_hours": 55.282,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/675c0bc9272f5826.json"
+    },
+    {
+      "age_hours": 20.435,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/67ad4be488738fc6.json"
+    },
+    {
+      "age_hours": 47.967,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/67d32823ef6a4786.json"
+    },
+    {
+      "age_hours": 5.379,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/68031921245d89c8.json"
+    },
+    {
+      "age_hours": 42.618,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6862deb49e041e5e.json"
+    },
+    {
+      "age_hours": 21.322,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/68c36bb8aebb225e.json"
+    },
+    {
+      "age_hours": 62.095,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6a5d672ce016edde.json"
+    },
+    {
+      "age_hours": 38.927,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6b073a72ba627b1d.json"
+    },
+    {
+      "age_hours": 34.097,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6c2d56765aa7ee07.json"
+    },
+    {
+      "age_hours": 3.842,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6d19784163d05d39.json"
+    },
+    {
+      "age_hours": 32.055,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6e28c9a1113ad624.json"
+    },
+    {
+      "age_hours": 47.345,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6fec66f2c9fded6a.json"
+    },
+    {
+      "age_hours": 23.504,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/6fee717114b2057c.json"
+    },
+    {
+      "age_hours": 52.634,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/72964d689b8d3422.json"
+    },
+    {
+      "age_hours": 45.815,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/73e018b2280b2079.json"
+    },
+    {
+      "age_hours": 60.881,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/753b7191d320c0b9.json"
+    },
+    {
+      "age_hours": 12.167,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/76bd0e57608e694c.json"
+    },
+    {
+      "age_hours": 25.423,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/796344e1c357b8c3.json"
+    },
+    {
+      "age_hours": 69.118,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/7c8621c9add2f42a.json"
+    },
+    {
+      "age_hours": 25.519,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/7ced706b23a703dc.json"
+    },
+    {
+      "age_hours": 28.492,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/7ebbef34fa9ed360.json"
+    }
+  ],
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "include_recent": true,
+  "mode": "dry_run",
+  "moved": [],
+  "moved_bytes": 0,
+  "moved_count": 0,
+  "quarantine_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T155726Z",
+  "receipt_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/inbox_quarantine_receipts/20260612T155727Z-a2a-inbox-quarantine.json",
+  "recent_hours": 24.0,
+  "schema_version": "dharma.a2a.inbox_quarantine_receipt.v1",
+  "skipped": [],
+  "skipped_count": 0,
+  "status": "DRY_RUN",
+  "timestamp": "2026-06-12T15:57:26+00:00",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/"
+}

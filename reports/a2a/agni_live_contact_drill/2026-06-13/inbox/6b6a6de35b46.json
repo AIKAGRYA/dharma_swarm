@@ -1,0 +1,30 @@
+{
+  "schema_version": "dharma.a2a.inbox_delivery.v1",
+  "delivered_at": "2026-06-12T17:30:05+00:00",
+  "agent_uid": "codex_agni_drill_20260613",
+  "bridge_kind": "agni_nats_cli_pull_handler_drill",
+  "source_subject": "dharma.a2a.codex_agni_drill_20260613",
+  "stream": "DHARMA_A2A",
+  "consumer": "codex_agni_drill_a2a_20260613",
+  "broker_scope": "agni",
+  "production_broker_claim": true,
+  "broker_ack": true,
+  "semantic_reply_claim": false,
+  "peer_model_processed_claim": false,
+  "envelope": {
+    "ack_subject": "dharma.a2a.codex_agni_drill_20260613.ack.6b6a6de35b46",
+    "content": "# A2A AGNI Live Contact Drill Packet\n\nsender: codex_composer\ntarget: codex_agni_drill_20260613\npurpose: prove the governed sender can publish through AGNI and that a durable AGNI consumer can pull and acknowledge the packet.\n\nThis is a synthetic Codex-owned target. It proves AGNI broker mechanics and\ndoes not claim Fable/Composer or external model consensus.\n",
+    "file": "reports/a2a/agni_live_contact_drill/2026-06-13/PACKET.md",
+    "from": "operator",
+    "kind": "fleet.packet",
+    "packet_id": "6b6a6de35b46",
+    "reply_subject": "dharma.a2a.codex_agni_drill_20260613.reply.6b6a6de35b46",
+    "route": "a2a",
+    "schema_version": "dharma.a2a.send.v1",
+    "sha256": "87234b9914694d548288e53f63e35a3e9ef3451a16c7085bc9896e7b94c98fd3",
+    "subject": "dharma.a2a.codex_agni_drill_20260613",
+    "target_uid": "codex_agni_drill_20260613",
+    "timestamp": "2026-06-12T17:29:49Z",
+    "to": "codex_agni_drill_20260613"
+  }
+}

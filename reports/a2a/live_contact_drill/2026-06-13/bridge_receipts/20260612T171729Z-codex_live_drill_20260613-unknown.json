@@ -1,0 +1,14 @@
+{
+  "agent_uid": "codex_live_drill_20260613",
+  "collaboration_claim": "none",
+  "consumer": "codex_live_drill_20260613",
+  "contact_evidence_tier": "NO_CONTACT",
+  "endpoint": "nats://127.0.0.1:4222",
+  "error": "nats-py is not installed in this Python environment",
+  "route": "agent-inbox",
+  "schema_version": "dharma.a2a.inbox_bridge_receipt.v1",
+  "status": "NATS_CLIENT_MISSING",
+  "stream": "DHARMA_FLEET",
+  "subject": "dharma.agent.codex_live_drill_20260613.inbox",
+  "timestamp": "2026-06-12T17:17:29Z"
+}

@@ -1,0 +1,1159 @@
+{
+  "agent_filter": [],
+  "candidate_bytes_by_agent": {
+    "00162fcf95434dd1.json": 991,
+    "00162fcf95434dd1.json_composer": 991,
+    "00460d124b4d4588.json": 991,
+    "00460d124b4d4588.json_composer": 991,
+    "00625be51d2f41f3.json": 991,
+    "00625be51d2f41f3.json_composer": 991,
+    "00657241a5c04432.json": 991,
+    "00657241a5c04432.json_composer": 991,
+    "006ace220098cd60.json": 991,
+    "006ace220098cd60.json_composer": 991,
+    "0074e0a0a37ff3ae.json": 991,
+    "128664a2f87e85df": 991,
+    "163ffce72e05f83b.json": 991,
+    "2e46f6867acc44cb": 991,
+    "2e46f6867acc44cb.json": 991,
+    "5e4aee58d018f97a.json": 991,
+    "6830ab35b9cc418d": 991,
+    "6830ab35b9cc418d.json": 991,
+    "a2a_supervisor": 991,
+    "ack_from": 991,
+    "b74fdabd46b049f4": 991,
+    "b74fdabd46b049f4.json": 991,
+    "claimed": 991,
+    "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 991,
+    "claude-opus": 991,
+    "codex": 991,
+    "codex\ncodex\nhermes\nhermes_composer": 991,
+    "codex-hardening-smoke": 991,
+    "codex_5_5_cli": 991,
+    "codex_a2a": 991,
+    "codex_a2a_lifecycle_contract": 991,
+    "codex_composer": 991,
+    "codex_conjunction": 991,
+    "codex_conjunction_live": 991,
+    "codex_forgewright": 991,
+    "codex_runtime": 991,
+    "codex_worker_spine": 991,
+    "collab": 991,
+    "collab_loop": 991,
+    "collaboration_packet": 991,
+    "collaboration_packet_retry": 991,
+    "d1449e6558194a62": 991,
+    "d1449e6558194a62.json": 991,
+    "devin-roaming": 991,
+    "devin-roaming-2987d222": 991,
+    "drishti": 991,
+    "e2d6c8df42bb413a": 991,
+    "e2d6c8df42bb413a.json": 991,
+    "ebda731b8835e7b8.json": 991,
+    "fable_composer": 991,
+    "fleet-coordinator": 991,
+    "forge_measurement_guardian": 991,
+    "generic_sender": 991,
+    "hermes": 991,
+    "hermes-m5": 991,
+    "hermes_m5": 991,
+    "karya": 991,
+    "loop_h_revenue_wedge_gate_monitor": 991,
+    "loop_repair": 991,
+    "loop_repair_codex": 991,
+    "merge_master_mike": 991,
+    "operator": 991,
+    "opus_composer": 991,
+    "opus_forge_architect": 991,
+    "perplexity-computer": 991,
+    "qwen_code": 991,
+    "receipt": 991,
+    "receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 991,
+    "receipt_ts-bb486356": 991,
+    "receipt_ts-bb486356_from_loop_repair": 991,
+    "revenue_wedge_gate_loop": 991,
+    "smriti": 991,
+    "unknown": 991,
+    "viveka": 991,
+    "warp_fable_weaver": 991,
+    "warp_oz": 991
+  },
+  "candidate_count": 152,
+  "candidate_counts_by_agent": {
+    "00162fcf95434dd1.json": 2,
+    "00162fcf95434dd1.json_composer": 2,
+    "00460d124b4d4588.json": 2,
+    "00460d124b4d4588.json_composer": 2,
+    "00625be51d2f41f3.json": 2,
+    "00625be51d2f41f3.json_composer": 2,
+    "00657241a5c04432.json": 2,
+    "00657241a5c04432.json_composer": 2,
+    "006ace220098cd60.json": 2,
+    "006ace220098cd60.json_composer": 2,
+    "0074e0a0a37ff3ae.json": 2,
+    "128664a2f87e85df": 2,
+    "163ffce72e05f83b.json": 2,
+    "2e46f6867acc44cb": 2,
+    "2e46f6867acc44cb.json": 2,
+    "5e4aee58d018f97a.json": 2,
+    "6830ab35b9cc418d": 2,
+    "6830ab35b9cc418d.json": 2,
+    "a2a_supervisor": 2,
+    "ack_from": 2,
+    "b74fdabd46b049f4": 2,
+    "b74fdabd46b049f4.json": 2,
+    "claimed": 2,
+    "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 2,
+    "claude-opus": 2,
+    "codex": 2,
+    "codex\ncodex\nhermes\nhermes_composer": 2,
+    "codex-hardening-smoke": 2,
+    "codex_5_5_cli": 2,
+    "codex_a2a": 2,
+    "codex_a2a_lifecycle_contract": 2,
+    "codex_composer": 2,
+    "codex_conjunction": 2,
+    "codex_conjunction_live": 2,
+    "codex_forgewright": 2,
+    "codex_runtime": 2,
+    "codex_worker_spine": 2,
+    "collab": 2,
+    "collab_loop": 2,
+    "collaboration_packet": 2,
+    "collaboration_packet_retry": 2,
+    "d1449e6558194a62": 2,
+    "d1449e6558194a62.json": 2,
+    "devin-roaming": 2,
+    "devin-roaming-2987d222": 2,
+    "drishti": 2,
+    "e2d6c8df42bb413a": 2,
+    "e2d6c8df42bb413a.json": 2,
+    "ebda731b8835e7b8.json": 2,
+    "fable_composer": 2,
+    "fleet-coordinator": 2,
+    "forge_measurement_guardian": 2,
+    "generic_sender": 2,
+    "hermes": 2,
+    "hermes-m5": 2,
+    "hermes_m5": 2,
+    "karya": 2,
+    "loop_h_revenue_wedge_gate_monitor": 2,
+    "loop_repair": 2,
+    "loop_repair_codex": 2,
+    "merge_master_mike": 2,
+    "operator": 2,
+    "opus_composer": 2,
+    "opus_forge_architect": 2,
+    "perplexity-computer": 2,
+    "qwen_code": 2,
+    "receipt": 2,
+    "receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus": 2,
+    "receipt_ts-bb486356": 2,
+    "receipt_ts-bb486356_from_loop_repair": 2,
+    "revenue_wedge_gate_loop": 2,
+    "smriti": 2,
+    "unknown": 2,
+    "viveka": 2,
+    "warp_fable_weaver": 2,
+    "warp_oz": 2
+  },
+  "candidate_preview": [
+    {
+      "age_hours": 0.161,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00162fcf95434dd1.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00162fcf95434dd1.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00162fcf95434dd1.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00460d124b4d4588.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00460d124b4d4588.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00460d124b4d4588.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00460d124b4d4588.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00625be51d2f41f3.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00625be51d2f41f3.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00625be51d2f41f3.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00625be51d2f41f3.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00657241a5c04432.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00657241a5c04432.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "00657241a5c04432.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "00657241a5c04432.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "006ace220098cd60.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "006ace220098cd60.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "006ace220098cd60.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "006ace220098cd60.json_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "0074e0a0a37ff3ae.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/0074e0a0a37ff3ae.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "0074e0a0a37ff3ae.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/0074e0a0a37ff3ae.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "128664a2f87e85df",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/128664a2f87e85df/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "128664a2f87e85df",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/128664a2f87e85df/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "163ffce72e05f83b.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/163ffce72e05f83b.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "163ffce72e05f83b.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/163ffce72e05f83b.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "2e46f6867acc44cb",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "2e46f6867acc44cb",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "2e46f6867acc44cb.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "2e46f6867acc44cb.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "5e4aee58d018f97a.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/5e4aee58d018f97a.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "5e4aee58d018f97a.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/5e4aee58d018f97a.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "6830ab35b9cc418d",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "6830ab35b9cc418d",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "6830ab35b9cc418d.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "6830ab35b9cc418d.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "a2a_supervisor",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/a2a_supervisor/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "a2a_supervisor",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/a2a_supervisor/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "ack_from",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ack_from/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "ack_from",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ack_from/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "b74fdabd46b049f4",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "b74fdabd46b049f4",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "b74fdabd46b049f4.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "b74fdabd46b049f4.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "claimed",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "claimed",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "claude-opus",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claude-opus/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "claude-opus",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claude-opus/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex\ncodex\nhermes\nhermes_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex\ncodex\nhermes\nhermes_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex\ncodex\nhermes\nhermes_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex\ncodex\nhermes\nhermes_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex-hardening-smoke",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex-hardening-smoke/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex-hardening-smoke",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex-hardening-smoke/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_5_5_cli",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_5_5_cli/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_5_5_cli",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_5_5_cli/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_a2a",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_a2a",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_a2a_lifecycle_contract",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a_lifecycle_contract/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_a2a_lifecycle_contract",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a_lifecycle_contract/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_conjunction",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_conjunction",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_conjunction_live",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction_live/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_conjunction_live",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction_live/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_forgewright",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_forgewright/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_forgewright",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_forgewright/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_runtime",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_runtime/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_runtime",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_runtime/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "codex_worker_spine",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_worker_spine/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "codex_worker_spine",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_worker_spine/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "collab",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "collab",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "collab_loop",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab_loop/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "collab_loop",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab_loop/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "collaboration_packet",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "collaboration_packet",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "collaboration_packet_retry",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet_retry/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "collaboration_packet_retry",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet_retry/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "d1449e6558194a62",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "d1449e6558194a62",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "d1449e6558194a62.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "d1449e6558194a62.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "devin-roaming",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "devin-roaming",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "devin-roaming-2987d222",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming-2987d222/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "devin-roaming-2987d222",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming-2987d222/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "drishti",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/drishti/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "drishti",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/drishti/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "e2d6c8df42bb413a",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "e2d6c8df42bb413a",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "e2d6c8df42bb413a.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "e2d6c8df42bb413a.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "ebda731b8835e7b8.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ebda731b8835e7b8.json/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "ebda731b8835e7b8.json",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ebda731b8835e7b8.json/c48b86f5f88660b4.json"
+    },
+    {
+      "age_hours": 0.161,
+      "agent": "fable_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/a9829ed5b7e23045.json"
+    },
+    {
+      "age_hours": 0.16,
+      "agent": "fable_composer",
+      "entry_type": "file",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/c48b86f5f88660b4.json"
+    }
+  ],
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "include_recent": true,
+  "mode": "dry_run",
+  "moved": [],
+  "moved_bytes": 0,
+  "moved_count": 0,
+  "quarantine_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T162350Z",
+  "receipt_path": "/Users/dhyana/dharma_swarm_a2a_active/reports/a2a/inbox_quarantine_receipts/20260612T162350Z-a2a-inbox-quarantine.json",
+  "recent_hours": 24.0,
+  "schema_version": "dharma.a2a.inbox_quarantine_receipt.v1",
+  "skipped": [
+    {
+      "agent": "00162fcf95434dd1.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00162fcf95434dd1.json_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00162fcf95434dd1.json_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00460d124b4d4588.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00460d124b4d4588.json_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00460d124b4d4588.json_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00625be51d2f41f3.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00625be51d2f41f3.json_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00625be51d2f41f3.json_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00657241a5c04432.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "00657241a5c04432.json_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/00657241a5c04432.json_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "006ace220098cd60.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "006ace220098cd60.json_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/006ace220098cd60.json_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "0074e0a0a37ff3ae.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/0074e0a0a37ff3ae.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "128664a2f87e85df",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/128664a2f87e85df/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "163ffce72e05f83b.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/163ffce72e05f83b.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "2e46f6867acc44cb",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "2e46f6867acc44cb.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/2e46f6867acc44cb.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "5e4aee58d018f97a.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/5e4aee58d018f97a.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "6830ab35b9cc418d",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "6830ab35b9cc418d.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/6830ab35b9cc418d.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "a2a_supervisor",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/a2a_supervisor/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "ack_from",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ack_from/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "b74fdabd46b049f4",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "b74fdabd46b049f4.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/b74fdabd46b049f4.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "claimed",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claimed_collab:novel-artifact-scorecard-v1-20260525:assistant:opus/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "claude-opus",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/claude-opus/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex\ncodex\nhermes\nhermes_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex\ncodex\nhermes\nhermes_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex-hardening-smoke",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex-hardening-smoke/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_5_5_cli",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_5_5_cli/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_a2a",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_a2a_lifecycle_contract",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_a2a_lifecycle_contract/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_conjunction",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_conjunction_live",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_conjunction_live/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_forgewright",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_forgewright/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_runtime",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_runtime/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "codex_worker_spine",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_worker_spine/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "collab",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "collab_loop",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collab_loop/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "collaboration_packet",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "collaboration_packet_retry",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/collaboration_packet_retry/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "d1449e6558194a62",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "d1449e6558194a62.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/d1449e6558194a62.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "devin-roaming",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "devin-roaming-2987d222",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/devin-roaming-2987d222/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "drishti",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/drishti/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "e2d6c8df42bb413a",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "e2d6c8df42bb413a.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/e2d6c8df42bb413a.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "ebda731b8835e7b8.json",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/ebda731b8835e7b8.json/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "fable_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "fleet-coordinator",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fleet-coordinator/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "forge_measurement_guardian",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/forge_measurement_guardian/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "generic_sender",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/generic_sender/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "hermes",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "hermes-m5",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "hermes_m5",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes_m5/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "karya",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/karya/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "loop_h_revenue_wedge_gate_monitor",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/loop_h_revenue_wedge_gate_monitor/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "loop_repair",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/loop_repair/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "loop_repair_codex",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/loop_repair_codex/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "merge_master_mike",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/merge_master_mike/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "operator",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/operator/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "opus_composer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "opus_forge_architect",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_forge_architect/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "perplexity-computer",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/perplexity-computer/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "qwen_code",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/qwen_code/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "receipt",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/receipt/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/receipt_collab:novel-artifact-scorecard-v1-20260525:assistant:opus/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "receipt_ts-bb486356",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/receipt_ts-bb486356/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "receipt_ts-bb486356_from_loop_repair",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/receipt_ts-bb486356_from_loop_repair/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "revenue_wedge_gate_loop",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/revenue_wedge_gate_loop/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "smriti",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/smriti/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "unknown",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/unknown/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "viveka",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/viveka/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "warp_fable_weaver",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/warp_fable_weaver/README.md",
+      "reason": "not_candidate_file"
+    },
+    {
+      "agent": "warp_oz",
+      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/warp_oz/README.md",
+      "reason": "not_candidate_file"
+    }
+  ],
+  "skipped_count": 76,
+  "status": "DRY_RUN",
+  "timestamp": "2026-06-12T16:23:50+00:00",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/"
+}

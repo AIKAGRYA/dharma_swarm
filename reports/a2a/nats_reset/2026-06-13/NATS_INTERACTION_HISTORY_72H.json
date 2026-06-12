@@ -1,0 +1,99 @@
+{
+  "schema_version": "dharma.a2a.nats_interaction_history.v1",
+  "created_at": "2026-06-13T01:56:00+09:00",
+  "worktree": "/Users/dhyana/dharma_swarm_a2a_active",
+  "window_utc": {
+    "start": "2026-06-09T16:56:00+00:00",
+    "end": "2026-06-12T16:56:00+00:00"
+  },
+  "send_receipts": {
+    "count": 45,
+    "status": [
+      ["PUBLISH_ACKED", 28],
+      ["HERMES_M5_CONSUMED", 7],
+      ["PUBLISH_FAILED", 6],
+      ["DEVIN_CONSUMED", 3],
+      ["NATS_CLIENT_MISSING", 1]
+    ],
+    "stream": [
+      ["DHARMA_FLEET", 21],
+      ["missing_stream", 13],
+      ["DHARMA_A2A", 11]
+    ],
+    "ack_or_contact_tier": [
+      ["PUBLISH_ACCEPTED", 18],
+      ["JETSTREAM_PUB_ACK", 13],
+      ["HANDLER_ACKED", 7],
+      ["unknown", 5],
+      ["NO_CONTACT", 2]
+    ],
+    "endpoint": [
+      ["nats://127.0.0.1:4222", 33],
+      ["wss://157.245.193.15:8443", 12]
+    ],
+    "consumed_flag": [
+      ["False", 35],
+      ["True", 10]
+    ]
+  },
+  "reply_receipts": {
+    "count": 11,
+    "status": [
+      ["NO_REPLY", 10],
+      ["DOMAIN_RECEIPTED", 1]
+    ],
+    "stream": [
+      ["DHARMA_FLEET", 11]
+    ],
+    "tier": [
+      ["NO_REPLY", 10],
+      ["DOMAIN_RECEIPTED", 1]
+    ]
+  },
+  "domain_reply_receipts": {
+    "count": 3,
+    "status": [
+      ["ARTIFACT_INVALID", 2],
+      ["DOMAIN_REPLY_PUBLISHED", 1]
+    ],
+    "semantic_reply_claim": [
+      ["False", 3]
+    ]
+  },
+  "hermes_pending_alerts_last_72h": {
+    "count_files": 138,
+    "sources": [
+      ["autonomous_controller", 138],
+      ["cron_health", 120],
+      ["nikki", 6]
+    ],
+    "message_prefixes": [
+      ["System degraded", 138],
+      ["Cron failures", 120],
+      ["NIKKI written", 6]
+    ]
+  },
+  "a2a_fleet_logs_last_72h": {
+    "count_files": 288,
+    "bytes_scanned": 20858758,
+    "pattern_counts": [
+      ["dark_or_dormant", 80],
+      ["alert_router_payload", 28],
+      ["broadcast_to_all", 22],
+      ["sample_broadcast", 20],
+      ["unprocessed", 11],
+      ["phantom_ack", 0],
+      ["permission_denied", 0],
+      ["jetstream_pub_ack", 0],
+      ["publish_acked", 0],
+      ["no_reply", 0]
+    ]
+  },
+  "interpretation": {
+    "most_common_receipt_problem": "PUBLISH_ACKED/PUBLISH_ACCEPTED dominates over consumed/domain-receipted proof.",
+    "most_common_reply_problem": "10 of 11 reply captures are NO_REPLY.",
+    "most_common_file_bus_problem": "Hermes alert-router creates frequent pending alerts and its legacy broadcast path can amplify one alert into every filesystem inbox.",
+    "topology_problem": "Most send receipts use local nats://127.0.0.1:4222 DHARMA_FLEET, while production AGNI is wss://157.245.193.15:8443 DHARMA_A2A."
+  },
+  "production_claim": false
+}

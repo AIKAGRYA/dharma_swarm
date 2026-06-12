@@ -37,6 +37,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -64,12 +65,23 @@ STATUS_NATS_CLIENT_MISSING = "NATS_CLIENT_MISSING"
 STATUS_PUBLISH_FAILED = "PUBLISH_FAILED"
 STATUS_PUBLISH_ACKED = "PUBLISH_ACKED"
 STATUS_PUBLISH_DEDUPED = "PUBLISH_DEDUPED"
+STATUS_BROKER_SCOPE_MISMATCH = "BROKER_SCOPE_MISMATCH"
 ACK_TIER_NO_CONTACT = "NO_CONTACT"
 ACK_TIER_PUBLISH_ACCEPTED = "PUBLISH_ACCEPTED"
 ACK_TIER_CORE_FLUSH_ONLY = "CORE_FLUSH_ONLY"
 ACK_TIER_HANDLER_ACKED = "HANDLER_ACKED"
 ROUTE_A2A = "a2a"
 ROUTE_AGENT_INBOX = "agent-inbox"
+BROKER_SCOPE_LOCAL = "local"
+BROKER_SCOPE_AGNI = "agni"
+BROKER_SCOPE_EXTERNAL = "external"
+BROKER_SCOPE_UNKNOWN = "unknown"
+BROKER_SCOPES = (
+    BROKER_SCOPE_LOCAL,
+    BROKER_SCOPE_AGNI,
+    BROKER_SCOPE_EXTERNAL,
+    BROKER_SCOPE_UNKNOWN,
+)
 
 AGENT_UID_ALIASES = {
     "devin": "devin-roaming-2987d222",
@@ -83,6 +95,66 @@ def _validate_subject_token(token: str, *, label: str) -> str:
     if not cleaned or any(char.isspace() or char in forbidden for char in cleaned):
         raise ValueError(f"invalid {label} for NATS subject: {cleaned!r}")
     return cleaned
+
+
+def classify_broker_scope(config: NATSConfig, env: dict[str, str] | None = None) -> dict[str, Any]:
+    override = (env or {}).get("DHARMA_A2A_BROKER_SCOPE", "").strip().lower()
+    if override:
+        if override not in BROKER_SCOPES:
+            return {
+                "broker_scope": BROKER_SCOPE_UNKNOWN,
+                "broker_scope_source": "env_invalid",
+                "broker_scope_note": "DHARMA_A2A_BROKER_SCOPE is invalid",
+                "production_broker_claim": False,
+            }
+        return {
+            "broker_scope": override,
+            "broker_scope_source": "env",
+            "broker_scope_note": "operator supplied DHARMA_A2A_BROKER_SCOPE",
+            "production_broker_claim": override == BROKER_SCOPE_AGNI,
+        }
+
+    endpoint = (config.endpoint or "").strip()
+    if not endpoint:
+        return {
+            "broker_scope": BROKER_SCOPE_UNKNOWN,
+            "broker_scope_source": "endpoint",
+            "broker_scope_note": "no NATS endpoint configured",
+            "production_broker_claim": False,
+        }
+
+    if endpoint.startswith("context:"):
+        context_name = endpoint.removeprefix("context:").strip().lower()
+        is_agni = "agni" in context_name
+        return {
+            "broker_scope": BROKER_SCOPE_AGNI if is_agni else BROKER_SCOPE_EXTERNAL,
+            "broker_scope_source": "nats_context",
+            "broker_scope_note": f"NATS CLI context {context_name}",
+            "production_broker_claim": is_agni,
+        }
+
+    parsed = urlparse(endpoint)
+    host = (parsed.hostname or "").lower()
+    if host in {"localhost", "::1"} or host.startswith("127."):
+        return {
+            "broker_scope": BROKER_SCOPE_LOCAL,
+            "broker_scope_source": "endpoint",
+            "broker_scope_note": "loopback NATS endpoint",
+            "production_broker_claim": False,
+        }
+    if host == "157.245.193.15" or "agni" in host:
+        return {
+            "broker_scope": BROKER_SCOPE_AGNI,
+            "broker_scope_source": "endpoint",
+            "broker_scope_note": "known AGNI NATS endpoint",
+            "production_broker_claim": True,
+        }
+    return {
+        "broker_scope": BROKER_SCOPE_EXTERNAL,
+        "broker_scope_source": "endpoint",
+        "broker_scope_note": "non-local NATS endpoint that is not known AGNI",
+        "production_broker_claim": False,
+    }
 
 
 def resolve_agent_uid(to: str, *, agent_uid: str = "") -> str:
@@ -271,6 +343,66 @@ def _nats_cli_command(config: NATSConfig, *, timeout_s: float, ca_path: Path | N
         cmd.append(f"--tlsca={ca_path}")
     cmd.extend(["publish", "--jetstream", "--force-stdin"])
     return cmd
+
+
+def _validate_nats_context(context: str) -> str:
+    cleaned = (context or "").strip()
+    if not cleaned or any(char.isspace() or char in {"/", "\\"} for char in cleaned):
+        raise ValueError("invalid NATS context")
+    return cleaned
+
+
+def _nats_context_config(context: str) -> NATSConfig:
+    return NATSConfig(
+        endpoint=f"context:{_validate_nats_context(context)}",
+        user="",
+        credential="",
+        missing=(),
+        credential_family="nats_context",
+    )
+
+
+def _publish_with_nats_context_cli(
+    context: str,
+    envelope: dict[str, Any],
+    *,
+    timeout_s: float,
+) -> dict[str, Any]:
+    if shutil.which("nats") is None:
+        raise ModuleNotFoundError("No module named 'nats'", name="nats")
+    safe_context = _validate_nats_context(context)
+    cmd = [
+        "nats",
+        "--context",
+        safe_context,
+        f"--timeout={max(timeout_s, 0.1):g}s",
+        "publish",
+        "--jetstream",
+        "--force-stdin",
+        envelope["subject"],
+    ]
+    proc = subprocess.run(
+        cmd,
+        input=json.dumps(envelope, sort_keys=True),
+        text=True,
+        capture_output=True,
+        timeout=max(timeout_s + 5.0, 5.0),
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()
+        raise RuntimeError(f"nats context publish failed with code {proc.returncode}: {detail}")
+    return {
+        "status": STATUS_PUBLISH_ACKED,
+        "ack_tier": ACK_TIER_PUBLISH_ACCEPTED,
+        "transport_ack": "NATS_CONTEXT_CLI_JETSTREAM_PUB_ACK",
+        "cli_context_used": True,
+        "nats_context": safe_context,
+        "cli_stdout": proc.stdout.strip(),
+        "consumed": False,
+        "replied": False,
+        "reply_payload": None,
+    }
 
 
 def _publish_with_nats_cli(
@@ -493,6 +625,8 @@ def _build_publish_evidence_receipt(dispatch: dict[str, Any], receipt: dict[str,
         "ack_tier": str(receipt.get("ack_tier") or ""),
         "contact_evidence_tier": str(receipt.get("contact_evidence_tier") or ""),
         "collaboration_claim": str(receipt.get("collaboration_claim") or ""),
+        "broker_scope": str(receipt.get("broker_scope") or ""),
+        "production_broker_claim": str(bool(receipt.get("production_broker_claim"))),
         "packet_id": str(metadata.get("packet_id") or ""),
         "route": str(metadata.get("route") or ""),
         "subject": str(metadata.get("subject") or ""),
@@ -553,6 +687,8 @@ def _complete_runtime_publish(dispatch: dict[str, Any], receipt: dict[str, Any])
         "contact_evidence_tier": receipt.get("contact_evidence_tier"),
         "live_contact_claim": bool(receipt.get("live_contact_claim")),
         "collaboration_claim": receipt.get("collaboration_claim"),
+        "broker_scope": receipt.get("broker_scope"),
+        "production_broker_claim": bool(receipt.get("production_broker_claim")),
         "subject": receipt.get("subject"),
         "receipt_path": receipt.get("receipt_path"),
         "runtime_warrant_ref": receipt.get("runtime_warrant_ref"),
@@ -635,7 +771,12 @@ def classify_contact_evidence(receipt: dict[str, Any]) -> dict[str, Any]:
             "collaboration_claim": "duplicate_publish_skipped",
             "operator_contact_note": "duplicate packet publish skipped by RuntimeStateStore idempotency",
         }
-    if status in {STATUS_SECRETS_MISSING, STATUS_NATS_CLIENT_MISSING, STATUS_PUBLISH_FAILED}:
+    if status in {
+        STATUS_SECRETS_MISSING,
+        STATUS_NATS_CLIENT_MISSING,
+        STATUS_PUBLISH_FAILED,
+        STATUS_BROKER_SCOPE_MISMATCH,
+    }:
         return {
             "contact_evidence_tier": ACK_TIER_NO_CONTACT,
             "live_contact_claim": False,
@@ -680,6 +821,17 @@ def main(argv: list[str] | None = None) -> int:
         default="",
         help="explicit packet id for idempotent retries; defaults to a fresh random id",
     )
+    parser.add_argument(
+        "--require-broker-scope",
+        choices=BROKER_SCOPES,
+        default="",
+        help="fail before publish unless the configured NATS endpoint classifies to this scope",
+    )
+    parser.add_argument(
+        "--nats-context",
+        default="",
+        help="publish with an existing NATS CLI context, e.g. agni-wss; proves broker acceptance only",
+    )
     parser.add_argument("--json", action="store_true", help="print the receipt JSON to stdout")
     parser.add_argument(
         "--insecure-tls",
@@ -694,7 +846,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: packet file not found: {file_path}", file=sys.stderr)
         return 2
 
-    config = _nats_config(dict(os.environ), require_devin_secrets=False)
+    env = dict(os.environ)
+    try:
+        config = (
+            _nats_context_config(args.nats_context)
+            if args.nats_context
+            else _nats_config(env, require_devin_secrets=False)
+        )
+    except ValueError as exc:
+        print(f"ERROR: {type(exc).__name__}", file=sys.stderr)
+        return 2
+    broker_scope = classify_broker_scope(config, env)
     packet_id = args.packet_id.strip() or uuid.uuid4().hex[:12]
     try:
         envelope = build_envelope(
@@ -722,6 +884,7 @@ def main(argv: list[str] | None = None) -> int:
         "file": envelope["file"],
         "sha256": envelope["sha256"],
         "nats": _redacted_nats_config(config),
+        **broker_scope,
     }
 
     runtime_dispatch: dict[str, Any] | None = None
@@ -729,6 +892,13 @@ def main(argv: list[str] | None = None) -> int:
         receipt["status"] = STATUS_SECRETS_MISSING
         receipt["ack_tier"] = None
         receipt["missing"] = list(config.missing)
+    elif args.require_broker_scope and broker_scope["broker_scope"] != args.require_broker_scope:
+        receipt["status"] = STATUS_BROKER_SCOPE_MISMATCH
+        receipt["ack_tier"] = None
+        receipt["error"] = (
+            f"required broker scope {args.require_broker_scope}, "
+            f"got {broker_scope['broker_scope']}"
+        )
     else:
         runtime_dispatch = _begin_runtime_publish(
             envelope=envelope,
@@ -752,18 +922,25 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 try:
                     deadline_s = args.timeout * 2 + args.wait + 5
-                    outcome = asyncio.run(
-                        asyncio.wait_for(
-                            _publish_and_wait(
-                                config,
-                                envelope,
-                                wait_s=args.wait,
-                                timeout_s=args.timeout,
-                                insecure_tls=args.insecure_tls,
-                            ),
-                            timeout=deadline_s,
+                    if args.nats_context:
+                        outcome = _publish_with_nats_context_cli(
+                            args.nats_context,
+                            envelope,
+                            timeout_s=args.timeout,
                         )
-                    )
+                    else:
+                        outcome = asyncio.run(
+                            asyncio.wait_for(
+                                _publish_and_wait(
+                                    config,
+                                    envelope,
+                                    wait_s=args.wait,
+                                    timeout_s=args.timeout,
+                                    insecure_tls=args.insecure_tls,
+                                ),
+                                timeout=deadline_s,
+                            )
+                        )
                     receipt.update(outcome)
                 except Exception as exc:  # surface broker/TLS failures as a receipt, not a stack trace
                     if _is_missing_nats_client(exc):
@@ -808,6 +985,8 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     if receipt["status"] == STATUS_NATS_CLIENT_MISSING:
         return 4
+    if receipt["status"] == STATUS_BROKER_SCOPE_MISMATCH:
+        return 5
     if receipt["status"] == STATUS_PUBLISH_FAILED:
         return 1
     return 0

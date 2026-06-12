@@ -1,0 +1,153 @@
+schema_version: dharma.active_track.subtracks.v1
+track_id: runtime-truth-nats-2026-06
+track_alias: a2a-runtime-spine-2026-06
+max_subtracks: 5
+max_seams_per_subtrack: 3
+owner: "@codex_composer"
+updated_at: "2026-06-13"
+
+design_rule: >
+  A track may have at most five subtracks. Each subtrack may expose at most
+  three seams. Anything larger is a new track or must be folded into an
+  existing owner surface.
+
+subtracks:
+  - id: 01-canonical-nats-topology
+    name: Canonical NATS topology
+    posture: red
+    objective: >
+      Collapse local/AGNI ambiguity into one declared topology with bounded
+      streams, durable consumers, deduplication, retention, and explicit bridge
+      health.
+    seams:
+      - id: streams-and-subjects
+        owns:
+          - docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+          - docs/plans/2026-06-11-dharma-a2a-stream-retention-proposal.md
+        invariant: Canonical stream names, subject prefixes, and retention limits are declared before live use.
+      - id: durable-consumers
+        owns:
+          - scripts/runtime/a2a_inbox_bridge.py
+          - scripts/runtime/a2a_daemon_wiring_audit.py
+          - scripts/runtime/a2a_launchagent_quarantine.py
+          - scripts/runtime/a2a_live_handler_repair_plan.py
+          - reports/a2a/inbox_bridge_receipts/**
+          - reports/a2a/launchagent_quarantine_receipts/**
+          - reports/a2a/nats_reset/**/A2A_DAEMON_WIRING_AUDIT.json
+          - reports/a2a/nats_reset/**/A2A_LIVE_HANDLER_REPAIR_PLAN.json
+        invariant: Hot-contact consumers are stable UIDs; their daemon handlers point at live targets; pending durable messages are classified as target-owned handler repair or explicit reset before mutation.
+      - id: broker-routing
+        owns:
+          - scripts/runtime/a2a_send.py
+          - reports/handoffs/A2A_HUB_REPAIRS_2026-06-11.md
+          - reports/a2a/routing_scope_receipts/**
+          - reports/a2a/agni_live_contact_drill/**
+        invariant: A send receipt names broker scope, stream, subject, route, target UID, and ack tier; production-intended sends cannot silently use a local broker, and AGNI routes must use a subject family actually live on DHARMA_A2A.
+
+  - id: 02-hot-contact-ack-and-domain-receipts
+    name: Hot contact, ack tiers, and domain receipts
+    posture: amber
+    objective: >
+      Make every operator-facing claim distinguish publish acceptance, handler
+      delivery, domain receipt, semantic reply, and work completion.
+    seams:
+      - id: send-receipts
+        owns:
+          - scripts/runtime/a2a_send.py
+          - reports/a2a/send_receipts/**
+        invariant: PUBLISH_ACCEPTED alone never claims live collaboration or production readiness.
+      - id: reply-capture
+        owns:
+          - scripts/runtime/a2a_reply_capture.py
+          - reports/a2a/reply_receipts/**
+        invariant: Untyped reply payloads never imply semantic collaboration.
+      - id: target-owned-domain-reply
+        owns:
+          - scripts/runtime/a2a_domain_reply_worker.py
+          - reports/a2a/domain_reply_receipts/**
+        invariant: DOMAIN_RECEIPTED requires a typed target-owned artifact and matching reply subject.
+
+  - id: 03-inbox-drain-reset-and-retention
+    name: Inbox drain, reset, and retention
+    posture: red
+    objective: >
+      Back up, quarantine, and reset stale broker/file-inbox state without
+      destroying evidence or creating a second bus.
+    seams:
+      - id: agni-stream-and-consumer-reset
+        owns:
+          - reports/a2a/nats_reset/**
+          - reports/a2a/nats_reset/**/NATS_CONSUMER_INBOX_RESET_APPLIED.json
+          - reports/a2a/nats_reset/**/A2A_QUORUM_CONSUMER_RESET_APPLIED.json
+          - reports/a2a/nats_reset/**/agni_consumers_after/**
+        invariant: No AGNI purge occurs without backup path, before/after counts, and receipt hash; consumer reset can zero inbox backlog without claiming stream purge, handler delivery, peer review, or semantic delivery.
+      - id: file-inbox-quarantine
+        owns:
+          - ~/.dharma/a2a_bus/inboxes/**
+          - scripts/runtime/a2a_inbox_quarantine.py
+          - scripts/runtime/a2a_file_bus_guard.py
+          - scripts/runtime/a2a_hermes_broadcast_guard.py
+          - reports/a2a/inbox_quarantine_receipts/**
+          - reports/a2a/hermes_broadcast_guard/**
+        invariant: >-
+          File inbox cleanup moves stale entries to dated quarantine before deletion,
+          and mirrored `to: all` payloads cannot be counted as independent
+          live-contact tasks; Hermes alert-router filesystem broadcast remains
+          disabled unless AGNI target-owned receipts replace it.
+      - id: retention-ratchet
+        owns:
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/NATS_DRAIN_AND_RESET_RUNBOOK.md
+        invariant: A stream with unlimited retention cannot be production-ready for hot contact.
+
+  - id: 04-shared-state-graph-and-vector-memory
+    name: Shared graph, board, and vector memory
+    posture: amber
+    objective: >
+      Make graph/vector/board views fast shared state for agents while keeping
+      authority with source owners.
+    seams:
+      - id: orientation-and-truth-graph
+        owns:
+          - scripts/governance/orientation_graph.py
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/CONSOLIDATION_MAP.md
+        invariant: Orientation/truth graphs project existing owners; they do not become authority.
+      - id: board-and-runtime-packets
+        owns:
+          - dharma_swarm/board/adapters/**
+          - dharma_swarm/operator_core/contracts.py
+        invariant: Board cards and runtime packets preserve correlation identity and cite owner receipts.
+      - id: vector-memory-index
+        owns:
+          - dharma_swarm/vector_store.py
+          - docs/specs/HYBRID_MEMORY_SUBSTRATE_V01_MASTER_BUILD.md
+        invariant: Vector search is retrieval context, never proof of live state or completion.
+
+  - id: 05-persistent-agent-workflow-and-quorum
+    name: Persistent agent workflow and readiness quorum
+    posture: amber
+    objective: >
+      Run this track through persistent-agent workflows with explicit production
+      readiness consensus, not one-agent narrative.
+    seams:
+      - id: ds-goal-and-longruns
+        owns:
+          - scripts/runtime/autonomy_spine.py
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/DAEMON_WIRING_AUDIT.md
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/LIVE_HANDLER_REPAIR_PLAN.md
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/WORKFLOW.md
+        invariant: Long-running work has mission id, stop condition, verifier, and receipt path.
+      - id: readiness-quorum
+        owns:
+          - docs/governance/active_tracks/a2a-runtime-spine-2026-06/PRODUCTION_READINESS_QUORUM.md
+          - scripts/runtime/a2a_prod_readiness_quorum.py
+          - scripts/runtime/a2a_prod_readiness_solicit.py
+          - scripts/runtime/a2a_prod_readiness_delivery_status.py
+          - scripts/runtime/a2a_quorum_blocker_status.py
+          - scripts/runtime/a2a_reviewer_route_health.py
+          - reports/a2a/prod_readiness_quorum/**
+        invariant: Production readiness needs at least two persistent agents and three model families; solicitation, transport, delivery, blocker-status, and route-health receipts do not substitute for reviewer records.
+      - id: active-track-crosscheck
+        owns:
+          - docs/governance/ACTIVE_TRACK.yaml
+          - reports/governance/active_track_evidence.*
+        invariant: A2A track status is rendered by governance, not remembered by agents.

@@ -1,0 +1,48 @@
+{
+  "schema_version": "dharma.a2a.file_inbox_quarantine_summary.v1",
+  "created_at": "2026-06-13T01:25:35+09:00",
+  "status": "APPLIED",
+  "worktree": "/Users/dhyana/dharma_swarm_a2a_active",
+  "track_path": "docs/governance/active_tracks/a2a-runtime-spine-2026-06/",
+  "inboxes_root": "/Users/dhyana/.dharma/a2a_bus/inboxes",
+  "quarantine_run_root": "/Users/dhyana/.dharma/a2a_bus/quarantine/inboxes/20260612T162359Z",
+  "detailed_receipt": "reports/a2a/inbox_quarantine_receipts/20260612T162359Z-a2a-inbox-quarantine.json",
+  "moved_count": 152,
+  "moved_bytes": 75316,
+  "skipped_count": 76,
+  "readme_pointer_count": 76,
+  "post_reset_candidate_count": 0,
+  "post_reset_non_readme_count": 0,
+  "trigger": "Hermes broadcast mirror repopulated all filesystem inboxes after first quarantine.",
+  "payloads_observed": [
+    {
+      "id": "a9829ed5b7e23045",
+      "from": "hermes-m5",
+      "to": "all",
+      "type": "alert",
+      "schema": "hermes.alert_router.a2a.v1"
+    },
+    {
+      "id": "c48b86f5f88660b4",
+      "from": "hermes-m5",
+      "to": "all",
+      "type": "dharma_bridge",
+      "schema": "hermes.dharma_bridge.event.v1"
+    }
+  ],
+  "verification": {
+    "dry_run_after_apply": "python3 scripts/runtime/a2a_inbox_quarantine.py --include-recent --json",
+    "dry_run_timestamp_utc": "2026-06-12T16:25:35+00:00",
+    "dry_run_candidate_count": 0,
+    "non_readme_count_command": "find /Users/dhyana/.dharma/a2a_bus/inboxes -mindepth 2 ! -name README.md -print",
+    "non_readme_count": 0
+  },
+  "production_claim": false,
+  "remaining_blockers": [
+    "AGNI DHARMA_A2A broker stream still has unbounded retention",
+    "AGNI DHARMA_A2A still retains historical 8.1M messages",
+    "usable full stream backup is still missing",
+    "production readiness quorum is not yet collected",
+    "fable_composer has a local identity and file inbox but no declared durable AGNI consumer"
+  ]
+}

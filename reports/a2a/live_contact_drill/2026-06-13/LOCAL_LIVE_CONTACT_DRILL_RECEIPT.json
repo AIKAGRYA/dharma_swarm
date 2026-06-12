@@ -1,0 +1,86 @@
+{
+  "schema_version": "dharma.a2a.live_contact_drill_receipt.v1",
+  "created_at": "2026-06-12T17:19:35+00:00",
+  "status": "LOCAL_DOMAIN_RECEIPTED",
+  "production_status": "NOT_PRODUCTION_READY",
+  "broker_scope": "local",
+  "production_broker_claim": false,
+  "stream": "DHARMA_FLEET",
+  "endpoint": "nats://127.0.0.1:4222",
+  "target_agent_uid": "codex_live_drill_20260613",
+  "packet_id": "7eb03e84f03a",
+  "send_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/send_receipts/20260612T171816Z-codex_live_drill_20260613-7eb03e84f03a.json",
+  "delivery_record_path": "reports/a2a/live_contact_drill/2026-06-13/inbox/7eb03e84f03a.json",
+  "handler_ack_payload_path": "reports/a2a/live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json",
+  "domain_receipt_payload_path": "reports/a2a/live_contact_drill/2026-06-13/outboxes/codex_live_drill_20260613/domain_reply_7eb03e84f03a.json",
+  "reply_capture_receipt_path": "reports/a2a/live_contact_drill/2026-06-13/REPLY_CAPTURE_RECEIPT.json",
+  "steps": [
+    {
+      "step": "provision_inbox_consumer",
+      "status": "PASS",
+      "command": "nats --timeout=10s consumer add DHARMA_FLEET codex_live_drill_20260613 --pull --filter dharma.agent.codex_live_drill_20260613.inbox --deliver new --ack explicit --max-deliver 5 --max-pending 100 --defaults",
+      "observed": "consumer created with Unprocessed Messages: 0"
+    },
+    {
+      "step": "send_packet",
+      "status": "PASS",
+      "command": "python3 scripts/runtime/a2a_send.py --to codex_live_drill_20260613 --route agent-inbox --agent-uid codex_live_drill_20260613 --file reports/a2a/live_contact_drill/2026-06-13/PACKET.md --receipt-dir reports/a2a/live_contact_drill/2026-06-13/send_receipts --wait 0 --timeout 5 --json",
+      "observed": "PUBLISH_ACKED with broker_scope=local and collaboration_claim=publish_only"
+    },
+    {
+      "step": "pull_and_ack_inbox_message",
+      "status": "PASS",
+      "command": "nats --timeout=10s consumer next DHARMA_FLEET codex_live_drill_20260613 --raw --ack",
+      "observed": "envelope packet_id=7eb03e84f03a was pulled and broker-acked"
+    },
+    {
+      "step": "publish_handler_ack",
+      "status": "PASS",
+      "command": "nats --timeout=10s pub --jetstream dharma.agent.codex_live_drill_20260613.inbox.ack.7eb03e84f03a --force-stdin < reports/a2a/live_contact_drill/2026-06-13/HANDLER_ACK_PAYLOAD.json",
+      "observed": "handler ack stored in DHARMA_FLEET sequence 8350"
+    },
+    {
+      "step": "provision_reply_consumer",
+      "status": "PASS",
+      "command": "nats --timeout=10s consumer add DHARMA_FLEET codex_live_drill_reply_20260613 --pull --filter dharma.agent.codex_live_drill_20260613.inbox.reply.7eb03e84f03a --deliver new --ack explicit --max-deliver 5 --max-pending 100 --defaults",
+      "observed": "reply consumer created with Unprocessed Messages: 0"
+    },
+    {
+      "step": "publish_domain_receipt",
+      "status": "PASS",
+      "command": "nats --timeout=10s pub --jetstream dharma.agent.codex_live_drill_20260613.inbox.reply.7eb03e84f03a --force-stdin < reports/a2a/live_contact_drill/2026-06-13/outboxes/codex_live_drill_20260613/domain_reply_7eb03e84f03a.json",
+      "observed": "domain receipt stored in DHARMA_FLEET sequence 8351"
+    },
+    {
+      "step": "pull_and_ack_domain_receipt",
+      "status": "PASS",
+      "command": "nats --timeout=10s consumer next DHARMA_FLEET codex_live_drill_reply_20260613 --raw --ack",
+      "observed": "dharma.a2a.domain_receipt.v1 was pulled and broker-acked"
+    },
+    {
+      "step": "verify_consumers_drained",
+      "status": "PASS",
+      "command": "nats --timeout=10s consumer info DHARMA_FLEET codex_live_drill_20260613 && nats --timeout=10s consumer info DHARMA_FLEET codex_live_drill_reply_20260613",
+      "observed": "both drill consumers show Outstanding Acks: 0 and Unprocessed Messages: 0"
+    }
+  ],
+  "blocked_python_tools": [
+    {
+      "tool": "scripts/runtime/a2a_inbox_bridge.py",
+      "status": "NATS_CLIENT_MISSING",
+      "receipt_glob": "reports/a2a/live_contact_drill/2026-06-13/bridge_receipts/*.json"
+    },
+    {
+      "tool": "scripts/runtime/a2a_domain_reply_worker.py / scripts/runtime/a2a_reply_capture.py",
+      "status": "not run for drill because current Python interpreter lacks nats-py",
+      "replacement": "NATS CLI pull/publish receipts above"
+    }
+  ],
+  "production_interpretation": "This proves local NATS mechanics for publish, durable pull, handler ack payload, typed domain receipt publication, reply pull, and drain-to-zero. It does not satisfy production AGNI contact or readiness quorum.",
+  "next_required_receipts": [
+    "A governed AGNI send using broker_scope=agni",
+    "An AGNI handler ack from a target-owned handler",
+    "An AGNI DOMAIN_RECEIPTED capture",
+    "At least two persistent-agent reviewer records across at least three model families"
+  ]
+}
