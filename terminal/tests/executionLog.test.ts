@@ -156,6 +156,84 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(recollapsed.some((line) => line.text.includes("routing the greeting"))).toBe(false);
   });
 
+  test("F-173: assistant bridge event renders its message as the turn's response in the chat transcript", () => {
+    const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
+    const answer = "I am the Helm. Identity intents route straight through me.";
+    // Wire shape per bridge_events.md §1.16: {type:"assistant", request_id, message} — no timestamp.
+    const assistantEvents = canonicalEventsFromBridgeEvent({type: "assistant", request_id: "7", message: answer});
+    expect(assistantEvents).toHaveLength(1);
+    expect(assistantEvents[0]?.kind).toBe("assistant_text");
+    expect(assistantEvents[0]?.phase).toBe("complete");
+    expect(assistantEvents[0]?.content).toBe(answer);
+    // Empty messages stay silent instead of minting an empty response.
+    expect(canonicalEventsFromBridgeEvent({type: "assistant", request_id: "8", message: "   "})).toHaveLength(0);
+    // Identical canned answers on different turns stay distinct (id keys on request_id).
+    expect(canonicalEventsFromBridgeEvent({type: "assistant", request_id: "9", message: answer})[0]?.id).not.toBe(assistantEvents[0]?.id);
+
+    const events = [
+      userPromptExecutionEvent("who are you and what can you do?", "2026-06-12T11:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session.ack",
+        session_id: sessionHex,
+        provider: "codex",
+        model: "gpt-5.4",
+        request_id: "7",
+        created_at: "2026-06-12T11:00:01Z",
+      }),
+      ...assistantEvents,
+      ...canonicalEventsFromBridgeEvent({type: "session_end", session_id: sessionHex, success: true, request_id: "7", created_at: "2026-06-12T11:00:02Z"}),
+    ];
+
+    const collapsed = projectChatTraceLines(events);
+    const responseIndex = collapsed.findIndex((line) => line.kind === "assistant" && line.text === answer);
+    const summaryIndex = collapsed.findIndex((line) => /^✓ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text));
+    expect(responseIndex).toBeGreaterThanOrEqual(0);
+    expect(summaryIndex).toBeGreaterThanOrEqual(0);
+    expect(responseIndex).toBeLessThan(summaryIndex);
+    expect(collapsed.some((line) => line.text.includes("no response"))).toBe(false);
+    expect(collapsed.some((line) => /[0-9a-f]{12,}/i.test(line.text))).toBe(false);
+  });
+
+  test("F-173: a turn that ends without any response-bearing event renders an explicit no-response marker, never bare complete", () => {
+    const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
+    const events = [
+      userPromptExecutionEvent("second question with no answer", "2026-06-12T11:01:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session.ack",
+        session_id: sessionHex,
+        provider: "codex",
+        model: "gpt-5.4",
+        request_id: "8",
+        created_at: "2026-06-12T11:01:01Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({type: "session_end", session_id: sessionHex, success: true, request_id: "8", created_at: "2026-06-12T11:01:02Z"}),
+    ];
+
+    const collapsed = projectChatTraceLines(events);
+    expect(collapsed.some((line) => line.kind === "error" && line.text === "✖ no response — turn ended without output")).toBe(true);
+    // The turn's summary line carries the failed glyph — never a ✓-complete with an empty body.
+    expect(collapsed.filter((line) => /^✓ \d+ steps? · /.test(line.text))).toHaveLength(0);
+    expect(collapsed.filter((line) => /^✖ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    const markerIndex = collapsed.findIndex((line) => line.text.includes("no response"));
+    const summaryIndex = collapsed.findIndex((line) => /^✖ \d+ steps? · /.test(line.text));
+    expect(markerIndex).toBeLessThan(summaryIndex);
+
+    // A turn answered via a command/intent step (intent.result shortcut) is response-bearing — no marker.
+    const commandTurn = [
+      userPromptExecutionEvent("show status", "2026-06-12T11:02:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "command.result",
+        command: {command: "/status"},
+        output: "bridge connected",
+        created_at: "2026-06-12T11:02:01Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({type: "session_end", session_id: sessionHex, success: true, request_id: "9", created_at: "2026-06-12T11:02:02Z"}),
+    ];
+    const commandCollapsed = projectChatTraceLines(commandTurn);
+    expect(commandCollapsed.some((line) => line.text.includes("no response"))).toBe(false);
+    expect(commandCollapsed.filter((line) => /^✓ \d+ steps? · /.test(line.text))).toHaveLength(1);
+  });
+
   test("deduplicates canonical execution events by id during merges", () => {
     const original = [
       {

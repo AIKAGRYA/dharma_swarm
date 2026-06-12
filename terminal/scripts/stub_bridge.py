@@ -5,14 +5,24 @@ Pointed at via DHARMA_PYTHON; ignores the `-m dharma_swarm.terminal_bridge stdio
 argv the TS side passes. Completes exactly one turn per session.start with a
 response text and multiple trace steps, using hex session/request ids so the
 F-172 no-raw-ids rule is exercised end to end.
+
+Scenarios (STUB_BRIDGE_SCENARIO env var):
+  default (unset)        — F-172 tooled turn: ack + thinking + tool + text_complete + session_end.
+  assistant_then_empty   — F-173: first session.start answers via the identity-intent
+                           shortcut shape {type:"assistant", request_id, message} + synth
+                           session_end (bridge_events.md §1.16 — no timestamp on the wire);
+                           the second session.start ends with NO response-bearing event
+                           (ack + session_end only).
 """
 import json
+import os
 import sys
 import time
 
 SESSION_HEX = "9f86d081884c7d659a2feaa0c55ad015"
 TOOL_CALL_HEX = "c0ffee00c0ffee00deadbeef"
 RESPONSE_TEXT = "The Helm hears you loud and clear."
+ASSISTANT_TEXT = "I am the Helm. Identity intents route straight through me."
 
 
 def emit(payload):
@@ -35,6 +45,8 @@ def stream_envelope(event_type, request_id, **extra):
 
 
 def main():
+    scenario = os.environ.get("STUB_BRIDGE_SCENARIO", "")
+    turn_count = 0
     emit({"type": "bridge.ready", "schema_version": 1, "protocol": "dharma-terminal-bridge"})
     for line in sys.stdin:
         line = line.strip()
@@ -80,6 +92,7 @@ def main():
                 "system_prompt": "",
             })
         elif request_type == "session.start":
+            turn_count += 1
             emit({
                 "type": "session.ack",
                 "request_id": request_id,
@@ -87,6 +100,11 @@ def main():
                 "provider": "codex",
                 "model": "gpt-5.4",
             })
+            if scenario == "assistant_then_empty":
+                if turn_count == 1:
+                    emit({"type": "assistant", "request_id": request_id, "message": ASSISTANT_TEXT})
+                emit(stream_envelope("session_end", request_id, success=True, error_code=None, error_message=None))
+                continue
             emit(stream_envelope("thinking_complete", request_id, content="weighing the reply", is_redacted=False))
             emit(stream_envelope(
                 "tool_call_complete", request_id,

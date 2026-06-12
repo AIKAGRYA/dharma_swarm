@@ -142,6 +142,28 @@ export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): 
     ];
   }
 
+  // F-173: identity/memory intent answers arrive as {type:"assistant", request_id, message}
+  // (bridge_events.md §1.16); without this branch the answer text is silently discarded.
+  // The wire shape carries no timestamp, so the id keys on request_id for distinctness.
+  if (type === "assistant") {
+    const content = String(event.message ?? "");
+    if (!content.trim()) {
+      return [];
+    }
+    return [
+      {
+        id: `assistant_text:assistant:${String(event.request_id ?? "").trim()}:${content.slice(0, 24)}`,
+        raw: event,
+        sourceEventType: type,
+        kind: "assistant_text",
+        phase: "complete",
+        title: compactText(content),
+        content,
+        timestamp: timestampFromEvent(event),
+      },
+    ];
+  }
+
   if (type === "thinking_delta" || type === "thinking_complete") {
     const content = String(event.content ?? "");
     if (!content.trim()) {
@@ -452,6 +474,7 @@ type ChatTurn = {
   assistant?: string;
   assistantTimestamp?: string;
   route?: string;
+  endedWithoutResponse?: boolean;
 };
 
 function mergeStepDetail(current: string[], incoming: string[] | undefined): string[] {
@@ -545,6 +568,14 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
     }
     if (event.kind === "status" && /session (failed|ended)/i.test(event.title)) {
       activeTurn.phase = /failed/i.test(event.title) || event.phase === "failed" ? "failed" : activeTurn.phase === "failed" ? "failed" : "complete";
+      // F-173: a turn that ends without any response-bearing content (assistant text
+      // or a command/intent answer) never renders as a bare complete — it carries an
+      // explicit no-response marker and the failed glyph instead.
+      const hasResponse = Boolean(activeTurn.assistant) || activeTurn.steps.some((step) => step.kind === "command");
+      if (!hasResponse) {
+        activeTurn.endedWithoutResponse = true;
+        activeTurn.phase = "failed";
+      }
       activeTurn = undefined;
     }
   }
@@ -576,6 +607,8 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
       for (const responseLine of turn.assistant.split("\n")) {
         projected.push(line("assistant", responseLine, turn.assistantTimestamp));
       }
+    } else if (turn.endedWithoutResponse) {
+      projected.push(line("error", "✖ no response — turn ended without output", turn.steps.at(-1)?.timestamp));
     }
 
     const stepCount = turn.steps.length;
