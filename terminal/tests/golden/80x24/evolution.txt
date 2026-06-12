@@ -1,21 +1,20 @@
+╰──────────────────────────────────────────────────────────────────────────────╯
+ loop unknown  verify unknown  runtime idle  approvals clear
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA  OFF | codex:gpt-5.4 | REA | Evoluti…                                 │
 │ tab navigation | responsive                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
+ loop unknown  verify unknown  runtime idle  approvals clear
 ◂ Control Agents [Evoluti…] Thinking Tools Timeline
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Evolution                                                                    │
 │ Forward-loop, swarm evolution, and shell continuation surface.               │
 │                                                                              │
 │ Cascade and self-improvement surface loading...                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                            │
 │ route  ready | codex:gpt-5.4                                                 │

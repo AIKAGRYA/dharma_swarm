@@ -1,5 +1,7 @@
+│ tab navigation | responsive                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ loop unknown  verify unknown  runtime idle  approvals clear
 Chat [Mission] Repo Commands Models Ontology ▸
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Mission                                                                      │
 │ Bootstrap framing, intent routing, and session launch context.               │
@@ -12,11 +14,9 @@ Chat [Mission] Repo Commands Models Ontology ▸
 │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate     │
 │ output.                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                            │
 │ route  ready | codex:gpt-5.4                                                 │

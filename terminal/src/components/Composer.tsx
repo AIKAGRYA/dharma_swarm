@@ -7,10 +7,9 @@ type Props = {
   compact?: boolean;
 };
 
-export function Composer({prompt, compact = false}: Props): React.ReactElement {
+export function Composer({prompt}: Props): React.ReactElement {
   return (
-    <Box marginTop={1} borderStyle="round" borderColor={THEME.indigo} paddingX={1} flexDirection="column">
-      {!compact ? <Text color={THEME.wave} bold>Operator Prompt</Text> : null}
+    <Box borderStyle="round" borderColor={THEME.indigo} paddingX={1} flexDirection="column">
       <Box>
         <Text color={THEME.stone}>&gt; </Text>
         <Text color={THEME.foam}>{prompt || " "}</Text>
