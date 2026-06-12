@@ -10,3 +10,16 @@
         24/30/40 match pane heights, all contain "Dharma Terminal". Overnight loop must execute prompt-pack
         code blocks with bash, not zsh.
   note: pre-theme SGR goldens carry 16-color ANSI only (no 38;2 RGB) — expected pre-theme; S4 introduces theme.
+[2026-06-11T21:35Z] F-001 implemented
+  evidence: bun test exit 0, 527 pass / 0 fail (was 462/65 baseline); grep -r '/Users/dhyana/dharma_swarm' tests src -> no matches (exit 1);
+            typecheck 0 errors; failure-ratchet clean (now-failures.txt empty, comm vs baseline empty — strict 0-failure gate holds post-F-001);
+            boot-smoke OK twice (frame contains "Dharma Terminal" + "backend offline, retrying"); ratchets unchanged: largest file protocol.ts 4064,
+            Sidebar/RepoPane dupe fns 40, Record<string, unknown> in protocol.ts 97; golden pre-theme diff clean; commit 361f35c2b
+  files: terminal/tests/app.test.ts, terminal/tests/repoPane.test.ts, terminal/tests/persistence.test.ts, terminal/tests/sidebar.test.ts,
+         terminal/tests/protocol.test.ts, terminal/tests/transcriptFormatting.test.ts, spec-forge/features.json,
+         docs/docops/AUTO_INVENTORY.md + docs/governance/SOVEREIGN_MANIFEST.md (docops pre-commit reconcile, prescribed step 10 path)
+  lesson: 250 full-path literals PLUS 8 truncated prefixes ("/Users/dhyana/dharma_sw") from Sidebar compact(root,24) — grep the short prefix too;
+          bun test/app boot rewrite tracked terminal/.dharma-terminal-state.json (STATE_PATH ignores state-dir env vars) — restore byte-exact before commit.
+  note: docops gate fired with zero markdown added by the feature (markdown drift 218445->218449 pre-existed); .venv/bin/python absent in this
+        worktree — ran python3 scripts/docops/check_docops_integrity.py --write-auto-sections instead, reconciled SOVEREIGN_MANIFEST.md:201, retry-once green.
+[2026-06-11T21:42:42Z] EVAL F-001 GREEN — criteria 9/9 pass
