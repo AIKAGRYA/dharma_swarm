@@ -78,6 +78,8 @@ spec-forge/*
 !spec-forge/RUN_RECEIPT.md
 !spec-forge/knowledge/
 !spec-forge/loop.sh
+!spec-forge/tour.sh
+!spec-forge/watch.sh
 .superpowers/
 
 # Local agent/tool indexes and runtime traces.
