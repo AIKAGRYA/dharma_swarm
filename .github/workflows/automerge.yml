@@ -1,0 +1,201 @@
+name: automerge
+
+# Fully automated merge lane for clean bot PRs and simple human PRs.
+#
+# When a PR carries the `automerge` or `bot-pr` label, this workflow watches
+# for the moment ALL status checks are green and no review requests changes,
+# then dispatches the existing Merge Master Mike router
+# (codex-mention-router.yml) with merge_when_clean=true.
+#
+# Guard rails (nothing is weakened):
+#   - Mike's deterministic gate still runs in full: fourfold-warrant,
+#     coherence-delta, CI rollup, unresolved review threads, and reviewer
+#     receipts must ALL be clean before auto-merge is armed.
+#   - This workflow never merges directly; it only asks Mike.
+#   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
+#   - One dispatch per readiness fingerprint, so later reviews/receipt comments
+#     can re-dispatch the same head SHA if Mike previously blocked.
+#
+# Opting in:
+#   gh pr edit <N> --add-label automerge      # human PRs
+#   Bot lanes should label their PRs `bot-pr` at creation time.
+#
+# Auto-enrollment (no manual labeling needed):
+#   PRs authored by bots (login ends in `[bot]`, is_bot, or `Copilot`) and PRs
+#   whose title carries an automation marker (`[automated]` / `[auto]`) are
+#   automatically given the `bot-pr` label by the enroll step below, so they
+#   enter this lane without anyone remembering to label them. Remove the label
+#   to opt a PR out.
+
+on:
+  pull_request:
+    types: [opened, reopened, labeled, ready_for_review]
+  check_suite:
+    types: [completed]
+  pull_request_review:
+    types: [submitted, dismissed]
+  schedule:
+    - cron: "45 * * * *"  # hourly sweep: catches anything the events missed
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to evaluate (optional; default = sweep all labeled PRs)"
+        required: false
+
+concurrency:
+  group: automerge
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  evaluate:
+    name: Evaluate and dispatch auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      EVENT_NAME: ${{ github.event_name }}
+      EVENT_PR: ${{ github.event.pull_request.number || github.event.inputs.pr || '' }}
+      CHECK_SUITE_SHA: ${{ github.event.check_suite.head_sha || '' }}
+    steps:
+      - name: Auto-enroll bot and automated PRs
+        run: |
+          set -euo pipefail
+          # Apply `bot-pr` to every open PR that is bot-authored or carries an
+          # automation marker in its title but has no opt-in label yet, so the
+          # lane engages without manual labeling. Drafts are still never
+          # dispatched (step below), and removing the label opts a PR out
+          # permanently for that evaluation pass.
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,title,labels,author \
+            --jq '.[]
+              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr") | not)
+              | select(
+                  (.author.is_bot == true)
+                  or (.author.login | test("\\[bot\\]$"))
+                  or (.author.login == "Copilot")
+                  or (.title | ascii_downcase | test("\\[automated\\]|\\[auto\\]"))
+                )
+              | .number' > /tmp/enroll.txt || true
+          while IFS= read -r pr; do
+            [ -z "$pr" ] && continue
+            echo "Auto-enrolling #${pr} with bot-pr label"
+            gh pr edit "$pr" --repo "$GH_REPO" --add-label bot-pr || true
+          done < /tmp/enroll.txt
+
+      - name: Build candidate PR list
+        id: candidates
+        run: |
+          set -euo pipefail
+          if [ -n "${EVENT_PR}" ]; then
+            echo "${EVENT_PR}" > /tmp/candidates.txt
+          elif [ -n "${CHECK_SUITE_SHA}" ]; then
+            # check_suite carries no PR context when the suite belongs to a
+            # branch; resolve open PRs by head SHA.
+            gh pr list --repo "$GH_REPO" --state open --limit 200 \
+              --json number,headRefOid \
+              --jq ".[] | select(.headRefOid == \"${CHECK_SUITE_SHA}\") | .number" \
+              > /tmp/candidates.txt
+          else
+            # Scheduled sweep: every open PR carrying an opt-in label.
+            gh pr list --repo "$GH_REPO" --state open --limit 200 \
+              --json number,labels \
+              --jq '.[] | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr")) | .number' \
+              > /tmp/candidates.txt
+          fi
+          echo "Candidates:"
+          cat /tmp/candidates.txt || true
+
+      - name: Evaluate candidates and dispatch Mike
+        run: |
+          set -euo pipefail
+          dispatched=0
+          skipped=0
+          summary="## Automerge Lane\n\n"
+
+          while IFS= read -r pr; do
+            [ -z "$pr" ] && continue
+            view="$(gh pr view "$pr" --repo "$GH_REPO" \
+              --json number,isDraft,labels,reviewDecision,headRefOid,mergeable,statusCheckRollup,comments,latestReviews)"
+
+            # 1. Opt-in label required
+            labeled="$(echo "$view" | jq -r '.labels | map(.name) | any(. == "automerge" or . == "bot-pr")')"
+            if [ "$labeled" != "true" ]; then
+              skipped=$((skipped + 1)); continue
+            fi
+
+            # 2. Never drafts, never CHANGES_REQUESTED
+            is_draft="$(echo "$view" | jq -r '.isDraft')"
+            decision="$(echo "$view" | jq -r '.reviewDecision // ""')"
+            if [ "$is_draft" = "true" ] || [ "$decision" = "CHANGES_REQUESTED" ]; then
+              summary+="- #${pr}: skipped (draft=${is_draft}, reviewDecision=${decision})\n"
+              skipped=$((skipped + 1)); continue
+            fi
+
+            # 3. All checks must be completed and green (ignore this workflow
+            #    and neutral/skipped conclusions).
+            not_green="$(echo "$view" | jq -r '
+              [ .statusCheckRollup[]?
+                | select((.name // .context // "") | test("automerge") | not)
+                | select(
+                    ((.status // "COMPLETED") != "COMPLETED")
+                    or (((.conclusion // .state // "") | ascii_upcase)
+                        | IN("SUCCESS","NEUTRAL","SKIPPED","") | not)
+                  )
+              ] | length')"
+            if [ "$not_green" != "0" ]; then
+              summary+="- #${pr}: skipped (${not_green} checks not green/completed)\n"
+              skipped=$((skipped + 1)); continue
+            fi
+
+            # 4. One dispatch per readiness fingerprint. Mike may block on
+            #    reviewer receipts or unresolved threads that arrive after
+            #    checks first turn green; include review/comment/check counts
+            #    so those later state changes can re-dispatch this head SHA.
+            sha="$(echo "$view" | jq -r '.headRefOid')"
+            ready_key="$(echo "$view" | jq -r '
+              [
+                .headRefOid,
+                (.reviewDecision // ""),
+                ([.statusCheckRollup[]?] | length | tostring),
+                ([.comments[]?] | length | tostring),
+                ([.latestReviews[]?] | length | tostring)
+              ] | join(":")')"
+            marker="<!-- automerge-dispatch:${ready_key} -->"
+            already="$(echo "$view" | jq -r --arg m "$marker" \
+              '[.comments[]? | select(.body | startswith($m))] | length')"
+            if [ "$already" != "0" ]; then
+              summary+="- #${pr}: already dispatched for readiness key ${ready_key}\n"
+              skipped=$((skipped + 1)); continue
+            fi
+
+            # 5. Hand off to Merge Master Mike (full deterministic gate +
+            #    auto-merge arming happen there).
+            gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
+              -f pr="$pr" -f merge_when_clean=true
+            gh pr comment "$pr" --repo "$GH_REPO" --body "${marker}
+          ## 🟢 Automerge lane engaged
+
+          All status checks are green and no review requests changes, so the
+          automerge lane dispatched **Merge Master Mike** with
+          \`merge_when_clean: true\` for head \`${sha}\`.
+
+          Mike still runs the full deterministic gate (fourfold-warrant,
+          coherence-delta, reviewer receipts, unresolved threads) before any
+          merge is armed. This dispatch marker is keyed to readiness state
+          \`${ready_key}\`; later review/comment/check changes can dispatch
+          again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`
+          label to leave this lane." || true
+            summary+="- #${pr}: **dispatched** Mike (merge_when_clean) for readiness key ${ready_key}\n"
+            dispatched=$((dispatched + 1))
+          done < /tmp/candidates.txt
+
+          summary+="\n**Summary:** ${dispatched} dispatched, ${skipped} skipped\n"
+          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"

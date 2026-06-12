@@ -23,8 +23,8 @@ must pass these gates before merge:
 | 8 | PR collision detect | `pr-collision-detect.yml` | Warning comment (non-blocking) |
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
-| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Dry-run by default; closes older non-draft `[automated]` duplicates only when manually dispatched with `dry_run=false` |
-| 12 | Docs-low automerge dispatcher | `automerge.yml` | Label-gated; dispatches MMM only for green docs/report projection PRs |
+| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older trusted same-repo duplicates of `[automated]`/`[auto]` PRs, keeping the newest |
+| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
 
 ### Local pre-flight
 
@@ -91,11 +91,17 @@ Declared lanes and limits (defined in `.github/workflows/bot-pr-limit.yml`):
 
 | Lane | headRef pattern | Max open |
 |---|---|---|
-| `spine-adoption-refresh` | `*spine-adoption*` | 1 |
+| `spine-adoption-refresh` | `*spine-adoption*` (anywhere in headRef) | 1 |
 | `docops-autorefresh` | `chore/docops-autorefresh*` | 1 |
 | `verdict-inter-agent` | `verdict/inter_agent*` | 3 |
 | `chore-inter-agent` | `chore/inter-agent*` | 3 |
 | `spine-surface-join` | `chore/spine/*` | 2 |
+
+The spine-adoption lane was originally `chore/governance*spine-adoption*`, but
+the refresher spawned siblings under `chore/spine-adoption-…`,
+`chore/auto-spine-adoption-…`, and `ops/spine-adoption-metric-…`, all of which
+evaded the throttle (the #559/#571/#580/#583 pile). The pattern now matches
+the intent token anywhere in the headRef so renamed lanes cannot slip through.
 
 Human PRs on non-lane branches are unaffected. To add a new automation lane,
 add a `case` arm to the `Resolve intent from headRef` step and a row to this
@@ -119,57 +125,91 @@ When duplicates are detected, only the **latest/most complete** PR
 should remain open. Earlier attempts should be closed with a comment
 linking to the successor.
 
-### Duplicate Automated PR Dedupe
+### Duplicate Automated PR Dedupe (`pr-dedupe.yml`)
 
-`pr-dedupe.yml` groups open non-draft PRs by normalized title and only considers
-titles carrying `[automated]` or `[auto]`. It reports every six hours. It closes
-older duplicates only when a maintainer manually dispatches the workflow with
-`dry_run=false`. It never merges and never deletes branches.
+The collision detector only warns. The `pr-dedupe.yml` workflow **acts**, but
+title markers are not trusted by themselves because this workflow runs under
+`pull_request_target` with write permissions. It groups open PRs by normalized
+title only when all of these are true:
+
+1. The title carries an automation marker (`[automated]` or `[auto]`).
+2. The PR head is in the same repository.
+3. The PR has a trusted automation signal: bot author, trusted automation head
+   prefix, or maintainer-applied `bot-pr` / `automerge` label.
+
+For any trusted group of 2+ PRs, it closes all but the newest PR (highest
+number), comments a governance explanation, and deletes the orphaned branches.
+It runs on PR open/reopen, every 6 hours on a schedule, and on
+`workflow_dispatch` (with a `dry_run` input). PRs without an automation marker
+or trusted same-repo automation signal are never touched, and nothing is ever
+merged by this lane.
 
 ---
 
-## 2b. Docs-Low Automerge Dispatcher
+## 2b. Automerge Lane (`automerge.yml`)
 
-GitHub auto-merge is allowed at the repository level, but Merge Master Mike
-remains the merge authority. `.github/workflows/automerge.yml` is only a
-dispatcher:
-
-1. A PR must carry `automerge` or `bot-pr`.
-2. The PR must be non-draft, mergeable, have no `CHANGES_REQUESTED` review
-   decision, and have all non-automerge checks green.
-3. Changed files must be limited to `docs/`, `reports/governance/`, or
-   markdown projection files. Hot paths such as `.github/`, `scripts/`,
-   `dharma_swarm/`, `tests/`, `api/`, and `dashboard/` are skipped.
-4. The dispatcher invokes `codex-mention-router.yml` with
-   `merge_when_clean=true` and `required_reviewers=none`.
-5. Mike still runs the deterministic gate and arms GitHub auto-merge using the
-   current head commit. A later push must re-dispatch for the new head SHA.
-
-Non-docs-low PRs should use the normal local Mike review lane:
+The fully automated merge path for clean bot PRs and simple human PRs.
+Opt in by labeling a PR `automerge` (human work) or `bot-pr` (automation
+lanes should add it at creation time):
 
 ```bash
-make pr-mike
-make pr-run-codex PR=<number>
-make pr-run-claude PR=<number>
-make pr-gate PR=<number>
-make pr-merge PR=<number> ARGS="--confirm merge-pr-<number> --auto --execute"
+gh pr edit <N> --add-label automerge
 ```
+
+Trigger surface: label added, ready-for-review, `check_suite` completion,
+review submitted/dismissed, plus an hourly sweep. When **all** status checks
+are green/completed, the PR is not a draft, and no review requests changes,
+the lane dispatches the existing Merge Master Mike router
+(`codex-mention-router.yml`) with `merge_when_clean: true`.
+
+Dispatch markers are keyed to a readiness fingerprint, not just the head SHA:
+head SHA, review decision, status-check count, comment count, and review count.
+If Mike blocks because reviewer receipts, threads, or checks were not yet
+present, later review/comment/check changes can dispatch again for the same
+head SHA.
+
+Nothing is weakened: Mike still runs his full deterministic gate
+(fourfold-warrant, coherence-delta, CI rollup, unresolved review threads,
+reviewer receipts) before arming auto-merge. The lane never merges directly.
+Remove the label to leave the lane.
+
+### Required reviewer receipts
+
+Mike's required reviewer receipts are **`copilot,claude`**. Devin is a
+*committer* agent (it opens PRs); it does not post review receipts, so
+requiring a `devin` receipt left the gate permanently unclearable. If Devin
+gains a review surface later, add it back to `REQUIRED_REVIEWERS` in
+`codex-mention-router.yml` and the `merge-master-mike-backlog.yml` default.
 
 ---
 
 ## 2c. Merge Queue Readiness
 
-The repository workflows now include `merge_group:` triggers so `main` can use
-GitHub's merge queue. Tree-level checks run against the queued batch. PR-shaped
-checks that require PR body or base/head SHA context skip their job on
-`merge_group`; they already passed on the PR before queueing.
+When the open-PR count floats high, sequential merging hits the rebase loop:
+each merge invalidates every other branch. The long-term fix is GitHub's
+**merge queue** + **auto-merge**, which batch-tests queued PRs against a
+temporary branch and merge them together.
 
-One repository setting remains an operator/admin action:
+All gating workflows now carry the `merge_group:` trigger so the queue can be
+enabled without stranding required checks:
 
-1. Settings -> Branches -> `main` protection.
-2. Enable **Require merge queue**.
-3. Start with squash merge, build concurrency `2`, maximum merge group size
-   `1` or `2`, and only non-failing PRs enabled.
+- **Tree-shaped gates** (`tests`, `docops`, `test-hygiene`, `manifest-check`,
+  `semgrep`, `gitleaks`, `codeql`, `active-track`) run **fully** on the
+  queued batch -- this is the point of the queue.
+- **Batch-aware comparison gates** (`module-budget`) compare the merge-group
+  base/head SHAs on `merge_group`, so Rule 10 still evaluates the queued batch.
+- **PR-shaped gates** (`coherence-delta`, `fourfold-warrant`, `commit-lint`,
+  `structure`) need PR context (body or PR-specific file list) that a
+  `merge_group` event does not carry. They already passed on the PR run before
+  the PR could be queued, so their jobs skip on `merge_group` (skipped =
+  satisfied for required checks).
+
+One-time repository settings (operator action, cannot be done from the repo):
+
+1. **Settings → General** → check **Allow auto-merge**.
+2. **Settings → Branches → `main` rule** → check **Require merge queue**.
+3. Keep the existing required status checks; they now report on
+   `merge_group` events.
 
 ---
 
