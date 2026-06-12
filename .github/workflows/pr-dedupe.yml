@@ -59,21 +59,39 @@ jobs:
         run: |
           set -euo pipefail
 
+          repo_owner="${GH_REPO%%/*}"
+          trusted_head_re='^(ops|chore|codex|devin|governance)/'
+
           gh pr list --repo "$GH_REPO" --state open --limit 200 \
-            --json number,title,isDraft,headRefName,createdAt \
+            --json number,title,isDraft,headRefName,headRepositoryOwner,author,labels,createdAt \
             > /tmp/open_prs.json
 
-          # Normalize titles and group; only groups whose title carries an
-          # automation marker are eligible for dedupe.
+          # Normalize titles and group. Title markers are not trusted by
+          # themselves: pull_request_target has write credentials, so dedupe
+          # only touches same-repo PRs that also have a trusted automation
+          # signal (bot author, trusted head prefix, or maintainer-applied
+          # opt-in label).
           jq -c '
+            def label_names: (.labels // [] | map(.name));
+            def trusted($owner; $head_re):
+              ((.headRepositoryOwner.login // "") == $owner)
+              and (
+                (.author.is_bot == true)
+                or ((.author.login // "") == "Copilot")
+                or ((.author.login // "") | test("\\[bot\\]$"))
+                or ((.headRefName // "") | test($head_re))
+                or (label_names | any(. == "bot-pr" or . == "automerge"))
+              );
             [ .[]
               | . + {norm: (.title | ascii_downcase | gsub("\\s+"; " ") | gsub("^ | $"; ""))}
               | select(.norm | test("\\[automated\\]|\\[auto\\]"))
+              | select(trusted($repo_owner; $trusted_head_re))
             ]
             | group_by(.norm)
             | map(select(length > 1) | sort_by(.number))
             | .[]
-          ' /tmp/open_prs.json > /tmp/dupe_groups.jsonl || true
+          ' --arg repo_owner "$repo_owner" --arg trusted_head_re "$trusted_head_re" \
+            /tmp/open_prs.json > /tmp/dupe_groups.jsonl || true
 
           closed_count=0
           summary="## Duplicate Automated PR Dedupe\n\n"

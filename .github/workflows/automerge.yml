@@ -13,7 +13,8 @@ name: automerge
 #     receipts must ALL be clean before auto-merge is armed.
 #   - This workflow never merges directly; it only asks Mike.
 #   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
-#   - One dispatch per head SHA (marker comment) so green→dispatch fires once.
+#   - One dispatch per readiness fingerprint, so later reviews/receipt comments
+#     can re-dispatch the same head SHA if Mike previously blocked.
 #
 # Opting in:
 #   gh pr edit <N> --add-label automerge      # human PRs
@@ -122,7 +123,7 @@ jobs:
           while IFS= read -r pr; do
             [ -z "$pr" ] && continue
             view="$(gh pr view "$pr" --repo "$GH_REPO" \
-              --json number,isDraft,labels,reviewDecision,headRefOid,mergeable,statusCheckRollup,comments)"
+              --json number,isDraft,labels,reviewDecision,headRefOid,mergeable,statusCheckRollup,comments,latestReviews)"
 
             # 1. Opt-in label required
             labeled="$(echo "$view" | jq -r '.labels | map(.name) | any(. == "automerge" or . == "bot-pr")')"
@@ -154,13 +155,24 @@ jobs:
               skipped=$((skipped + 1)); continue
             fi
 
-            # 4. One dispatch per head SHA
+            # 4. One dispatch per readiness fingerprint. Mike may block on
+            #    reviewer receipts or unresolved threads that arrive after
+            #    checks first turn green; include review/comment/check counts
+            #    so those later state changes can re-dispatch this head SHA.
             sha="$(echo "$view" | jq -r '.headRefOid')"
-            marker="<!-- automerge-dispatch:${sha} -->"
+            ready_key="$(echo "$view" | jq -r '
+              [
+                .headRefOid,
+                (.reviewDecision // ""),
+                ([.statusCheckRollup[]?] | length | tostring),
+                ([.comments[]?] | length | tostring),
+                ([.latestReviews[]?] | length | tostring)
+              ] | join(":")')"
+            marker="<!-- automerge-dispatch:${ready_key} -->"
             already="$(echo "$view" | jq -r --arg m "$marker" \
               '[.comments[]? | select(.body | startswith($m))] | length')"
             if [ "$already" != "0" ]; then
-              summary+="- #${pr}: already dispatched for ${sha}\n"
+              summary+="- #${pr}: already dispatched for readiness key ${ready_key}\n"
               skipped=$((skipped + 1)); continue
             fi
 
@@ -177,9 +189,11 @@ jobs:
 
           Mike still runs the full deterministic gate (fourfold-warrant,
           coherence-delta, reviewer receipts, unresolved threads) before any
-          merge is armed. Remove the \`automerge\`/\`bot-pr\` label to leave
-          this lane." || true
-            summary+="- #${pr}: **dispatched** Mike (merge_when_clean) for ${sha}\n"
+          merge is armed. This dispatch marker is keyed to readiness state
+          \`${ready_key}\`; later review/comment/check changes can dispatch
+          again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`
+          label to leave this lane." || true
+            summary+="- #${pr}: **dispatched** Mike (merge_when_clean) for readiness key ${ready_key}\n"
             dispatched=$((dispatched + 1))
           done < /tmp/candidates.txt
 
