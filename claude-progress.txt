@@ -89,3 +89,14 @@
   note: commit took 2 attempts: (1) docops FAIL manifest-markdown-lines 218465->218466 (trailing LESSONS line riding), reconciled per prescribed step-10 path; (2) green — shakti warrant passed with NO skip, third consecutive session.
   note: `git checkout -- <file>` is blocked by the session sandbox (discards-uncommitted-changes guard); restore probe-mutated files with `git show HEAD:<path> > <path>` instead.
 [2026-06-12T02:03:43Z] EVAL F-008 GREEN — criteria 7/7 pass
+[2026-06-12T02:30Z] F-009 implemented
+  evidence: bash scripts/ratchet.sh prints max_file_lines=4064 + dup_functions=40 + "ratchet: OK" exit 0 (baseline run + post-restore + post-commit); manual count via comm -12 of grep -oE top-level fn names = 40, matches;
+            probe ratchetProbeDuplicateFn appended to BOTH Sidebar.tsx and RepoPane.tsx -> exit 1 "dup_functions 41 exceeds baseline 40", reverted byte-exact via git show HEAD: redirect (git status clean for both files), re-run exit 0;
+            typecheck 0 errors; bun test 527 pass / 0 fail exit 0; failure-ratchet now-failures.txt 0 lines, comm vs baseline 0 lines; ratchets flat: protocol.ts 4064, dup fns 40, Record<string, unknown> 97;
+            golden pre-theme git status clean; boot_smoke (tmux one-liner) green pre-work + pre-commit ("Dharma Terminal" + "backend offline, retrying"); commit bc5e5f4d0
+  files: terminal/scripts/ratchet.sh (dup_functions counter), terminal/scripts/ratchet_baselines.txt (dup_functions=40), spec-forge/features.json (F-009 status only),
+         docs/docops/AUTO_INVENTORY.md + docs/governance/SOVEREIGN_MANIFEST.md (docops reconcile 218466->218650, 880->882 files: batch-boundary amendment markdown rode this reconcile),
+         spec-forge/RUN_RECEIPT.md (conductor HARNESS-AMENDED residue line rode this commit - see note)
+  lesson: pre-commit STASHES unstaged changes, so docops counts the STAGED tree - any unstaged tracked .md (here RUN_RECEIPT.md +1 harness line) makes a worktree-reconciled manifest off-by-N at hook time; stage residue .md lines with the commit or reconcile will never converge
+  note: commit took 3 attempts: (1) docops FAIL markdown drift 218466->218649 (batch amendment + trailing lines), reconciled per prescribed step-10 path against the worktree (218650); (2) retry FAILED off-by-one 218650 vs 218649 - DISTINCT cause: pre-commit stash excluded the unstaged RUN_RECEIPT.md residue line from the staged count; staged that residue line (established trailing-residue-rides-commit pattern, F-002 distinct-gate precedent); (3) green.
+[2026-06-12T02:24:15Z] EVAL F-009 GREEN — criteria 8/8 pass (gates: typecheck 0, 527/527 tests 0 fail, ratchets 4064/40/97 flat; feature: dup_functions=40 = manual count 40, probe 41→exit 1, revert clean; 6/6 pre-theme goldens identical)

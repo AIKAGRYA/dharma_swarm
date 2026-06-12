@@ -11,9 +11,13 @@
 #   dup_functions  — identically-named top-level function declarations
 #                    shared between Sidebar.tsx and RepoPane.tsx.
 #                    Baseline 40; end target 0.
+#   record_unknown — lines containing Record<string, unknown> in
+#                    src/protocol.ts plus its successor src/protocol/
+#                    modules (grep -c semantics). Baseline 97; end
+#                    target <=1 at the single typed ingress.
 #
-# F-010 (record_unknown) and F-012 (hex_violations) extend this script
-# with their own counters when they land.
+# F-012 (hex_violations) extends this script with its own counter when
+# it lands.
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -78,6 +82,33 @@ if [ "$dup_functions" -gt "$baseline_dup_functions" ]; then
 fi
 if [ "$dup_functions" -lt "$baseline_dup_functions" ]; then
   echo "ratchet: dup_functions improved ($dup_functions < baseline $baseline_dup_functions) — tighten $BASELINES_FILE" >&2
+fi
+
+# Counter: record_unknown (F-010)
+protocol_file="$TERMINAL_DIR/src/protocol.ts"
+protocol_dir="$TERMINAL_DIR/src/protocol"
+record_unknown=0
+record_sources_found=0
+if [ -f "$protocol_file" ]; then
+  record_sources_found=1
+  record_unknown=$(( record_unknown + $(grep -c 'Record<string, unknown>' "$protocol_file") ))
+fi
+if [ -d "$protocol_dir" ]; then
+  while IFS= read -r proto_file; do
+    record_sources_found=1
+    record_unknown=$(( record_unknown + $(grep -c 'Record<string, unknown>' "$proto_file") ))
+  done < <(find "$protocol_dir" -type f \( -name '*.ts' -o -name '*.tsx' \))
+fi
+[ "$record_sources_found" -eq 1 ] || fail "no protocol sources found (src/protocol.ts or src/protocol/)"
+
+baseline_record_unknown=$(read_baseline record_unknown)
+echo "record_unknown=$record_unknown"
+
+if [ "$record_unknown" -gt "$baseline_record_unknown" ]; then
+  fail "record_unknown $record_unknown exceeds baseline $baseline_record_unknown (Record<string, unknown> lines in src/protocol.ts + src/protocol/)"
+fi
+if [ "$record_unknown" -lt "$baseline_record_unknown" ]; then
+  echo "ratchet: record_unknown improved ($record_unknown < baseline $baseline_record_unknown) — tighten $BASELINES_FILE" >&2
 fi
 
 echo "ratchet: OK"

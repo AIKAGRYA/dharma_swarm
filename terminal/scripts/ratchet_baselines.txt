@@ -2,3 +2,4 @@
 # Tighten a value here when the measured counter falls below it; never raise one.
 max_file_lines=4064
 dup_functions=40
+record_unknown=97
