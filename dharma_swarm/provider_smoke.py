@@ -245,8 +245,8 @@ def list_ollama_manifest_models(base_dir: str | Path | None = None) -> list[str]
 def list_ollama_runtime_models(base_url: str | None = None) -> list[str]:
     """Return models reported by the running Ollama daemon, if reachable."""
     base = str(base_url or "http://localhost:11434").strip().rstrip("/")
-    if not base:
-        return []
+    if not base or not base.startswith(("http://", "https://")):
+        return []  # scheme allowlist — no file:// / ftp:// via configured base
     try:
         with urlopen(f"{base}/api/tags", timeout=2.0) as response:
             payload = json.loads(response.read().decode("utf-8"))

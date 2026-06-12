@@ -375,6 +375,8 @@ def call_codex(prompt: str, cwd: Path, timeout_s: int) -> tuple[str, dict[str, A
 
 
 def http_json(url: str, headers: dict[str, str], body: dict[str, Any], timeout_s: int) -> tuple[dict[str, Any], int]:
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing non-http(s) endpoint scheme: {url[:40]}")
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:

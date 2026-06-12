@@ -98,6 +98,7 @@ def load_holon(name: str, agents_root: Path | None = None) -> RunningHolon:
     """
     if not _AGENT_NAME_RE.fullmatch(name or ""):
         raise FileNotFoundError("no registered agent (invalid name)")
+    name = name.replace("\r", "").replace("\n", "")
     root = agents_root or AGENTS_ROOT
     agent_dir = root / name
     identity_path = agent_dir / "identity.json"

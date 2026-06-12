@@ -45,6 +45,9 @@ async def holon_chat(name: str, req: HolonChatRequest):
     """Stream a reply from the holon's OWN model. Never delegates to _agentic_stream."""
     if not _HOLON_NAME_RE.fullmatch(name):
         raise HTTPException(status_code=404, detail="no registered holon by that name")
+    # replace() chain after the regex gate: the sanitizer shape CodeQL's
+    # log-injection taint tracking recognizes (the fullmatch guard alone is not).
+    name = name.replace("\r", "").replace("\n", "")
     try:
         holon = holon_bridge.load_holon(name)
     except FileNotFoundError as exc:

@@ -254,14 +254,14 @@ def main(argv: list[str] | None = None) -> int:
             receipt.update(outcome)
         except Exception as exc:  # surface broker/TLS failures as a receipt, not a stack trace
             receipt["status"] = STATUS_PUBLISH_FAILED
-            # Redact credential material: NATS errors can echo the endpoint URL
-            # as user:password@host, and config.credential must never reach the
-            # printed/persisted receipt (CodeQL py/clear-text-logging-sensitive-data).
-            error_text = f"{type(exc).__name__}: {exc}"
+            # The receipt is printed and persisted, and NATS exception text can echo
+            # the endpoint URL as user:password@host. Keep the receipt taint-free:
+            # only the exception TYPE enters it; the scrubbed detail goes to stderr.
+            receipt["error"] = type(exc).__name__
+            detail = re.sub(r"://[^/@\s]+@", "://***@", str(exc))
             if config.credential:
-                error_text = error_text.replace(config.credential, "***")
-            error_text = re.sub(r"://[^/@\s]+@", "://***@", error_text)
-            receipt["error"] = error_text[:500]
+                detail = detail.replace(config.credential, "***")
+            print(f"publish failed ({type(exc).__name__}): {detail[:300]}", file=sys.stderr)
 
     receipt_path = write_receipt(Path(args.receipt_dir), receipt)
     receipt["receipt_path"] = str(receipt_path)

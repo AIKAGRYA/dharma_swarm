@@ -211,6 +211,8 @@ def _auth_ping(base: str, key: str) -> None:
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     data = json.dumps(payload).encode("utf-8")
     url = base.rstrip("/") + "/chat/completions"
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing non-http(s) endpoint scheme: {url[:40]}")
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30):
@@ -252,6 +254,8 @@ def _post_json(url: str, payload: dict, headers: dict, timeout: int = 90,
     backoff. 4xx (incl. auth) is non-transient and raised immediately.
     """
     data = json.dumps(payload).encode("utf-8")
+    if not url.startswith(("http://", "https://")):
+        raise ValueError(f"refusing non-http(s) endpoint scheme: {url[:40]}")
     last_exc: Exception | None = None
     for attempt in range(attempts):
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
