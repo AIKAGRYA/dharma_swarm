@@ -60,3 +60,10 @@
   files: terminal/scripts/pty_smoke.sh (new), spec-forge/features.json (F-005 status only)
   lesson: probe chars must dodge globally bound printables [ ] 1 2 3 (sidebar-mode + tab-cycle keys swallow them before prompt.append); j/k safe only on the chat tab
 [2026-06-12T01:30:33Z] EVAL F-005 GREEN — criteria 9/9 pass
+[2026-06-12T01:33Z] F-006 implemented
+  evidence: grep '"packageManager": "bun@1.3.11"' terminal/package.json exit 0; bun test 527 pass / 0 fail exit 0 (twice: feature check + ratchet run); scripts/pty_smoke.sh exit 0 ("> helmprobe" echoed, 9 keystrokes);
+            typecheck 0 errors; failure-ratchet now-failures.txt 0 lines, comm vs baseline empty; ratchets flat: protocol.ts 4064, Sidebar/RepoPane dup fns 40, Record<string, unknown> 97;
+            golden pre-theme git diff/status clean; boot_smoke.sh exit 0 pre-work + pre-commit; commit 9b6b20cd8
+  files: terminal/package.json (packageManager line only), spec-forge/features.json (F-006 status only), claude-progress.txt (EVAL F-005 trailing line rode this commit)
+  lesson: pre-commit green on FIRST attempt - no docops drift fired and fourfold-shakti-warrant passed with no skip (F-002's flagged text finally outside staged-hunk context range); the skip ritual is not automatic anymore
+[2026-06-12T01:38:34Z] EVAL F-006 GREEN — criteria 10/10 pass
