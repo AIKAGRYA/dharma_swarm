@@ -174,6 +174,12 @@ class AgentOpsRunFact:
     scope_violations: tuple[str, ...] = ()
     failed_gates: tuple[str, ...] = ()
     commit_hash: str | None = None
+    runtime_truth_ref_keys: tuple[str, ...] = ()
+    runtime_truth_jobs_with_refs: int = 0
+    runtime_truth_jobs_without_refs: int = 0
+    receipt_refs: tuple[str, ...] = ()
+    correlation_ids: tuple[str, ...] = ()
+    identity_invariant_digests: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -463,6 +469,9 @@ def coherence_map_to_dict(bundle: OperatingFactBundle | None = None) -> dict[str
 
 
 def _agentops_fact(path: Path, report: dict[str, Any]) -> AgentOpsRunFact:
+    runtime_summary = report.get("runtime_truth_summary")
+    if not isinstance(runtime_summary, dict):
+        runtime_summary = {}
     gates = report.get("gates") if isinstance(report.get("gates"), list) else []
     gate_facts = [_gate_fact(gate, index) for index, gate in enumerate(gates)]
     failed_gates = tuple(gate.name for gate in gate_facts if gate.passed is False)
@@ -520,6 +529,14 @@ def _agentops_fact(path: Path, report: dict[str, Any]) -> AgentOpsRunFact:
         scope_violations=violations,
         failed_gates=failed_gates,
         commit_hash=commit_hash,
+        runtime_truth_ref_keys=_strings(runtime_summary.get("ref_keys")),
+        runtime_truth_jobs_with_refs=_int(runtime_summary.get("jobs_with_refs")),
+        runtime_truth_jobs_without_refs=_int(runtime_summary.get("jobs_without_refs")),
+        receipt_refs=runtime_ref_values(
+            report, ("receipt_id", "receipt_hash", "receipt_refs", "runtime_receipt_refs")
+        ),
+        correlation_ids=runtime_ref_values(report, ("run_id", "trace_id", "correlation_id")),
+        identity_invariant_digests=runtime_ref_values(report, ("identity_invariant_digest",)),
     )
 
 
@@ -559,7 +576,17 @@ def _agentops_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) 
             open_gap="AgentOps is declared but no report fact is present in this bundle",
             next_packet_hint="run one bounded AgentOps packet and load its report.json",
         )
-    evidence = tuple(run.source_path for run in bundle.agentops)
+    evidence = tuple(
+        ref
+        for run in bundle.agentops
+        for ref in (
+            run.source_path,
+            *run.receipt_refs,
+            *run.correlation_ids,
+            *run.identity_invariant_digests,
+        )
+        if ref
+    )
     if any(run.gate_state == "some_red" or run.scope_state == "scope_violation" for run in bundle.agentops):
         return _state(
             boundary,
@@ -569,12 +596,30 @@ def _agentops_organ_state(boundary: OrganBoundary, bundle: OperatingFactBundle) 
             open_gap="execution facts exist but the packet is not clean",
             next_packet_hint="fix the red gate or narrow allowed_files before expanding scope",
         )
-    if any(run.gate_state == "all_green" and run.scope_state == "scope_clean" for run in bundle.agentops):
+    green_clean_runs = tuple(
+        run for run in bundle.agentops if run.gate_state == "all_green" and run.scope_state == "scope_clean"
+    )
+    has_runtime_refs = any(
+        bool(run.receipt_refs)
+        or bool(run.correlation_ids)
+        or bool(run.identity_invariant_digests)
+        for run in green_clean_runs
+    )
+    if green_clean_runs and has_runtime_refs:
         return _state(
             boundary,
-            observed_state="AgentOps report loaded with green gates and clean scope",
+            observed_state="AgentOps report loaded with green gates, clean scope, and runtime truth refs",
             coherence_state="bound",
             evidence_refs=evidence,
+        )
+    if green_clean_runs:
+        return _state(
+            boundary,
+            observed_state="AgentOps report loaded with green gates and clean scope but no runtime truth refs",
+            coherence_state="partial",
+            evidence_refs=evidence,
+            open_gap="green gate/scope report lacks runtime truth refs",
+            next_packet_hint="rerun AgentOps with trace, receipt, or identity refs before projecting bound",
         )
     return _state(
         boundary,

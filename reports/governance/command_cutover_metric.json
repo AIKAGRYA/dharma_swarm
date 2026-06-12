@@ -1,0 +1,82 @@
+{
+  "schema_version": "dharma.command_cutover_metric.v1",
+  "generated_at": "2026-06-12T01:54:45Z",
+  "metric_scope": "default-path command surface adoption, not adapter readiness",
+  "canonical_substrate": [
+    "dharma_swarm/spine/identity.py",
+    "dharma_swarm/spine/receipt.py",
+    "dharma_swarm/spine/invoke.py",
+    "dharma_swarm/spine/tollbooth.py",
+    "dharma_swarm/spine/warrant.py",
+    "dharma_swarm/runtime_state.py"
+  ],
+  "counts": {
+    "surfaces_reviewed": 11,
+    "runtime_state_idempotency_before_side_effect": 2,
+    "runtime_warrant_before_side_effect": 2,
+    "persisted_runtime_receipt": 2,
+    "direct_evidence_receipt_association": 2,
+    "projection_or_adapter_only": 4,
+    "amber_or_red_bypass": 5
+  },
+  "joined_default_paths": [
+    "scripts/runtime/autonomy_spine.py",
+    "scripts/runtime/a2a_send.py"
+  ],
+  "runtime_warrant_criteria": [
+    "registered surface/action policy",
+    "normalized non-empty requested claim boundary",
+    "RuntimeStateStore idempotency claimed before side effect",
+    "matching idempotency row exists with status=started",
+    "requested claims are allowlisted and not prohibited pre-action overclaims",
+    "denied warrants persist blocked runtime_warrant receipt when identity exists"
+  ],
+  "evidence_receipt_association": {
+    "count": 2,
+    "surfaces": [
+      "scripts/runtime/autonomy_spine.py",
+      "scripts/runtime/a2a_send.py"
+    ],
+    "storage": "embedded spine.EvidenceReceipt JSON plus compact ref inside the existing command RuntimeReceipt payload; no dispatch_evidence RuntimeReceipt row"
+  },
+  "projection_or_adapter_only": [
+    "scripts/runtime/a2a_inbox_bridge.py",
+    "scripts/runtime/a2a_reply_capture.py",
+    "scripts/runtime/a2a_domain_reply_artifact.py",
+    "api/routers/control_surface.py"
+  ],
+  "remaining_bypasses": [
+    {
+      "surface": "AgentOps reports",
+      "classification": "AMBER",
+      "missing": "runtime refs on green reports before bound projection"
+    },
+    {
+      "surface": "registered holon wake",
+      "classification": "AMBER",
+      "missing": "fresh fail-closed unknown-holon and registered wake tool-scope proof"
+    },
+    {
+      "surface": "overnight/autopilot",
+      "classification": "AMBER",
+      "missing": "per-script split instead of broad mixed-risk bucket"
+    },
+    {
+      "surface": "Forge/Hydra",
+      "classification": "RED",
+      "missing": "fresh run receipt, verifier, and artifact hashes"
+    },
+    {
+      "surface": "cron/provider rotator",
+      "classification": "AMBER",
+      "missing": "runtime wrapper or explicit external-gated classification for side-effecting cron paths"
+    }
+  ],
+  "external_authority_guardrails": [
+    {
+      "surface": "Capital Lab live trading",
+      "classification": "RED",
+      "missing": "operator/legal authority and exchange-scoped live warrant before any live path"
+    }
+  ]
+}

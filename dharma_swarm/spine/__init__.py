@@ -37,6 +37,11 @@ from dharma_swarm.spine.identity import (
     MissingExecutionIdentity,
     require_execution_identity,
 )
+from dharma_swarm.spine.warrant import (
+    RuntimeWarrant,
+    RuntimeWarrantDenied,
+    issue_runtime_warrant,
+)
 from dharma_swarm.spine.adapters import (
     adapt_execution_identity,
     attach_execution_identity,
@@ -52,11 +57,14 @@ __all__ = [
     "MissingExecutionIdentity",
     "ReceiptStatus",
     "RoutingDecision",
+    "RuntimeWarrant",
+    "RuntimeWarrantDenied",
     "adapt_execution_identity",
     "attach_execution_identity",
     "identity_from_carrier",
     "identity_metadata",
     "invoke_agent",
+    "issue_runtime_warrant",
     "AgentInvoker",
     "require_execution_identity",
     "runtime_receipt_kwargs",

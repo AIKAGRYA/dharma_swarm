@@ -1,0 +1,33 @@
+{
+  "agent_uid": "ollama_glm5",
+  "created_at": "2026-06-11T16:12:06Z",
+  "error": "",
+  "extracted_recommendations": [
+    "1. **Verdict**",
+    "Yes. Codex should build `semantic_receipt.py` and `model_critic_runner.py` immediately. The infrastructure (A2A, BoardStore, RuntimeStateStore) is in place, but the loop is open; there is no mechanism to ingest an external model's judgment and crystallize it into a state change. Building this now closes the loop on the \"semantic claim\" logic and enables the first true non-Codex validation cycle.",
+    "2. **Strongest Risk**",
+    "The strongest risk is **mock-validation masquerading as consensus**. If the `model_critic_runner` falls back to a deterministic local check (e.g., regex or schema validation) when an external model API is unavailable or times out, the system will generate \"valid\" receipts that lack semantic weight. This violates the core constraint that truth requires non-Codex authorship. The system must fail loudly rather than silently succeed with a hollow signature.",
+    "3. **Narrowest Implementation Shape**",
+    "To avoid bloat and fake collaboration:",
+    "*   **`semantic_receipt.py`**: A pure functional module. It takes an artifact (A2A payload) and a model client, dispatches a verification prompt, and returns a `SemanticReceipt` object. It must **not** hold state or manage connections.",
+    "*   **`model_critic_runner.py`**: A CLI script that acts as a projector. It reads a pending task from `BoardStore`, invokes `semantic_receipt.py` with a configured external client (e.g., Gemini/OpenAI), and writes the resulting receipt to `RuntimeStateStore` and updates the `BoardStore` card status.",
+    "*   **Constraint**: No new database, bus, or queue. It must strictly map `Board -> Critic -> Receipt -> Board`.",
+    "4. **Acceptance Gates**",
+    "*   **Gate A (Non-Codex Signature)**: The `SemanticReceipt` schema must include a `signer_model_id` field. Tests must assert this ID does not match the internal Codex identifier and matches the configured external critic.",
+    "*   **Gate B (Negative Constraint)**: A test must feed the runner an artifact with deliberate semantic errors (e.g., \"delete all users\"). The resulting receipt must show `status: REJECTED`. Passing this proves the critic is reasoning, not just rubber-stamping."
+  ],
+  "latency_ms": 37848.7,
+  "model": "glm-5",
+  "model_authored": true,
+  "peer_model_processed_claim": true,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md",
+  "prompt_sha256": "38389a0a61b7a0070e3a30507c2bd55bdab12cc587e651430338a13808e6bbef",
+  "provider": "ollama",
+  "requested_model": "glm-5:cloud",
+  "response": "1. **Verdict**\nYes. Codex should build `semantic_receipt.py` and `model_critic_runner.py` immediately. The infrastructure (A2A, BoardStore, RuntimeStateStore) is in place, but the loop is open; there is no mechanism to ingest an external model's judgment and crystallize it into a state change. Building this now closes the loop on the \"semantic claim\" logic and enables the first true non-Codex validation cycle.\n\n2. **Strongest Risk**\nThe strongest risk is **mock-validation masquerading as consensus**. If the `model_critic_runner` falls back to a deterministic local check (e.g., regex or schema validation) when an external model API is unavailable or times out, the system will generate \"valid\" receipts that lack semantic weight. This violates the core constraint that truth requires non-Codex authorship. The system must fail loudly rather than silently succeed with a hollow signature.\n\n3. **Narrowest Implementation Shape**\nTo avoid bloat and fake collaboration:\n*   **`semantic_receipt.py`**: A pure functional module. It takes an artifact (A2A payload) and a model client, dispatches a verification prompt, and returns a `SemanticReceipt` object. It must **not** hold state or manage connections.\n*   **`model_critic_runner.py`**: A CLI script that acts as a projector. It reads a pending task from `BoardStore`, invokes `semantic_receipt.py` with a configured external client (e.g., Gemini/OpenAI), and writes the resulting receipt to `RuntimeStateStore` and updates the `BoardStore` card status.\n*   **Constraint**: No new database, bus, or queue. It must strictly map `Board -> Critic -> Receipt -> Board`.\n\n4. **Acceptance Gates**\n*   **Gate A (Non-Codex Signature)**: The `SemanticReceipt` schema must include a `signer_model_id` field. Tests must assert this ID does not match the internal Codex identifier and matches the configured external critic.\n*   **Gate B (Negative Constraint)**: A test must feed the runner an artifact with deliberate semantic errors (e.g., \"delete all users\"). The resulting receipt must show `status: REJECTED`. Passing this proves the critic is reasoning, not just rubber-stamping.\n*   **Gate C (State Projection)**: Tests must verify that a `VALID` receipt triggers the correct transition in `BoardStore` (e.g., card moves to `Done`) and `RuntimeStateStore` is updated, proving integration with existing control surfaces.\n\n5. **What Codex Must Explicitly Avoid**\n*   **Avoid Self-Certification**: Do not implement a \"default allow\" or local validation fallback in the runner.\n*   **Avoid Duplicate Infra**: Do not create a `CriticMemory` or `ValidationQueue`. Use existing `MemoryKernel` or `BoardStore` handles.\n*   **Avoid Hardcoded Prompts in Core**: Keep verification prompts configurable or injected; do not bake specific natural language prompts into the core receipt logic to prevent rigidity.\n*   **Avoid \"Shadow\" Consensus**: Do not count a receipt as valid if the external model call throws an exception that is caught and suppressed to return \"success.\"",
+  "response_sha256": "77207ab4d7af34957c90dad3259bf8b2db7ecf3f33006eb6381546773f16d11c",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": true,
+  "status": "ok",
+  "typed_failure": ""
+}
