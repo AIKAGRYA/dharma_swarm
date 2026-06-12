@@ -304,7 +304,7 @@
     "estimated_minutes": 15,
     "priority": "P0",
     "status": "implemented",
-    "verified": false
+    "verified": true
   },
   {
     "id": "F-018",
@@ -3195,6 +3195,133 @@
     ],
     "estimated_minutes": 20,
     "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-171",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Multi-line paste shall land in the composer as a multi-line draft (or an explicit visible line-join) — NEVER dropped (abuse round 2 finding 12, NEW P0: a bracketed paste of 3 lines including unicode ∿≋仏 produced ZERO occurrences anywhere — not in the composer, not in the transcript, no error; isolation showed single-line paste works both bracketed and raw, so the bug is newline handling in paste input). Complements parity contract 1.2 (F-135), which later grades a 10-line block; this feature fixes the input path the parity grade depends on.",
+    "steps": [
+      "Boot the app hermetically offline in tmux per the boot-smoke pattern (paste handling is client-side; no backend needed)",
+      "Load a 3-line payload including unicode (e.g. paste-line-one ∿ / paste-line-two ≋ / paste-line-three 仏) via tmux load-buffer and deliver it with paste-buffer -p (bracketed paste) targeting the composer",
+      "Poll-capture and observe all 3 line markers present in the composer as a multi-line draft (or joined with an explicit visible separator) — zero dropped lines, zero dropped unicode",
+      "Repeat with raw (non-bracketed) paste-buffer and observe the same no-loss guarantee",
+      "Add a unit test over the composer input path asserting newline-bearing input is preserved in the draft, never discarded"
+    ],
+    "verification": "tmux hermetic boot; printf 'paste-line-one ∿\\npaste-line-two ≋\\npaste-line-three 仏\\n' | tmux load-buffer - ; tmux paste-buffer -p into the composer; poll-capture: all three line markers (including the unicode chars) occur in the captured frame; script exits nonzero if any marker is absent; bun test green on the newline-paste preservation unit test",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-172",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Trace collapse by default: a completed turn shall render response-first with exactly ONE collapsed trace summary line beneath it (e.g. `✓ 4 steps · codex:gpt-5.4 · ^T expand`), with ^T toggling trace expansion; raw session/request hex IDs shall NEVER render in the transcript at any expansion state (operator flunk verdict finding 15: 'hello?' produced 11 lines of plumbing — trace expanded by default, raw session hex IDs, request numbers, 'Turn completed' — with the actual reply buried beneath; operator-facing rule: the response is the star, the trace is one collapsed line).",
+    "steps": [
+      "Boot the app with DHARMA_PYTHON pointed at a minimal scripted stub bridge (speaks the wire protocol on stdio, per bridge_events.md shapes) that completes one turn with response text and at least 2 trace steps",
+      "Send a prompt; poll-capture; observe the response text rendered ABOVE a single collapsed trace summary line carrying step count, route label, and the ^T hint — no expanded trace steps on first paint",
+      "Assert no session/request hex-id token (12+ consecutive hex chars) appears anywhere in the transcript region",
+      "Send ^T; capture; observe trace detail expanded (steps visible); send ^T again; observe it collapsed back — hex IDs absent in BOTH states",
+      "Add a unit test asserting the completed-turn transcript patch contains exactly one trace summary line and zero raw id fields"
+    ],
+    "verification": "tmux + stub-bridge turn: post-completion capture contains the response text above exactly one line matching '✓ .* · .* · \\^T' and zero matches of a hex-id pattern [0-9a-f]{12,} in the transcript region; trace step detail absent before ^T, present after ^T, absent after a second ^T; script exits nonzero on any violation; unit test green in bun test",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-173",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "The TS layer shall handle the `assistant` bridge event — {type:'assistant', request_id, message} emitted by terminal_bridge.py:760-765 (identity intents) and :776-781 (memory intents) per bridge_events.md §1.16 — and render its message as the turn's response text in the chat transcript. Today eventToTabPatch has NO assistant branch and identity/memory answers are DISCARDED silently (operator flunk verdict finding 16, CONFIRMED LIVE: the real backend answered 'who are you and what can you do?' via an assistant event; the TUI threw the words away and stamped '◇ Turn 1 | complete' with no response text — the worst bug). Additionally, a turn that ends without ANY response-bearing event shall NOT render as complete-with-empty-body: it renders an explicit no-response/failed marker instead (complements F-157's turn honesty). This is a targeted handler landed ahead of the full F-026 union work, which later subsumes it.",
+    "steps": [
+      "Add an assistant branch to the event-to-transcript path so {type:'assistant', message} renders as the turn's response on the chat tab, per the bridge_events.md §1.16 shape",
+      "Boot with a scripted stub bridge that answers a turn via assistant + synthesized session_end (the identity-intent shortcut response shape from bridge_events.md)",
+      "Send a prompt; poll-capture; observe the assistant message text rendered as the turn's response in the transcript",
+      "Stub a second turn that ends with session_end and NO response-bearing event; observe the turn renders an explicit no-response or failed marker — never a bare complete with empty body",
+      "Add a unit test feeding an assistant event fixture through the event ingress and asserting the chat transcript patch carries the message text"
+    ],
+    "verification": "tmux + stub bridge emitting {type:'assistant', request_id, message:'<sentinel text>'} then session_end: capture contains the sentinel text as the turn's response in the transcript; a second stub turn with no response-bearing event renders an explicit no-response/failed marker and does NOT show a completed turn with zero response text; script exits nonzero on either violation; assistant-fixture unit test green in bun test",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-174",
+    "component": "s1-bridge",
+    "category": "functional",
+    "description": "Session continuity: terminal_bridge.py shall honor the conversation history TS already sends in session.start.messages — today Python builds messages=[{role:'user',content:prompt}] only (terminal_bridge.py:807-814) and IGNORES the messages array app.tsx sends at :2091-2123 (bridge_events.md wire mismatch #1), so every turn cold-bootstraps a fresh session (operator flunk verdict finding 17: full bootstrap→session-ended per message, the same canned router monologue twice, and multi-second-to-minutes turn latency dominated by session startup — the operator's 'not even interactive'). When session.start carries messages, the bridge shall build the outbound completion request from that history with the prompt as the final user message (appended only if not already last); when messages is absent, today's prompt-only behavior is preserved. SCOPE: terminal_bridge.py + the bridge_events.md contract doc ONLY — do NOT touch orchestrator/spine surfaces.",
+    "steps": [
+      "Read bridge_events.md wire-mismatch #1 and terminal_bridge.py:807-814; implement messages consumption in the session.start handler (history passthrough + final-prompt rule), leaving behavior unchanged when messages is absent",
+      "Update bridge_events.md to mark wire mismatch #1 resolved, documenting the history-passthrough and prompt-precedence rule",
+      "Run a two-turn exchange (stub or live) with outbound-request logging: turn 1 sends a distinctive user message; on turn 2, capture the bridge's outbound completion request and observe it includes turn 1's user content (and turn 1's reply when available) BEFORE turn 2's prompt",
+      "Add a python-side test: session.start with a 3-entry messages array yields a completion request containing all 3 entries plus the prompt as final user message; session.start without messages yields the prompt-only request",
+      "Confirm the diff is confined to terminal_bridge.py + bridge_events.md (no orchestrator/spine files touched)"
+    ],
+    "verification": "two-turn exchange (stub or live) with outbound completion-request logging: turn 2's outbound messages array contains turn 1's user content ahead of turn 2's prompt; python-side test covering messages passthrough + prompt-only fallback passes; git diff for the feature touches only terminal_bridge.py and bridge_events.md — script exits nonzero if any orchestrator/spine surface appears in the diff",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-175",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Error rendering honesty: bridge errors shall render in the transcript as exactly ONE human-readable line with status color and a glyph matching semantics — ✖ for failure, NEVER a ✓ on a failed state — and raw JSON blobs shall never render in the transcript (operator flunk verdict finding 18: a full pretty-printed error object including schema_version and timestamps rendered in the conversation, AND the failure carried a ✓ checkmark — '✓ Status | session failed' — with 'Turn failed' as a buried sub-bullet). The failed turn's own row carries ✖; the full error payload goes to a debug surface/log, not the chat.",
+    "steps": [
+      "Route bridge error events (and turn-failing outcomes) through a one-line humanizer: status glyph + short human-readable message; the full payload is preserved on a debug surface/log only",
+      "Audit status-glyph selection so glyph and semantics always agree — no ✓ may render adjacent to failed/error text",
+      "Boot with a stub bridge that emits an error event carrying a nested JSON payload; send a prompt; poll-capture",
+      "Observe exactly one human-readable error line with ✖, zero '{' or '}' characters in the transcript region, and the turn row showing ✖ failed (not ✓)",
+      "Add a unit test: error event fixture → transcript patch is a single line, contains no brace characters, and the turn status glyph is ✖"
+    ],
+    "verification": "tmux + stub bridge emitting an error event with a JSON-object payload: capture shows exactly one error line containing ✖, zero '{'/'}' characters in the transcript region, and no ✓ glyph on the failed turn row; script exits nonzero on any violation; one-line brace-free error-render + glyph/semantics unit test green in bun test",
+    "dependencies": [
+      "F-002",
+      "F-157"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-176",
+    "component": "s4-theme",
+    "category": "visual",
+    "description": "ScenicStrip glyph-coverage fallback: when the terminal/font cannot render the block-art glyphs, the strip shall degrade gracefully — a simple wave rule or full suppression — never broken confetti (operator flunk verdict finding 19: the strip shattered into confetti blocks on the operator's actual terminal font). Implementation: a runtime opt-out env DHARMA_NO_SCENIC=1 suppresses the strip entirely, plus boot-default (zen) suppression so the default chat layout renders no art rows. HONEST LIMIT: font/glyph coverage is NOT reliably detectable from inside a TUI — the contract is graded on the opt-out and default-suppression paths, not on auto-detection (which this feature explicitly does not claim). The 25 hand-tuned art constants remain byte-identical per F-081 — suppression wraps rendering, never edits the art.",
+    "steps": [
+      "Add DHARMA_NO_SCENIC=1 handling: when set, the strip renders nothing (or a single plain rule line) and the layout reclaims the rows with no empty bordered band left behind",
+      "Make the boot-default (zen) layout suppress the scenic strip by default; cockpit or an explicit opt-in surface may still show it",
+      "Boot with DHARMA_NO_SCENIC=1 and capture at 80x24 and 120x40: zero block-art/shade glyph characters in the frames and no gap artifact where the strip was",
+      "Boot the default layout WITHOUT the env and observe no scenic art rows render by default (suppression is the default, not just the opt-out)",
+      "Record the font-detection limitation honestly in terminal/LESSONS/ — no auto-detect claim anywhere in code comments or docs"
+    ],
+    "verification": "tmux boot with DHARMA_NO_SCENIC=1: captures at 80x24 and 120x40 contain zero ScenicStrip block-art/shade glyphs and no empty bordered band at the strip's former position; default boot without the env also renders zero scenic art rows; unit/snapshot test covers the env-gated suppression branch; script exits nonzero on any art glyph under the opt-out; ScenicStrip.tsx art constants byte-identical (F-081 law)",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P2",
     "status": "not_started",
     "verified": false
   }
