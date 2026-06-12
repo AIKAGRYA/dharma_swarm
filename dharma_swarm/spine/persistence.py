@@ -48,10 +48,28 @@ async def ensure_receipt_column(db: AsyncDB) -> None:
 
 
 async def persist_receipt(receipt: EvidenceReceipt, db: AsyncDB) -> None:
-    """Write receipt JSON to the delegation_runs row for this task."""
+    """Write receipt JSON to the delegation_runs row for this task.
+
+    Surface split (do not conflate): receipt_json is the ORCHESTRATOR-surface
+    witness column (GATE-1 watches it). The A2A surface persists canonically
+    via RuntimeReceipt + IdempotencyRecord and leaves receipt_json empty —
+    an empty blob on an A2A row is success, not failure (see
+    tests/test_spine_persistence_invariant.py invariant 7).
+
+    Raises RuntimeError when the UPDATE matches zero rows: a 0-row write
+    committing silently would leave the operator's witness count flat with no
+    diagnostic — indistinguishable from "gate not yet attempted". Callers'
+    fail-open handlers turn this into a visible warning.
+    """
     receipt_json = json.dumps(receipt.to_dict(), default=str)
-    await db.execute(
+    cur = await db.execute(
         "UPDATE delegation_runs SET receipt_json = ? WHERE task_id = ?",
         (receipt_json, receipt.task_id),
     )
     await db.commit()
+    rowcount = getattr(cur, "rowcount", None)
+    if rowcount == 0:
+        raise RuntimeError(
+            f"persist_receipt: no delegation_runs row matched task_id="
+            f"{receipt.task_id!r} — receipt produced but NOT persisted"
+        )

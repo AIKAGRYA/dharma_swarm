@@ -1,0 +1,98 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-soak-monitor-activation",
+  "created_at_utc": "2026-06-02T16:01:24Z",
+  "agent": "codex_cli",
+  "role": "forge_reality_arena_runtime_guardian",
+  "authority": "internal_measurement_only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "run_id": "20260602T133721Z",
+  "result": "Cycle 13 closed the internal build lane early with autonomy_cycle_policy.decision=stop_internal_autonomy_cycles. This packet starts a passive 10h wall-clock soak monitor so the run continues as measurement evidence without generating fake internal build packets.",
+  "why_not_restart_build_hydra": "The v1 scorecard reports score=100, remaining_internal_packets=[], completion_state=internal_exhausted_external_gated, and remaining gates require Guardian/external acted receipt/operator lease authority. Restarting Codex build cycles would create churn rather than valid progress.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_soak.py",
+    "tests/test_forge_reality_arena_soak.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-soak-monitor-activation.json",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.md"
+  ],
+  "soak_monitor": {
+    "tmux_session": "forge-reality-arena-soak",
+    "state_dir": "/Users/dhyana/.dharma/forge_reality_arena_master",
+    "heartbeat_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/forge_reality_arena_soak_heartbeat.json",
+    "samples_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/soak/20260602T133721Z/samples.jsonl",
+    "latest_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/soak/20260602T133721Z/latest.json",
+    "manifest_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/soak/20260602T133721Z/manifest.json",
+    "log_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/forge-reality-arena-soak.log",
+    "interval_seconds": 600,
+    "target_hours": 10,
+    "run_started_at": "2026-06-02T13:37:21Z",
+    "mode": "passive_measurement_no_codex_build_cycles"
+  },
+  "status_integration": {
+    "scorecard_fields": [
+      "soak_monitor_ref",
+      "soak_monitor_status",
+      "soak_monitor_sample_index",
+      "soak_monitor_elapsed_hours",
+      "soak_monitor_remaining_hours"
+    ],
+    "control_watch_tower_visibility": true,
+    "machine_artifact_consistency_fields": [
+      "soak_monitor_ref",
+      "soak_monitor_status"
+    ]
+  },
+  "verification": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py scripts/runtime/forge_reality_arena_soak.py tests/test_forge_reality_arena_status.py tests/test_forge_reality_arena_soak.py",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_soak.py",
+      "exit_code": 0,
+      "result": "2 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_soak.py --run-started-at 2026-06-02T13:37:21Z --target-hours 10 --once --no-refresh",
+      "exit_code": 0,
+      "result": "one passive sample written; decision=stop_internal_autonomy_cycles"
+    },
+    {
+      "command": "tmux new-session -d -s forge-reality-arena-soak ... forge_reality_arena_soak.py",
+      "exit_code": 0,
+      "result": "session launched and heartbeat observed"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_soak.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "27 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --refresh-runtime-truth",
+      "exit_code": 0,
+      "result": "reports/forge/forge-reality-arena/status_artifact.json regenerated"
+    }
+  ],
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "codex_build_cycle_restarted": false,
+    "dry_run_or_measurement_only": true
+  },
+  "next_packet": "Let forge-reality-arena-soak run until elapsed_hours>=10, then run the final audit matrix and write the terminal v1 scorecard closeout receipt."
+}

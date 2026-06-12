@@ -1,0 +1,144 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-36-supervisor-decision",
+  "cycle": 36,
+  "created_at_utc": "2026-06-01T13:12:15Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Add a read-only autonomous supervisor decision to the Forge Hydra status artifact so the long-run runner can distinguish useful autonomous relaunches from countersign/operator-authority-gated churn.",
+  "status": "completed_repo_local_receipt",
+  "mcp_notes": {
+    "mcp_synergy": "Used MCP-first routing for filesystem reads and GitNexus impact analysis.",
+    "gitnexus_repo": "/Users/dhyana/dharma_swarm",
+    "filesystem": "Read Forge Hydra status generator, focused tests, cycle-35 audit, live status artifact, dense gym adapters, and DSE index before editing."
+  },
+  "impact": {
+    "gitnexus_targets": [
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:summarize_forge_hydra_status",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      },
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:render_markdown_status",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      }
+    ],
+    "detect_changes_scope_all": {
+      "risk": "CRITICAL",
+      "changed_files": 78,
+      "changed_symbols": 1312,
+      "affected_processes": 20,
+      "note": "Repository-wide dirty worktree predates this cycle; scoped cycle edits are limited to Forge Hydra status supervisor decision, its focused tests, and repo-local report artifacts."
+    }
+  },
+  "outputs": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-36/status_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-36/status.md",
+    "reports/forge/forge-hydra-status/cycle-36/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-36-supervisor-decision.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "status_artifact_has_autonomous_supervisor_decision": true,
+    "markdown_has_autonomous_supervisor_section": true,
+    "supervisor_continues_when_internal_work_available": true,
+    "supervisor_pauses_when_only_countersign_or_external_authority_remains": true,
+    "external_acted_receipts_remain_zero": true,
+    "archive_fitness_changed": false,
+    "external_contact_performed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "19 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py",
+      "outcome": "live status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --output-dir reports/forge/forge-hydra-status/cycle-36",
+      "outcome": "cycle-36 status artifacts regenerated"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/forge-hydra-status/cycle-36/status_artifact.json >/dev/null",
+      "outcome": "pass"
+    }
+  ],
+  "artifact_hashes": {
+    "status_script_sha256": "578dd45835fa4a4a6661c0300c72fbf296f2000a188aa0ce93ffceba23c5f240",
+    "status_test_sha256": "a30fe567ef42231a7728bd504a15d6a004da416abe345ed29cf44fb45f870787",
+    "live_status_artifact_sha256": "9b8b335e5706f0b8d01be1e635c950b6493e96fdca92ce8ffa5c2e13020c69ca",
+    "live_status_markdown_sha256": "8fc81a3a83bd99504da0bd1555fcb6a8f577d98441d1acf6acb36a85cde0abb1",
+    "cycle_status_artifact_sha256": "9b8b335e5706f0b8d01be1e635c950b6493e96fdca92ce8ffa5c2e13020c69ca",
+    "cycle_status_markdown_sha256": "8fc81a3a83bd99504da0bd1555fcb6a8f577d98441d1acf6acb36a85cde0abb1"
+  },
+  "status_snapshot": {
+    "next_cycle_status": "internal_evidence_waiting_on_countersign",
+    "next_cycle_recommended_action": "await_or_request_required_countersign",
+    "next_cycle_packet": "v0.1.0-live-telos-gate",
+    "next_cycle_internal_build_items": 0,
+    "next_cycle_internal_repair_items": 0,
+    "next_cycle_pending_countersign_items": 9,
+    "next_cycle_external_authority_blocked_items": 2,
+    "autonomous_cycle_useful": false,
+    "supervisor_relaunch_recommended": false,
+    "supervisor_recommended_action": "pause_relaunch_until_authority_state_changes",
+    "supervisor_boundary": "countersign_or_external_authority",
+    "supervisor_counts": {
+      "internal_build_items": 0,
+      "internal_repair_items": 0,
+      "pending_countersign_items": 9,
+      "external_authority_blocked_items": 2
+    },
+    "dense_eval_artifacts": 9,
+    "dense_eval_unique_packets": 3,
+    "dense_eval_artifacts_all_passed": true,
+    "external_acted_receipts": 0,
+    "quality_stratified_external_acted_receipts": 0,
+    "blocked_external_authority_items": 6,
+    "archive_fitness_authority": "none_from_this_status_artifact"
+  },
+  "canonical_receipt": {
+    "attempted": false,
+    "reason": "No mission/task/goal/AgentOps/DSE receipt identifier is present in this runtime; repo-local receipt artifacts are required.",
+    "detected_context_variables": []
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed.",
+    "Repository-wide GitNexus detect-changes remains critical because of pre-existing unrelated dirty worktree state."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

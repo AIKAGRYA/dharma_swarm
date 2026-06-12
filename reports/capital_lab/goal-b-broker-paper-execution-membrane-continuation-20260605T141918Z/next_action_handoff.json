@@ -1,0 +1,95 @@
+{
+  "artifact_type": "goal_b_operator_next_action_handoff",
+  "blocked_clean_status": true,
+  "broker_write_authority": false,
+  "clean": false,
+  "contract_caveats": [
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/MASTER_GOAL.md",
+      "status": "present_restored_by_planner_receipt_r-46f80f04fd71db7a",
+      "required_next_action": "treat_as_continuation_contract_and_keep_live_readiness_zero"
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/PACKET_SCHEMAS.md",
+      "status": "present_restored_by_planner_receipt_r-46f80f04fd71db7a",
+      "required_next_action": "validate_new_packets_against_restored_schema"
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-20260605T135732Z/",
+      "status": "missing_in_current_checkout",
+      "required_next_action": "restore_prior_planner_acceptance_artifacts_or_mark_superseded"
+    }
+  ],
+  "generated_at": "2026-06-05T14:26:02Z",
+  "hard_invariants": {
+    "broker_write_authority": false,
+    "clean": false,
+    "live_authority": false,
+    "live_readiness": 0,
+    "no_live_keys": true,
+    "no_live_orders": true,
+    "no_profit_claims": true
+  },
+  "input_artifacts": [
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T134546Z-goal-b-agni-broker-paper-execution/agni_readonly_execution_surface_scan.json",
+      "sha256": "311addfa7bcf768733cfbafac4aa7cdf29a591e593796f11c1ee7e44789ccb63"
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T134546Z-goal-b-agni-broker-paper-execution/adapter_readiness_packet.json",
+      "sha256": "d4965b2e5b01cd6fbc8fd4a49c8c5a849b84797203c32198b92372b14e1c97e0"
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T134546Z-goal-b-agni-broker-paper-execution/execution_feasibility_packet.json",
+      "sha256": "4836be354b95847febe1ce95ea8c4ac8807049ee75d5582115191f696086eea3"
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T135732Z-goal-b-broker-paper-execution-membrane/planner_packet.json",
+      "sha256": "e10741865e56df899271f129e479082799f7bdff562018857729170bdb0476c4"
+    }
+  ],
+  "live_authority": false,
+  "live_collaboration_claim": {
+    "a2a_live_ack_evidence": false,
+    "nats_live_ack_evidence": false,
+    "claimed": false,
+    "available_evidence": "autonomy_spine_ledger_and_tmux_dispatch_only"
+  },
+  "live_readiness": 0,
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "next_actions": [
+    {
+      "id": "use_restored_contract",
+      "owner_role": "planner",
+      "action": "Use the restored MASTER_GOAL.md and PACKET_SCHEMAS.md as the continuation contract and mark the missing 13:57 report artifacts restored or superseded.",
+      "acceptance": "Top-level contract files exist and preserve live_readiness=0, live_authority=false, clean=false until all gates pass."
+    },
+    {
+      "id": "fence_hyperliquid_authority",
+      "owner_role": "builder",
+      "action": "Fence or quarantine /root/hyperliquid-trading-agent from Goal B broker-paper authority.",
+      "acceptance": "Adapter path cannot import or call live Hyperliquid order/cancel methods and records an authority-fence packet."
+    },
+    {
+      "id": "broker_paper_lifecycle_parity",
+      "owner_role": "builder",
+      "action": "Build paper/sandbox adapter lifecycle receipts for submit, ack, partial_fill, full_fill, cancel, reject, and expire.",
+      "acceptance": "Every event is represented by a receipt with deterministic client_order_id and no secret values."
+    },
+    {
+      "id": "ledger_reconciliation",
+      "owner_role": "builder",
+      "action": "Reconcile local ledger orders against broker-paper snapshot and block on mismatch.",
+      "acceptance": "Reconciliation packet includes matching and mismatch cases with explicit blocked behavior."
+    },
+    {
+      "id": "negative_drills",
+      "owner_role": "verifier",
+      "action": "Run duplicate ID, rejection, cancel, expire, stale-data, heartbeat, max-loss, and rate/exposure drills.",
+      "acceptance": "Verifier records pass/fail receipts with commands and artifacts."
+    }
+  ],
+  "reporter_task_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation-t05-reporter",
+  "schema_version": "goal_b.operator_handoff.v1",
+  "status": "operator_handoff_written_unclean"
+}

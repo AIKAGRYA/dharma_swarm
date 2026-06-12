@@ -1,0 +1,55 @@
+{
+  "schema": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-12-status-dense-packet-dedup",
+  "cycle": 12,
+  "created_at": "2026-06-01T08:54:02Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "scope": "Harden the local Forge Hydra status dashboard so duplicate dense eval verifier artifacts are counted separately from unique dense eval packets.",
+  "outputs": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status-dense-packet-dedup/cycle-12/verifier_artifact.json",
+    "reports/forge/forge-hydra-status-dense-packet-dedup/cycle-12/completion_audit.md"
+  ],
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "5 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+      "outcome": "status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py tests/test_forge_pre_v1_audit.py -q --tb=short",
+      "outcome": "10 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null",
+      "outcome": "pass"
+    }
+  ],
+  "blockers": [
+    "Canonical ds-goal receipt not attempted because no mission/task/goal id environment variable was present.",
+    "GitNexus for /Users/dhyana/dharma_swarm remains unavailable; current worktree is not in the MCP registry and analyze timed out after 90 seconds."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "spending": false,
+    "commit_push_pr": false,
+    "fitness_changed": false
+  },
+  "status": "completed_repo_local_receipt"
+}

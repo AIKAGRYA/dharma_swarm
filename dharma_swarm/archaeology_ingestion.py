@@ -69,6 +69,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.memory_palace import PalaceQuery
 from typing import Any
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,98 @@
+{
+  "packet_id": "forge-external-beast-cycle-12",
+  "cycle": 12,
+  "recorded_at": "2026-06-01T20:17:49+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "public_pr_opened",
+  "external_confirmed": false,
+  "first_external_receipt_witness_created": false,
+  "archive_fitness_changed": false,
+  "target": {
+    "repo": "abduznik/instrumation",
+    "issue_url": "https://github.com/abduznik/instrumation/issues/96",
+    "pr_url": "https://github.com/abduznik/instrumation/pull/98",
+    "fork": "AmitabhainArunachala/instrumation",
+    "branch": "codex/issue-96-remove-simulateddriver",
+    "commit_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+    "base_sha": "8ef441f2f25b345022660ca958292a587861d513",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/abduznik-instrumation"
+  },
+  "readiness_gate": {
+    "packet_path": "reports/forge/external-beast/targets/abduznik-instrumation-issue-96/readiness.md",
+    "source_url_recorded": true,
+    "live_source_state_recorded": true,
+    "competition_scan_recorded": true,
+    "local_clone_or_fork_plan_recorded": true,
+    "acceptance_criteria_recorded": true,
+    "implementation_summary_recorded": true,
+    "test_command_and_result_recorded": true,
+    "public_action_plan_recorded": true,
+    "lease_fit_recorded": true,
+    "rollback_plan_recorded": true
+  },
+  "live_checks": {
+    "issue_open": true,
+    "issue_locked": false,
+    "issue_comments": 0,
+    "open_pr_competition_before_action": 0,
+    "pr_open": true,
+    "pr_draft": false,
+    "pr_mergeable": true,
+    "maintainer_action_observed": false,
+    "github_actions_state": "action_required_fork_workflow_gating"
+  },
+  "implementation": {
+    "summary": "Removed the dead SimulatedDriver(SimulatedMultimeter) stub from src/instrumation/drivers/simulated.py.",
+    "files_changed_in_target_repo": [
+      "src/instrumation/drivers/simulated.py"
+    ],
+    "additions": 0,
+    "deletions": 4
+  },
+  "tests": [
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "INSTRUMATION_MODE=SIM /Users/dhyana/.dharma/forge_external_beast/venvs/abduznik-instrumation-py311/bin/flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics",
+      "exit_code": 0,
+      "outcome": "passed",
+      "summary": "output 0"
+    },
+    {
+      "command": "INSTRUMATION_MODE=SIM /Users/dhyana/.dharma/forge_external_beast/venvs/abduznik-instrumation-py311/bin/python -m pytest -q",
+      "exit_code": 0,
+      "outcome": "passed",
+      "summary": "156 passed in 11.45s"
+    },
+    {
+      "command": "jq empty reports/agentops/work_packets/forge-external-beast-cycle-12.json",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check -- reports/forge/external-beast/cycle-012.md reports/forge/external-beast/targets/abduznik-instrumation-issue-96/readiness.md reports/agentops/work_packets/forge-external-beast-cycle-12.json",
+      "exit_code": 0,
+      "outcome": "passed"
+    }
+  ],
+  "public_actions": [
+    "created fork AmitabhainArunachala/instrumation",
+    "pushed branch codex/issue-96-remove-simulateddriver",
+    "opened PR https://github.com/abduznik/instrumation/pull/98"
+  ],
+  "guardrails": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_dharma_swarm_main": false,
+    "merged_protected_branch": false,
+    "published_broad_claim": false,
+    "set_nonzero_archive_fitness": false,
+    "escalated_to_v2_autonomy": false
+  },
+  "blocker": "No external acted receipt yet; PR 98 awaits external maintainer action."
+}

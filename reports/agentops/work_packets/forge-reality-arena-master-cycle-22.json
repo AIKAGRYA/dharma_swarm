@@ -1,0 +1,181 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-22",
+  "created_at_utc": "2026-06-02T08:45:22Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": {
+    "operator_cycle": 8,
+    "master_cycle": 22
+  },
+  "result": "Added a deterministic Reality Arena authority scan verifier, wired its pass/violation counts into status and the AgentOps status packet, refreshed all core arena artifacts, and verified 59 scoped JSON files with 0 external/fitness authority violations. Dense events remain internal training signal only and fitness authority stayed zero.",
+  "patch_hash": "sha256:c579a1916ce5104fdc9ab3b02c0e728f7c087bfd1e0b41e79055195238aac274",
+  "content_hash_inputs": [
+    "scripts/runtime/forge_reality_arena_authority_scan.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_authority_scan.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "files_changed": [
+    "scripts/runtime/forge_reality_arena_authority_scan.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_authority_scan.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md"
+  ],
+  "artifacts_refreshed": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "new_learning_artifacts": [
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json"
+  ],
+  "status_snapshot": {
+    "dense_reps": 100,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 97,
+    "transfer_passed_reps": 94,
+    "base_memorized_candidates_denied": 95,
+    "coordination_scenarios_run": 160,
+    "coordination_unique_scenarios": 20,
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_scenarios_passed": 160,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 20,
+    "failure_capsule_failure_classes": 12,
+    "failure_capsules_should_feed_fitness": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 94,
+    "transfer_gated_improvement_candidates": 94,
+    "fitness_boundary_blocked_candidates": 6,
+    "authority_scan_status": "passed",
+    "authority_scan_scanned_files": 59,
+    "authority_scan_violations": 0,
+    "authority_scan_blockers": 0,
+    "fitness_eligible_receipts": 0,
+    "external_anchors_observed_not_owned": 2,
+    "target_missing": []
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_authority_scan.py scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_authority_scan.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "20 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_reality_arena_authority_scan.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "43 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "7 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "exit_code": 0,
+      "outcome": "wrote 160-episode coordination artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0,
+      "outcome": "wrote normalized dense-event ledger"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0,
+      "outcome": "wrote Docker sandbox verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0,
+      "outcome": "wrote benchmark adapter verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-capsule-drill",
+      "exit_code": 0,
+      "outcome": "wrote 16-capsule drill artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "outcome": "wrote fitness-boundary dry-run artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "outcome": "scanned 59 scoped JSON files, 0 violations"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "wrote status_artifact.json, status.md, and forge-reality-arena-status.json with authority scan result"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json >/dev/null && python3 -m json.tool reports/forge/forge-reality-arena/status_artifact.json >/dev/null && python3 -m json.tool reports/agentops/work_packets/forge-reality-arena-status.json >/dev/null",
+      "exit_code": 0,
+      "outcome": "JSON artifacts parse"
+    }
+  ],
+  "tooling_notes": [
+    {
+      "tool": "GitNexus impact",
+      "status": "blocked",
+      "detail": "Repository /Users/dhyana/dharma_swarm was not available in GitNexus. The tool listed only sibling or stale worktrees, so a manual file-level impact scan and focused tests were used."
+    }
+  ],
+  "external_boundary": {
+    "external_actions_performed": false,
+    "external_repo_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "fitness_eligible_receipts": 0
+  },
+  "acceptance": {
+    "concrete_improvement": "deterministic authority scan verifier plus status and AgentOps packet wiring",
+    "status_refreshed": true,
+    "agentops_status_refreshed": true,
+    "repo_local_receipt_required": true,
+    "canonical_ds_goal_context_available": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "failure_capsules_should_feed_fitness_false": true,
+    "authority_scan_passed": true,
+    "fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutated": false
+  },
+  "next": "Use the authority scan as a fixed run-health gate, then add another transfer_probe or reality_latency adversarial scenario only if it increases coverage beyond the current saturated ladder."
+}

@@ -1,0 +1,22 @@
+{
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "task_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h-t04-verifier",
+  "timestamp": "2026-06-05T14:55:00Z",
+  "status": "completed",
+  "evidence": {
+    "files_verified": [
+      "dharma_swarm/capital_lab/alpha_evidence.py",
+      "tests/test_capital_lab_alpha_evidence.py"
+    ],
+    "boundary_checks": {
+      "live_readiness": 0,
+      "live_authority": false,
+      "secret_scan": "passed (no hardcoded keys found)",
+      "profit_claim_scan": "passed (no claims found in artifacts)"
+    },
+    "deterministic_tests": "Verified test file logic matches requirements (score caps, artifact manifest, report rendering). Tests are ready for execution once runtime environment allows.",
+    "artifact_integrity": "Artifact manifest and bundle validation logic implemented in alpha_evidence.py and verified."
+  },
+  "verification_status": "PASS_WITH_RESERVATIONS",
+  "reservations": "Execution of tests and autonomy_spine verify command blocked by tool restrictions. Structural and static verification complete."
+}

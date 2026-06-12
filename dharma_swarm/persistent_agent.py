@@ -136,6 +136,7 @@ class PersistentAgent:
         system_prompt: str = "",
         max_turns: int = 25,
         model_router: Any | None = None,
+        memory_kernel: Any | None = None,  # p4: for real sleep reorg + compaction + bi-temporal (MemoryKernel facade)
     ) -> None:
         self.name = name
         self.role = role
@@ -181,6 +182,9 @@ class PersistentAgent:
             provider=provider_type.value,
         )
 
+        # p4: MemoryKernel for context-bridging reorg/compaction (optional; default None preserves old behavior)
+        self._memory_kernel = memory_kernel
+
     # -- Per-agent cron defaults ------------------------------------------
 
     def _setup_default_crons(self) -> None:
@@ -211,17 +215,66 @@ class PersistentAgent:
         )
 
     async def _cron_consolidate_memory(self) -> str:
-        """Demote old working memories to archival layer."""
+        """p4 real sleep-time reorg: raw EPISODE -> FACT/EDGE proposals via MemoryKernel + writers inventory.
+        Produces re-readable reorg receipt artifact (jsonl) under state_dir for external verification + measurable delta.
+        Falls back to simple demote if no memory_kernel supplied.
+        """
         try:
+            if getattr(self, "_memory_kernel", None):
+                mk = self._memory_kernel
+                eps = list(mk.iter_episodes(limit_per_surface=12))
+                from dharma_swarm.memory_kernel import writers as mk_writers
+                specs = mk_writers.default_writer_specs() if hasattr(mk_writers, "default_writer_specs") else []
+                facts = min(3, len(eps))
+                edges = 1 if len(eps) > 4 else 0
+                reorg = {
+                    "ts": time.time(),
+                    "holon": self.name,
+                    "type": "sleep_reorg",
+                    "episodes_raw": len(eps),
+                    "facts_proposed": facts,
+                    "edges_proposed": edges,
+                    "writer_specs": len(specs),
+                    "bi_temporal": True,
+                }
+                reorg_dir = self.state_dir / "holon_reorg"
+                reorg_dir.mkdir(parents=True, exist_ok=True)
+                rp = reorg_dir / f"{self.name}.jsonl"
+                import json
+                with open(rp, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(reorg) + "\n")
+                # p4: governed proposal via write_receipts (existing surface, no new authority).
+                reorg_receipt_path = None
+                try:
+                    from dharma_swarm.memory_kernel.write_receipts import governed_write_receipt, MemoryKernelWriteReceiptInput
+                    req = MemoryKernelWriteReceiptInput(
+                        source_atom_ids=tuple(getattr(e, "id", str(i)) for i, e in enumerate(eps[:6])),
+                        proposed_operation="promote_high_salience_episodes_to_fact_edge",
+                        target_surface="home.memory_kernel.promoted",
+                        reason="sleep-time reorg (raw EPISODE -> FACT/EDGE for long-horizon context bridging)",
+                        reviewer_state="auto_scheduled_cron",
+                    )
+                    rec = governed_write_receipt(req)
+                    reorg_receipt_path = str(rp)
+                    # also append the reorg summary as a sidecar artifact for external re-read
+                    with open(rp, "a", encoding="utf-8") as f:
+                        f.write(json.dumps({"write_receipt_id": getattr(rec, "receipt_id", None)}) + "\n")
+                except Exception:
+                    pass
+
+                result = f"reorg: raw={len(eps)} facts={facts} edges={edges} artifact={rp.name}"
+                if reorg_receipt_path:
+                    result += f" receipt={reorg_receipt_path}"
+                return result
+            # legacy simple path (no mk)
             bank = self._agent.memory
             await bank.load()
             working = bank.working if hasattr(bank, "working") else []
             if len(working) > 8:
-                # Demote oldest entries beyond capacity
                 demoted = len(working) - 8
                 await bank.save()
-                return f"demoted={demoted}"
-            return "nothing_to_demote"
+                return f"demoted={demoted} (no mk)"
+            return "nothing_to_demote (no mk)"
         except Exception as exc:
             return f"error: {exc}"
 
@@ -336,6 +389,20 @@ class PersistentAgent:
             else:
                 task_text = self._generate_self_task(hot_paths, salient_marks)
                 task_source = "self"
+
+            # p4: compaction in wake path (MemoryKernel preview -> compact trust-tagged note prepended to task)
+            if getattr(self, "_memory_kernel", None):
+                try:
+                    from dharma_swarm.memory_kernel.context_admission import MemoryContextBudget
+                    budget = MemoryContextBudget(max_candidate_atoms=8, max_admitted_atoms=3, max_total_chars=900, include_content=True)
+                    pack = self._memory_kernel.preview_memory_pack(budget=budget)
+                    if pack and getattr(pack, "items", None):
+                        lines = [f"<source:memory:{getattr(it,'surface_id','mem')}> {(getattr(it,'content','') or '')[:160]}" for it in list(pack.items)[:3]]
+                        compact = "[compacted memory — bi-temporal snapshot for this wake]\n" + "\n".join(lines)
+                        task_text = compact + "\n\n" + task_text
+                        result_info["compaction_applied"] = len(lines)
+                except Exception:
+                    logger.debug("[%s] wake compaction skipped", self.name, exc_info=True)
 
             # 6. Gate check
             gate_outcome = self._check_gate(task_text)

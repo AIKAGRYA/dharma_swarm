@@ -1,0 +1,121 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-78",
+  "cycle": 78,
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "created_at_utc": "2026-06-02T04:18:07Z",
+  "objective": "Run a bounded Cycle 78 external-beast custody sweep: recheck active external PRs for material maintainer action, reverify known external merges, preserve authority boundaries, and record evidence.",
+  "scope": {
+    "repo_root": "/Users/dhyana/dharma_swarm",
+    "state_dir": "/Users/dhyana/.dharma/forge_external_beast",
+    "public_actions_allowed_by_lease": [
+      "fork/create branch if readiness gate passes",
+      "push target branch if readiness gate passes",
+      "open or update one concise PR if readiness gate passes",
+      "post one concise issue/PR comment tied to PR if normal for target"
+    ],
+    "public_actions_taken": [],
+    "forbidden_actions_not_taken": [
+      "spend money",
+      "request payment",
+      "claim bounty",
+      "submit private credentials",
+      "publish broad Dharma Swarm performance claims",
+      "merge or push to dharma_swarm main",
+      "set external_confirmed true",
+      "create first_external_receipt_witness",
+      "set nonzero archive fitness",
+      "escalate to v2 autonomy"
+    ]
+  },
+  "source_checks": {
+    "git_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "branch": "trust-build-compass",
+    "gitnexus_status": "up-to-date",
+    "github_connector_checked": true,
+    "github_graphql_checked": true,
+    "github_authored_search_checked": true
+  },
+  "results": {
+    "active_external_open_prs": 7,
+    "known_external_merges_reverified": 4,
+    "closed_unmerged_external_prs_rechecked": 1,
+    "new_material_external_actions": 0,
+    "new_public_action": false,
+    "archive_fitness_changed": false,
+    "witness_modified": false,
+    "blockers": "none"
+  },
+  "artifacts": [
+    "reports/forge/external-beast/cycle-078.md",
+    "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-078-active-pr-ledger.md",
+    "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-078-material-action-sweep.md",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-live-sweep/summary.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-receipt-guard/abduznik-instrumation-98-guard.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-receipt-guard/yasuno-5555-guild-7-guard.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-receipt-guard/leticiv-intigriti-asset-copier-6-guard.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-receipt-guard/abhigyan-shekhar-waggle-mcp-222-guard.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-receipt-guard/dry-run-probes.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-status/status_artifact.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-078-status/status.md"
+  ],
+  "verification": [
+    {
+      "command": "git status --short && git rev-parse --abbrev-ref HEAD && git rev-parse HEAD",
+      "outcome": "passed"
+    },
+    {
+      "command": "npx gitnexus status",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh auth status && gh api rate_limit",
+      "outcome": "passed"
+    },
+    {
+      "command": "GitHub connector search_issues",
+      "outcome": "passed for authored open, merged, and closed PR cross-checks"
+    },
+    {
+      "command": "GitHub GraphQL live PR/issue/review/comment sweep",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh search prs --author AmitabhainArunachala --state open/--merged/--state closed",
+      "outcome": "passed"
+    },
+    {
+      "command": "python scripts/runtime/forge_github_receipt.py --event-json ... --out ...",
+      "outcome": "passed for four known external merges"
+    },
+    {
+      "command": "python scripts/runtime/forge_github_receipt.py --dry-run-probes --out ...",
+      "outcome": "passed; synthetic authority blocked"
+    },
+    {
+      "command": "python scripts/runtime/forge_hydra_status.py --active-track-evidence /dev/null --output-dir ...",
+      "outcome": "passed"
+    },
+    {
+      "command": "jq empty on Cycle 78 JSON artifacts",
+      "outcome": "passed"
+    },
+    {
+      "command": "Cycle 78 artifact trailing-whitespace and ASCII scan",
+      "outcome": "passed"
+    },
+    {
+      "command": "shasum -a 256 on witness and readiness packets",
+      "outcome": "passed; hashes match Cycle 77 custody record"
+    },
+    {
+      "command": "bash scripts/runtime/codex_toolbelt_status.sh",
+      "outcome": "passed with expected optional credential warnings"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "passed"
+    }
+  ]
+}

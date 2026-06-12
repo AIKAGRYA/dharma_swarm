@@ -1,0 +1,223 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-42",
+  "cycle": 42,
+  "recorded_at": "2026-06-02T05:01:58+08:00",
+  "observed_at_utc": "2026-06-01T21:01:58Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "public_pr_opened_schmug_clodcast_issue_42_no_external_action_yet",
+  "public_action_taken": true,
+  "new_public_pr_opened": true,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": true,
+  "fork_created": true,
+  "automated_external_services_observed": true,
+  "non_maintainer_human_review_observed": true,
+  "human_maintainer_action_observed": false,
+  "new_pr_accepted_or_merged": false,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-042.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-042-active-pr-ledger.md",
+      "kind": "active_external_pr_ledger"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/schmug-clodcast-issue-42/cycle-042-readiness.md",
+      "kind": "target_readiness_packet_passed_gate"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-42.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-042-status/status_artifact.json",
+      "kind": "read_only_status_snapshot",
+      "sha256": "72055182dcad4087d670d489a0bb50bc75cf856b3dca2f3708a0d4efde8748bb",
+      "authority_state_hash": "sha256:b93e1c840b8898731e0f87cda0cfc0219bb852b2aebbedce307a885fbda00132"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-042-status/status.md",
+      "kind": "read_only_status_snapshot_markdown",
+      "sha256": "7a3678fb66dbff24008b5660eeeb74a312b42ab5bf349959aa75462d710e3289"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "dharma_impact_analysis_required": false
+  },
+  "new_external_pr": {
+    "repo": "schmug/clodcast",
+    "issue_number": 42,
+    "issue_url": "https://github.com/schmug/clodcast/issues/42",
+    "pr_number": 43,
+    "pr_url": "https://github.com/schmug/clodcast/pull/43",
+    "fork": "AmitabhainArunachala/clodcast",
+    "branch": "codex/issue-42-pages-hook-config",
+    "head_sha": "3e2c9611112134f987fbd319860128dc321997e9",
+    "base_sha": "64c7720f2413c9bea8c1fb68b69d488accab108b",
+    "state": "OPEN",
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "UNSTABLE",
+    "checks": {},
+    "comments": [],
+    "reviews": [],
+    "maintainer_action_observed": false,
+    "external_confirmed": false
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "pr_number": 222,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "issue_number": 3,
+      "pr_number": 5,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "issue_number": 4,
+      "pr_number": 6,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "UNSTABLE",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 11,
+      "pr_number": 22,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 7,
+      "pr_number": 23,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "external_human_comment_observed": true,
+      "treated_as_maintainer_acceptance": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "issue_number": 42,
+      "pr_number": 43,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "UNSTABLE",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "labmain_recheck": {
+    "repo": "labmain/ai-agent-pay-demo",
+    "issue_number": 35,
+    "issue_url": "https://github.com/labmain/ai-agent-pay-demo/issues/35",
+    "state": "OPEN",
+    "locked": false,
+    "labels": [
+      "bounty:$50"
+    ],
+    "comments_count": 11,
+    "updated_at": "2026-05-31T03:46:50Z",
+    "open_prs_referencing_issue": 17,
+    "open_pr_numbers_referencing_issue": [
+      36,
+      51,
+      53,
+      59,
+      61,
+      62,
+      66,
+      67,
+      68,
+      72,
+      76,
+      79,
+      80,
+      83,
+      85,
+      86,
+      88
+    ],
+    "disqualified": true,
+    "disqualification_reason": "high competition"
+  },
+  "status_projection": {
+    "status_artifact_sha256": "72055182dcad4087d670d489a0bb50bc75cf856b3dca2f3708a0d4efde8748bb",
+    "status_markdown_sha256": "7a3678fb66dbff24008b5660eeeb74a312b42ab5bf349959aa75462d710e3289",
+    "authority_state_hash": "sha256:b93e1c840b8898731e0f87cda0cfc0219bb852b2aebbedce307a885fbda00132",
+    "acted_receipts": 3,
+    "external_humans_or_orgs_acted": 3,
+    "internal_build_items": 0,
+    "internal_repair_items": 0,
+    "pending_countersign_items": 9,
+    "external_authority_blocked_items": 1,
+    "autonomous_cycle_useful": false
+  },
+  "guardrails": {
+    "money_spent_or_requested": false,
+    "payment_claimed": false,
+    "private_credentials_submitted": false,
+    "protected_branch_pushed_or_merged": false,
+    "broad_claims_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "external_confirmed_set": false,
+    "first_external_receipt_witness_created": false,
+    "archive_fitness_nonzero_set": false,
+    "v2_autonomy_escalated": false
+  },
+  "blockers": [
+    "active external PRs still lack maintainer acceptance, merge, approval, or material review",
+    "new schmug/clodcast PR 43 is open but has no external maintainer action yet",
+    "labmain issue 35 remains overcrowded with 17 competing open PRs",
+    "evaleval candidate remains blocked by competing PR 154"
+  ]
+}

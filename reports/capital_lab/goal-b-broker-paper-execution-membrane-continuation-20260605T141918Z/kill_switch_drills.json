@@ -1,0 +1,58 @@
+{
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "receipts": {
+    "heartbeat_kill_switch": {
+      "broker_write_authority": false,
+      "clean": false,
+      "condition": "heartbeat_missing",
+      "drill": "heartbeat_kill_switch",
+      "generated_at": "2026-06-05T15:10:20Z",
+      "kill_switch_engaged": true,
+      "live_authority": false,
+      "live_readiness": 0,
+      "passed": true,
+      "schema_version": "goal_b.kill_switch_drill.v1",
+      "self_hash": "02afb8043930eb88d12ab467c996252f94736327d52ecb9b94350505c4af2000"
+    },
+    "max_loss_or_drawdown_kill_switch": {
+      "broker_write_authority": false,
+      "clean": false,
+      "condition": "max_loss_exceeded",
+      "drill": "max_loss_or_drawdown_kill_switch",
+      "generated_at": "2026-06-05T15:10:20Z",
+      "kill_switch_engaged": true,
+      "live_authority": false,
+      "live_readiness": 0,
+      "passed": true,
+      "schema_version": "goal_b.kill_switch_drill.v1",
+      "self_hash": "f2fa7ea46f65524b8f404cb52b70fe023752fd729f17f7215ace39a74ce62271"
+    },
+    "order_rate_or_exposure_kill_switch": {
+      "broker_write_authority": false,
+      "clean": false,
+      "condition": "order_rate_or_exposure_limit_exceeded",
+      "drill": "order_rate_or_exposure_kill_switch",
+      "generated_at": "2026-06-05T15:10:20Z",
+      "kill_switch_engaged": true,
+      "live_authority": false,
+      "live_readiness": 0,
+      "passed": true,
+      "schema_version": "goal_b.kill_switch_drill.v1",
+      "self_hash": "26cdb63acb4a1e80cd1451dcf3b79168e6a57d0fe134458d24be8ef5aa2fb4f5"
+    },
+    "stale_data_kill_switch": {
+      "broker_write_authority": false,
+      "clean": false,
+      "condition": "market_data_stale",
+      "drill": "stale_data_kill_switch",
+      "generated_at": "2026-06-05T15:10:20Z",
+      "kill_switch_engaged": true,
+      "live_authority": false,
+      "live_readiness": 0,
+      "passed": true,
+      "schema_version": "goal_b.kill_switch_drill.v1",
+      "self_hash": "4d93426804f95579ad5ddec6d2dc3739f5ed3fc4826f454ac1170f6cadab5816"
+    }
+  },
+  "schema_version": "goal_b.kill_switch_drill_bundle.v1"
+}

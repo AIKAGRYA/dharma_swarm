@@ -1,0 +1,107 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-13-autonomy-cycle-policy",
+  "created_at_utc": "2026-06-02T15:48:47Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "cycle": {
+    "v1_cycle": 13,
+    "operator_cycle": 13,
+    "label": "autonomy-cycle-policy"
+  },
+  "result": "Cycle 13 made the v1 closeout machine-actionable. The scorecard/status/CWT contract now emits an autonomy_cycle_policy that tells the supervisor to continue only when internal packets remain or score is below threshold; otherwise it stops internal autonomy cycles at the external authority boundary.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-13-autonomy-cycle-policy.json"
+  ],
+  "verification": [
+    {
+      "command": "GitNexus impact build_v1_scorecard",
+      "exit_code": 0,
+      "result": "tool returned target not found; manual file-level blast radius used"
+    },
+    {
+      "command": "rg -n \"build_v1_scorecard\\(|control_watch_tower_visibility|remaining_internal_packets|remaining_external_gates\" scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py reports/forge/forge-reality-arena/v1_scorecard.md reports/agentops/work_packets/forge-reality-arena-status.json",
+      "exit_code": 0,
+      "result": "manual impact surface limited to status assembly, generated CWT/status/scorecard artifacts, and focused tests"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "25 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --refresh-runtime-truth",
+      "exit_code": 0,
+      "result": "pass; regenerated status_artifact, scorecard, AgentOps status, runtime truth snapshots, and Control Watch Tower readout"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "exit_code": 0,
+      "result": "dharma-reward-forge-v0 and goodworks-dgm-core-2026-05 reported shippable by local criteria"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "result": "pass; violation_count=0"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "result": "pass; dry_run_status=verified"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "exit_code": 0,
+      "result": "pass; probe_failures=[] and source_cache_mismatches=[]"
+    },
+    {
+      "command": "make onboard > /Users/dhyana/.dharma/forge_reality_arena_master/cycle_013_make_onboard.txt",
+      "exit_code": 0,
+      "result": "pass; onboard output captured under the v1 writable state dir"
+    }
+  ],
+  "evidence": {
+    "status_artifact_ref": "reports/forge/forge-reality-arena/status_artifact.json",
+    "scorecard_ref": "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "control_watch_tower_ref": "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "agentops_status_ref": "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "onboard_capture_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/cycle_013_make_onboard.txt",
+    "latest_v1_cycle_receipt_ref": "reports/agentops/work_packets/forge-reality-arena-v1-cycle-13-autonomy-cycle-policy.json",
+    "autonomy_cycle_policy_decision": "stop_internal_autonomy_cycles"
+  },
+  "acceptance": {
+    "autonomy_policy_promoted_to_status": true,
+    "autonomy_policy_embedded_in_scorecard": true,
+    "autonomy_policy_embedded_in_control_watch_tower": true,
+    "autonomy_policy_embedded_in_agentops_status": true,
+    "autonomy_policy_markdown_rendered": true
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "dry_run_only": true
+  },
+  "score_delta": "none; score remains 100/100 and internal_exhausted_external_gated",
+  "blockers": [
+    "GitNexus active checkout target lookup still cannot resolve build_v1_scorecard",
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next_packet": "Stop internal Forge Reality Arena v1 autonomy cycles unless an operator or architect opens v1.1 internal scope; otherwise request an operator-approved External Beast or Measurement Guardian lease packet."
+}

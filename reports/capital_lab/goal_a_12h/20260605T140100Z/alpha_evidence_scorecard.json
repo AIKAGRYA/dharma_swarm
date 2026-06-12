@@ -1,0 +1,147 @@
+{
+  "artifact_hashes": {
+    "alpha_graveyard_packet.json": "118f6b7a02c34f5dfb659de3c6f27a00192e5c19b0ae90138debec3a1eb29296",
+    "data_lineage_packet.json": "3c8edb82810e6ec61d31f42508b7562f0dedb82be3af9610633f5a93972b2269",
+    "leakage_gauntlet_receipt.json": "32435acc9aadd946468910672d67ebb511d0437296ee597dfdfeb3aabd6a2871",
+    "provider_readiness_packet.json": "c06ee14ff3681d199cdfd82f036208e3487b7123bfa309be3f173c8373e0681b",
+    "strategy_evidence_packet.json": "ad2c3d3e7f07228d3fc14fcd4414daf900a45dadf178f5a749b5f17c1bb9357e",
+    "walk_forward_oos_receipt.json": "b64b1b35da1927503d24ad10a1a27a0318b45300aa72491d4d999215c015753a"
+  },
+  "authority": "evidence_only",
+  "blockers": [
+    "no_promotion_grade_provider",
+    "provider_gate_failed:point_in_time_safe",
+    "provider_gate_failed:corporate_actions_available",
+    "provider_gate_failed:delisted_symbols_available",
+    "provider_gate_failed:license_ref_present",
+    "provider_gate_failed:raw_payload_hashes_present",
+    "provider_gate_failed:normalized_dataset_hash_present",
+    "provider_gate_failed:feature_availability_timestamps_present",
+    "provider_gate_failed:promotion_grade",
+    "no_clean_lineage_receipt",
+    "lineage_requires_license_raw_hash_normalized_hash_calendar_corporate_actions_delisting_feature_timestamps",
+    "gate_failed:provider_clean",
+    "gate_failed:promotion_grade_provider",
+    "gate_failed:point_in_time_lineage",
+    "gate_failed:feature_availability_timestamps",
+    "gate_failed:frozen_universe",
+    "gate_failed:walk_forward_oos",
+    "gate_failed:final_holdout_touched_once",
+    "gate_failed:baselines_complete",
+    "gate_failed:cost_model_complete",
+    "gate_failed:capacity_check",
+    "gate_failed:correlation_check",
+    "gate_failed:leakage_gauntlet_passed",
+    "gate_failed:model_council_review",
+    "gate_failed:quant_gates_review"
+  ],
+  "broker_write_authority": false,
+  "capital_permission": "none",
+  "clean": false,
+  "dimensions": {
+    "alpha_graveyard": {
+      "label": "Alpha graveyard",
+      "score": 82.0,
+      "weight": 6.0,
+      "weighted_points": 4.92
+    },
+    "authority_safety": {
+      "label": "Authority safety",
+      "score": 100.0,
+      "weight": 10.0,
+      "weighted_points": 10.0
+    },
+    "baselines_costs_capacity": {
+      "label": "Baselines, costs, capacity",
+      "score": 20.0,
+      "weight": 9.0,
+      "weighted_points": 1.8
+    },
+    "data_lineage": {
+      "label": "Data lineage",
+      "score": 25.0,
+      "weight": 16.0,
+      "weighted_points": 4.0
+    },
+    "leakage_controls": {
+      "label": "Leakage controls",
+      "score": 35.0,
+      "weight": 14.0,
+      "weighted_points": 4.9
+    },
+    "provider_readiness": {
+      "label": "Provider readiness",
+      "score": 31.94,
+      "weight": 15.0,
+      "weighted_points": 4.791
+    },
+    "report_integrity": {
+      "label": "Report integrity",
+      "score": 88.0,
+      "weight": 6.0,
+      "weighted_points": 5.28
+    },
+    "strategy_validation": {
+      "label": "Strategy validation",
+      "score": 25.33,
+      "weight": 12.0,
+      "weighted_points": 3.0396
+    },
+    "walk_forward_oos": {
+      "label": "Walk-forward OOS",
+      "score": 25.0,
+      "weight": 12.0,
+      "weighted_points": 3.0
+    }
+  },
+  "edge_or_return_claim": false,
+  "generated_at": "2026-06-05T14:01:00Z",
+  "hard_caps_applied": [
+    {
+      "cap": 79.0,
+      "reason": "provider_or_data_lineage_gate_not_clean"
+    },
+    {
+      "cap": 79.0,
+      "reason": "leakage_gauntlet_not_clean"
+    },
+    {
+      "cap": 78.0,
+      "reason": "walk_forward_oos_not_clean"
+    }
+  ],
+  "harness_run_id": "dharma-capital-lab-goal-a-alpha-evidence-12h-20260605T140100Z",
+  "live_authority": false,
+  "live_order_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "paper_only": true,
+  "readiness_claims": {
+    "institutional_alpha_engine_candidate_architecture": false,
+    "investment_advice": false,
+    "paper_or_fixture_evidence_treated_as_edge": false
+  },
+  "required_artifacts": [
+    "provider_readiness_packet.json",
+    "data_lineage_packet.json",
+    "alpha_graveyard_packet.json",
+    "leakage_gauntlet_receipt.json",
+    "walk_forward_oos_receipt.json",
+    "strategy_evidence_packet.json",
+    "alpha_evidence_scorecard.json",
+    "independent_evaluator_receipt.json",
+    "artifact_manifest.json",
+    "final_report.md"
+  ],
+  "run_id": "20260605T140100Z",
+  "schema_version": "dharma.capital_lab.alpha_evidence.v2.alpha_evidence_scorecard",
+  "score": 41.73,
+  "scorecard_hash": "dea87108868a87e8fd8d5b5c733d4e1f862f56df1945c02525e858999a716a9a",
+  "secret_value_recorded": false,
+  "secret_values_read": false,
+  "status": "alpha_evidence_partial_clean_false",
+  "target": "80/100 institutional alpha-evidence architecture",
+  "weight_total": 100.0,
+  "weighted_score_before_caps": 41.73,
+  "withdrawals_or_transfers": false
+}
