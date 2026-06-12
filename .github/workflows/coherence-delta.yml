@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
     types: [opened, edited, reopened, synchronize, ready_for_review]
+  merge_group:
 
 concurrency:
   group: coherence-delta-${{ github.ref }}
@@ -18,6 +19,11 @@ jobs:
   coherence-delta:
     name: Coherence Delta PR body
     runs-on: ubuntu-latest
+    # On merge_group batches there is no PR context (body, head/base
+    # SHAs); these PR-shaped validations already passed on the PR run
+    # before the PR entered the queue. Skipped = satisfied for required
+    # checks, so the queue is not blocked.
+    if: github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
       - name: Checkout
