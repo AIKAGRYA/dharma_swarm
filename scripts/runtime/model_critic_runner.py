@@ -107,6 +107,8 @@ def _call_ollama(
     endpoint: str,
     timeout_seconds: int,
 ) -> tuple[str, dict[str, Any], int]:
+    if not endpoint.lower().startswith(("http://", "https://")):
+        raise ValueError(f"unsupported critic endpoint scheme: {endpoint!r}")
     payload = {"model": model, "prompt": prompt, "stream": False}
     started = time.perf_counter()
     req = urllib.request.Request(

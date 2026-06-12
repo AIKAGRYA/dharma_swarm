@@ -341,7 +341,7 @@ def write_receipt(receipt_dir: Path, receipt: dict[str, Any]) -> Path:
     suffix = 1
     while True:
         try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
             path = receipt_dir / f"{stem}-{suffix}.json"
             suffix += 1
