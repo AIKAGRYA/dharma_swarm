@@ -184,7 +184,7 @@ class TestSelectProviders:
     def test_free_tier_providers(self, router: SmartRouter) -> None:
         providers = router.select_providers(CostTier.FREE)
         assert ProviderType.OLLAMA in providers
-        assert ProviderType.CEREBRAS in providers
+        assert ProviderType.GROQ in providers
         # No paid providers
         assert ProviderType.ANTHROPIC not in providers
 
@@ -368,11 +368,11 @@ class TestIntegrationHelpers:
         candidates = [
             ProviderType.ANTHROPIC,
             ProviderType.OLLAMA,
-            ProviderType.CEREBRAS,
+            ProviderType.GROQ,
             ProviderType.OPENAI,
         ]
         filtered = router.filter_candidates_by_tier(candidates, CostTier.FREE)
-        assert filtered == [ProviderType.OLLAMA, ProviderType.CEREBRAS]
+        assert filtered == [ProviderType.OLLAMA, ProviderType.GROQ]
 
     def test_filter_candidates_fallback(self, router: SmartRouter) -> None:
         # Only premium providers -> filtering for FREE falls back
@@ -391,12 +391,12 @@ class TestIntegrationHelpers:
             ProviderType.ANTHROPIC,
             ProviderType.OPENAI,
             ProviderType.OLLAMA,
-            ProviderType.CEREBRAS,
+            ProviderType.GROQ,
         ]
         reranked = router.rerank_candidates(candidates, CostTier.FREE)
         # Free tier providers should come first
         assert reranked[0] == ProviderType.OLLAMA
-        assert reranked[1] == ProviderType.CEREBRAS
+        assert reranked[1] == ProviderType.GROQ
         # Premium providers follow
         assert ProviderType.ANTHROPIC in reranked[2:]
         assert ProviderType.OPENAI in reranked[2:]

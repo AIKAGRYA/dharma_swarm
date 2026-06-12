@@ -70,8 +70,8 @@ from dharma_swarm.model_hierarchy import (
 )
 
 _TIER_PROVIDERS: dict[CostTier, list[ProviderType]] = {
-    CostTier.FREE: list(_H_FREE[:2]),   # Ollama, Cerebras
-    CostTier.CHEAP: list(_H_FREE[2:]) + list(_H_CHEAP),  # Groq..SambaNova + Mistral..OR_FREE
+    CostTier.FREE: list(_H_FREE[:2]),   # Ollama, Groq
+    CostTier.CHEAP: list(_H_FREE[2:]) + list(_H_CHEAP),  # Cerebras..NIM + GoogleAI..OR_FREE
     CostTier.MID: [
         ProviderType.OPENROUTER,
         ProviderType.GOOGLE_AI,
