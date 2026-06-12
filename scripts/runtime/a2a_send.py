@@ -28,6 +28,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import ssl
 import sys
 import uuid
@@ -253,7 +254,14 @@ def main(argv: list[str] | None = None) -> int:
             receipt.update(outcome)
         except Exception as exc:  # surface broker/TLS failures as a receipt, not a stack trace
             receipt["status"] = STATUS_PUBLISH_FAILED
-            receipt["error"] = f"{type(exc).__name__}: {exc}"
+            # Redact credential material: NATS errors can echo the endpoint URL
+            # as user:password@host, and config.credential must never reach the
+            # printed/persisted receipt (CodeQL py/clear-text-logging-sensitive-data).
+            error_text = f"{type(exc).__name__}: {exc}"
+            if config.credential:
+                error_text = error_text.replace(config.credential, "***")
+            error_text = re.sub(r"://[^/@\s]+@", "://***@", error_text)
+            receipt["error"] = error_text[:500]
 
     receipt_path = write_receipt(Path(args.receipt_dir), receipt)
     receipt["receipt_path"] = str(receipt_path)

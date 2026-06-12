@@ -5,3 +5,4 @@
 2026-06-12T01:19:32Z STEP3 timing proof: _workspace_section over ~/.dharma = 0.20s (pre-fix ~73s)
 2026-06-12T01:19:56Z STEP4a daemon kickstarted, new pid 89130, DHARMA_SPINE_DISPATCH=1 confirmed
 2026-06-12T01:23:23Z STEP4 daemon restarted pid 89130, spine flag confirmed, lock held; starting witness watch
+2026-06-12T01:35:29Z STEP4b WARNING: new daemon pid 89130 wedged in boot since 10:20:24 JST — synthesize_lessons_learned/MemoryPalace regex scan blocking event loop, 72GB RSS, no ticks yet; witness watch armed, waiting

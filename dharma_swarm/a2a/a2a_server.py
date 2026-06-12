@@ -485,7 +485,8 @@ class A2AServer:
             return False
         task.status = A2ATaskStatus.CANCELLED
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s cancelled", task_id)
+        safe_task_id = str(task_id).replace("\n", " ").replace("\r", " ")[:128]
+        logger.info("A2A task %s cancelled", safe_task_id)
         return True
 
     def reject(self, task_id: str, reason: str = "") -> bool:
@@ -499,7 +500,8 @@ class A2AServer:
         task.status = A2ATaskStatus.REJECTED
         task.error = safe_reason
         task.updated_at = datetime.now(timezone.utc).isoformat()
-        logger.info("A2A task %s rejected: %s", task_id, safe_reason)
+        safe_task_id = str(task_id).replace("\n", " ").replace("\r", " ")[:128]
+        logger.info("A2A task %s rejected: %s", safe_task_id, safe_reason)
         return True
 
     def require_auth(self, task_id: str, reason: str = "") -> bool:

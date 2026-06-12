@@ -85,12 +85,19 @@ def _coerce_provider(raw: str | None) -> str:
     return candidate
 
 
+_AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-.]{0,63}$")
+
+
 def load_holon(name: str, agents_root: Path | None = None) -> RunningHolon:
     """Load a registered agent from ``~/.dharma/agents/<name>/`` as a RunningHolon.
 
     ``system_prompt`` is the agent's own ``prompt_variants/active.txt`` (byte-for-byte,
     BOM-stripped), falling back to ``identity['system_prompt']`` (logged) when absent.
+    ``name`` must be a registry directory slug — anything else is rejected before any
+    path is built (path-traversal + log-injection defense at the record→runtime door).
     """
+    if not _AGENT_NAME_RE.fullmatch(name or ""):
+        raise FileNotFoundError("no registered agent (invalid name)")
     root = agents_root or AGENTS_ROOT
     agent_dir = root / name
     identity_path = agent_dir / "identity.json"

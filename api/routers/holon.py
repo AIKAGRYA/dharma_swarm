@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -23,6 +24,11 @@ from dharma_swarm.conversation_log import log_exchange
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# System-boundary validation: holon names are registry directory names. Rejecting
+# anything else here cuts the user-controlled taint for every downstream logger
+# (router, holon_bridge, holon_compass) and blocks path traversal into the registry.
+_HOLON_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-.]{0,63}$")
 
 
 class HolonChatRequest(BaseModel):
@@ -37,12 +43,15 @@ def _sse(obj: dict) -> str:
 @router.post("/holon/{name}/chat")
 async def holon_chat(name: str, req: HolonChatRequest):
     """Stream a reply from the holon's OWN model. Never delegates to _agentic_stream."""
+    if not _HOLON_NAME_RE.fullmatch(name):
+        raise HTTPException(status_code=404, detail="no registered holon by that name")
     try:
         holon = holon_bridge.load_holon(name)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"no registered holon: {name}") from exc
     except ValueError as exc:  # malformed identity.json / no model
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.error("[holon] %s: identity load failed: %s", name, exc)
+        raise HTTPException(status_code=500, detail="holon identity is malformed") from exc
 
     provider = holon_bridge.get_holon_provider(holon)
     session_id = f"holon-{name}"
@@ -57,8 +66,10 @@ async def holon_chat(name: str, req: HolonChatRequest):
                 collected.append(chunk)
                 yield _sse({"content": chunk})
         except Exception as exc:  # provider failure mid-stream — surface, don't crash the conn
-            logger.warning("[holon] %s reply error: %s", name, exc)
-            yield _sse({"error": str(exc)[:300]})
+            logger.warning("[holon] %s reply error: %s", name, exc, exc_info=True)
+            # Generic client-facing error: exception text can carry provider URLs,
+            # key names, or stack fragments (CodeQL py/stack-trace-exposure).
+            yield _sse({"error": "provider error — see server logs"})
         reply_text = "".join(collected)
         log_exchange(
             "assistant", reply_text, interface="holon",
