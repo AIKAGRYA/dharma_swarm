@@ -78,6 +78,7 @@ from dharma_swarm.terminal_commands.agents import (
     _cmd_agent_talk,
     _cmd_agent_run,
     _cmd_agent_status,
+    _cmd_agent_kill,
     cmd_task_create,
     cmd_task_list,
 )
@@ -635,6 +636,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_agent_status.add_argument("name", nargs="?", default=None)
     p_agent_status.add_argument("--json", action="store_true", help="Emit JSON output")
+
+    p_agent_kill = agent_sub.add_parser(
+        "kill",
+        help="Raise (or clear) the durable kill signal for a registered holon",
+    )
+    p_agent_kill.add_argument("name", help="Registered holon name, e.g. opus_composer")
+    p_agent_kill.add_argument("--reason", default="", help="Why the holon is being halted")
+    p_agent_kill.add_argument("--clear", action="store_true", help="Clear an existing kill signal")
 
     # -- task --
     p_task = sub.add_parser("task", help="Task management")
@@ -1555,21 +1564,34 @@ def main() -> None:
                     _cmd_agent_list()
                 case "runs":
                     _cmd_agent_runs()
-                case "talk":
-                    _cmd_agent_talk(
-                        args.name,
-                        " ".join(args.message),
-                        routing_mode=args.mode,
-                        max_tokens=args.max_tokens,
-                    )
-                case "run":
-                    _cmd_agent_run(
-                        args.name,
-                        cycles=args.cycles,
-                        routing_mode=args.mode,
-                    )
-                case "status":
-                    _cmd_agent_status(args.name, as_json=args.json)
+                case "talk" | "run" | "status" | "kill":
+                    # Holon subcommands fail closed with a concise error, never a traceback.
+                    try:
+                        match args.agent_cmd:
+                            case "talk":
+                                _cmd_agent_talk(
+                                    args.name,
+                                    " ".join(args.message),
+                                    routing_mode=args.mode,
+                                    max_tokens=args.max_tokens,
+                                )
+                            case "run":
+                                _cmd_agent_run(
+                                    args.name,
+                                    cycles=args.cycles,
+                                    routing_mode=args.mode,
+                                )
+                            case "status":
+                                _cmd_agent_status(args.name, as_json=args.json)
+                            case "kill":
+                                _cmd_agent_kill(
+                                    args.name,
+                                    reason=args.reason,
+                                    clear=args.clear,
+                                )
+                    except Exception as e:
+                        print(f"Agent command failed: {e}")
+                        raise SystemExit(2)
                 case _:
                     parser.parse_args(["agent", "--help"])
         case "task":

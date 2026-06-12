@@ -21,10 +21,13 @@ from dharma_swarm.models import LLMRequest
 from dharma_swarm.runtime_provider import (
     ProviderType,
     create_runtime_provider,
-    resolve_runtime_provider_config,
+    preferred_runtime_provider_configs,
 )
 
-FREE_FIRST = ["ollama", "openrouter", "deepseek", "nvidia_nim"]
+# Free-first mode deliberately excludes the Claude/Max door: the declared-first mode
+# owns that route, and a local sovereign agent's cheap mode must never silently route
+# to claude_code (05_RECONCILED_PLAN non-negotiables).
+_FREE_CHAIN_EXCLUDES = frozenset({ProviderType.CLAUDE_CODE})
 ROUTING_MODE_CHOICES = ("free-first", "declared-first")
 _PROVIDER_FAILURE_MARKERS = (
     "credit balance is too low",
@@ -58,20 +61,21 @@ def _looks_like_provider_failure(reply: str) -> bool:
 
 
 def _resolve_free_provider():
-    """Free-first provider resolution (explicit local-free mode). Returns (provider, ptype, model)."""
-    last_err = None
-    for pname in FREE_FIRST:
-        try:
-            ptype = ProviderType(pname)
-        except ValueError:
+    """Free-first provider resolution via the canonical low-cost chain.
+
+    Walks ``preferred_runtime_provider_configs()`` — the single source of provider
+    ordering (Ollama and NVIDIA NIM before any OpenRouter lane) — instead of a
+    hand-rolled list, skipping the claude_code fallback door. Returns
+    ``(provider, ptype_value, model)``.
+    """
+    last_err = "no providers available"
+    for cfg in preferred_runtime_provider_configs():
+        if cfg.provider in _FREE_CHAIN_EXCLUDES:
             continue
         try:
-            cfg = resolve_runtime_provider_config(ptype)
-            if not getattr(cfg, "available", True):
-                continue
-            return create_runtime_provider(cfg), pname, cfg.default_model
+            return create_runtime_provider(cfg), cfg.provider.value, cfg.default_model
         except Exception as exc:  # noqa: BLE001
-            last_err = f"{pname}: {type(exc).__name__}: {exc}"
+            last_err = f"{cfg.provider.value}: {type(exc).__name__}: {exc}"
             continue
     raise RuntimeError(f"no free provider available (last: {last_err})")
 
@@ -121,18 +125,21 @@ async def talk(
             max_tokens=max_tokens,
         )
 
+    fallback_from: str | None = None
     try:
         reply = await _stream_request(provider, _request(model))
     except Exception as exc:  # noqa: BLE001
         if mode != "declared-first":
             raise
         print(f"\n[warn] declared route failed ({type(exc).__name__}: {exc}); falling back to free-first")
+        fallback_from = route_label
         provider, pname, model = _resolve_free_provider()
         route_label = f"{pname}/{model}"
         print(f"{name} [fallback {route_label}]> ", end="", flush=True)
         reply = await _stream_request(provider, _request(model))
-    if mode == "declared-first" and _looks_like_provider_failure(reply):
+    if mode == "declared-first" and fallback_from is None and _looks_like_provider_failure(reply):
         print("\n[warn] declared route returned provider/account failure; falling back to free-first")
+        fallback_from = route_label
         provider, pname, model = _resolve_free_provider()
         route_label = f"{pname}/{model}"
         print(f"{name} [fallback {route_label}]> ", end="", flush=True)
@@ -144,6 +151,7 @@ async def talk(
         "holon": name,
         "routing_mode": mode,
         "model": route_label,
+        "fallback_from": fallback_from,
         "at": datetime.now(timezone.utc).isoformat(),
         "you": message,
         "reply": reply,

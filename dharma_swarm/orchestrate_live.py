@@ -2193,12 +2193,38 @@ async def orchestrate(background: bool = False) -> None:
 
     _log("orchestrator", f"All {len(tasks)} systems launched ({len(tasks)} loops incl. free-grind)")
 
+    abandoned_loops: set[str] = set()
+
+    def _write_loop_liveness(restart_counts: dict[str, int]) -> None:
+        """Project loop liveness for read-only operator surfaces (dgc status).
+
+        This loop is the owner of loop-liveness truth; abandoned loops used to
+        be visible only by grepping swarm.log (world-model died silently at
+        every boot for this reason — NEW-14).
+        """
+        try:
+            path = STATE_DIR / "ops" / "loop_liveness.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "pid": os.getpid(),
+                "running": sorted(tasks.keys()),
+                "restart_counts": dict(restart_counts),
+                "abandoned": sorted(abandoned_loops),
+            }
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            tmp.replace(path)
+        except Exception:
+            logger.debug("loop_liveness write failed", exc_info=True)
+
     try:
         # Resilient loop: restart failed tasks instead of dying on first error.
         # Transient failures (e.g. "database is locked") should not kill all
         # 13 loops — just log, wait a beat, and let the system heal.
         max_restarts = 5
         restart_counts: dict[str, int] = {}
+        _write_loop_liveness(restart_counts)
 
         while tasks and not shutdown_event.is_set():
             done, pending = await asyncio.wait(
@@ -2242,6 +2268,9 @@ async def orchestrate(background: bool = False) -> None:
                     tasks[name] = asyncio.create_task(task_factories[name](), name=name)
                 else:
                     _log("orchestrator", f"System {name} exceeded max restarts, abandoning")
+                    abandoned_loops.add(name)
+
+            _write_loop_liveness(restart_counts)
 
     except asyncio.CancelledError:
         pass

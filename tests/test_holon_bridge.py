@@ -139,6 +139,80 @@ def test_holon_talk_declared_first_uses_identity_model(tmp_path, monkeypatch):
     }
 
 
+def test_holon_talk_free_first_walks_canonical_chain(monkeypatch):
+    """free-first must use preferred_runtime_provider_configs and skip the claude_code door."""
+    from types import SimpleNamespace
+
+    from scripts import holon_talk
+    from dharma_swarm.runtime_provider import ProviderType
+
+    configs = [
+        SimpleNamespace(provider=ProviderType.CLAUDE_CODE, default_model="claude-opus-4-8"),
+        SimpleNamespace(provider=ProviderType.OLLAMA, default_model="glm-5:cloud"),
+        SimpleNamespace(provider=ProviderType.NVIDIA_NIM, default_model="llama-3.3-70b"),
+    ]
+    monkeypatch.setattr(holon_talk, "preferred_runtime_provider_configs", lambda: configs)
+    sentinel = object()
+    created: list = []
+
+    def _fake_create(cfg):
+        created.append(cfg.provider)
+        return sentinel
+
+    monkeypatch.setattr(holon_talk, "create_runtime_provider", _fake_create)
+
+    provider, pname, model = holon_talk._resolve_free_provider()
+
+    assert provider is sentinel
+    assert pname == "ollama"  # first non-claude entry of the canonical chain
+    assert model == "glm-5:cloud"
+    assert created == [ProviderType.OLLAMA]  # claude_code skipped, never instantiated
+
+
+async def test_holon_talk_declared_failure_falls_back_with_receipt_provenance(
+    tmp_path, monkeypatch, capsys
+):
+    """Declared-route failure text must fall back once and record fallback_from in the receipt."""
+    from scripts import holon_talk
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    root = _make_agent(tmp_path / "agents-root")
+    holon = load_holon("opus_composer", agents_root=root)
+    monkeypatch.setattr(holon_talk, "load_holon", lambda name: holon)
+
+    class FailingProvider:
+        async def stream(self, request):
+            yield "Credit balance is too low"
+
+    class GoodProvider:
+        async def stream(self, request):
+            yield "I am opus_composer; my telos is dharma."
+
+    monkeypatch.setattr(
+        holon_talk,
+        "_resolve_declared_provider",
+        lambda h: (FailingProvider(), "claude_code", "claude-opus-4-8"),
+    )
+    free_calls: list[int] = []
+
+    def _fake_free():
+        free_calls.append(1)
+        return GoodProvider(), "ollama", "glm-5:cloud"
+
+    monkeypatch.setattr(holon_talk, "_resolve_free_provider", _fake_free)
+
+    rc = await holon_talk.talk("opus_composer", "who are you?", routing_mode="declared-first")
+
+    assert rc == 0
+    assert free_calls == [1]  # exactly one fallback, no double fallback
+    rpath = tmp_path / ".dharma" / "agents" / "opus_composer" / "talk_receipts.jsonl"
+    receipt = json.loads(rpath.read_text(encoding="utf-8").splitlines()[-1])
+    assert receipt["routing_mode"] == "declared-first"
+    assert receipt["model"] == "ollama/glm-5:cloud"
+    assert receipt["fallback_from"] == "claude_code/claude-opus-4-8"
+    assert "opus_composer" in receipt["reply"]
+
+
 # --- Criterion 2: holon_reply routes through the holon's OWN model AND streams freely ---
 
 async def test_stub_model_routing(tmp_path):

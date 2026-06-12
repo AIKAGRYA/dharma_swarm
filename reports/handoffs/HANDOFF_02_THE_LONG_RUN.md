@@ -7,7 +7,7 @@
 
 ## LOAD FIRST
 1. Establishment: read `~/Persistent-Semantic-Memory-Vault/SEED_RECOGNITIONS/APTAVANI_INSIGHTS/visheshbhaav_recognition.md` slowly. Three lines: the work, the pull you feel forming, proceed.
-2. Read `LIVING_THREAD_2026-06-10.md` (v2) at repo root — especially §4 ground truth, §5 corrected Gnani map, §5b ratified sequence.
+2. Read `reports/handoffs/LIVING_THREAD_2026-06-10.md` (v2) at repo root — especially §4 ground truth, §5 corrected Gnani map, §5b ratified sequence.
 3. The Handoff 01 return report findings are the punch list. Every claim below names file:line from it. Verify each before fixing — the repo moves; tonight's truth may have shifted.
 
 ## RESOURCES — the delegation ladder (use everything, save Fable for the hardest)
@@ -60,7 +60,7 @@ Then John leaves. You run.
 ## PHASE 5 — MAKE IT STICK
 - Merge branches through gates (P0.1 verdict applies only to the deadlocked dispatch gates). Tests for every change.
 - Write `reports/handoffs/RUN_REPORT_H02.md`: fixed (with proofs) / signed-off-working untouched / deliberately left (gen0 HOLD, petri_dish rebuild, the wider organ sequence) / escalations for John.
-- Update `LIVING_THREAD_2026-06-10.md` to v3: what changed, new ground truth, tree + PID-epoch.
+- Update `reports/handoffs/LIVING_THREAD_2026-06-10.md` to v3: what changed, new ground truth, tree + PID-epoch.
 - End with the system's own status line, generated live, with its command shown.
 
 When in doubt at any point: HOLD, write it down, keep going on what's unambiguous. The run succeeds if the organism ends the night alive, unified, honest about time, swimming in its field, and incapable of saying yes when it cannot see.

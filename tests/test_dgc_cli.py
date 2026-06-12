@@ -217,6 +217,52 @@ def test_dgc_cli_agent_status_command_dispatch():
             mock.assert_called_once_with("opus_composer", as_json=True)
 
 
+def test_dgc_cli_agent_kill_command_dispatch():
+    """main() dispatches `agent kill` to the holon kill-switch wrapper."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "kill", "opus_composer", "--reason", "maintenance"]):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_kill") as mock:
+            main()
+            mock.assert_called_once_with("opus_composer", reason="maintenance", clear=False)
+
+
+def test_dgc_cli_agent_kill_clear_dispatch():
+    """main() forwards `agent kill --clear` to the wrapper."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "kill", "opus_composer", "--clear"]):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_kill") as mock:
+            main()
+            mock.assert_called_once_with("opus_composer", reason="", clear=True)
+
+
+def test_dgc_cli_agent_talk_error_is_user_friendly(capsys):
+    """Holon talk failures should be concise CLI errors, not tracebacks."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "talk", "ghost", "hello"]):
+        with patch(
+            "dharma_swarm.dgc_cli._cmd_agent_talk",
+            side_effect=FileNotFoundError("no registered agent at ~/.dharma/agents/ghost/identity.json"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 2
+    assert "Agent command failed:" in capsys.readouterr().out
+
+
+def test_dgc_cli_agent_talk_nonzero_exit_passes_through():
+    """A nonzero holon talk exit code must propagate, not be remapped to 2."""
+    from dharma_swarm.dgc_cli import main
+
+    with patch("sys.argv", ["dgc", "agent", "talk", "opus_composer", "hello"]):
+        with patch("dharma_swarm.dgc_cli._cmd_agent_talk", side_effect=SystemExit(1)):
+            with pytest.raises(SystemExit) as exc:
+                main()
+    assert exc.value.code == 1
+
+
 def test_cmd_status_reports_canonical_pulse_artifacts(monkeypatch, tmp_path, capsys):
     """cmd_status should use canonical ~/.dharma pulse artifacts when legacy state is absent."""
     import subprocess

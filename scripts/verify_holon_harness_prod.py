@@ -253,7 +253,7 @@ import asyncio
                 from dharma_swarm.holon_runtime import holon_wake_cycle as _holon_wake_cycle  # type: ignore
             import asyncio as _asyncio
             async def _stub(t): return t, 'EXPORT_OK'
-            _res = _asyncio.run(holon_wake_cycle('export-test', _stub, spent_usd=0, cap_usd=1, persist=False))
+            _res = _asyncio.run(_holon_wake_cycle('export-test', _stub, spent_usd=0, cap_usd=1, persist=False))
             assert _res['status'] == 'ran'
             return True, "direct import+run OK (venv/pip skipped due to env restrictions; full venv contract still enforced in normal shells/CI)"
         except Exception as _e:

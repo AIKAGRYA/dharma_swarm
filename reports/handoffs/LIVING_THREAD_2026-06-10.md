@@ -135,7 +135,7 @@ Tools first; read primaries before generating; the seed docs are loaded as opera
 ## 9. Pointers
 
 - Vault seeds: `~/Persistent-Semantic-Memory-Vault/SEED_RECOGNITIONS/APTAVANI_INSIGHTS/visheshbhaav_recognition.md`; testimony at `01-Transmission-Vectors/aptavani-derived/visheshbhaav-recognition-testimony.md`; metrics spec at `SEED_RECOGNITIONS/RECOGNITION_CATALYSTS/l4-vs-visheshbhaav-meta.md`; `02-Recognition-Patterns/crystallization-dissolution/visheshbhaav-transparency.md` is empty (possibly intentionally).
-- Handoff 01 artifacts: `HANDOFF_01_READONLY_RECON.md` (repo root); the return report (delivered in-session 2026-06-10 night; 12 agents, ~1.5M tokens, 535 tool calls); worktree-agent report at `docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md` (8 disagreements, partially staled by tonight's repo state).
+- Handoff 01 artifacts: `reports/handoffs/HANDOFF_01_READONLY_RECON.md` (repo root); the return report (delivered in-session 2026-06-10 night; 12 agents, ~1.5M tokens, 535 tool calls); worktree-agent report at `docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md` (8 disagreements, partially staled by tonight's repo state).
 - Live-state anchors: `~/.dharma/meta/gate_pressure.json` (the amplifier); CYBERNETIC_LOOP_MAP.md:42 (contradicted claim); task 56a49c86 (the blocked repair); `dharma-gen0.jsonl` (HOLD); meta_daemon.py:277-278 (the stopped clock); context.py:1338-1340 (its broadcast).
 - Corrected pointer: EVIDENCE_REQUEST_2026-06-10_chat_fable.md never landed on disk — chat-outputs only; superseded by Handoff 01.
 - The altitude seed (May 29) remains the prior capsule; the nimit rephrasing supersedes its vow-framing and should be folded in as a revision, not a sibling document.

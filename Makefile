@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -127,6 +127,26 @@ lint:
 
 syntax-check:
 	@$(VENV_PYTHON) -m compileall -q dharma_swarm api scripts && echo "syntax-check: OK (compileall clean)"
+
+# Undefined names are guaranteed NameErrors at runtime — always blocking.
+lint-blockers:
+	@ruff check dharma_swarm/ api/ scripts/ --select=F821 --quiet && echo "lint-blockers: OK (no undefined names)"
+
+# The watchmen-watcher: verifies the verification gates themselves work.
+# Born 2026-06-12 after syntax-check, test-fast, and suite collection were
+# all found broken simultaneously with nothing noticing.
+verifier-selfcheck:
+	@echo "[1/4] syntax-check"
+	@$(MAKE) -s syntax-check
+	@echo "[2/4] lint-blockers (F821)"
+	@$(MAKE) -s lint-blockers
+	@echo "[3/4] test collection"
+	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
+		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
+	@tail -1 /tmp/dharma-collect-check.log
+	@echo "[4/4] onboard door"
+	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
+	@echo "verifier-selfcheck: ALL GATES FUNCTIONAL"
 
 gh-auth:
 	gh auth login
@@ -286,7 +306,7 @@ operator-prod-smoke:
 # `make spine-check` target stays as an operator-convenience alias only.
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
-agent-build-preflight: onboard hygiene-check
+agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
 
 agent-build-closeout:

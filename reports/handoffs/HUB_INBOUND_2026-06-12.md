@@ -62,9 +62,17 @@ possibly need action** (#332 operator merge steps IF still open; the lapsed #564
 reconcile request), 28 stale telemetry. Contents digested only — no action taken on
 them, per scope.
 
+## 2b. codex_composer Build A cross-build request — answered (added 06-12 05:4x JST)
+
+- **Request:** seq 8,106,896 `cross_build_request` — evidence-only review of Build A: green/amber/red on five claims (spine-repair priority, ds-goal-before-loops, D6 freezability, P3 narrow reconcile, 4h-run-yes/standing-system-no), strongest disagreement, first patch/verifier.
+- **Reply packet:** `inter_agent/codex/inbound/2026-06-12T0215Z-fable-5-cursor-build-a-crossbuild-review-reply.md` (+ `.PROOF.md`). Composed/sent by the 02:15 JST session (hung before filing proof); verified and completed 05:4x JST.
+- **Verdicts:** claims 1/4/5 GREEN (with staleness notes — P3 delta landed at `b6561646f`, the 4h run already happened and honored its gate), claim 2 GREEN-sequencing/AMBER-repair, claim 3 AMBER. **Strongest disagreement:** spine status ratified against a dirty worktree — `autonomy_spine.py` carries +459/−9 uncommitted over `f0d03ffaf` (re-confirmed 05:45 JST; 97 dirty paths total); D6 verifier is a static path-pattern check anchored to the forbidden qwen-lane console, so "console truth GREEN" overclaims (`PATH_MAP_GREEN / RENDER_UNVERIFIED` proposed). First verifier proposed: `verify_spine_committed.py` (~30 lines, fail on executed-vs-HEAD drift).
+- **Sent:** `dharma.a2a.codex` — local `DHARMA_FLEET` seq **8327** + AGNI `DHARMA_A2A` seq **8,106,910**; fleet CC AGNI seq **8,106,911**. All JETSTREAM_PUB_ACK; receipts in `reports/a2a/send_receipts/` (171116Z, 171239Z, 204611Z).
+- **New for codex's next session:** `dharma_swarm_main/.venv` has no pytest — canonical lane cannot self-verify with its own interpreter.
+
 ## 4. For the operator
 
-1. **Cross-build request unanswered (deliberately):** codex's Build A review request (seq 8,106,896, high priority, 06-11 04:57Z) was acked but needs a dedicated evidence pass — schedule it or assign a worker.
+1. ~~**Cross-build request unanswered (deliberately):**~~ **CLOSED 06-12:** codex's Build A review request (seq 8,106,896) answered with a dedicated evidence pass — see §2b.
 2. **Mike digest action items (2):** confirm #332's current state before running its operator steps; decide if the #564 reconcile review still matters under the stalled merge order.
 3. **Devin JetStream permissions:** 3 separate Devin sessions reported "JetStream durable subscribe denied" — likely why devin_inbox shows "Last Delivery: never" with 10 unprocessed. Server-side permission check on agni needed (this WAS the case where SSH might matter — for devin's user, not ours).
 4. **fable_5_cursor home dock:** proposed (in the codex reply) a minimal `~/.dharma/agents/fable_5_cursor/HOLON_CONTEXT.md`; not created pending operator ratification of the dock convention.
@@ -80,5 +88,7 @@ them, per scope.
 | Mike digest | `reports/handoffs/MIKE_INBOX_DIGEST_2026-06-12.md` |
 | Mike raw drain | `reports/a2a/mike_inbox_drain_20260612T0158Z.txt` |
 | This packet | `reports/handoffs/HUB_INBOUND_2026-06-12.md` |
+| Build A review reply (added 06-12) | `inter_agent/codex/inbound/2026-06-12T0215Z-fable-5-cursor-build-a-crossbuild-review-reply.md` (+ `.PROOF.md`) |
+| Build A reply send receipts | `reports/a2a/send_receipts/20260611T171116Z-codex-3b99240cf702.json`, `…171239Z-codex-d673b8b489bc.json`, `…204611Z-fleet-d144173e626f.json` |
 
 Server-side: one durable consumer (`fable_5_cursor_inbox`) created on DHARMA_A2A; nothing else changed on agni.

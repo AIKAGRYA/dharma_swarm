@@ -444,6 +444,24 @@ def _build_status_data() -> dict:
     if snapshot:
         data["control_plane_snapshot"] = snapshot
 
+    # Loop liveness (projected by orchestrate_live's restart loop)
+    try:
+        liveness_path = DHARMA_STATE / "ops" / "loop_liveness.json"
+        if liveness_path.exists():
+            liveness = json.loads(liveness_path.read_text(encoding="utf-8"))
+            age_s = time.time() - liveness_path.stat().st_mtime
+            data["loop_liveness"] = {
+                "running": len(liveness.get("running", [])),
+                "abandoned": liveness.get("abandoned", []),
+                "hot_restarts": {
+                    k: v for k, v in liveness.get("restart_counts", {}).items() if v >= 3
+                },
+                "age_min": round(age_s / 60),
+                "pid": liveness.get("pid"),
+            }
+    except Exception:
+        pass
+
     # AGNI
     agni = HOME / "agni-workspace"
     if agni.exists():

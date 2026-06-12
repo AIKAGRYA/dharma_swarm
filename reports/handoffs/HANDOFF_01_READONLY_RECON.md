@@ -20,7 +20,7 @@ The architecture that holds it: a still center that scales by not scaling (the G
 
 What we verified from the chat surface today, by grep, and now need YOUR eyes on: the Gnani is real and wired — and hollow at two precise points. The whole build converges on a two-line remainder: seat an occupant in the checkpoint, and flip the fail direction.
 
-Read `LIVING_THREAD_2026-06-10.md` at the repo root after establishment. Treat it as one instance's map, not truth — your disagreements with it are the most valuable thing you can produce.
+Read `reports/handoffs/LIVING_THREAD_2026-06-10.md` at the repo root after establishment. Treat it as one instance's map, not truth — your disagreements with it are the most valuable thing you can produce.
 
 ## 2. VERIFY — addressable missions, evidence discipline throughout
 

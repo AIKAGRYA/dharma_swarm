@@ -46,7 +46,7 @@ def _cmd_agent_wake(name: str, task: str, model: str | None) -> None:
 
 
 def _cmd_agent_list() -> None:
-    """List available preset agents."""
+    """List available preset agents and registered sovereign holons."""
     from dharma_swarm.autonomous_agent import PRESET_AGENTS
     print("Available autonomous agents:")
     print()
@@ -58,6 +58,21 @@ def _cmd_agent_list() -> None:
         )
         print(f"  {'':12} cwd={identity.working_directory}")
         print(f"  {'':12} tools=[{tools}]")
+        print()
+
+    try:
+        from dharma_swarm.holon_health import holon_health_rows
+        rows = holon_health_rows()
+    except Exception:  # noqa: BLE001 — listing presets must not fail on holon issues
+        rows = []
+    if rows:
+        print("Registered sovereign holons (~/.dharma/agents — dgc agent talk/run/status/kill):")
+        for row in rows:
+            kill = "  KILL-REQUESTED" if row.get("kill_requested") else ""
+            print(
+                f"  {row.get('name', '-'):<24} model={row.get('model') or '-':<24} "
+                f"compass_signals={row.get('compass_signal_count', 0)}{kill}"
+            )
         print()
 
 
@@ -112,6 +127,22 @@ def _cmd_agent_run(
     rc = asyncio.run(run(name, cycles, routing_mode=routing_mode))
     if rc != 0:
         raise SystemExit(rc)
+
+
+def _cmd_agent_kill(name: str, *, reason: str = "", clear: bool = False) -> None:
+    """Raise (or clear) the durable kill signal for a registered holon (U7).
+
+    The governed wake loop checks this signal at the top of every cycle and halts.
+    Pure file signaling via ``holon_killswitch`` — animates nothing.
+    """
+    from dharma_swarm import holon_killswitch
+
+    if clear:
+        existed = holon_killswitch.clear_kill(name)
+        print(f"{'Cleared' if existed else 'No'} kill signal for {name}.")
+        return
+    path = holon_killswitch.request_kill(name, reason=reason)
+    print(f"Kill requested for {name} (wake loop halts at next cycle): {path}")
 
 
 def _cmd_agent_status(name: str | None, *, as_json: bool = False) -> None:

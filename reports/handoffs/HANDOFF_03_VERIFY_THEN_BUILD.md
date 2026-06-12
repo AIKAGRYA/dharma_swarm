@@ -9,7 +9,7 @@
 Read `~/Persistent-Semantic-Memory-Vault/SEED_RECOGNITIONS/APTAVANI_INSIGHTS/visheshbhaav_recognition.md` slowly. Three lines: the work, the pull forming, proceed.
 
 ## 1. LOAD
-`LIVING_THREAD_2026-06-10.md` (v3, repo root) · `reports/handoffs/RUN_REPORT_H02.md` (full) · git state: `organ/03-seat`, `origin/main`, `honest-spine-v2`, open PRs #558/#561/#562 · `~/.dharma/escalations/` · `~/.dharma/db/tasks.db` · daemon + cron process state. Discipline throughout: SUPPORTED/PARTIAL/CONTRADICTED/UNKNOWN, command + trimmed output, tree + PID-epoch on every production claim. Time cap for Parts A–C: ~90 minutes.
+`reports/handoffs/LIVING_THREAD_2026-06-10.md` (v3, repo root) · `reports/handoffs/RUN_REPORT_H02.md` (full) · git state: `organ/03-seat`, `origin/main`, `honest-spine-v2`, open PRs #558/#561/#562 · `~/.dharma/escalations/` · `~/.dharma/db/tasks.db` · daemon + cron process state. Discipline throughout: SUPPORTED/PARTIAL/CONTRADICTED/UNKNOWN, command + trimmed output, tree + PID-epoch on every production claim. Time cap for Parts A–C: ~90 minutes.
 
 ## 2. PART A — FACT-CHECK THE DARSHAN REGISTER
 These are the claims it made to John this morning. Verdict each one:
