@@ -89,7 +89,9 @@ import type {AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, Canoni
 const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
 const SESSION_CATALOG_LIMIT = 12;
 const SESSION_TRANSCRIPT_LIMIT = 40;
-const MIN_SCROLL_WINDOW_SIZE = 8;
+// F-021: floor lowered 8 -> 5 so the 80x24 budget (24 - 17 chrome rows = 7)
+// is not forced past the terminal height by the old floor.
+const MIN_SCROLL_WINDOW_SIZE = 5;
 
 type ModelChoice = RouteTarget;
 
@@ -2444,7 +2446,11 @@ export function App(): React.ReactElement {
   const terminalWidth = (process.stdout.columns ?? Number(process.env.COLUMNS ?? "0")) || 120;
   const terminalHeight = (process.stdout.rows ?? Number(process.env.LINES ?? "0")) || 30;
   const compactShell = terminalWidth <= 90;
-  const paneWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - (compactShell ? 14 : 18));
+  // F-021: offsets re-derived from measured boot chrome — compact: header 4 +
+  // summary 1 + tab bar 1 + pane chrome 3 + composer 3 + footer 5 = 17; wide
+  // chrome measures ~22-24 but the offset stays at 20 so the expanded-trace
+  // anchor rows stay inside the end-anchored window at 100x30 (F-172 check).
+  const paneWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - (compactShell ? 17 : 20));
   const outline = useMemo(() => outlineFromTabs(state.tabs), [state.tabs]);
   const modelChoices = selectableRouteTargets(state.routePolicy);
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
@@ -3170,14 +3176,19 @@ export function App(): React.ReactElement {
         activeTitle={activeTab?.title ?? "Workspace"}
         focusMode={focusModeFor(activeTab, state)}
         activeCount={state.tabs.length}
-        compact={compactShell}
+        // F-021: the full header line needs ~118 cols; below that Yoga
+        // squeezes its segments into garble — fall back to the compact copy.
+        compact={compactShell || terminalWidth < 118}
       />
-      {!compactShell ? (
-        <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
-      ) : null}
+      <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
       <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
-      {activeTab?.kind === "chat" && !compactShell ? <ScenicStrip /> : null}
-      <Box marginTop={1}>
+      {/* F-021: the 8-row wave renders only when the height budget affords it
+          (>= 40 rows) and the chat is still quiet — once real turns arrive the
+          transcript window owns those rows and the strip recedes. */}
+      {activeTab?.kind === "chat" && !compactShell && terminalHeight >= 40 && displayedTranscriptLines.length <= 4 ? (
+        <ScenicStrip />
+      ) : null}
+      <Box>
         {state.uiMode.sidebarVisible !== "hidden" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
           <Sidebar
             mode={state.uiMode.sidebarMode}

@@ -96,7 +96,7 @@ repos:
       - id: trailing-whitespace
         exclude: '\.md$'
       - id: end-of-file-fixer
-        exclude: '\.(md|svg|json)$'
+        exclude: '(?:\.(md|svg|json)$|^terminal/tests/golden/)'
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ['--maxkb=2048']
