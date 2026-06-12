@@ -14,7 +14,11 @@ tmux new-session -d -s "$S" -x 120 -y 40 \
   "DHARMA_PYTHON=/nonexistent/python DHARMA_TERMINAL_STATE_DIR=$(mktemp -d) DHARMA_TERMINAL_SUPERVISOR_STATE_DIR=$(mktemp -d) COLORTERM=truecolor bun run start"
 sleep 6;  snap 00_boot
 
-tmux send-keys -t "$S" "tour probe message"; sleep 2;   snap 01_typed
+# Probe text must NOT contain the token "tour" (or any plain-language UI-intent
+# phrase from src/uiIntents.ts) — "tour probe message" matched the /tour intent
+# and was answered locally, so frames 02/03 stopped exercising the offline
+# natural-prompt queue path they grade.
+tmux send-keys -t "$S" "namaste helm probe"; sleep 2;   snap 01_typed
 tmux send-keys -t "$S" Enter;               sleep 3;   snap 02_sent
 sleep 6;                                                snap 03_turn_state        # honest queued/failed vs perpetual running?
 tmux send-keys -t "$S" "/help"; sleep 1; tmux send-keys -t "$S" Enter; sleep 2.5; snap 04_help   # silent-swallow regression
