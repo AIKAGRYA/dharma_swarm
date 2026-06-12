@@ -52,6 +52,7 @@ export const COMMAND_TAB_REGISTRY: Readonly<Record<string, string>> = {
   // (same pattern as the bare /model picker) — they never reach the bridge.
   zen: "chat",
   cockpit: "chat",
+  scroll: "chat",
   deck: "chat",
   tour: "chat",
 };

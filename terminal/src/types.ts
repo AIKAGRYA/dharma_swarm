@@ -449,7 +449,8 @@ export type UIModeOverlay =
 export type SidebarVisibility = "visible" | "collapsed" | "hidden";
 
 // F-063: zen is the boot default; deck-focus carries the focused deck name.
-export type LayoutMode = "zen" | "cockpit" | `deck-focus:${string}`;
+// FACE-3: "scroll" is the reading-first manuscript face (/scroll).
+export type LayoutMode = "zen" | "cockpit" | "scroll" | `deck-focus:${string}`;
 
 export type UIModeState = {
   activeTabId: string;

@@ -8,7 +8,7 @@
 import type {RouteTarget} from "./types";
 
 export type UiIntent =
-  | {kind: "layout"; mode: "zen" | "cockpit"}
+  | {kind: "layout"; mode: "zen" | "cockpit" | "scroll"}
   | {kind: "pane"; tabId: string; title: string}
   | {kind: "model"; target: RouteTarget}
   // A clear model-switch ask whose target matched nothing: answered locally
@@ -23,6 +23,9 @@ const IMPERATIVE = /\b(open|show|switch|change|go|take|bring|give|jump|move|back
 
 const ZEN_WORDS = /\b(zen|traditional|simple|clean|minimal|normal)\b/i;
 const COCKPIT_WORDS = /\b(cockpit|dashboard|fusion|funky|full|mission control)\b/i;
+// FACE-3: precise phrases only — bare "scroll" is a TUI verb ("scroll the
+// view down") and must never yank the user into the manuscript face.
+const SCROLL_WORDS = /\b(manuscript|reading mode|the scroll)\b/i;
 const UI_NOUN = /\b(mode|view|screen|layout|ui|tui|interface|dashboard|cockpit)\b/i;
 
 const TOUR_RE =
@@ -54,6 +57,9 @@ export function matchUiIntent(
   // Layout intents need BOTH a mode word and a UI noun ("switch to zen mode",
   // "go back to the simple view") so "tell me about zen buddhism" never trips.
   if (IMPERATIVE.test(text) && UI_NOUN.test(text)) {
+    if (SCROLL_WORDS.test(text)) {
+      return {kind: "layout", mode: "scroll"};
+    }
     if (COCKPIT_WORDS.test(text)) {
       return {kind: "layout", mode: "cockpit"};
     }
@@ -158,10 +164,11 @@ export function tourLines(panes: PaneRef[]): string[] {
   return [
     "THE HELM — guided tour",
     "",
-    "Two layouts:",
+    "Three layouts:",
     "  zen      just this conversation (you are here; boot default)",
     "  cockpit  full instrument panel — tabs, sidebar, telemetry",
-    "  Switch any time: F2, /zen, /cockpit — or just ask in plain language",
+    "  scroll   reading manuscript — centered column, ^D telemetry drawer",
+    "  Switch any time: F2, /zen, /cockpit, /scroll — or just ask in plain language",
     '  ("switch to the dashboard view", "back to the simple screen").',
     "",
     "Panes (Tab / Shift-Tab cycle, ^K opens the switcher, or ask):",

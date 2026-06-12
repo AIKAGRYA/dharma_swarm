@@ -33,6 +33,7 @@ import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiInten
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
 import {
   buildVerificationSummaryRows,
@@ -2445,6 +2446,9 @@ export function App(): React.ReactElement {
   // probe, so a live 120->80 resize garbled for seconds. This tick forces a
   // React re-render the moment the terminal resizes.
   const [, setViewportTick] = useState(0);
+  // FACE-3 the scroll: the telemetry drawer is view-local — never persisted,
+  // reset each boot, meaningless outside the scroll face.
+  const [scrollDrawerOpen, setScrollDrawerOpen] = useState(false);
   useEffect(() => {
     const handleResize = (): void => {
       setViewportTick((tick) => tick + 1);
@@ -2725,7 +2729,9 @@ export function App(): React.ReactElement {
       respond(
         intent.mode === "zen"
           ? "Zen — just the conversation. F2 or /cockpit brings the panel back."
-          : "Cockpit — full panel. F2 or /zen returns to the quiet view.",
+          : intent.mode === "scroll"
+            ? "The scroll — reading mode. ^D peeks telemetry · F2 or /zen returns."
+            : "Cockpit — full panel. F2 or /zen returns to the quiet view.",
       );
       return;
     }
@@ -2768,6 +2774,8 @@ export function App(): React.ReactElement {
     if (text === "/zen") return {kind: "layout", mode: "zen"};
     // FACE-2: /post is the command-post alias for /cockpit.
     if (text === "/cockpit" || text === "/post") return {kind: "layout", mode: "cockpit"};
+    // FACE-3: the reading-first manuscript face.
+    if (text === "/scroll") return {kind: "layout", mode: "scroll"};
     if (text === "/tour") return {kind: "tour"};
     return null;
   }
@@ -3305,6 +3313,12 @@ export function App(): React.ReactElement {
       dispatch({type: "activity.raw.toggle"});
       return;
     }
+    if (key.ctrl && input === "d" && state.uiMode.layoutMode === "scroll") {
+      // FACE-3: the scroll's telemetry drawer — scoped to the manuscript face
+      // so ^D stays free for future faces everywhere else.
+      setScrollDrawerOpen((open) => !open);
+      return;
+    }
     if (key.return) {
       submitPrompt(state.prompt);
       return;
@@ -3359,6 +3373,49 @@ export function App(): React.ReactElement {
           <Composer prompt={state.prompt} compact={compactShell} />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{zenStatus}</Text>
+          </Box>
+        </Box>
+        <Box flexGrow={1} />
+      </Box>
+    );
+  }
+
+  // FACE-3 the scroll: a reading-first manuscript — the conversation as a
+  // clean centered column (~80 cols), one thin wave rule between turns, all
+  // telemetry folded behind a single toggleable drawer row (^D). The composer
+  // carries the frame's only border; Tab/^K still fall through to the cockpit
+  // chrome below, and returning to chat restores the manuscript.
+  if (
+    state.uiMode.layoutMode === "scroll" &&
+    activeTab?.kind === "chat" &&
+    state.uiMode.activeOverlay.kind === "none"
+  ) {
+    const scrollWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    // Manuscript measure: a touch under the zen clamp — the column is the
+    // identity of this face, so it earns gutters at wide terminals.
+    const scrollMeasure = Math.min(terminalWidth, 84);
+    const scrollStatus = scrollStatusLine({
+      drawerOpen: scrollDrawerOpen,
+      routeLabel: routeLabel(state.routePolicy),
+      bridgeStatus: state.bridgeStatus,
+      routeState: state.routePolicy.routeState,
+      strategy: state.routePolicy.strategy,
+    });
+    return (
+      <Box flexDirection="column" height={terminalHeight} alignItems="center">
+        <Box flexShrink={0} flexDirection="column" width={scrollMeasure}>
+          <TranscriptPane
+            frameless
+            title="Chat"
+            lines={manuscriptLines(displayedTranscriptLines, scrollMeasure)}
+            scrollOffset={activeScrollOffset}
+            windowSize={scrollWindow}
+            emptyState={transcriptMeta.emptyState}
+            accentColor={transcriptMeta.accentColor}
+          />
+          <Composer prompt={state.prompt} compact={compactShell} />
+          <Box paddingX={1}>
+            <Text dimColor wrap="truncate-end">{scrollStatus}</Text>
           </Box>
         </Box>
         <Box flexGrow={1} />
