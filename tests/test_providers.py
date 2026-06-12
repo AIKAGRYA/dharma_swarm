@@ -416,3 +416,30 @@ async def test_ollama_keyless_local_degrades_cloud_model(monkeypatch):
     await p.complete(request)
     assert seen["model"] == p.default_model
     assert not seen["model"].endswith(":cloud")
+
+
+def test_ollama_native_messages_coerce_string_tool_arguments():
+    messages = [
+        {"role": "user", "content": "hi"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"function": {"name": "f", "arguments": '{"x": 1}'}}],
+        },
+        {"role": "tool", "content": "42"},
+    ]
+    fixed = OllamaProvider._native_messages(messages)
+    assert fixed[1]["tool_calls"][0]["function"]["arguments"] == {"x": 1}
+    assert fixed[0] == messages[0]
+
+
+def test_ollama_native_messages_bad_json_arguments_become_empty_object():
+    messages = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{"function": {"name": "f", "arguments": "{broken"}}],
+        }
+    ]
+    fixed = OllamaProvider._native_messages(messages)
+    assert fixed[0]["tool_calls"][0]["function"]["arguments"] == {}

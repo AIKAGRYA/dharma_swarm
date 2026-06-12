@@ -1055,13 +1055,36 @@ class OllamaProvider(LLMProvider):
             f"Ollama cloud error after {len(attempts)} attempts: {last_error or 'unknown error'}"
         )
 
+    @staticmethod
+    def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Native /api/chat requires tool_call arguments as objects, not JSON
+        strings — Ollama rejects string arguments with a 400 parse error."""
+        normalized: list[dict[str, Any]] = []
+        for msg in messages:
+            tool_calls = msg.get("tool_calls")
+            if not tool_calls:
+                normalized.append(msg)
+                continue
+            fixed_calls = []
+            for tc in tool_calls:
+                fn = dict(tc.get("function") or {})
+                args = fn.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        fn["arguments"] = json.loads(args) if args.strip() else {}
+                    except (ValueError, TypeError):
+                        fn["arguments"] = {}
+                fixed_calls.append({**tc, "function": fn})
+            normalized.append({**msg, "tool_calls": fixed_calls})
+        return normalized
+
     async def _complete_native(
         self, model: str, messages: list[dict[str, str]], request: LLMRequest,
     ) -> LLMResponse:
         """Local path: native Ollama /api/chat endpoint."""
         payload: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": self._native_messages(messages),
             "stream": False,
             "options": {
                 "temperature": request.temperature,
