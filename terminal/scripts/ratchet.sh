@@ -16,6 +16,13 @@
 #                    modules (grep -c semantics). Baseline 97; end
 #                    target <=1 at the single typed ingress.
 #
+# Baseline persistence (F-011): baselines live in the git-tracked
+# scripts/ratchet_baselines.txt. A regression versus a stored value exits 1.
+# An improvement REWRITES the stored value in place — commit the tightened
+# baselines file together with the improving change, making every ratchet
+# one-directional. Tightening happens only at the end of a fully green run;
+# a red run never mutates the baselines file.
+#
 # F-012 (hex_violations) extends this script with its own counter when
 # it lands.
 set -u
@@ -40,6 +47,18 @@ read_baseline() {
   printf '%s' "$value"
 }
 
+# F-011: rewrite one key=value line in the baselines file (in-place truncate,
+# preserves every other line byte-for-byte).
+tighten_baseline() {
+  local key="$1" new_value="$2" rewritten
+  rewritten=$(awk -v key="$key" -v val="$new_value" -F= \
+    '$1 == key { print key "=" val; next } { print }' "$BASELINES_FILE")
+  printf '%s\n' "$rewritten" > "$BASELINES_FILE"
+}
+
+# Improvements collected as "key value" lines, applied only on a green run.
+TIGHTENS=""
+
 # Counter: max_file_lines (F-008)
 max_file_lines=0
 max_file=""
@@ -60,7 +79,9 @@ if [ "$max_file_lines" -gt "$baseline_max_file_lines" ]; then
   fail "max_file_lines $max_file_lines exceeds baseline $baseline_max_file_lines (largest: ${max_file#"$TERMINAL_DIR"/})"
 fi
 if [ "$max_file_lines" -lt "$baseline_max_file_lines" ]; then
-  echo "ratchet: max_file_lines improved ($max_file_lines < baseline $baseline_max_file_lines) — tighten $BASELINES_FILE" >&2
+  echo "ratchet: max_file_lines improved ($max_file_lines < baseline $baseline_max_file_lines) — tightening $BASELINES_FILE" >&2
+  TIGHTENS="${TIGHTENS}max_file_lines $max_file_lines
+"
 fi
 
 # Counter: dup_functions (F-009)
@@ -81,7 +102,9 @@ if [ "$dup_functions" -gt "$baseline_dup_functions" ]; then
   fail "dup_functions $dup_functions exceeds baseline $baseline_dup_functions (top-level function names shared by Sidebar.tsx and RepoPane.tsx)"
 fi
 if [ "$dup_functions" -lt "$baseline_dup_functions" ]; then
-  echo "ratchet: dup_functions improved ($dup_functions < baseline $baseline_dup_functions) — tighten $BASELINES_FILE" >&2
+  echo "ratchet: dup_functions improved ($dup_functions < baseline $baseline_dup_functions) — tightening $BASELINES_FILE" >&2
+  TIGHTENS="${TIGHTENS}dup_functions $dup_functions
+"
 fi
 
 # Counter: record_unknown (F-010)
@@ -108,7 +131,20 @@ if [ "$record_unknown" -gt "$baseline_record_unknown" ]; then
   fail "record_unknown $record_unknown exceeds baseline $baseline_record_unknown (Record<string, unknown> lines in src/protocol.ts + src/protocol/)"
 fi
 if [ "$record_unknown" -lt "$baseline_record_unknown" ]; then
-  echo "ratchet: record_unknown improved ($record_unknown < baseline $baseline_record_unknown) — tighten $BASELINES_FILE" >&2
+  echo "ratchet: record_unknown improved ($record_unknown < baseline $baseline_record_unknown) — tightening $BASELINES_FILE" >&2
+  TIGHTENS="${TIGHTENS}record_unknown $record_unknown
+"
+fi
+
+# F-011: all counters green — persist any improvements so the ratchet is
+# one-directional from here on. Commit the rewritten baselines file with
+# the improving change.
+if [ -n "$TIGHTENS" ]; then
+  printf '%s' "$TIGHTENS" | while read -r t_key t_value; do
+    [ -n "$t_key" ] || continue
+    tighten_baseline "$t_key" "$t_value"
+    echo "ratchet: tightened $t_key baseline to $t_value in $BASELINES_FILE — commit it with this change" >&2
+  done
 fi
 
 echo "ratchet: OK"

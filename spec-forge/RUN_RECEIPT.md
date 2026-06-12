@@ -55,3 +55,4 @@ RUN_START 2026-06-12T00:22:09Z mode=in-session-conductor caps=8cycles/batch head
 2026-06-12T02:03:43Z F-008 GREEN 7eba0613d ratchet.sh baseline exit 0 max_file_lines=4064, +50-line probe exit 1 then revert clean, typecheck 0, 527/527 tests 0 fail, ratchets 4064/40/97 flat, 6/6 pre-theme goldens identical
 HARNESS-AMENDED 2026-06-12T02:11:31Z head=c4dfa1ccf (operator-sanctioned batch-boundary spec amendment F-157..F-170 + CONSTITUTION design-truth pointer; evaluator window starts here)
 2026-06-12T02:24:25Z F-009 GREEN a74eb42e5 ratchet dup_functions=40 exit 0 = manual comm count 40, probe 41 exit 1 revert clean, typecheck 0, 527/527 tests 0 fail, ratchets 4064/40/97 flat vs parent, 6/6 pre-theme goldens identical
+2026-06-12T02:35:57Z F-010 GREEN 02542135f ratchet record_unknown=97 exit 0 = grep -c 97, isolated probe 98 exit 1 revert clean, typecheck 0, 527/527 tests 0 fail, ratchets 4064/40/97 flat vs parent, 6/6 pre-theme goldens identical
