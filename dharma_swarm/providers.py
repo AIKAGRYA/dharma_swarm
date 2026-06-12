@@ -11,6 +11,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import inspect
 import json
+import logging
 import os
 import random
 import shutil
@@ -82,6 +83,8 @@ from dharma_swarm.telemetry_plane import (
     RoutingDecisionRecord,
     TelemetryPlaneStore,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(BaseProvider):

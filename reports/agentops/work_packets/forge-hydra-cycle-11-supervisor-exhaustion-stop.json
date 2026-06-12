@@ -1,0 +1,55 @@
+{
+  "schema": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-11-supervisor-exhaustion-stop",
+  "cycle": 11,
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "created_at": "2026-06-01T08:35:06Z",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "objective": "Add and verify an explicit all-internal-packets-exhausted stop condition to the Forge Hydra persistent Codex supervisor.",
+  "status": "completed",
+  "files": [
+    "dharma_swarm/codex_overnight.py",
+    "tests/test_codex_overnight.py",
+    "reports/forge/forge-hydra-supervisor-exhaustion-stop/cycle-11/verifier_artifact.json",
+    "reports/forge/forge-hydra-supervisor-exhaustion-stop/cycle-11/completion_audit.md"
+  ],
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_codex_overnight.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "9 passed, 1 warning"
+    },
+    {
+      "command": "bash -n scripts/start_forge_hydra_long_run.sh scripts/status_forge_hydra_long_run.sh scripts/codex_overnight_autopilot.py",
+      "exit_code": 0,
+      "summary": "shell syntax ok"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile dharma_swarm/codex_overnight.py scripts/codex_overnight_autopilot.py",
+      "exit_code": 0,
+      "summary": "python compile ok"
+    },
+    {
+      "command": "TMP_STATE=$(mktemp -d); STATE_DIR=\"$TMP_STATE\" SESSION_NAME=\"forge-hydra-cycle-11-nonexistent\" bash scripts/status_forge_hydra_long_run.sh; rm -rf \"$TMP_STATE\"",
+      "exit_code": 0,
+      "summary": "status script smoke ok"
+    }
+  ],
+  "receipts": [
+    "reports/forge/forge-hydra-supervisor-exhaustion-stop/cycle-11/verifier_artifact.json",
+    "reports/forge/forge-hydra-supervisor-exhaustion-stop/cycle-11/completion_audit.md"
+  ],
+  "blockers": [
+    "No canonical ds-goal receipt id was present in the environment.",
+    "GitNexus does not index /Users/dhyana/dharma_swarm.",
+    "Context+ semantic search, blast radius, static analysis, and memory upsert timed out after 600 seconds each."
+  ],
+  "authority_boundary": {
+    "external_confirmed": false,
+    "fitness_changed": false,
+    "operator_approval_required": false
+  }
+}

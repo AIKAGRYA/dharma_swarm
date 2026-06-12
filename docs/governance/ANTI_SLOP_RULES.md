@@ -102,9 +102,10 @@ count before Rule 10 fails.
 | `dharma_swarm/evolution.py` | 3401 | 3741 |
 | `dharma_swarm/swarm.py` | 3252 | 3577 |
 | `dharma_swarm/providers.py` | 3096 | 3405 |
-| `dharma_swarm/orchestrator.py` | 2525 | 2777 |
+| `dharma_swarm/orchestrator.py` | 2923 (re-grandfathered 2026-06-12; was 2525 — issue #582) | 3215 |
 | `dharma_swarm/tui/app.py` | 2520 | 2772 |
 | `dharma_swarm/terminal_bridge.py` | 2192 | 2411 |
+| `dharma_swarm/capital_lab/alpha_evidence.py` | 1251 (grandfathered 2026-06-12 — issue #581) | 1376 |
 
 When one of these crosses its ceiling, the PR fails until either:
 - the file is decomposed (preferred), or

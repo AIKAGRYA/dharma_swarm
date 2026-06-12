@@ -4,13 +4,17 @@ from __future__ import annotations
 
 import os
 
+from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_value
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 
 
 OLLAMA_LOCAL_BASE_URL = "http://localhost:11434"
 OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
-OLLAMA_DEFAULT_LOCAL_MODEL = "llama3.2"
+# Default to a model that is actually pulled locally. llama3.2 was the old
+# default but is frequently not pulled (-> Ollama 404). Override with
+# OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
+OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
 OLLAMA_CLOUD_FRONTIER_MODELS = (
     "glm-5:cloud",
@@ -50,7 +54,9 @@ def ollama_prefers_cloud(
     if _env_flag("OLLAMA_USE_CLOUD"):
         return True
 
-    resolved_key = (api_key if api_key is not None else os.environ.get("OLLAMA_API_KEY", "")).strip()
+    resolved_key = (
+        api_key if api_key is not None else env_value(OLLAMA_API_KEY_ENV)
+    )
     if not resolved_key:
         return False
 
@@ -114,7 +120,7 @@ def build_ollama_headers(
     if not is_ollama_cloud_base_url(resolved):
         return {}
 
-    token = (api_key if api_key is not None else os.environ.get("OLLAMA_API_KEY", "")).strip()
+    token = api_key if api_key is not None else env_value(OLLAMA_API_KEY_ENV)
     if not token:
         raise RuntimeError("OLLAMA_API_KEY not set")
     return {"Authorization": f"Bearer {token}"}

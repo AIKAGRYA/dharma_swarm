@@ -1,0 +1,62 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-11-watchdog-idle-negative",
+  "created_at_utc": "2026-06-02T15:35:00Z",
+  "agent": "codex_supervisor",
+  "role": "forge_reality_arena_watchdog",
+  "authority": "evidence-only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "cycle": {
+    "v1_cycle": 11,
+    "operator_cycle": 11,
+    "label": "watchdog-idle-negative"
+  },
+  "result": "Cycle 11 child process was alive for approximately 7 minutes with zero CPU, unchanged rollout trace size, no agent/tool messages after session startup, and no last-message output. The watchdog terminated the idle child so the 10h runner could continue instead of spending the full 7200s cycle timeout on a silent process.",
+  "changed_files": [
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-11-watchdog-idle-negative.json"
+  ],
+  "verification": [
+    {
+      "command": "ps -p 56380,56381 -o pid,ppid,etime,%cpu,%mem,state,command",
+      "exit_code": 0,
+      "result": "observed cycle 11 codex child alive for 07:07 with 0.0 CPU and no output"
+    },
+    {
+      "command": "stat rollout-2026-06-02T23-27-36-019e88f2-885b-7d81-aaae-c4671337560e.jsonl",
+      "exit_code": 0,
+      "result": "rollout trace remained at 22267 bytes since 2026-06-02T15:27:39Z"
+    },
+    {
+      "command": "kill -TERM 56380 56381",
+      "exit_code": 0,
+      "result": "terminated idle cycle 11 child; supervisor recorded cycle_011_last_message.txt as empty and advanced the manifest"
+    }
+  ],
+  "evidence": {
+    "run_id": "20260602T133721Z",
+    "run_dir": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/codex_overnight/20260602T133721Z",
+    "prompt_file": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/codex_overnight/20260602T133721Z/prompts/cycle_011.md",
+    "output_file": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/codex_overnight/20260602T133721Z/outputs/cycle_011_last_message.txt",
+    "stdout_file": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/codex_overnight/20260602T133721Z/logs/cycle_011_stdout.log",
+    "rollout_trace": "/Users/dhyana/.codex/sessions/2026/06/02/rollout-2026-06-02T23-27-36-019e88f2-885b-7d81-aaae-c4671337560e.jsonl",
+    "output_file_size_bytes": 0,
+    "rollout_trace_size_bytes": 22267,
+    "cycle_timeout_seconds": 7200
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "dry_run_only": true
+  },
+  "blockers": [
+    "codex_child_idle_no_trace_growth",
+    "cycle_011_empty_last_message"
+  ],
+  "next_packet": "Let the supervisor continue the 10h run; if another child repeats the same idle pattern, harden the runner with an idle-output watchdog rather than relying on the 7200s timeout."
+}

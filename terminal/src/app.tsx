@@ -2629,6 +2629,7 @@ export function App(): React.ReactElement {
       };
       const route = routeLabel(state.routePolicy);
       queueAppActions(dispatch, [
+        {type: "tab.activate", tabId: "chat"},
         {type: "tab.append", tabId: "chat", lines: [userLine]},
         {
           type: "execution.events.ingest",

@@ -18,6 +18,7 @@ from dharma_swarm.api_keys import (
     RUNTIME_PROVIDER_API_KEY_ENV_KEYS,
     env_has_value,
     env_value,
+    has_any_llm,
     provider_api_key_env,
 )
 from dharma_swarm.models import ProviderType
@@ -76,6 +77,17 @@ def test_all_api_key_registry_contains_system_services() -> None:
 def test_chat_provider_registry_matches_dashboard_surface() -> None:
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.OPENROUTER.value] == OPENROUTER_API_KEY_ENV
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.NVIDIA_NIM.value] == "NVIDIA_NIM_API_KEY"
+
+
+def test_env_value_empty_mapping_does_not_read_real_shell(monkeypatch) -> None:
+    monkeypatch.setenv(OPENROUTER_API_KEY_ENV, "real-shell-key")
+
+    assert env_value(OPENROUTER_API_KEY_ENV, {}) is None
+
+
+def test_has_any_llm_uses_canonical_runtime_keys() -> None:
+    assert has_any_llm({}) is False
+    assert has_any_llm({OPENROUTER_API_KEY_ENV: "or-key"}) is True
 
 
 def test_env_helpers_trim_and_detect_presence() -> None:

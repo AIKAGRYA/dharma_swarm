@@ -1,0 +1,65 @@
+{
+  "schema": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-14-status-dense-code-metrics",
+  "cycle": 14,
+  "created_at": "2026-06-01T09:12:42Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "scope": "Expose dense-code-gym nested run metrics in the Forge Hydra operator status artifact.",
+  "outputs": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-14/verifier_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-14/completion_audit.md"
+  ],
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py tests/test_dense_code_gym.py -q --tb=short",
+      "outcome": "9 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+      "outcome": "status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null",
+      "outcome": "pass"
+    }
+  ],
+  "artifacts": {
+    "patch_hash": "9df49d74555fd4f72572cdd6ee0885989e7e1cd86ab5a4e706aadb04432e9093",
+    "status_artifact_sha256": "f278118bbeea5e2ee41128e9db8d44f9e887af98ff11dfddbbf3ef12db1a4562",
+    "status_markdown_sha256": "05080a1b9ccec1f0bd985b9afc8a16d04bd3d6d0310e55568f209292b538a11f",
+    "status_hash": "sha256:0fe6df81ba0f786eba207318ebefe2c9e144131cfd5a9b20f22a45f8f7171ccd",
+    "verifier_artifact": "reports/forge/forge-hydra-status/cycle-14/verifier_artifact.json"
+  },
+  "dense_code_metrics": {
+    "passing_candidate": "2 passed, 0 failed, score 1.0",
+    "base_memorized_candidate": "1 passed, 1 failed, score 0.5",
+    "memorized_base_candidate_denied_by_variant": true,
+    "external_confirmed": false,
+    "training_signal_only": true
+  },
+  "blockers": [
+    "Canonical ds-goal receipt not attempted because no mission/task/goal/AgentOps/DSE receipt environment variable was present.",
+    "GitNexus for /Users/dhyana/dharma_swarm remains unavailable for current-worktree impact; the current worktree is not registered and symbol impact lookups returned Target not found in the latest indexed sibling."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "spending": false,
+    "commit_push_pr": false,
+    "fitness_changed": false
+  },
+  "status": "completed_repo_local_receipt"
+}

@@ -1,0 +1,129 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-3-knowledge-ops-handoff",
+  "created_at_utc": "2026-06-02T14:03:07Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "mission": "Forge Reality Arena v1",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "operator_goal_id": "",
+  "operator_goal_id_unavailable_reason": "not_recorded_in_autonomy_mission",
+  "run_id": "20260602T133721Z",
+  "correlation_id": "20260602-forge-reality-arena-v1-10h:forge-reality-arena-master-v1:20260602T133721Z",
+  "authority": "evidence-only",
+  "status": "repo_local_receipt",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "cycle": {
+    "v1_cycle": 3,
+    "packet": "knowledge_ops_failure_capsule_handoff",
+    "rungs": [
+      "rung_6_knowledge_ops_memory_kernel_handoff"
+    ]
+  },
+  "result": "Forge Reality Arena status now writes a candidate-only Knowledge Ops handoff for failure capsules. The handoff classifies all 24 current capsules as candidate_for_knowledge_ops, records per-capsule source hashes, keeps trusted memory promotion at zero, and keeps fitness feed disabled.",
+  "outputs": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/knowledge-ops/failure_capsule_handoff.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-3-knowledge-ops-handoff.json"
+  ],
+  "artifact_hashes": {
+    "status_artifact": "sha256:ea500619ea0fb78c115b9ef9afffc4deb9c8644d7b51acca499854c373d598fb",
+    "status_markdown": "sha256:4de647f0454ea1ff23b3e0528d2c18ce4f4f3a8bc7ea1245867171686b19d7ea",
+    "agentops_status": "sha256:846d5b1457dd102bc7a1b6c747d59f92941d0ca5ff2e60ca978c2f7b10fa32b8",
+    "knowledge_ops_handoff": "sha256:b40f6f68f65f4065c8dc80f93744a7025ee4350fb14907f783cb24794306de24"
+  },
+  "knowledge_ops_handoff": {
+    "memory_ingestion_status": "candidate_handoff_ready",
+    "memory_trust_tier": "quarantined_candidate",
+    "memory_ingestion_receipt_ref": "reports/forge/forge-reality-arena/knowledge-ops/failure_capsule_handoff.json",
+    "source_artifact_hash": "sha256:26a5b31ff6334af9aec0ae04f70a6747f1174da1afb1081111fefa09fafebf4e",
+    "failure_capsule_count": 24,
+    "candidate_for_knowledge_ops_count": 24,
+    "quarantined_count": 0,
+    "promoted_by_existing_memory_gate_count": 0,
+    "trusted_memory_promotion_performed": false,
+    "fitness_feed_allowed": false,
+    "existing_memory_gate_required": true
+  },
+  "acceptance": {
+    "each_failure_capsule_classified": true,
+    "source_artifact_hashes_present": true,
+    "memory_ingestion_status_present": true,
+    "memory_ingestion_receipt_ref_present": true,
+    "memory_trust_tier_present": true,
+    "trusted_memory_promotion_performed": false,
+    "fitness_feed_allowed": false,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "fitness_mutation_performed": false
+  },
+  "test_commands": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "outcome": "passed: 23 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --state-dir /Users/dhyana/.dharma/forge_reality_arena_master",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_failure_capsule.py",
+      "outcome": "passed: 24 capsules, 0 invalid JSON, 0 invalid schema, 0 should_feed_fitness"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/governance/check_memory_kernel_canonical.py",
+      "outcome": "failed: pre-existing dharma_swarm/venture_cell/operator_os/memory_kernel.py is authority-looking outside the Memory Kernel allowlist"
+    },
+    {
+      "command": "python3 scripts/governance/check_memory_kernel_canonical.py --no-worktree",
+      "outcome": "failed: same branch-scope memory_kernel.py allowlist blocker"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "passed"
+    }
+  ],
+  "blockers": [
+    "Memory Kernel canonicality gate fails on pre-existing dharma_swarm/venture_cell/operator_os/memory_kernel.py; this packet did not introduce a new memory-authority module or class.",
+    "Forge Reality Arena may nominate failure capsules but cannot promote trusted memory; existing Memory Kernel / Knowledge Ops promotion gate must perform any future ingestion.",
+    "operator_goal_id is not separately recorded in the autonomy-spine mission"
+  ],
+  "remaining_internal_packets": [
+    "control_watch_tower_scorecard_visibility",
+    "adversary_verifier_false_completion_fixtures",
+    "v1_final_scorecard"
+  ],
+  "remaining_external_gates": [
+    "external acted receipt",
+    "Measurement Guardian countersign",
+    "operator lease for any public or economic action",
+    "archive fitness mutation authority"
+  ],
+  "dry_run_only": true
+}

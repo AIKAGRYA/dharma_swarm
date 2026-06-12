@@ -1,0 +1,43 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-30-fq1-repair-bridge",
+  "cycle": 30,
+  "created_at_utc": "2026-06-01T12:19:39Z",
+  "agent": "codex_forgewright",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "objective": "Bridge completed FQ1 sealed-reserve generator evidence into the stale v0.1.1 and v0.1.6 refuted countersign repair queue without clearing decorrelated countersign requirements.",
+  "status": "completed",
+  "files": [
+    "reports/forge/fq1-sealed-reserve-perturbation-generator/verifier_artifact.json",
+    "reports/forge/v0.1.1-transfer-gate/cycle-30/verifier_artifact.json",
+    "reports/forge/v0.1.1-transfer-gate/cycle-30/completion_audit.md",
+    "reports/forge/v0.1.6-isomorphic-perturbation-oracle/cycle-30/verifier_artifact.json",
+    "reports/forge/v0.1.6-isomorphic-perturbation-oracle/cycle-30/completion_audit.md",
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-30-fq1-repair-bridge.json"
+  ],
+  "tests": [
+    "tests/test_fq1_sealed_reserve_generator.py tests/test_reward_forge_v0.py tests/test_dharma_eval.py tests/test_evolution_promotion.py: 39 passed, 1 warning",
+    "scripts/runtime/forge_fq1_sealed_reserve.py: regenerated FQ1 verifier artifact",
+    "scripts/runtime/forge_pre_v1_audit.py --out reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json: passed",
+    "scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status: passed",
+    "tests/test_forge_pre_v1_audit.py tests/test_forge_hydra_status.py: 26 passed, 1 warning",
+    "jq status assertions: pre_v1_refuted_repair_required=0 and pre_v1_refuted_repair_evidence_passed_pending_countersign=3"
+  ],
+  "blockers": [
+    "canonical ds-goal receipt unavailable because no mission/task identifiers were present",
+    "decorrelated countersign re-audit is still required before stale refutations can be cleared",
+    "overall worktree remains critically dirty due to pre-existing unrelated changes"
+  ],
+  "external_authority": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

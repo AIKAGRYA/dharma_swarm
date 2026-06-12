@@ -1,0 +1,147 @@
+{
+  "acceptance_gates": [
+    {
+      "gate": "G0_contract_and_packets",
+      "must_pass": [
+        "MASTER_GOAL.md exists",
+        "PACKET_SCHEMAS.md exists",
+        "planner packet and run manifest include artifact hashes"
+      ]
+    },
+    {
+      "gate": "G1_no_live_authority",
+      "must_pass": [
+        "no live orders",
+        "no signed live payloads",
+        "no secret values read or recorded",
+        "Hyperliquid live-capable methods fenced from Goal B adapter path"
+      ]
+    },
+    {
+      "gate": "G2_lifecycle_parity",
+      "must_pass": [
+        "submit receipt",
+        "ack receipt",
+        "partial_fill receipt",
+        "full_fill receipt",
+        "cancel receipt",
+        "reject receipt",
+        "expire receipt"
+      ]
+    },
+    {
+      "gate": "G3_idempotency",
+      "must_pass": [
+        "required client_order_id on every order",
+        "duplicate submit cannot create a second order",
+        "idempotency survives durable ledger replay"
+      ]
+    },
+    {
+      "gate": "G4_reconciliation",
+      "must_pass": [
+        "local ledger reconciles against broker-paper snapshot",
+        "mismatches block readiness",
+        "mismatch receipt includes order and field-level differences"
+      ]
+    },
+    {
+      "gate": "G5_drills",
+      "must_pass": [
+        "duplicate-order drill",
+        "rejection drill",
+        "cancel-before-fill drill",
+        "expire-stale-order drill",
+        "heartbeat kill-switch drill",
+        "stale-data kill-switch drill",
+        "max-loss kill-switch drill",
+        "order-rate or exposure kill-switch drill"
+      ]
+    },
+    {
+      "gate": "G6_operator_handoff",
+      "must_pass": [
+        "exact status fields reported",
+        "artifact and command references included",
+        "no live readiness, live authority, or profit claim without receipts"
+      ]
+    }
+  ],
+  "artifact_type": "goal_b_planner_acceptance_contract",
+  "broker_write_authority": false,
+  "clean": false,
+  "default_next_status": "blocked_live_authority_detected",
+  "discovered_blockers": [
+    "prior MASTER_GOAL.md missing at continuation start",
+    "prior PACKET_SCHEMAS.md missing at continuation start",
+    "prior 20260605T135732Z planner report directory missing at continuation start",
+    "Agni Hyperliquid live-capable repository and private-key alias remain blocker inputs",
+    "no external broker-paper order receipts available",
+    "no idempotent broker client_order_id contract implemented yet",
+    "no broker-paper snapshot reconciliation implemented yet"
+  ],
+  "generated_at": "2026-06-05T14:24:50Z",
+  "live_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "no_claims": [
+    "no live orders",
+    "no live keys",
+    "no signed live payloads",
+    "no profit claims",
+    "no NATS or A2A live collaboration claim"
+  ],
+  "prior_inputs": [
+    "20260605T134546Z-goal-b-agni-broker-paper-execution",
+    "20260605T135732Z-goal-b-broker-paper-execution-membrane"
+  ],
+  "risk_register": [
+    {
+      "id": "R1_live_authority_bleed",
+      "mitigation": "deny imports and runtime calls from live-capable Hyperliquid methods; keep clean false until quarantined or separately leased",
+      "risk": "Agni has live-capable Hyperliquid code and a private-key alias"
+    },
+    {
+      "id": "R2_fixture_overclaim",
+      "mitigation": "mark fixture-only evidence and keep live_readiness zero",
+      "risk": "local fixture proof can be mistaken for external broker-paper readiness"
+    },
+    {
+      "id": "R3_idempotency_gap",
+      "mitigation": "deterministic client_order_id plus durable replay test",
+      "risk": "duplicate order creation"
+    },
+    {
+      "id": "R4_reconciliation_gap",
+      "mitigation": "field-level snapshot comparison blocks readiness on mismatch",
+      "risk": "local ledger diverges from broker state"
+    },
+    {
+      "id": "R5_kill_switch_partiality",
+      "mitigation": "explicit heartbeat, stale-data, max-loss, order-rate and exposure drills",
+      "risk": "existing gates do not cover order-rate or exposure halts"
+    },
+    {
+      "id": "R6_operator_confusion",
+      "mitigation": "repeat false and zero status fields in every packet",
+      "risk": "paper or candidate wording gets read as live authority"
+    }
+  ],
+  "schema_version": "goal_b.planner_acceptance_contract.v1",
+  "smallest_proof_loop": [
+    "static authority guard",
+    "runtime authority guard",
+    "fixture broker order intent",
+    "submit and ack receipts",
+    "partial_fill and full_fill receipts",
+    "cancel, reject, and expire receipts",
+    "duplicate submit drill",
+    "matched reconciliation",
+    "mismatch reconciliation block",
+    "kill-switch drills",
+    "adapter readiness and feasibility packets"
+  ],
+  "status": "planner_contract_complete",
+  "task_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation-t01-planner"
+}
+

@@ -1,0 +1,191 @@
+{
+  "acceptance": {
+    "agentops_status_refreshed": true,
+    "archive_fitness_mutated": false,
+    "authority_scan_passed": true,
+    "canonical_ds_goal_context_available": false,
+    "concrete_improvement": "new deterministic operator-compression scenario for compact status blocker omission",
+    "dense_training_signal_not_fitness_authority": true,
+    "failure_capsules_should_feed_fitness_false": true,
+    "fitness_eligible_receipts_zero": true,
+    "repo_local_receipt_required": true,
+    "status_refreshed": true
+  },
+  "agent": "codex_5_5_cli",
+  "artifacts_refreshed": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsules/status_courier_missing_blocker_detail-baada4b50b25.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "authority": "evidence-only",
+  "content_hash_inputs": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsules/status_courier_missing_blocker_detail-baada4b50b25.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "created_at_utc": "2026-06-02T09:11:44Z",
+  "cycle": {
+    "master_cycle": 24,
+    "operator_cycle": 10
+  },
+  "external_boundary": {
+    "archive_fitness_changed": false,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "external_repo_contact": false,
+    "fitness_eligible_receipts": 0,
+    "merged": false,
+    "payment_action": false,
+    "published": false,
+    "pushed": false
+  },
+  "files_changed": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py"
+  ],
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "new_learning_artifacts": [
+    "status_courier_missing_blocker_detail scenario in scripts/runtime/forge_swarm_coordination_gym.py",
+    "reports/forge/forge-reality-arena/failure-capsules/status_courier_missing_blocker_detail-baada4b50b25.json"
+  ],
+  "next": "Add a requirement-by-requirement master-spec audit packet for remaining 30-day internal iteration goals without treating dense evals as fitness authority.",
+  "packet_id": "forge-reality-arena-master-cycle-24",
+  "patch_hash": "sha256:eda10f3a4916ee0111949cefd878ae59da6de0023d32b64eddd2ff050999e23c",
+  "result": "Added status_courier_missing_blocker_detail, a deterministic operator_compression scenario that rejects compact status handoffs when they omit the exact blocker and evidence reference. Extended the canonical failure-capsule drill to 17 fixtures and regenerated the live gym at 8 repetitions, yielding 22 unique scenarios and 176 passed local episodes while keeping external confirmation and fitness eligibility at zero.",
+  "role": "codex_forgewright",
+  "schema_version": "agentops_work_packet.v1",
+  "status_snapshot": {
+    "authority_scan_blockers": 0,
+    "authority_scan_scanned_files": 62,
+    "authority_scan_status": "passed",
+    "authority_scan_violations": 0,
+    "base_memorized_candidates_denied": 95,
+    "benchmark_adapter_status": "verified",
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_scenarios_failed": 0,
+    "coordination_scenarios_passed": 176,
+    "coordination_scenarios_run": 176,
+    "coordination_unique_scenarios": 22,
+    "dense_reps": 100,
+    "docker_sandbox_status": "smoke_passed",
+    "duplicate_dense_artifacts": 97,
+    "external_anchors_observed_not_owned": 2,
+    "failure_capsule_failure_classes": 12,
+    "failure_capsules_should_feed_fitness": 0,
+    "failure_capsules_written": 21,
+    "fitness_boundary_blocked_candidates": 6,
+    "fitness_boundary_candidates_for_human_review": 94,
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_eligible_receipts": 0,
+    "target_missing": [],
+    "transfer_gated_improvement_candidates": 94,
+    "transfer_passed_reps": 94,
+    "unique_dense_packets": 3
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "40 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_authority_scan.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "52 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "38 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "exit_code": 0,
+      "outcome": "wrote 176-episode coordination artifact with 22 unique scenarios"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-capsule-drill",
+      "exit_code": 0,
+      "outcome": "wrote 17-capsule drill artifact and one new status-courier capsule"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0,
+      "outcome": "wrote normalized dense-event ledger"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0,
+      "outcome": "wrote Docker sandbox verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0,
+      "outcome": "wrote benchmark adapter verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "outcome": "verified 94 human-review candidates, 6 blocked candidates, 0 actual fitness eligibility"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "wrote status_artifact.json, status.md, and forge-reality-arena-status.json"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "outcome": "scanned 62 scoped JSON files, 0 violations"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "refreshed final status with authority scan results"
+    }
+  ],
+  "tooling_notes": [
+    {
+      "detail": "Repository /Users/dhyana/dharma_swarm was not available in GitNexus. The tool listed sibling/stale checkouts only, so manual file-level impact checks were used.",
+      "status": "blocked",
+      "tool": "GitNexus impact"
+    },
+    {
+      "detail": "rg scan showed live impact limited to forge_swarm_coordination_gym.py, focused gym/status tests, fitness-boundary count consumers, and regenerated arena artifacts.",
+      "status": "completed",
+      "tool": "manual blast scan"
+    }
+  ],
+  "track": "dharma-reward-forge-v0"
+}

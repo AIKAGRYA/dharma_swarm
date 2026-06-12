@@ -1,0 +1,118 @@
+{
+  "acceptance": {
+    "actual_fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutation_claims_absent": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_actions_performed": false,
+    "external_confirmed_claims_absent": true,
+    "fitness_eligible_receipts_zero": true,
+    "merged": false,
+    "new_coordination_scenario_recorded": true,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "repo_local_receipt_required": true
+  },
+  "agent": "codex",
+  "authority": "evidence-only",
+  "blockers": [
+    {
+      "blocker": "Docker daemon unavailable during local smoke refresh",
+      "impact": "docker_sandbox_status is docker_unavailable; benchmark adapter remains verified and no external boundary is crossed"
+    },
+    {
+      "blocker": "GitNexus MCP/CLI registry did not resolve /Users/dhyana/dharma_swarm despite successful analyze refresh",
+      "impact": "cycle used manual file-level impact scan plus focused tests"
+    }
+  ],
+  "bounded_packet": "Rung 1/Rung 2 - expand DS coordination gym with stale-status-vs-owner truth-surface scenario and preserve five-replay target",
+  "changed_files": [
+    "dharma_swarm/codex_overnight.py",
+    "scripts/start_forge_hydra_long_run.sh",
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-12.json"
+  ],
+  "completed_at": "2026-06-02T07:09:05Z",
+  "cycle": 12,
+  "metrics": {
+    "actual_fitness_eligible_receipts": 0,
+    "authority_scan_external_confirmed_true": 0,
+    "authority_scan_violations": 0,
+    "benchmark_adapter_status": "verified",
+    "coordination_20_run_target_met": true,
+    "coordination_50_run_target_met": true,
+    "coordination_5x_replay_target_met": true,
+    "coordination_failed_count": 0,
+    "coordination_scenario_expansion_target_met": true,
+    "coordination_scenarios_passed": 60,
+    "coordination_scenarios_run": 60,
+    "coordination_unique_scenarios": 12,
+    "dense_reps": 100,
+    "docker_sandbox_status": "docker_unavailable",
+    "failure_capsules_written": 10,
+    "fitness_eligible_receipts": 0,
+    "new_coordination_scenarios": 1,
+    "target_missing_count": 0,
+    "transfer_passed_reps": 94
+  },
+  "notes": [
+    "The tmux/codex child died after applying the scenario patch but before writing cycle output; the recovery pass completed tests, regenerated artifacts, and wrote this receipt.",
+    "Future cycle prompt now caps auxiliary MCP/GitNexus index-refresh attempts and requires manual file-level impact fallback when repo resolution stays broken.",
+    "The launcher now writes shell-level supervisor start/exit stamps to ~/.dharma/forge_reality_arena_master/logs/forge-reality-arena-master_supervisor.log."
+  ],
+  "result": "Expanded Forge Reality Arena coordination gym from 11 to 12 unique scenarios with a stale status artifact vs current owner-file truth-surface fixture; restored five-replay status to 60 passed coordination episodes; preserved dense reps at 100, transfer-passed reps at 94, and zero fitness-eligible receipts.",
+  "schema_version": "forge_reality_arena_master_cycle_receipt.v1",
+  "tests": [
+    {
+      "command": "python3 -m py_compile dharma_swarm/codex_overnight.py scripts/codex_overnight_autopilot.py scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed"
+    },
+    {
+      "command": "bash -n scripts/start_forge_hydra_long_run.sh scripts/status_forge_hydra_long_run.sh",
+      "result": "passed"
+    },
+    {
+      "command": "pytest -q tests/test_codex_overnight.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py",
+      "result": "35 passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 5",
+      "result": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_docker_sandbox.py",
+      "result": "exited 0 with docker_sandbox_status=docker_unavailable"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_benchmark_adapter.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed"
+    },
+    {
+      "command": "structured JSON authority scan",
+      "result": "authority_violations=0"
+    }
+  ]
+}
