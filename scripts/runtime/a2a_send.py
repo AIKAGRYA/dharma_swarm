@@ -191,6 +191,20 @@ def write_receipt(receipt_dir: Path, receipt: dict[str, Any]) -> Path:
     return path
 
 
+def console_receipt() -> dict[str, Any]:
+    """Return an operator-facing receipt shape without persisted receipt fields."""
+    return {
+        "schema_version": "dharma.a2a.send_console.v1",
+        "packet_id": "<redacted>",
+        "status": "<recorded>",
+        "subject": "<redacted>",
+        "ack_subject": "<redacted>",
+        "reply_subject": "<redacted>",
+        "file": "<redacted>",
+        "receipt_path": "<written>",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--to", required=True, help="agent lane, e.g. devin, codex, claude")
@@ -231,7 +245,6 @@ def main(argv: list[str] | None = None) -> int:
         "sha256": envelope["sha256"],
         "nats": _redacted_nats_config(config),
     }
-
     if config.missing or not config.endpoint:
         receipt["status"] = STATUS_SECRETS_MISSING
         receipt["missing"] = list(config.missing)
@@ -265,10 +278,10 @@ def main(argv: list[str] | None = None) -> int:
     receipt_path = write_receipt(Path(args.receipt_dir), receipt)
     receipt["receipt_path"] = str(receipt_path)
     if args.json:
-        print(json.dumps(receipt, indent=2, sort_keys=True))
+        print(json.dumps(console_receipt(), indent=2, sort_keys=True))
     else:
-        print(f"{receipt['status']} packet_id={packet_id} subject={envelope['subject']}")
-        print(f"receipt: {receipt_path}")
+        print("a2a_send: <recorded>")
+        print("receipt: <written>")
     if receipt["status"] == STATUS_SECRETS_MISSING:
         return 3
     if receipt["status"] == STATUS_PUBLISH_FAILED:
