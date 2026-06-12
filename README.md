@@ -86,6 +86,7 @@ If any prose in any doc disagrees with `make onboard`, **trust `make onboard`**,
 - Start at [run_operator.sh](run_operator.sh) for the canonical local backend boot path.
 - Start at [dashboard/package.json](dashboard/package.json) for frontend commands.
 - Start at [scripts/repo_xray.py](scripts/repo_xray.py) for repo-wide static indexing.
+- **Keys & model routing — THE ONE WAY:** [docs/ops/MODEL_KEY_ROUTING.md](docs/ops/MODEL_KEY_ROUTING.md). One key home (`~/.dharma/agent_keys.env` + `dkeys`), one resolver door (`runtime_provider.resolve_runtime_provider_config`), Anthropic→Max plan. Read before any key or model call.
 
 ## GAIA Docs
 

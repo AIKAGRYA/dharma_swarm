@@ -1,0 +1,171 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-20",
+  "created_at_utc": "2026-06-02T08:24:25Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": {
+    "operator_cycle": 6,
+    "master_cycle": 20
+  },
+  "result": "Added the authority_receipt_mirror_without_actor external-boundary scenario, raised the coordination expansion target to 19 fixtures, expanded the canonical failure capsule drill to 15 fixtures, and regenerated Arena status with 152 coordination episodes. Dense events remain internal training signal only and fitness authority stayed zero.",
+  "patch_hash": "sha256:7de4e6af8681731bffb86d0c492b7c708babab983586ba0277bcb9e66517822b",
+  "content_hash_inputs": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "files_changed": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md"
+  ],
+  "artifacts_refreshed": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-pressure-test/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "new_learning_artifacts": [
+    "reports/forge/forge-reality-arena/failure-capsules/authority_receipt_mirror_without_actor-5878fbebd7fa.json"
+  ],
+  "status_snapshot": {
+    "dense_reps": 100,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 97,
+    "transfer_passed_reps": 94,
+    "base_memorized_candidates_denied": 95,
+    "coordination_scenarios_run": 152,
+    "coordination_unique_scenarios": 19,
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_scenarios_passed": 152,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 19,
+    "failure_capsule_failure_classes": 11,
+    "failure_capsules_should_feed_fitness": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 94,
+    "transfer_gated_improvement_candidates": 94,
+    "fitness_boundary_blocked_candidates": 6,
+    "fitness_eligible_receipts": 0,
+    "external_anchors_observed_not_owned": 2,
+    "target_missing": []
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "mcp__contextplus.run_static_analysis target_path=scripts/runtime/forge_swarm_coordination_gym.py",
+      "exit_code": 0,
+      "outcome": "No issues found"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "36 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "9 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "exit_code": 0,
+      "outcome": "wrote 152-episode coordination artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-capsule-drill",
+      "exit_code": 0,
+      "outcome": "wrote 15-capsule drill artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0,
+      "outcome": "wrote normalized dense-event ledger"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0,
+      "outcome": "wrote Docker sandbox verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0,
+      "outcome": "wrote benchmark adapter verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "outcome": "wrote fitness-boundary dry-run artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "wrote status_artifact.json, status.md, and forge-reality-arena-status.json"
+    },
+    {
+      "command": "authority scan over reports/forge/forge-reality-arena and reports/agentops/work_packets JSON",
+      "exit_code": 0,
+      "outcome": "192 JSON files checked, 0 violations"
+    }
+  ],
+  "gitnexus": {
+    "impact_probe_attempted": true,
+    "impact_probe_result": "blocked",
+    "blocker": "GitNexus indexed sibling checkouts but could not resolve active checkout symbols run_coordination_gym or SCENARIOS in scripts/runtime/forge_swarm_coordination_gym.py; manual file-level blast scan and focused tests were used."
+  },
+  "external_boundary": {
+    "external_actions_performed": false,
+    "external_repo_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "fitness_eligible_receipts": 0
+  },
+  "acceptance": {
+    "concrete_improvement": "new adversarial external-boundary coordination scenario plus failure capsule drill expansion",
+    "status_refreshed": true,
+    "agentops_status_refreshed": true,
+    "repo_local_receipt_required": true,
+    "canonical_ds_goal_context_available": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "failure_capsules_should_feed_fitness_false": true,
+    "fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutated": false
+  },
+  "next": "Increase dense sealed replay volume toward the 500-episode stretch target, or add another adversarial fixture from the operator_compression/review_response families if replay remains saturated."
+}

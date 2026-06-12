@@ -1,0 +1,147 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-33-dense-code-network-guard",
+  "cycle": 33,
+  "created_at_utc": "2026-06-01T12:48:07Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Harden the dense SWE-bench-Live-style code repair adapter so score metadata and status metrics explicitly preserve local external-service guard and network-isolation telemetry.",
+  "status": "completed_repo_local_receipt",
+  "impact": {
+    "gitnexus_targets": [
+      {
+        "target": "Function:dharma_swarm/eval/dense_code_gym.py:run_dense_code_repair_cases",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      },
+      {
+        "target": "Function:scripts/runtime/forge_dense_code_gym.py:build_artifact",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      },
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:_dense_metrics",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 2
+      }
+    ],
+    "detect_changes_scope_all": {
+      "risk": "CRITICAL",
+      "changed_files": 78,
+      "changed_symbols": 1312,
+      "affected_processes": 20,
+      "note": "Repository-wide dirty worktree predates this cycle; scoped cycle edits are limited to dense-code packet files, status metric passthrough, and local Forge report artifacts."
+    }
+  },
+  "outputs": [
+    "dharma_swarm/eval/dense_code_gym.py",
+    "scripts/runtime/forge_dense_code_gym.py",
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_dense_code_gym.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-33/verifier_artifact.json",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-33/completion_audit.md",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-33/sealed_manifests/trial-00/swe-live-local-router-2026-06.base.manifest.json",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-33/sealed_manifests/trial-00/swe-live-local-router-2026-06-ec088bca00.variant.manifest.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-33-dense-code-network-guard.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "uses_generated_sealed_base_and_variant": true,
+    "sealed_transform_deterministic": true,
+    "sealed_seed_not_leaked_to_candidate": true,
+    "sealed_variant_not_visible_to_candidate": true,
+    "raw_seed_absent_from_dense_code_cases": true,
+    "variant_manifest_hash_propagated_to_variant_cases": true,
+    "base_and_variant_candidate_views_are_distinct": true,
+    "memorized_base_candidate_denied_by_variant": true,
+    "external_confirmed": false,
+    "training_signal_not_fitness_authority": true,
+    "local_cases_record_external_services_disallowed": true,
+    "score_metadata_records_external_services_disallowed": true,
+    "score_metadata_records_network_guard": true,
+    "score_metadata_records_network_isolation": true,
+    "archive_fitness_changed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile dharma_swarm/eval/dense_code_gym.py scripts/runtime/forge_dense_code_gym.py scripts/runtime/forge_hydra_status.py tests/test_dense_code_gym.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_code_gym.py -q --tb=short",
+      "outcome": "4 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "18 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_code_gym.py --output-dir reports/forge/dense-code-gym-repair-adapter/cycle-33 --freshness-month 2026-06",
+      "outcome": "cycle verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py",
+      "outcome": "operator status artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_gym_adapter.py tests/test_dense_code_gym.py tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "27 passed, 1 warning"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/dense-code-gym-repair-adapter/cycle-33/verifier_artifact.json",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json",
+      "outcome": "pass"
+    }
+  ],
+  "artifact_hashes": {
+    "dense_code_core_sha256": "03e217a49f2bf7b2836f04c63f5abd1bb7e51b7b11b019323ad998d5355fca33",
+    "dense_code_adapter_script_sha256": "23451b5b203419facedb82f69247e68d6f9b7391906a151c16b395c806636ece",
+    "forge_status_script_sha256": "b044bc55686a62092fabfed78018f5d70ee544b32cc11b9b75fe8c0f715dba94",
+    "dense_code_test_sha256": "eab30bc303abe2de53426c2d03f08cecc3ffe647c01e508ecd88dedeafe04b84",
+    "forge_status_test_sha256": "ed20c50846155c4269ea4d5b1eacb28b87646e8886b1a567cb9c68671b995c31",
+    "cycle_verifier_artifact_sha256": "836693d9eee032a0d3a4e921b1a1b3cc8d7c940db137ad1b804af3892b820cbb",
+    "status_artifact_sha256": "7290fbd145d5462f323225ca0e57a8051a5be0bb1d8ae6bec62614e96aea2066"
+  },
+  "status_snapshot": {
+    "dense_eval_artifacts": 8,
+    "dense_eval_unique_packets": 3,
+    "dense_eval_duplicate_packet_artifacts": 5,
+    "packet_chain_verified_internal": 3,
+    "packet_chain_internal_remaining": 0,
+    "external_acted_receipts": 0,
+    "external_humans_or_orgs_acted": 0,
+    "blocked_external_authority_items": 6,
+    "receipt_policy_status": "repo_local_required_no_canonical_context"
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed.",
+    "Repository-wide GitNexus detect-changes remains critical because of pre-existing unrelated dirty worktree state."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

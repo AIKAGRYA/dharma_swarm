@@ -1,0 +1,27 @@
+{
+  "agent": "codex_forgewright",
+  "archive_fitness_changed": false,
+  "authority": "internal-only",
+  "created_at_utc": "2026-06-03T16:13:29Z",
+  "external_actions_performed": false,
+  "mission": "Forge Reality Arena v2",
+  "mission_id": "20260603T160201Z-forge-reality-arena-v2-reality-updates-fitness",
+  "negative_result_receipts": [
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/negative-results/no_new_external_operator_lease.json"
+  ],
+  "outputs": [
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/v2_scorecard.json",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/v2_scorecard.md",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/dense_gym_ledger.jsonl",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/transfer_candidate_ledger.jsonl",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/guardian_decision_ledger.jsonl",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/sparse_external_candidate_ledger.jsonl",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/fitness_update_candidate_ledger.jsonl",
+    "/Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena-v2/control-watch-tower/v2_readout.json"
+  ],
+  "packet_id": "forge-reality-arena-v2-cycle-1-scorecard",
+  "run_id": "20260603T160201Z",
+  "schema_version": "agentops_work_packet.v1",
+  "score": 100,
+  "status": "target_reached_internal_external_gated"
+}

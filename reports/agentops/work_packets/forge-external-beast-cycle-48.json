@@ -1,0 +1,250 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-48",
+  "cycle": 48,
+  "recorded_at": "2026-06-02T06:27:53+08:00",
+  "observed_at_utc": "2026-06-01T22:27:53Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "appium_mcp_379_local_candidate_prepared_public_action_withheld_by_build_readiness_gate",
+  "public_action_taken": false,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": false,
+  "fork_created": false,
+  "automated_external_services_observed": false,
+  "non_maintainer_human_review_observed": false,
+  "human_maintainer_action_observed": false,
+  "new_pr_accepted_or_merged": false,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-048.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/appium-appium-mcp-379/cycle-048-target-readiness-blocked.md",
+      "kind": "target_readiness_blocked_packet"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-48.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-048-status/status_artifact.json",
+      "kind": "read_only_status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-048-status/status.md",
+      "kind": "read_only_status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/worktrees/appium-appium-mcp-upstream-main/src/tests/tools/index.test.ts",
+      "kind": "local_target_patch_file"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "dharma_impact_analysis_required": false
+  },
+  "local_candidate": {
+    "repo": "appium/appium-mcp",
+    "issue_number": 379,
+    "issue_url": "https://github.com/appium/appium-mcp/issues/379",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/worktrees/appium-appium-mcp-upstream-main",
+    "branch": "codex/issue-379-tool-registry-test",
+    "commit_sha": "98bf3ba23d2f59d2204a233dbcba20897a71c56b",
+    "patch_sha256": "6157c61b7258df3df8fc606766f65c65e5870f471b635399dde884a36195cbea",
+    "public_action_readiness": "blocked",
+    "blocked_reason": "target repo build fails on existing runtime driver type errors outside the prepared test patch; prepared patch covers only the first issue bullet"
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "pr_number": 222,
+      "state": "OPEN",
+      "merge_state_status": "BLOCKED",
+      "checks_summary": "GitGuardian success; CodeRabbit success; contributor review/comment only",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "issue_number": 3,
+      "pr_number": 5,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "issue_number": 4,
+      "pr_number": 6,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 11,
+      "pr_number": 22,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 7,
+      "pr_number": 23,
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "issue_number": 42,
+      "pr_number": 43,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "jokiatgithub/AgentKanban",
+      "issue_number": 4,
+      "pr_number": 9,
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "siddhant-rajhans/cortexlab",
+      "issue_number": 75,
+      "pr_number": 76,
+      "state": "OPEN",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "target_local_checks": [
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm install --no-package-lock --ignore-scripts --loglevel=warn",
+      "exit_code": 0,
+      "notes": "plain npm install hung and was killed before this recovery install"
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm test -- --runTestsByPath src/tests/tools/index.test.ts",
+      "exit_code": 0,
+      "result": "1 passed"
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm test -- --runTestsByPath src/tests/tools/index.test.ts src/tests/create-server.test.ts src/tests/tools/session/device-info.test.ts",
+      "exit_code": 0,
+      "result": "3 suites passed, 27 tests passed"
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npx prettier --check src/tests/tools/index.test.ts",
+      "exit_code": 0
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npx eslint src/tests/tools/index.test.ts",
+      "exit_code": 0
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm run check",
+      "exit_code": 0,
+      "result": "eslint src --ext .ts and prettier --check passed"
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm run verify:names",
+      "exit_code": 1,
+      "result": "failed because dist/plugin.js is absent before build"
+    },
+    {
+      "target": "appium/appium-mcp",
+      "command": "npm run build",
+      "exit_code": 1,
+      "result": "failed on existing runtime driver type errors outside the prepared test patch"
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "target": "labmain/ai-agent-pay-demo#35",
+      "reason": "many competing PRs/comments and stale/noisy bounty traffic"
+    },
+    {
+      "target": "etcd-io/website#1166",
+      "reason": "clear issue but two contributors already publicly claimed work before local implementation"
+    },
+    {
+      "target": "jwodder/keefuzz#1",
+      "reason": "open PR #16 already targets the remaining test bullets"
+    }
+  ],
+  "guardrails": {
+    "money_spent_or_requested": false,
+    "bounty_claimed": false,
+    "private_credentials_submitted": false,
+    "protected_branch_pushed_or_merged": false,
+    "broad_performance_claim_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "external_confirmed_true_written": false,
+    "first_external_receipt_witness_created": false,
+    "nonzero_archive_fitness_set": false,
+    "v2_autonomy_escalation": false
+  },
+  "blockers": [
+    "No active external PR has material maintainer action yet.",
+    "Appium MCP local candidate is blocked from public action because npm run build is red on existing runtime driver type errors outside the prepared patch.",
+    "The prepared Appium patch covers only the tool-name contract slice, not the full direct-call-each-tool issue request."
+  ]
+}

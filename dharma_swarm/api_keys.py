@@ -8,6 +8,9 @@ code.
 from __future__ import annotations
 
 import os
+import re
+import shlex
+from pathlib import Path
 from typing import Iterable, Mapping
 
 ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY"
@@ -172,6 +175,120 @@ ENV_ALIASES: dict[str, str] = {
 }
 
 
+_SHELL_VAR_REF_PATTERN = re.compile(r"""^\$(?:\{?[A-Za-z_][A-Za-z0-9_]*\}?)$""")
+_RUNTIME_ENV_BOOTSTRAPPED = False
+
+
+def _is_unresolved_shell_ref(value: str) -> bool:
+    return bool(_SHELL_VAR_REF_PATTERN.match(value.strip()))
+
+
+def _usable_env_value(value: object) -> str | None:
+    text = str(value or "").strip()
+    if not text or _is_unresolved_shell_ref(text):
+        return None
+    return text
+
+
+def _valid_env_name(name: str) -> bool:
+    return bool(name) and (name[0].isalpha() or name[0] == "_") and all(
+        ch.isalnum() or ch == "_" for ch in name
+    )
+
+
+def runtime_env_paths(home: Path | None = None) -> tuple[Path, ...]:
+    root = home or Path.home()
+    return (
+        root / ".zshrc",
+        root / ".env",
+        root / ".dharma" / ".env",
+        root / ".dharma" / "daemon.env",
+        root / ".dharma" / "agent_keys.env",
+    )
+
+
+def _expand_simple_env_ref(value: str, env: Mapping[str, str]) -> str | None:
+    raw = value.strip()
+    if not _is_unresolved_shell_ref(raw):
+        return raw
+    name = raw[1:]
+    if name.startswith("{") and name.endswith("}"):
+        name = name[1:-1]
+    return _usable_env_value(env.get(name, ""))
+
+
+def apply_env_assignment(line: str, env: dict[str, str] | None = None) -> bool:
+    """Apply one simple shell-style env assignment without executing shell code."""
+    target = env if env is not None else os.environ
+    raw = line.strip()
+    if not raw or raw.startswith("#"):
+        return False
+    if raw.startswith("export "):
+        raw = raw[len("export "):].strip()
+    elif "export " in raw:
+        return False
+    try:
+        parts = shlex.split(raw, comments=True, posix=True)
+    except ValueError:
+        return False
+    if len(parts) != 1 or "=" not in parts[0]:
+        return False
+    name, value = parts[0].split("=", 1)
+    if not _valid_env_name(name):
+        return False
+    if _usable_env_value(target.get(name, "")):
+        return False
+    resolved_value = _expand_simple_env_ref(value, target)
+    if not resolved_value:
+        return False
+    target[name] = resolved_value
+    return True
+
+
+def load_runtime_env_files(
+    paths: Iterable[Path],
+    env: dict[str, str] | None = None,
+) -> int:
+    """Load simple export assignments from local runtime env files."""
+    loaded = 0
+    for path in paths:
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except Exception:
+            continue
+        for line in lines:
+            if apply_env_assignment(line, env):
+                loaded += 1
+    return loaded
+
+
+def bootstrap_runtime_env(
+    *,
+    env: dict[str, str] | None = None,
+    env_paths: Iterable[Path] | None = None,
+    include_files: bool = True,
+    force: bool = False,
+) -> list[tuple[str, str]]:
+    """Load local runtime env once and normalize canonical provider aliases."""
+    global _RUNTIME_ENV_BOOTSTRAPPED
+
+    target = env if env is not None else os.environ
+    if env is not None:
+        if include_files:
+            load_runtime_env_files(env_paths or runtime_env_paths(), target)
+        return normalize_env_aliases(target)
+
+    if force or not _RUNTIME_ENV_BOOTSTRAPPED:
+        _RUNTIME_ENV_BOOTSTRAPPED = True
+        os.environ["DHARMA_RUNTIME_ENV_LOADED"] = "1"
+        if include_files:
+            load_runtime_env_files(env_paths or runtime_env_paths())
+
+    return normalize_env_aliases()
+
+
 def normalize_env_aliases(
     env: dict[str, str] | None = None,
     *,
@@ -191,8 +308,8 @@ def normalize_env_aliases(
     for alias, canonical in ENV_ALIASES.items():
         if alias == canonical:
             continue
-        alias_val = target.get(alias, "").strip()
-        canonical_val = target.get(canonical, "").strip()
+        alias_val = _usable_env_value(target.get(alias, ""))
+        canonical_val = _usable_env_value(target.get(canonical, ""))
         if alias_val and not canonical_val:
             if not dry_run:
                 target[canonical] = alias_val
@@ -219,9 +336,8 @@ def service_api_key_env(name: str) -> str:
 
 
 def env_value(env_var: str, env: Mapping[str, str] | None = None) -> str | None:
-    source = env or os.environ
-    value = str(source.get(env_var, "")).strip()
-    return value or None
+    source = os.environ if env is None else env
+    return _usable_env_value(source.get(env_var, ""))
 
 
 def env_has_value(env_var: str, env: Mapping[str, str] | None = None) -> bool:
@@ -236,6 +352,11 @@ def present_api_key_envs(
     return [env_var for env_var in ordered if env_has_value(env_var, env)]
 
 
+def has_any_llm(env: Mapping[str, str] | None = None) -> bool:
+    """Return True when any canonical runtime LLM provider key is configured."""
+    return bool(present_api_key_envs(RUNTIME_PROVIDER_API_KEY_ENV_KEYS, env))
+
+
 def provider_available(provider: str, env: Mapping[str, str] | None = None) -> bool:
     """Return True if the named provider has a configured API key."""
     env_var = PROVIDER_API_KEY_ENV_KEYS.get(provider)
@@ -247,6 +368,8 @@ def provider_available(provider: str, env: Mapping[str, str] | None = None) -> b
 __all__ = [
     "ALL_API_KEY_ENV_KEYS",
     "ANTHROPIC_API_KEY_ENV",
+    "apply_env_assignment",
+    "bootstrap_runtime_env",
     "CEREBRAS_API_KEY_ENV",
     "CEREBRAS_BASE_URL_ENV",
     "CHAT_PROVIDER_API_KEY_ENV_KEYS",
@@ -266,6 +389,7 @@ __all__ = [
     "GOOGLE_AI_BASE_URL_ENV",
     "GROQ_API_KEY_ENV",
     "GROQ_BASE_URL_ENV",
+    "has_any_llm",
     "MISTRAL_API_KEY_ENV",
     "MISTRAL_BASE_URL_ENV",
     "MOONSHOT_API_KEY_ENV",
@@ -292,10 +416,12 @@ __all__ = [
     "TOGETHER_BASE_URL_ENV",
     "env_has_value",
     "env_value",
+    "load_runtime_env_files",
     "normalize_env_aliases",
     "present_api_key_envs",
     "provider_api_key_env",
     "provider_available",
     "provider_base_url_env",
+    "runtime_env_paths",
     "service_api_key_env",
 ]

@@ -67,6 +67,8 @@ reports/psmv_hyperfiles_20260313/graphs/*.json
 reports/memory_kernel/
 reports/docops/
 reports/system_map/latest.json
+reports/revenue_wedge/
+reports/forge/
 results.tsv
 run.log
 synthesizer_memory.json
@@ -101,3 +103,7 @@ results/*/
 
 # Paper drafts (kept local until promoted to a tracked branch).
 paper/
+.cursor/
+tools/world_scout_go/world_scout_go
+tools/evidence_ingestor_go/evidence_ingestor_go
+reports/capital_lab/goal_a_12h/session_logs/*.log

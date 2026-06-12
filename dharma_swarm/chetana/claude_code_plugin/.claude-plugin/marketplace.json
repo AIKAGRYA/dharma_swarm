@@ -1,0 +1,13 @@
+{
+  "name": "local-chetana",
+  "owner": {
+    "name": "dhyana"
+  },
+  "plugins": [
+    {
+      "name": "chetana",
+      "description": "Connective tissue layer — every session captured, ingested, gate-checked, and woven into the grand memory system.",
+      "source": "./chetana"
+    }
+  ]
+}

@@ -8,7 +8,10 @@ import logging
 import os
 from pathlib import Path
 import time
-from typing import Any, Iterable
+from typing import Any, Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dharma_swarm.swarm_router import SwarmExecutionPlan
 
 from dharma_swarm.decision_router import DecisionInput, DecisionRouter, RoutePath
 from dharma_swarm.model_hierarchy import (

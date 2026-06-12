@@ -1,0 +1,221 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-64",
+  "cycle": 64,
+  "recorded_at": "2026-06-02T09:18:19+08:00",
+  "observed_at_utc": "2026-06-02T01:18:19Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "ledger_correction_additional_external_merges_guard_verified",
+  "public_action_taken": false,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": false,
+  "fork_created": false,
+  "automated_external_services_observed": true,
+  "external_repo_collaborator_action_observed": true,
+  "new_external_collaborator_action_observed_this_cycle": false,
+  "new_external_acted_receipts_discovered_this_cycle": true,
+  "new_pr_accepted_or_merged_this_cycle": false,
+  "external_receipt_reverified_this_cycle": true,
+  "new_external_confirmation_flag_set_by_codex_forgewright_this_cycle": true,
+  "new_external_confirmation_flag_scope": "guard output artifacts only, after live external maintainer merge actions were observed; no witness or archive-fitness mutation",
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_modified_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-064.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-064-active-pr-ledger.md",
+      "kind": "active_pr_ledger"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/labmain-ai-agent-pay-demo-issue-35/cycle-064-disqualification-recheck.md",
+      "kind": "target_disqualification_recheck"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-64.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-status/status_artifact.json",
+      "kind": "status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-status/status.md",
+      "kind": "status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-receipt-reverification.json",
+      "kind": "waggle_receipt_guard_reverification"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-abduznik-instrumation-98-merge-event.json",
+      "kind": "merge_event_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-abduznik-instrumation-98-receipt-reverification.json",
+      "kind": "receipt_guard_reverification"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-yasuno-guild-7-merge-event.json",
+      "kind": "merge_event_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-yasuno-guild-7-receipt-reverification.json",
+      "kind": "receipt_guard_reverification"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-leticiv-intigriti-asset-copier-6-merge-event.json",
+      "kind": "merge_event_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-leticiv-intigriti-asset-copier-6-receipt-reverification.json",
+      "kind": "receipt_guard_reverification"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-guard-probes.json",
+      "kind": "receipt_guard_negative_probe"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dirty_entries_before_artifact_writes": 432,
+    "dharma_symbol_edits_this_cycle": false,
+    "witness_files_touched_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date_for_current_repo_root",
+    "dharma_impact_analysis_required": false,
+    "impact_analysis_note": "No function, class, or method symbol was edited; this cycle wrote reports and state artifacts only."
+  },
+  "guard_verified_external_merges": [
+    {
+      "repo": "abduznik/instrumation",
+      "issue_number": 96,
+      "issue_state": "CLOSED",
+      "issue_state_reason": "COMPLETED",
+      "issue_closed_at": "2026-06-01T12:51:00Z",
+      "pr_number": 98,
+      "pr_url": "https://github.com/abduznik/instrumation/pull/98",
+      "head_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+      "base_sha": "8ef441f2f25b345022660ca958292a587861d513",
+      "merged_at": "2026-06-01T12:50:58Z",
+      "merge_commit_sha": "6ef7f4c9cbdbb96d3c0df57261635ce489cf0c11",
+      "merged_by": "abduznik",
+      "merged_by_type": "User",
+      "merged_by_is_bot": false,
+      "external_confirmed": true,
+      "external_confirmed_source": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-abduznik-instrumation-98-receipt-reverification.json"
+    },
+    {
+      "repo": "Yasuno-5555/Guild",
+      "issue_number": 1,
+      "issue_state": "CLOSED",
+      "issue_state_reason": "COMPLETED",
+      "issue_closed_at": "2026-06-01T12:56:22Z",
+      "pr_number": 7,
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "base_sha": "e359a26802cab7160b682e3765da4472c98eba5f",
+      "merged_at": "2026-06-01T12:56:20Z",
+      "merge_commit_sha": "c809f0377fb9fd4bfa7f4b0e5aa8082fd4759361",
+      "merged_by": "Yasuno-5555",
+      "merged_by_type": "User",
+      "merged_by_is_bot": false,
+      "external_confirmed": true,
+      "external_confirmed_source": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-yasuno-guild-7-receipt-reverification.json"
+    },
+    {
+      "repo": "leticiv/intigriti-asset-copier",
+      "issue_number": 1,
+      "issue_state": "CLOSED",
+      "issue_state_reason": "COMPLETED",
+      "issue_closed_at": "2026-06-01T13:01:31Z",
+      "pr_number": 6,
+      "pr_url": "https://github.com/leticiv/intigriti-asset-copier/pull/6",
+      "head_sha": "dbf9fbb579d45cb3f9e4fa31f6d0bd5b73393a4b",
+      "base_sha": "df6208538d4b07184644afa09fb3614807420df1",
+      "merged_at": "2026-06-01T13:01:29Z",
+      "merge_commit_sha": "fd60a48582cde487fd10e3c00b30d2e5336e90ae",
+      "merged_by": "leticiv",
+      "merged_by_type": "User",
+      "merged_by_is_bot": false,
+      "external_confirmed": true,
+      "external_confirmed_source": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-leticiv-intigriti-asset-copier-6-receipt-reverification.json"
+    },
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "issue_state": "CLOSED",
+      "issue_state_reason": "COMPLETED",
+      "issue_closed_at": "2026-06-01T23:50:36Z",
+      "pr_number": 222,
+      "pr_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/pull/222",
+      "head_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+      "base_sha": "83c509153ad06f1e7c21ba2702a71856b17bc521",
+      "merged_at": "2026-06-01T23:50:35Z",
+      "merge_commit_sha": "ec5a4e06fb83f064155344eebc87ab44346ea84b",
+      "merged_by": "ard12",
+      "merged_by_type": "User",
+      "merged_by_is_bot": false,
+      "external_confirmed": true,
+      "external_confirmed_source": "/Users/dhyana/.dharma/forge_external_beast/cycle-064-receipt-reverification.json"
+    }
+  ],
+  "external_rejection_or_nonacceptance": [
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_number": 9,
+      "state": "CLOSED",
+      "merged_at": null,
+      "closed_at": "2026-06-01T12:58:08Z",
+      "external_actor": "Yasuno-5555",
+      "action": "closed_unmerged_with_comment",
+      "reason_summary": "Closed in favor of maintainer PR #10, which resolved issue #2.",
+      "external_confirmed": false
+    }
+  ],
+  "labmain_issue_35": {
+    "state": "OPEN",
+    "updated_at": "2026-05-31T03:46:50Z",
+    "comments": 11,
+    "open_competing_prs": 17,
+    "readiness": "disqualified_high_competition",
+    "public_action_planned": false
+  },
+  "guardrails": {
+    "money_spent": false,
+    "payment_requested": false,
+    "bounty_claimed": false,
+    "private_credentials_submitted": false,
+    "broad_performance_claim_published": false,
+    "protected_branch_merged_or_pushed": false,
+    "dharma_main_pushed_or_merged": false,
+    "archive_fitness_nonzero_set": false,
+    "first_external_receipt_witness_created_or_modified": false,
+    "v2_autonomy_escalated": false
+  },
+  "blockers": [
+    "Downstream witness chronology should be reconciled before any first-receipt witness materialization because Cycle 64 surfaced earlier guard-verified external merges than Waggle MCP #222."
+  ]
+}

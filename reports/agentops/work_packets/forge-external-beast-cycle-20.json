@@ -1,0 +1,169 @@
+{
+  "packet_id": "forge-external-beast-cycle-20",
+  "cycle": 20,
+  "recorded_at": "2026-06-01T21:29:38+08:00",
+  "observed_at_utc": "2026-06-01T13:29:38Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "verifier_handoff_manifest_hardened",
+  "public_action_taken": false,
+  "external_action_observed": true,
+  "external_confirmed": false,
+  "first_external_receipt_witness_created": false,
+  "archive_fitness_changed": false,
+  "receipt_confirmation_owner": "forge_measurement_guardian",
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-020.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/cycle-020-receipt-candidate-manifest.json",
+      "kind": "receipt_candidate_manifest",
+      "sha256": "9bcb3bd635a59a5960bf1a7f24e70c8d4b73820a860bf3762397f001d41175d7"
+    }
+  ],
+  "receipt_candidates_direct": [
+    {
+      "repo": "abduznik/instrumation",
+      "pr_url": "https://github.com/abduznik/instrumation/pull/98",
+      "issue_url": "https://github.com/abduznik/instrumation/issues/96",
+      "state": "MERGED",
+      "author": "AmitabhainArunachala",
+      "merged_by": "abduznik",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T12:50:58Z",
+      "head_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+      "merge_commit_sha": "6ef7f4c9cbdbb96d3c0df57261635ce489cf0c11",
+      "readiness_packet": "reports/forge/external-beast/targets/abduznik-instrumation-issue-96/readiness.md",
+      "readiness_sha256": "75dd9f0762cffabe8aa2aa3110e7d35c4881d64b872256ed3df09782e9afeb31"
+    },
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+      "state": "MERGED",
+      "author": "AmitabhainArunachala",
+      "merged_by": "Yasuno-5555",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T12:56:20Z",
+      "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "merge_commit_sha": "c809f0377fb9fd4bfa7f4b0e5aa8082fd4759361",
+      "readiness_packet": "reports/forge/external-beast/targets/yasuno-5555-guild-issue-1/readiness.md",
+      "readiness_sha256": "e9a91cce60f84e804df7f87335e4d2c53cfbd5d8a9314974b17e1cc782487da8"
+    },
+    {
+      "repo": "leticiv/intigriti-asset-copier",
+      "pr_url": "https://github.com/leticiv/intigriti-asset-copier/pull/6",
+      "issue_url": "https://github.com/leticiv/intigriti-asset-copier/issues/1",
+      "state": "MERGED",
+      "author": "AmitabhainArunachala",
+      "merged_by": "leticiv",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T13:01:29Z",
+      "head_sha": "dbf9fbb579d45cb3f9e4fa31f6d0bd5b73393a4b",
+      "merge_commit_sha": "fd60a48582cde487fd10e3c00b30d2e5336e90ae",
+      "maintainer_comment_observed": true,
+      "maintainer_comment_author": "leticiv",
+      "maintainer_comment_at": "2026-06-01T13:04:18Z",
+      "readiness_packet": "reports/forge/external-beast/targets/leticiv-intigriti-asset-copier-issue-1/readiness.md",
+      "readiness_sha256": "88355a660ce949bed23b28bc2882bcdc4547052a8722d41ebc22d852971a67a1"
+    }
+  ],
+  "still_waiting": [
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/23",
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "pr_url": "https://github.com/avanlolee/open-dtc-ops/pull/6",
+      "state": "OPEN",
+      "merge_state_status": "UNSTABLE",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "pr_url": "https://github.com/nakamekun/app-store-monitor/pull/5",
+      "state": "OPEN",
+      "merge_state_status": "CLEAN",
+      "comments": 0,
+      "reviews": 0
+    }
+  ],
+  "same_day_author_merge_crosscheck": {
+    "external_merged_prs_found": [
+      "leticiv/intigriti-asset-copier#6",
+      "abduznik/instrumation#98",
+      "Yasuno-5555/Guild#7"
+    ],
+    "internal_dharma_swarm_prs_excluded": [
+      "AmitabhainArunachala/dharma_swarm#408",
+      "AmitabhainArunachala/dharma_swarm#406",
+      "AmitabhainArunachala/dharma_swarm#401"
+    ]
+  },
+  "public_actions": [],
+  "decision": {
+    "opened_new_target": false,
+    "reason": "Existing external merge candidates make verifier handoff higher leverage than adding another outbound proposal before confirmation."
+  },
+  "guardrails": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_dharma_swarm_main": false,
+    "merged_protected_branch": false,
+    "published_broad_claim": false,
+    "created_first_external_receipt_witness": false,
+    "set_external_confirmed_true": false,
+    "set_nonzero_archive_fitness": false,
+    "escalated_to_v2_autonomy": false
+  },
+  "verification_commands": [
+    {
+      "command": "git status --short",
+      "exit_code": 0,
+      "outcome": "passed; worktree is dirty from pre-existing work"
+    },
+    {
+      "command": "gh auth status",
+      "exit_code": 0,
+      "outcome": "passed for account AmitabhainArunachala"
+    },
+    {
+      "command": "mcp__github_local.search_issues",
+      "exit_code": 0,
+      "outcome": "passed for direct merged candidates and open submissions"
+    },
+    {
+      "command": "gh pr view <external PRs>",
+      "exit_code": 0,
+      "outcome": "passed for PRs 98, 7, 6, 22, 23, 6, 5, 9, and 10"
+    },
+    {
+      "command": "gh issue view <linked issues>",
+      "exit_code": 0,
+      "outcome": "passed for linked issues 96, 1, 1, 2, 11, 7, 4, and 3"
+    },
+    {
+      "command": "shasum -a 256 <readiness packets and manifest>",
+      "exit_code": 0,
+      "outcome": "passed; hashes recorded in manifest and report"
+    }
+  ],
+  "blocker": "Separate forge_measurement_guardian verification is required before external_confirmed, first_external_receipt_witness, or archive fitness can change."
+}

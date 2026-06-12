@@ -1,0 +1,98 @@
+{
+  "id": "forge-external-beast-cycle-9",
+  "cycle": 9,
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "local_target_prepared_public_action_blocked",
+  "recorded_at": "2026-06-01T19:36:36+08:00",
+  "external_confirmed": false,
+  "first_external_receipt_witness_created": false,
+  "archive_fitness_changed": false,
+  "public_actions": [],
+  "summary": "Rechecked existing public PRs, prepared Yasuno-5555/Guild issue 2 locally, and withheld public action because local Docker sandbox verification cannot see bind-mounted workspace files.",
+  "watched_prs": [
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr": 7,
+      "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "state": "open",
+      "maintainer_action_observed": false,
+      "ci": "action_required_no_jobs"
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr": 22,
+      "head_sha": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "state": "open",
+      "maintainer_action_observed": false,
+      "ci": "action_required_no_jobs"
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr": 23,
+      "head_sha": "12b87ab1f96cb02da0217aff7af2aead22967f66",
+      "state": "open",
+      "maintainer_action_observed": false,
+      "ci": "action_required_no_jobs"
+    }
+  ],
+  "prepared_target": {
+    "repo": "Yasuno-5555/Guild",
+    "issue": 2,
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+    "branch": "codex/issue-2-python-example-bounty",
+    "readiness_packet": "reports/forge/external-beast/targets/yasuno-5555-guild-issue-2/readiness.md",
+    "public_action_planned": false,
+    "blocker": "local Docker bind mount exposes an empty workspace during guild verify --sandbox"
+  },
+  "tests": [
+    {
+      "command": "bounty validate for examples/python-off-by-one",
+      "outcome": "passed"
+    },
+    {
+      "command": "local pytest red proof",
+      "outcome": "expected failure observed: 3 failed, 1 passed"
+    },
+    {
+      "command": "temporary fixed-copy pytest green proof",
+      "outcome": "passed: 4 tests"
+    },
+    {
+      "command": "cargo check",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test --workspace --exclude guild-sandbox",
+      "outcome": "passed"
+    },
+    {
+      "command": "npm install",
+      "outcome": "passed; unrelated lockfile normalization reverted"
+    },
+    {
+      "command": "npm run build --workspaces",
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check -- examples/python-off-by-one",
+      "outcome": "passed"
+    },
+    {
+      "command": "guild verify --sandbox for examples/python-off-by-one",
+      "outcome": "failed due local Docker mount visibility; no public action taken"
+    }
+  ],
+  "guardrails": {
+    "spent_funds": false,
+    "pushed_branch": false,
+    "opened_pr": false,
+    "posted_comment": false,
+    "merged_protected_branch": false,
+    "published_broad_claim": false
+  },
+  "artifacts": [
+    "reports/forge/external-beast/cycle-009.md",
+    "reports/forge/external-beast/targets/yasuno-5555-guild-issue-2/readiness.md"
+  ]
+}

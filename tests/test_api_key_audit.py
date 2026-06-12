@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from dharma_swarm import api_key_audit as audit
 
 
@@ -96,3 +98,31 @@ def test_text_report_renders_configured_records_only() -> None:
     assert "OPENAI_API_KEY:" in report
     assert "OPENROUTER_API_KEY:" not in report
     assert "default_agentic: error" in report
+
+
+@pytest.mark.asyncio
+async def test_run_api_key_audit_normalizes_alias_env(monkeypatch) -> None:
+    async def fake_auth(spec, *, env=None):
+        del spec, env
+        return {"status": "skipped"}
+
+    async def fake_completion(spec, *, env=None):
+        del spec, env
+        return {"status": "skipped"}
+
+    monkeypatch.setattr(audit, "_probe_auth_endpoint", fake_auth)
+    monkeypatch.setattr(audit, "_probe_default_completion", fake_completion)
+
+    payload = await audit.run_api_key_audit(
+        include_agentic=False,
+        env={
+            "OPENROUTER_API_KEY": "or-test",
+            "GEMINI_API_KEY": "gemini-test",
+        },
+    )
+
+    assert payload["configured_key_names"] == [
+        "OPENROUTER_API_KEY",
+        "GOOGLE_AI_API_KEY",
+    ]
+    assert payload["summary"]["configured"] == 2

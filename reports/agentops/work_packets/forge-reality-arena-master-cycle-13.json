@@ -1,0 +1,133 @@
+{
+  "acceptance": {
+    "actual_fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutation_claims_absent": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_actions_performed": false,
+    "external_confirmed_claims_absent": true,
+    "fitness_eligible_receipts_zero": true,
+    "merged": false,
+    "new_coordination_scenario_recorded": true,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "repo_local_receipt_required": true
+  },
+  "agent": "codex",
+  "authority": "evidence-only",
+  "blockers": [
+    {
+      "blocker": "GitNexus MCP/CLI did not resolve the active /Users/dhyana/dharma_swarm checkout; direct impact call returned repository not found after a bounded analyze attempt timed out at 30s.",
+      "impact": "cycle used manual file-level blast-radius scan plus focused tests"
+    },
+    {
+      "blocker": "codebase-retrieval MCP failed to index /Users/dhyana/dharma_swarm.",
+      "impact": "cycle used direct file reads and deterministic verifiers"
+    }
+  ],
+  "bounded_packet": "Rung 2 - expand DS coordination gym with delayed sparse-anchor feedback scenario and preserve five-replay target",
+  "changed_files": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-13.json"
+  ],
+  "completed_at": "2026-06-02T07:18:00Z",
+  "cycle": 13,
+  "hashes": {
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:b6fe6f7065f34bebc2fd3ad59340879034f2659b2ad4c36b8b5bc714a24d9787",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:fc73f6b171ceb3fb7786602335cc27fda6495878a1ab659356bf255982b7f51e",
+    "reports/forge/forge-reality-arena/status.md": "sha256:e333ce760e8142b93a41fffa28d2d7e615fe8a38f4a45d90292191191c941e47",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:cffdce25d850a779c1d91db0baf3620698c1a0557f836899265faaf1da9d7cba",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:1150fc4d5abfe62e2af7c8153c4d3615e244030bff5db0e9de25bf73de3b8a34",
+    "scripts/runtime/forge_swarm_coordination_gym.py": "sha256:4c413dc429ae15717128096ba1f046fcb4774c28cf5b2a513b130ca20b34e439",
+    "tests/test_forge_reality_arena_status.py": "sha256:f9fe1bb0194b868826c3dc53c8047f56ac35790869a0d5c3ffe34c7eb7970914",
+    "tests/test_forge_swarm_coordination_gym.py": "sha256:ef0f3a0a0fe084ba75c9c52648160e444e0a11c580a076539edb26415d68cce1"
+  },
+  "lane": "forge-reality-arena-v0",
+  "metrics": {
+    "actual_fitness_eligible_receipts": 0,
+    "authority_scan_external_confirmed_true": 0,
+    "authority_scan_violations": 0,
+    "benchmark_adapter_status": "verified",
+    "coordination_20_run_target_met": true,
+    "coordination_50_run_target_met": true,
+    "coordination_5x_replay_target_met": true,
+    "coordination_failed_count": 0,
+    "coordination_scenario_expansion_target_met": true,
+    "coordination_scenarios_passed": 65,
+    "coordination_scenarios_run": 65,
+    "coordination_unique_scenarios": 13,
+    "dense_reps": 100,
+    "docker_sandbox_status": "smoke_passed",
+    "failure_capsules_written": 10,
+    "fitness_eligible_receipts": 0,
+    "new_coordination_scenarios": 1,
+    "target_missing_count": 0,
+    "transfer_passed_reps": 94
+  },
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "notes": [
+    "Operator requested cycle 1, but cycle receipts 1-12 already existed in the active tree; this receipt uses the next available master-cycle id to avoid overwriting prior evidence.",
+    "The first focused pytest run failed because reality_latency was not an allowed failure-capsule class; the scenario now maps delayed sparse-anchor failures to external_boundary.",
+    "No external actions, payments, pushes, merges, public claims, or archive fitness mutations were performed."
+  ],
+  "operator_requested_cycle": 1,
+  "packet_id": "forge-reality-arena-master-cycle-13",
+  "result": "Expanded Forge Reality Arena coordination gym from 12 to 13 unique scenarios with a delayed sparse-anchor feedback fixture that blocks premature success claims until sparse external evidence arrives; refreshed five-replay status to 65 passed coordination episodes while preserving 100 dense reps, 94 transfer-passed reps, and zero fitness-eligible receipts.",
+  "role": "codex_forgewright",
+  "schema_version": "forge_reality_arena_master_cycle_receipt.v1",
+  "tests": [
+    {
+      "command": "make onboard",
+      "result": "passed"
+    },
+    {
+      "command": "timeout 30 npx gitnexus analyze",
+      "result": "timed out after printing GitNexus Analyzer"
+    },
+    {
+      "command": "mcp__gitnexus.impact(repo=/Users/dhyana/dharma_swarm,target=run_coordination_gym)",
+      "result": "blocked: repository not found in GitNexus registry"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed"
+    },
+    {
+      "command": "pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "result": "26 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 5 && python3 scripts/runtime/forge_dense_eval_normalizer.py && python3 scripts/runtime/forge_docker_sandbox.py && python3 scripts/runtime/forge_benchmark_adapter.py && python3 scripts/runtime/forge_fitness_boundary_dry_run.py && python3 scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed; runtime artifacts refreshed"
+    },
+    {
+      "command": "pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py -q --tb=short",
+      "result": "30 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "pytest tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "result": "7 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "mcp__contextplus.run_static_analysis scripts/runtime/forge_swarm_coordination_gym.py and scripts/runtime/forge_reality_arena_status.py",
+      "result": "no issues found"
+    },
+    {
+      "command": "structured authority scan over reports/forge/forge-reality-arena and forge-reality-arena-status.json",
+      "result": "0 violations"
+    }
+  ],
+  "track": "dharma-reward-forge-v0"
+}

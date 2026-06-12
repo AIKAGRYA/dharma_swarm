@@ -1,0 +1,70 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-10",
+  "recorded_at": "2026-06-01T19:58:00+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "cycle": 10,
+  "objective": "Move Dharma Reward Forge toward a first real external acted receipt through a bounded public code contribution.",
+  "target": {
+    "repo": "Yasuno-5555/Guild",
+    "issue": "https://github.com/Yasuno-5555/Guild/issues/2",
+    "pr": "https://github.com/Yasuno-5555/Guild/pull/9",
+    "branch": "codex/issue-2-python-example-bounty",
+    "fork": "AmitabhainArunachala/Guild",
+    "commit_sha": "a1b47e6969b8507df4cffba3726ddf86d99e1e2c"
+  },
+  "actions": [
+    "Rechecked existing PRs and candidate issue state.",
+    "Moved the prepared Python bounty spec to examples/python-off-by-one/BOUNTY.yml to match issue requirements.",
+    "Verified red and green paths locally and with Guild sandbox from a Docker-visible temporary worktree.",
+    "Updated the target readiness packet before public action.",
+    "Pushed the target branch to the operator-controlled fork.",
+    "Opened upstream PR 9."
+  ],
+  "verification": [
+    {
+      "command": "cargo run -q -p guild-cli -- bounty validate examples/python-off-by-one/BOUNTY.yml",
+      "outcome": "passed"
+    },
+    {
+      "command": "python -m pytest -q in examples/python-off-by-one before solver fix",
+      "outcome": "expected failure: 3 failed, 1 passed"
+    },
+    {
+      "command": "python -m pytest -q in examples/python-off-by-one after temporary solver fix",
+      "outcome": "passed: 4 passed"
+    },
+    {
+      "command": "cargo run -q -p guild-cli -- verify --sandbox --bounty examples/python-off-by-one/BOUNTY.yml --base HEAD before solver fix",
+      "outcome": "expected failure: tests_pass failed"
+    },
+    {
+      "command": "cargo run -q -p guild-cli -- verify --sandbox --bounty examples/python-off-by-one/BOUNTY.yml --base HEAD after temporary solver fix",
+      "outcome": "passed: tests_pass and diff_limit"
+    },
+    {
+      "command": "git diff --check -- examples/python-off-by-one",
+      "outcome": "passed"
+    }
+  ],
+  "public_action_taken": true,
+  "external_confirmed": false,
+  "maintainer_action_observed": false,
+  "forbidden_actions_avoided": [
+    "spent_money",
+    "requested_payment",
+    "claimed_bounty",
+    "merged_protected_branch",
+    "set_archive_fitness",
+    "created_first_external_receipt_witness",
+    "set_external_confirmed_true"
+  ],
+  "blockers": [
+    "No external acted receipt yet; PR 9 awaits external maintainer action."
+  ],
+  "artifacts": [
+    "reports/forge/external-beast/cycle-010.md",
+    "reports/forge/external-beast/targets/yasuno-5555-guild-issue-2/readiness.md"
+  ]
+}
