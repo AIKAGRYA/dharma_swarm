@@ -3,6 +3,7 @@ name: fourfold-warrant
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
+  merge_group:
 
 concurrency:
   group: fourfold-warrant-${{ github.ref }}
@@ -16,6 +17,11 @@ jobs:
   fourfold-warrant:
     name: Fourfold Shakti Warrant
     runs-on: ubuntu-latest
+    # On merge_group batches there is no PR context (body, head/base
+    # SHAs); these PR-shaped validations already passed on the PR run
+    # before the PR entered the queue. Skipped = satisfied for required
+    # checks, so the queue is not blocked.
+    if: github.event_name != 'merge_group'
     timeout-minutes: 8
     steps:
       - name: Checkout full history

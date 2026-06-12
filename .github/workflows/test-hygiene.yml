@@ -3,6 +3,7 @@ name: test-hygiene
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+  merge_group:
 
 concurrency:
   group: test-hygiene-${{ github.ref }}

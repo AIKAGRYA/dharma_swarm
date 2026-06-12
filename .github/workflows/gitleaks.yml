@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+  merge_group:
 
 concurrency:
   group: gitleaks-${{ github.ref }}
