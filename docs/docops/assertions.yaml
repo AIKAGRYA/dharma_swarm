@@ -245,7 +245,8 @@
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
-      "docs/ops/TMUX_AGENT_SUBSTRATE.md"
+      "docs/ops/TMUX_AGENT_SUBSTRATE.md",
+      "spec-forge/living-agent-kernel/MASTER_SPEC.md"
     ]
   },
   "auto_sections": {
