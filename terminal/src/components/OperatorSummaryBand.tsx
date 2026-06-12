@@ -33,11 +33,9 @@ function toneColor(tone: SummaryItem["tone"]): string {
 
 export function OperatorSummaryBand({items, compact = false}: Props): React.ReactElement {
   if (compact) {
-    // F-021: borderless one-row strip — a bordered band costs 3 rows and the
-    // 24-row compact budget has exactly 1 to give; borders are not the signal.
     const compactItems = compactSummaryItems(items);
     return (
-      <Box paddingX={1} flexWrap="wrap">
+      <Box marginTop={1} borderStyle="round" borderColor={THEME.river} paddingX={1} flexWrap="wrap">
         {compactItems.map((item, index) => (
           <Box key={`${item.label}-${index}`} marginRight={2}>
             <Text color={THEME.stone}>{item.label}</Text>
@@ -49,7 +47,8 @@ export function OperatorSummaryBand({items, compact = false}: Props): React.Reac
     );
   }
   return (
-    <Box borderStyle="round" borderColor={THEME.river} paddingX={1} flexDirection="column">
+    <Box marginTop={1} borderStyle="round" borderColor={THEME.river} paddingX={1} flexDirection="column">
+      <Text color={THEME.river} bold>Operator Summary</Text>
       <Box flexWrap="wrap">
         {items.map((item, index) => (
           <Box key={`${item.label}-${index}`} marginRight={2}>

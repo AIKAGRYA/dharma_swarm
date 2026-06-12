@@ -1,9 +1,7 @@
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA  OFF | codex:gpt-5.4 | REA | Chat                                     │
-│ tab navigation | responsive                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- loop unknown  verify unknown  runtime idle  approvals clear
+
 [Chat] Mission Repo Commands Models Ontology ▸
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Chat                                                                         │
 │ Live operator exchange, assistant output, and command spillover that still   │
@@ -14,9 +12,11 @@
 │ Use plain prompts or slash commands. Chat carries the conversation; the      │
 │ surrounding tabs expose runtime, tools, and system state.                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                            │
 │ route  ready | codex:gpt-5.4                                                 │

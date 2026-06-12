@@ -17,7 +17,7 @@ export function StatusFooter({statusLine, routeSummary, footerHint, focusMode, c
     .slice(0, 4)
     .join(" | ");
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={THEME.ink} paddingX={1}>
+    <Box flexDirection="column" marginTop={1} borderStyle="round" borderColor={THEME.ink} paddingX={1}>
       <Text color={THEME.foam}>
         <Text color={THEME.wave}>status</Text>
         <Text color={THEME.stone}>  </Text>

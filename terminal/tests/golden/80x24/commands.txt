@@ -1,10 +1,9 @@
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
 │ DHARMA  OFF | codex:gpt-5.4 | REA | Commands                                 │
 │ tab navigation | responsive                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
- loop unknown  verify unknown  runtime idle  approvals clear
+
 ◂ Mission Repo [Commands] Models Ontology Runtime ▸
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Commands                                                                     │
 │ Registered command graph and operational affordances.                        │
@@ -13,9 +12,11 @@
 │ Plain language should resolve into Dharma-native commands when confidence is │
 │  high.                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                            │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                            │
 │ route  ready | codex:gpt-5.4                                                 │
