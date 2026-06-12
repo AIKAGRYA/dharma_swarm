@@ -42,3 +42,20 @@
   note: commit took 3 attempts: (1) docops markdown drift 218454->218457 (trailing LESSONS lines riding this commit), reconciled per prescribed step-10 path; (2) fourfold-shakti-warrant BLOCK on prior sessions' trailing entries (see lesson); (3) green with single-guard skip.
   note: untracked spec-forge/knowledge/DESIGN_FEEDBACK_OPERATOR_20260612.md appeared mid-session (operator drop, 09:42 local) - not touched, left for whichever session/eval consumes it.
 [2026-06-12T00:52:35Z] EVAL F-003 GREEN — criteria 8/8 pass
+[2026-06-12T01:04Z] F-004 implemented
+  evidence: bun test 527 pass / 0 fail exit 0 (twice); git status --porcelain before vs after bun test identical (zero new churn);
+            temp probe test (tests/sandbox_probe.test.ts, deleted before commit, never staged) proved preload fires: both DHARMA_TERMINAL_*STATE_DIR vars = mkdtemp paths under os.tmpdir;
+            typecheck 0 errors; failure-ratchet now-failures.txt 0 lines, comm vs baseline empty; ratchets flat: protocol.ts 4064, Sidebar/RepoPane dup fns 40, Record<string, unknown> 97;
+            golden pre-theme clean; boot_smoke.sh exit 0 pre-work + pre-commit; commit 2444435df
+  files: terminal/bunfig.toml (new, [test].preload), terminal/tests/setup.ts (new, sandbox preload), spec-forge/features.json (F-004 status only),
+         docs/docops/AUTO_INVENTORY.md + docs/governance/SOVEREIGN_MANIFEST.md (docops reconcile 218457->218460)
+  lesson: shakti warrant matches its unsafe pattern in unified-diff CONTEXT lines too - F-002's raw lesson text sits in the last lines of claude-progress.txt hunks, so appends tripped it again with zero flagged text ADDED; single-guard skip used once (3rd consecutive session).
+  note: ~/.dharma/terminal_supervisor EXISTS on this machine with real state dirs - before F-004, any test calling supervisor loads without env vars scanned REAL home state (persistence.ts candidateSupervisorStateDirs default branch); suite was green both with and without sandbox, so no test depended on it, but the hole is now closed.
+  note: commit took 3 attempts: (1) docops markdown drift 218457->218460 (LESSONS lines riding), reconciled per prescribed step-10 path; (2) fourfold-shakti-warrant BLOCK on context lines (see lesson); (3) green with sanctioned single-guard skip.
+[2026-06-12T01:15:43Z] EVAL F-004 GREEN — criteria 8/8 pass
+[2026-06-12T01:23Z] F-005 implemented
+  evidence: scripts/pty_smoke.sh exit 0 twice consecutively under bun 1.3.11 (frame shows "> helmprobe" - 9 keystrokes sent one at a time via tmux send-keys -l, all echoed in composer); negative check PTY_SMOKE_START_CMD="bun run no-such-script" exit 1 ("app never rendered interactive frame");
+            typecheck 0 errors; bun test 527 pass / 0 fail; failure-ratchet now-failures.txt 0 lines, comm vs baseline empty; ratchets flat: protocol.ts 4064, Sidebar/RepoPane dup fns 40, Record<string, unknown> 97;
+            golden pre-theme diff clean; boot_smoke.sh exit 0 pre-work + pre-commit
+  files: terminal/scripts/pty_smoke.sh (new), spec-forge/features.json (F-005 status only)
+  lesson: probe chars must dodge globally bound printables [ ] 1 2 3 (sidebar-mode + tab-cycle keys swallow them before prompt.append); j/k safe only on the chat tab
