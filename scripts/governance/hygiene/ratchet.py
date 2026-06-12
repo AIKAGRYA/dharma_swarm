@@ -181,10 +181,25 @@ def tighten(baselines: dict[str, int], comparisons: list[Comparison]) -> dict[st
 # ---------------------------------------------------------------------------
 
 
+def measure_or_broken(counter, repo_root: Path):
+    """Run one counter's measurement under the fail-closed contract.
+
+    Any crash — not just a deliberate BrokenCounter — must surface as
+    BROKEN (exit 2), never as a traceback and never as a pass: an
+    unmeasured counter is an open gate.
+    """
+    try:
+        return counter.measure(repo_root)
+    except BrokenCounter:
+        raise
+    except Exception as exc:
+        raise BrokenCounter(f"{counter.name} measurement crashed: {exc!r}") from exc
+
+
 def compare_all(repo_root: Path, baselines: dict[str, int]) -> list[Comparison]:
     comparisons = []
     for counter in COUNTERS:
-        reading = counter.measure(repo_root)
+        reading = measure_or_broken(counter, repo_root)
         comparisons.append(
             Comparison(
                 name=counter.name,
@@ -245,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
             if counter is None:
                 print(f"unknown counter: {args.explain} (use --list)", file=sys.stderr)
                 return EXIT_BROKEN
-            reading = counter.measure(repo_root)
+            reading = measure_or_broken(counter, repo_root)
             print(f"{counter.name} = {reading.value}")
             print(counter.definition)
             for line in reading.evidence:
@@ -260,7 +275,10 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return EXIT_BROKEN
-            values = {counter.name: counter.measure(repo_root).value for counter in COUNTERS}
+            values = {
+                counter.name: measure_or_broken(counter, repo_root).value
+                for counter in COUNTERS
+            }
             save_baselines(baseline_path, values, args.today)
             print(f"initialized {BASELINE_PATH} from current reality:")
             for name in sorted(values):

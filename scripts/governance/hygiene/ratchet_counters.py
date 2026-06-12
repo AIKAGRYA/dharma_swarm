@@ -109,13 +109,22 @@ def measure_ruff_undefined_or_redefined(repo_root: Path) -> Reading:
     if ruff_cmd is None:
         raise BrokenCounter("ruff binary not found (.venv/bin/ruff or PATH)")
     targets = [d for d in ("dharma_swarm", "api", "scripts", "tests") if (repo_root / d).is_dir()]
-    result = subprocess.run(
-        [ruff_cmd, "check", "--select", "F821,F811", "--output-format", "json", *targets],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    try:
+        result = subprocess.run(
+            # --ignore-noqa: a `# noqa` comment must not be able to hide a
+            # new undefined name from the ratchet — suppression is a review
+            # conversation, not a counter bypass.
+            [
+                ruff_cmd, "check", "--select", "F821,F811", "--ignore-noqa",
+                "--output-format", "json", *targets,
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        raise BrokenCounter(f"ruff did not produce a result: {exc}") from exc
     # ruff exits 0 (clean) or 1 (findings); anything else is a tool failure.
     if result.returncode not in (0, 1):
         raise BrokenCounter(f"ruff failed (exit {result.returncode}): {result.stderr.strip()[:200]}")

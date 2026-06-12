@@ -211,6 +211,33 @@ def test_broken_counter_exits_broken_not_green(fake_repo, monkeypatch):
     assert _run(fake_repo) == ratchet.EXIT_BROKEN
 
 
+@pytest.mark.parametrize(
+    "crash",
+    [
+        RuntimeError("tool wrapper blew up"),
+        OSError("binary vanished mid-run"),
+        __import__("subprocess").TimeoutExpired(cmd="ruff", timeout=120),
+        ValueError("malformed tool output"),
+    ],
+)
+def test_any_measurement_crash_is_broken_not_a_traceback(fake_repo, monkeypatch, crash, capsys):
+    """The fail-closed contract covers UNEXPECTED crashes, not only the
+    deliberate BrokenCounter — an unmeasured counter is an open gate."""
+
+    def explode(_root):
+        raise crash
+
+    broken = Counter(
+        name="debt_things", direction=Direction.DOWN, end_target=0,
+        definition="crashes unexpectedly", measure=explode,
+    )
+    monkeypatch.setattr(ratchet, "COUNTERS", (broken,))
+    _write_baselines(fake_repo, {"debt_things": 0})
+    assert _run(fake_repo) == ratchet.EXIT_BROKEN
+    err = capsys.readouterr().err
+    assert "debt_things" in err and "BROKEN" in err
+
+
 # -- invariant 9: persistence round-trip, no droppings ------------------------
 
 
@@ -318,17 +345,34 @@ def test_property_test_counter_counts_only_test_files(tmp_path):
     assert counters_mod.measure_property_test_files(repo).value == 1
 
 
-@pytest.mark.skipif(
-    shutil.which("ruff") is None and not (REPO_ROOT / ".venv/bin/ruff").exists(),
-    reason="ruff binary not available",
-)
-def test_ruff_counter_finds_a_planted_undefined_name(tmp_path):
-    repo = _synthetic_repo(tmp_path)
-    (repo / "dharma_swarm" / "broken.py").write_text("value = undefined_name\n")
+_RUFF_AVAILABLE = shutil.which("ruff") is not None or (REPO_ROOT / ".venv/bin/ruff").exists()
+
+
+def _link_ruff(repo: Path) -> None:
     venv_bin = repo / ".venv" / "bin"
     venv_bin.mkdir(parents=True)
     real = shutil.which("ruff") or str(REPO_ROOT / ".venv/bin/ruff")
     (venv_bin / "ruff").symlink_to(real)
+
+
+@pytest.mark.skipif(not _RUFF_AVAILABLE, reason="ruff binary not available")
+def test_ruff_counter_finds_a_planted_undefined_name(tmp_path):
+    repo = _synthetic_repo(tmp_path)
+    (repo / "dharma_swarm" / "broken.py").write_text("value = undefined_name\n")
+    _link_ruff(repo)
     reading = counters_mod.measure_ruff_undefined_or_redefined(repo)
     assert reading.value >= 1
     assert any("broken.py" in line and "F821" in line for line in reading.evidence)
+
+
+@pytest.mark.skipif(not _RUFF_AVAILABLE, reason="ruff binary not available")
+def test_ruff_counter_cannot_be_bypassed_with_noqa(tmp_path):
+    """A `# noqa: F821` comment must not hide a new undefined name —
+    suppression is a review conversation, not a counter bypass."""
+    repo = _synthetic_repo(tmp_path)
+    (repo / "dharma_swarm" / "sneaky.py").write_text(
+        "value = undefined_name  # noqa: F821\n"
+    )
+    _link_ruff(repo)
+    reading = counters_mod.measure_ruff_undefined_or_redefined(repo)
+    assert any("sneaky.py" in line and "F821" in line for line in reading.evidence)
