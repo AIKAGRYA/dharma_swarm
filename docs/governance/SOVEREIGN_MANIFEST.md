@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -127,6 +127,48 @@ Invariant that must hold throughout:
 - Do not commit provider API keys or any credentials.
 - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
 
+### Orientation Graph — whole-system view served on token one
+
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
+
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
+
+The track creates NO new truth store and NO authority surface. It
+projects from the existing owners only: foundations/THE_ORGANISM.md
+and docs/vision_maps/NORTH_STAR.md (identity),
+docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
+docs/governance/ACTIVE_TRACK.yaml (tracks),
+docs/docops/assertions.yaml canonical_guard.registered + the worktree
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
+
+Doctrine line that must hold (same as the reconciliation lane's):
+  Read models project truth from owners; they do not become authority.
+
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
+
+**Next items:**
+
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
+- Do not touch operator_core/** or runtime_state.py.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
@@ -191,13 +233,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **674** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **391 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,939** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **285,944** | wc -l across dharma_swarm Python modules |
 | Test files | **649** | find tests -name "*.py" -type f |
-| Test functions | **11,113 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **11,122 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **895** | find . -name "*.md" -type f |
-| Markdown total lines | **221,186** | wc -l across all .md |
+| Markdown files | **860** | find . -name "*.md" -type f |
+| Markdown total lines | **220,604** | wc -l across all .md |
 | Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
