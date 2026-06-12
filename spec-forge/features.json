@@ -66,7 +66,7 @@
     "estimated_minutes": 15,
     "priority": "P0",
     "status": "implemented",
-    "verified": false
+    "verified": true
   },
   {
     "id": "F-005",
