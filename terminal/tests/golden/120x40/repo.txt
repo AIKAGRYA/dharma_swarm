@@ -16,12 +16,12 @@
 │  │ │ ┌────────────────────────────────────┐  ┌──────────────────────────────────────────────────────────────────────┐│
 │  │ │ │ Sections                           │  │ Repo Snapshot                                                        ││
 │  │ │ │ repo posture and live risk         │  │ selected repo card                                                   ││
-│  │ │ │                                    │  │ Workspace snapshot loading...                                        ││
+│  │ │ │                                    │  │ Workspace snapshot: no signal (backend offline)                      ││
 │  │ │ │ ╭────────────────────────────────╮ │  │ The terminal should know what repo it is standing in.                ││
 │  │ │ │ │ ▶ Repo Snapshot                │ │  │                                                                      ││
 │  │ │ │ │   2 rows                       │ │  │                                                                      ││
-│  │ │ │ │   Workspace snapshot loading...│ │  │                                                                      ││
-│  │ │ │ │                                │ │  │                                                                      ││
+│  │ │ │ │   Workspace snapshot: no signal  │  │                                                                      ││
+│  │ │ │ │ (backend offline)              │ │  │                                                                      ││
 │  │ │ │ ╰────────────────────────────────╯ │  │                                                                      ││
 │  │ │ └────────────────────────────────────┘  └──────────────────────────────────────────────────────────────────────┘│
 ╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

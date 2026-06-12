@@ -47,20 +47,23 @@ OVERLAY_TIMEOUT=${GOLDEN_OVERLAY_TIMEOUT:-25}
 
 # Unique, bottom-anchored pane-body text per surface (verified against live
 # 80x24 frames; mock content from mockContent.ts and pane components).
+# F-161: offline frames project pending placeholders to "<subject>: no signal
+# (backend offline)", so placeholder-pane markers track the projected text
+# (prefix kept short enough to survive the 47-col card wrap at 80x24).
 marker_for() {
   case $1 in
     chat) printf 'Use plain prompts or slash commands' ;;
     mission) printf 'One state model. One bridge.' ;;
-    repo) printf 'Workspace snapshot loading' ;;
-    commands) printf 'Command graph loading' ;;
-    models) printf 'Model policy loading' ;;
-    ontology) printf 'Ontology snapshot loading' ;;
+    repo) printf 'Workspace snapshot: no signal' ;;
+    commands) printf 'Command graph: no signal' ;;
+    models) printf 'Model policy: no signal' ;;
+    ontology) printf 'Ontology snapshot: no signal' ;;
     runtime) printf 'Frontend runtime: Bun' ;;
     sessions) printf 'No selected session.' ;;
     approvals) printf 'No selected approval.' ;;
-    control) printf 'Control-plane snapshot loading' ;;
+    control) printf 'Control-plane snapshot: no signal' ;;
     agents) printf 'No selected route.' ;;
-    evolution) printf 'Cascade and self-improvement surface loading' ;;
+    evolution) printf 'Cascade and self-improvement surface: no signal' ;;
     modelPicker) printf 'No model targets loaded.' ;;
     paneSwitcher) printf '10. Control' ;;
     *) return 1 ;;

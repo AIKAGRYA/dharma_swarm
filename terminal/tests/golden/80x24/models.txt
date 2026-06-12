@@ -9,7 +9,7 @@
 │ Models                                                                       │
 │ Structured operator transcript.                                              │
 │                                                                              │
-│ Model policy loading...                                                      │
+│ Model policy: no signal (backend offline)                                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 ╭──────────────────────────────────────────────────────────────────────────────╮

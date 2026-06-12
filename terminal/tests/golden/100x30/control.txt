@@ -1,16 +1,16 @@
-╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
 │T │ │ Control                                                                                     │
 │  │ │ control summary, loop health, and next action | j/k or ↑/↓ move between sections            │
 │  │ │                                                                                             │
 │  │ │ ┌─────────────────────────────┐  ┌─────────────────────────────────────────────────────────┐│
 │  │ │ │ Sections                    │  │ Control Snapshot                                        ││
 │  │ │ │ control loop cards          │  │ selected control card                                   ││
-│  │ │ │                             │  │ Control-plane snapshot loading...                       ││
+│  │ │ │                             │  │ Control-plane snapshot: no signal (backend offline)     ││
 │  │ │ │ ╭─────────────────────────╮ │  │                                                         ││
 │  │ │ │ │ ▶ Control Snapshot      │ │  │                                                         ││
 │  │ │ │ │   1 rows                │ │  │                                                         ││
-│  │ │ │ │   Control-plane snapshot  │  │                                                         ││
-│  │ │ │ │ loading...              │ │  │                                                         ││
+│  │ │ │ │   Control-plane snapshot: │  │                                                         ││
+│  │ │ │ │  no signal (backend     │ │  │                                                         ││
+│  │ │ │ │ offline)                │ │  │                                                         ││
 │  │ │ │ ╰─────────────────────────╯ │  │                                                         ││
 │  │ │ └─────────────────────────────┘  └─────────────────────────────────────────────────────────┘│
 ╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯
