@@ -792,3 +792,165 @@ async def test_ollama_stream_yields_chunks(monkeypatch):
     monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", lambda timeout: _Client())
     chunks = [chunk async for chunk in provider.stream(req)]
     assert chunks == ["A", "B"]
+
+
+# ---------------------------------------------------------------------------
+# Regression: content-drop on OpenAI-compatible sibling providers (Loop 1).
+# Reasoning-only or list-typed message content must never collapse to "".
+# Fixed in Honest Spine v2 Phase 0; previously only OpenAIProvider was routed
+# through _extract_openai_compatible_message_text.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm.providers import (  # noqa: E402
+    ChutesProvider,
+    FireworksProvider,
+    GoogleAIProvider,
+    MistralProvider,
+    SambaNovaProvider,
+    SiliconFlowProvider,
+    TogetherProvider,
+    _extract_openai_compatible_message_text,
+)
+
+_SIBLING_PROVIDERS = [
+    SiliconFlowProvider,
+    TogetherProvider,
+    FireworksProvider,
+    GoogleAIProvider,
+    SambaNovaProvider,
+    MistralProvider,
+    ChutesProvider,
+]
+
+
+def _reasoning_only_resp() -> SimpleNamespace:
+    return _mk_resp(content=None, reasoning="the reasoned answer")
+
+
+def _list_content_resp() -> SimpleNamespace:
+    return SimpleNamespace(
+        model="m",
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=2, total_tokens=3),
+        choices=[SimpleNamespace(
+            message=SimpleNamespace(
+                content=[{"type": "text", "text": "part one"},
+                         {"type": "text", "text": "part two"}],
+                reasoning=None,
+                reasoning_details=None,
+                tool_calls=None,
+            ),
+            finish_reason="stop",
+        )],
+    )
+
+
+def _fake_client(resp: SimpleNamespace) -> SimpleNamespace:
+    return SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=AsyncMock(return_value=resp)),
+        ),
+    )
+
+
+@pytest.mark.parametrize("provider_cls", _SIBLING_PROVIDERS)
+def test_sibling_provider_reasoning_only_content_not_dropped(provider_cls) -> None:
+    provider = provider_cls(api_key="test-key")
+    provider._client = _fake_client(_reasoning_only_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the reasoned answer"
+
+
+@pytest.mark.parametrize("provider_cls", _SIBLING_PROVIDERS)
+def test_sibling_provider_list_content_not_dropped(provider_cls) -> None:
+    provider = provider_cls(api_key="test-key")
+    provider._client = _fake_client(_list_content_resp())
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert "part one" in resp.content and "part two" in resp.content
+
+
+def test_extractor_handles_plain_dict_message() -> None:
+    # NVIDIA NIM and providers_extended parse raw JSON dicts, not SDK objects.
+    assert _extract_openai_compatible_message_text(
+        {"content": None, "reasoning": "dict reasoning"}
+    ) == "dict reasoning"
+    assert _extract_openai_compatible_message_text(
+        {"content": [{"type": "text", "text": "dict list"}]}
+    ) == "dict list"
+
+
+# ---------------------------------------------------------------------------
+# Regression: content-drop on providers_extended (Ollama generate, NVIDIA NIM
+# extended, Moonshot). These parse raw httpx JSON; reasoning-only responses
+# must never collapse to "". Completes the honest-spine-v2 lane's conversion.
+# ---------------------------------------------------------------------------
+
+from dharma_swarm import providers_extended as _pe  # noqa: E402
+
+
+def _fake_httpx_client(payload: dict) -> type:
+    class _Resp:
+        status_code = 200
+        text = ""
+
+        @staticmethod
+        def json() -> dict:
+            return payload
+
+    class _Client:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc) -> None:
+            return None
+
+        async def post(self, *args, **kwargs):
+            return _Resp()
+
+    return _Client
+
+
+def test_extended_ollama_thinking_only_not_dropped(monkeypatch) -> None:
+    payload = {"response": "", "thinking": "reasoned locally",
+               "prompt_eval_count": 1, "eval_count": 2}
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = _pe.OllamaProvider()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "reasoned locally"
+
+
+def test_extended_ollama_response_still_preferred(monkeypatch) -> None:
+    payload = {"response": "the answer", "thinking": "scratchpad",
+               "prompt_eval_count": 1, "eval_count": 2}
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = _pe.OllamaProvider()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the answer"
+
+
+@pytest.mark.parametrize("provider_factory", [
+    lambda: _pe.NVIDIANIMProvider(api_key="test-key"),
+    lambda: _pe.MoonshotProvider(api_key="test-key"),
+])
+def test_extended_dict_provider_reasoning_only_not_dropped(
+    monkeypatch, provider_factory
+) -> None:
+    payload = {
+        "model": "m",
+        "usage": {},
+        "choices": [{
+            "message": {"content": None, "reasoning": "the reasoned answer"},
+            "finish_reason": "stop",
+        }],
+    }
+    monkeypatch.setattr(_pe.httpx, "AsyncClient", _fake_httpx_client(payload))
+    provider = provider_factory()
+    req = LLMRequest(messages=[{"role": "user", "content": "hi"}], model="m")
+    resp = asyncio.run(provider.complete(req))
+    assert resp.content == "the reasoned answer"
