@@ -59,3 +59,4 @@
             golden pre-theme diff clean; boot_smoke.sh exit 0 pre-work + pre-commit
   files: terminal/scripts/pty_smoke.sh (new), spec-forge/features.json (F-005 status only)
   lesson: probe chars must dodge globally bound printables [ ] 1 2 3 (sidebar-mode + tab-cycle keys swallow them before prompt.append); j/k safe only on the chat tab
+[2026-06-12T01:30:33Z] EVAL F-005 GREEN — criteria 9/9 pass
