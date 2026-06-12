@@ -2,28 +2,6 @@
  Keyboard-first operator shell. Backend bridged over stdio.
  Use plain prompts or slash commands. Chat carries the conversation; the surrounding tabs expose
  runtime, tools, and system state.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >                                                                                                │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

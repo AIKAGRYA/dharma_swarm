@@ -45,6 +45,22 @@ describe("F-066 natural-language UI intents", () => {
     }
   });
 
+  test("operator literal: 'change models to glm 4.' and 'glm 5.' resolve or answer locally — never a backend turn", () => {
+    const targets = [
+      ...TARGETS,
+      {alias: "glm", label: "GLM 5", provider: "openrouter", model: "glm-5", routeId: "r4", routeState: "ready", selectable: true} as const,
+    ];
+    const four = matchUiIntent("change models to glm 4.", PANES, targets);
+    expect(four).not.toBeNull();
+    const five = matchUiIntent("change models to glm 5.", PANES, targets);
+    expect(five?.kind).toBe("model");
+    if (five?.kind === "model") {
+      expect(five.target.model).toBe("glm-5");
+    }
+    const nothing = matchUiIntent("change models to fancypants ultra", PANES, targets);
+    expect(nothing?.kind).toBe("model_unknown");
+  });
+
   test("typo'd commands resolve to the nearest registered command", () => {
     expect(closestCommand("hlep", ["help", "git", "model"])).toBe("help");
     expect(closestCommand("modle", ["help", "git", "model"])).toBe("model");

@@ -11,6 +11,10 @@ export type UiIntent =
   | {kind: "layout"; mode: "zen" | "cockpit"}
   | {kind: "pane"; tabId: string; title: string}
   | {kind: "model"; target: RouteTarget}
+  // A clear model-switch ask whose target matched nothing: answered locally
+  // with the route menu — NEVER forwarded to a billed backend turn (operator
+  // cost incident: "change models to glm 4." ran as an agentic claude turn).
+  | {kind: "model_unknown"; query: string}
   | {kind: "tour"};
 
 type PaneRef = {id: string; title: string};
@@ -75,26 +79,37 @@ export function matchUiIntent(
   // selectable route target (alias, label, model, or provider:model tokens).
   // Up to two filler words ride between the verb and "to" so "change models
   // to claude opus" and "switch the route to grok" both land.
-  const switchMatch = text.match(/\b(?:switch|change|move)\b(?:\s+\w+){0,2}?\s+(?:to|over to|onto)\s+(.{2,60})$/i);
+  const switchMatch = text.match(/\b(?:switch|change|move)\b(?:\s+\w+){0,2}?\s+(?:to|over to|onto)\s+(.{1,60})$/i);
   if (switchMatch) {
-    const query = normalize(switchMatch[1]);
-    const queryTokens = query.split(" ").filter((token) => token.length > 1);
+    // Trailing sentence punctuation must not break matching ("glm 5." — the
+    // operator's literal message); digit tokens count ("glm 4" vs "glm-4").
+    const query = normalize(switchMatch[1]).replace(/\.+$/g, "").trim();
+    const queryTokens = query
+      .split(" ")
+      .map((token) => token.replace(/\.+$/g, ""))
+      .filter((token) => token.length > 1 || /\d/.test(token));
     let best: {target: RouteTarget; score: number} | null = null;
     for (const target of routeTargets) {
       const haystack = normalize(
         `${target.alias} ${target.label} ${target.provider} ${target.model} ${target.provider}:${target.model}`,
-      );
+      ).replace(/[-_]/g, " ");
       let score = 0;
       for (const token of queryTokens) {
-        if (haystack.includes(token)) score += token.length;
+        if (haystack.includes(token)) score += Math.max(token.length, 2);
       }
       if (score > 0 && (!best || score > best.score)) {
         best = {target, score};
       }
     }
-    // Demand a real overlap (≥4 matched chars) so "switch to plan b" stays chat.
+    // A real overlap (≥4 matched chars) keeps "switch to plan b" in chat;
+    // short alias+digit asks ("glm 5" = 3+2) clear it too.
     if (best && best.score >= 4) {
       return {kind: "model", target: best.target};
+    }
+    // The ask was unmistakably a model/route switch but nothing matched:
+    // answer locally, never bill a backend turn on a mis-parse.
+    if (/\b(model|models|route|routes|provider|llm|brain)\b/.test(text) && query) {
+      return {kind: "model_unknown", query};
     }
   }
 

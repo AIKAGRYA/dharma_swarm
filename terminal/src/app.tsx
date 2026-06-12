@@ -2739,6 +2739,15 @@ export function App(): React.ReactElement {
       respond(`Requesting route -> ${intent.target.provider}:${intent.target.model}`);
       return;
     }
+    if (intent.kind === "model_unknown") {
+      const menu = selectableRouteTargets(stateRef.current.routePolicy)
+        .map((target) => `  ${target.provider}:${target.model}`)
+        .join("\n");
+      respond(
+        `No route matches "${intent.query}". Available right now:\n${menu || "  (none — backend offline)"}\nSay "switch to <one of these>" or /model for the picker.`,
+      );
+      return;
+    }
     const panes = stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title}));
     respond(tourLines(panes).join("\n"));
   }
@@ -3205,14 +3214,9 @@ export function App(): React.ReactElement {
       dispatch({type: "tab.cycle", direction: 1});
       return;
     }
-    if (input === "[") {
-      dispatch({type: "tab.cycle", direction: -1});
-      return;
-    }
-    if (input === "]") {
-      dispatch({type: "tab.cycle", direction: 1});
-      return;
-    }
+    // Design-truth law #6 (operator hit it live typing "5.1" — the "1" fired a
+    // sidebar command mid-sentence): printable keys ALWAYS reach the composer;
+    // navigation is chords only. Bare [ ] and 1/2/3 bindings are gone.
     if (key.ctrl && input === "g") {
       dispatch({type: "tab.activate", tabId: "chat"});
       return;
@@ -3289,21 +3293,6 @@ export function App(): React.ReactElement {
       dispatch({type: "activity.raw.toggle"});
       return;
     }
-    if (input === "1") {
-      dispatch({type: "sidebar.mode", mode: "toc"});
-      dispatch({type: "status.set", value: "sidebar -> toc"});
-      return;
-    }
-    if (input === "2") {
-      dispatch({type: "sidebar.mode", mode: "context"});
-      dispatch({type: "status.set", value: "sidebar -> context"});
-      return;
-    }
-    if (input === "3") {
-      dispatch({type: "sidebar.mode", mode: "help"});
-      dispatch({type: "status.set", value: "sidebar -> help"});
-      return;
-    }
     if (key.return) {
       submitPrompt(state.prompt);
       return;
@@ -3336,27 +3325,29 @@ export function App(): React.ReactElement {
     ]
       .filter(Boolean)
       .join("  ·  ");
+    // Content-hugging like Claude Code: the composer sits directly under the
+    // last message (operator: "still too bulky" — the old bottom-pin left a
+    // dead gulf mid-screen). The frame stays full-height with the spacer BELOW
+    // the status line: mixed-height frames desync ink's in-place repaint
+    // (zen->cockpit->zen left a stale cockpit frame on screen).
     return (
       <Box flexDirection="column" height={terminalHeight}>
-        <Box flexGrow={1} flexDirection="column" overflow="hidden">
-          <Box flexShrink={0} flexDirection="column">
-            <TranscriptPane
-              frameless
-              title="Chat"
-              lines={displayedTranscriptLines}
-              scrollOffset={activeScrollOffset}
-              windowSize={zenWindow}
-              emptyState={transcriptMeta.emptyState}
-              accentColor={transcriptMeta.accentColor}
-            />
-          </Box>
-        </Box>
-        <Box flexDirection="column" flexShrink={0}>
+        <Box flexShrink={0} flexDirection="column">
+          <TranscriptPane
+            frameless
+            title="Chat"
+            lines={displayedTranscriptLines}
+            scrollOffset={activeScrollOffset}
+            windowSize={zenWindow}
+            emptyState={transcriptMeta.emptyState}
+            accentColor={transcriptMeta.accentColor}
+          />
           <Composer prompt={state.prompt} compact={compactShell} />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{zenStatus}</Text>
           </Box>
         </Box>
+        <Box flexGrow={1} />
       </Box>
     );
   }
