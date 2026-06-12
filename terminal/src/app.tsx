@@ -84,7 +84,6 @@ import {
   workspaceSnapshotToPreview,
 } from "./protocol.ts";
 import {initialState, reduceApp} from "./state.ts";
-import {projectLinesForBridgeStatus} from "./transcriptFormatting.ts";
 import type {AppAction, AppState, ApprovalQueueEntry, ApprovalQueueState, CanonicalPermissionDecision, CanonicalPermissionOutcome, CanonicalPermissionResolution, RouteTarget, RuntimeSnapshotPayload, SessionCatalogPayload, SessionDetailPayload, SessionPaneState, SurfaceAuthorityState, TabPreview, TabSpec, TranscriptLine, WorkspaceSnapshotPayload} from "./types.ts";
 
 const SNAPSHOT_REFRESH_INTERVAL_MS = 15000;
@@ -732,7 +731,7 @@ function providerResumeSessionId(detail: SessionDetailPayload | undefined): stri
 
 function displayedTranscriptLinesForTab(activeTab: TabSpec | undefined, state: AppState): TranscriptLine[] {
   if (activeTab?.kind !== "chat") {
-    return projectLinesForBridgeStatus(activeTab?.lines ?? [], state.bridgeStatus);
+    return activeTab?.lines ?? [];
   }
   const firstUserIndex = activeTab.lines.findIndex((line) => line.kind === "user");
   const chatPreludeLines = firstUserIndex >= 0 ? activeTab.lines.slice(0, firstUserIndex) : activeTab.lines;
@@ -3211,8 +3210,8 @@ export function App(): React.ReactElement {
             title={activeTab.title}
             preview={decorateSurfacePreview(state.liveRepoPreview ?? activeTab.preview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
             controlPreview={decorateSurfacePreview(state.liveControlPreview ?? state.tabs.find((tab) => tab.id === "control")?.preview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
-            controlLines={projectLinesForBridgeStatus(state.tabs.find((tab) => tab.id === "control")?.lines ?? [], state.bridgeStatus)}
-            lines={projectLinesForBridgeStatus(activeTab.lines, state.bridgeStatus)}
+            controlLines={state.tabs.find((tab) => tab.id === "control")?.lines ?? []}
+            lines={activeTab.lines}
             scrollOffset={activeScrollOffset}
             windowSize={paneWindowSize}
             selectedSectionIndex={state.paneFocusIndices[activeTab.id] ?? 0}
@@ -3234,12 +3233,11 @@ export function App(): React.ReactElement {
                 state.authoritativeSurfaces,
               )
             }
-            lines={projectLinesForBridgeStatus(
+            lines={
               activeTab.kind === "runtime" && activeTab.lines.length === 0
                 ? (state.tabs.find((tab) => tab.id === "control")?.lines ?? [])
-                : activeTab.lines,
-              state.bridgeStatus,
-            )}
+                : activeTab.lines
+            }
             scrollOffset={activeScrollOffset}
             windowSize={paneWindowSize}
             selectedSectionIndex={state.paneFocusIndices[activeTab.id] ?? 0}
@@ -3251,7 +3249,7 @@ export function App(): React.ReactElement {
         ) : activeTab?.kind === "agents" ? (
           <AgentsPane
             title={activeTab.title}
-            lines={projectLinesForBridgeStatus(activeTab.lines, state.bridgeStatus)}
+            lines={activeTab.lines}
             selectedRouteIndex={state.paneFocusIndices[activeTab.id] ?? 0}
           />
         ) : activeTab?.kind === "thinking" || activeTab?.kind === "tools" || activeTab?.kind === "timeline" ? (

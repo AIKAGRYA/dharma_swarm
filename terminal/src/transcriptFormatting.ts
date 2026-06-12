@@ -1,4 +1,4 @@
-import type {BridgeStatus, TranscriptLine} from "./types";
+import type {TranscriptLine} from "./types";
 
 export type TranscriptSegment = {
   text: string;
@@ -15,34 +15,6 @@ export type FormattedTranscriptLine = {
 };
 
 const COMMAND_PATTERN = /(^|[^\w/])(?<command>\/[a-z][a-z0-9_-]*)(?=$|[\s:),.])/gi;
-
-export const OFFLINE_NO_SIGNAL_TEXT = "no signal (backend offline)";
-
-// F-161: any 'loading' token offline is a dishonest pending state — the match is
-// deliberately broad (substring, case-insensitive) because the offline frame law
-// is "no 'loading' text anywhere", not "no known placeholder".
-const PENDING_TOKEN_PATTERN = /loading/i;
-const PENDING_SUBJECT_PATTERN = /^(?<subject>.*?)\s*loading(?:\.{3}|…)?\s*$/i;
-
-export function isPendingPlaceholderLine(line: TranscriptLine): boolean {
-  return PENDING_TOKEN_PATTERN.test(line.text ?? "");
-}
-
-export function projectLinesForBridgeStatus(lines: TranscriptLine[], bridgeStatus: BridgeStatus): TranscriptLine[] {
-  if (bridgeStatus !== "offline") {
-    return lines;
-  }
-  let changed = false;
-  const projected = lines.map((line) => {
-    if (!isPendingPlaceholderLine(line)) {
-      return line;
-    }
-    changed = true;
-    const subject = (line.text ?? "").match(PENDING_SUBJECT_PATTERN)?.groups?.subject?.trim();
-    return {...line, text: subject ? `${subject}: ${OFFLINE_NO_SIGNAL_TEXT}` : OFFLINE_NO_SIGNAL_TEXT};
-  });
-  return changed ? projected : lines;
-}
 
 function baseColorFor(kind: TranscriptLine["kind"]): string {
   switch (kind) {

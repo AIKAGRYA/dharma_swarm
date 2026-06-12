@@ -22,7 +22,7 @@
 │T │ │ Ontology                                                                                                        │
 │  │ │ Shared world model, foundations, and semantic frame updates.                                                    │
 │  │ │                                                                                                                 │
-│  │ │ Ontology snapshot: no signal (backend offline)                                                                  │
+│  │ │ Ontology snapshot loading...                                                                                    │
 │  │ │ The shell should surface DHARMA concepts, not just provider chat.                                               │
 ╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 

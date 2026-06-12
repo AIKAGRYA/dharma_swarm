@@ -8,7 +8,7 @@
 │ Commands                                                                     │
 │ Registered command graph and operational affordances.                        │
 │                                                                              │
-│ Command graph: no signal (backend offline)                                   │
+│ Command graph loading...                                                     │
 │ Plain language should resolve into Dharma-native commands when confidence is │
 │  high.                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,16 +1,16 @@
+╭──╮ ╭─────────────────────────────────────────────────────────────────────────────────────────────╮
 │T │ │ Repo                                                                                        │
 │  │ │ section focus active | j/k or ↑/↓ move between repo sections                                │
 │  │ │                                                                                             │
 │  │ │ ┌─────────────────────────────┐  ┌─────────────────────────────────────────────────────────┐│
 │  │ │ │ Sections                    │  │ Repo Snapshot                                           ││
 │  │ │ │ repo posture and live risk  │  │ selected repo card                                      ││
-│  │ │ │                             │  │ Workspace snapshot: no signal (backend offline)         ││
+│  │ │ │                             │  │ Workspace snapshot loading...                           ││
 │  │ │ │ ╭─────────────────────────╮ │  │ The terminal should know what repo it is standing in.   ││
 │  │ │ │ │ ▶ Repo Snapshot         │ │  │                                                         ││
 │  │ │ │ │   2 rows                │ │  │                                                         ││
-│  │ │ │ │   Workspace snapshot: no  │  │                                                         ││
-│  │ │ │ │ signal (backend offline)│ │  │                                                         ││
-│  │ │ │ │                         │ │  │                                                         ││
+│  │ │ │ │   Workspace snapshot    │ │  │                                                         ││
+│  │ │ │ │ loading...              │ │  │                                                         ││
 │  │ │ │ ╰─────────────────────────╯ │  │                                                         ││
 │  │ │ └─────────────────────────────┘  └─────────────────────────────────────────────────────────┘│
 ╰──╯ ╰─────────────────────────────────────────────────────────────────────────────────────────────╯

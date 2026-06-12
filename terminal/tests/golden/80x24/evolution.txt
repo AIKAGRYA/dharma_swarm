@@ -9,7 +9,7 @@
 │ Evolution                                                                    │
 │ Forward-loop, swarm evolution, and shell continuation surface.               │
 │                                                                              │
-│ Cascade and self-improvement surface: no signal (backend offline)            │
+│ Cascade and self-improvement surface loading...                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
 ╭──────────────────────────────────────────────────────────────────────────────╮
