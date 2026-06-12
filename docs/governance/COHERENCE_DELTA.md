@@ -135,6 +135,22 @@ The Coherence Delta gate is machine-checked by
 and fails if any of the four field markers is missing, empty, or left as a
 placeholder.
 
+The gate is malleable in form, strict in substance:
+
+- **Comment fallback.** If the PR body lacks a valid block, the checker scans
+  PR comments (latest first) and passes if any single comment answers all four
+  fields. This unblocks agents and bots that cannot edit the PR description —
+  the fix is "post one comment", not "find someone with edit rights".
+- **Label aliases.** Reasonable label variants are accepted (e.g. "Organs
+  touched", "Gap closed", "Proof", "Drift introduced") — the registered set
+  lives in `FIELD_ALIASES` in the checker. The gate cares that each question
+  is answered substantively, not that the label is typed verbatim.
+- **Copy-paste template on failure.** A failing run prints the exact four-bullet
+  block to paste into the body or a comment.
+
+What stays strict: all four answers must be substantive — placeholders
+("TBD", "n/a", bare "UNKNOWN") still fail.
+
 This is still not semantic proof. CI can verify that a PR body names an organ,
 gap, map reread, and drift statement; it cannot prove those answers are true.
 That residual limitation is tracked in `docs/state/BROKEN_REGISTER.md` as the

@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -60,6 +60,12 @@ help:
 	@echo "  make pr-run-claude PR=123 Run Claude Code against the latest review packet"
 	@echo "  make pr-gate PR=123 Verify merge gate against live GitHub state"
 	@echo "  make pr-merge PR=123 ARGS='--confirm merge-pr-123' Dry-run gated merge"
+	@echo "  make pr-mike ARGS='--dry-run --max-prs 5' Merge Master Mike packet -> reviewer -> gate fanout"
+	@echo "  make mike-wake    Record a fresh Mike wake receipt"
+	@echo "  make mike-status  Render Mike nest status"
+	@echo "  make mike-cycle ARGS='--cycle-mode dry-run --max-prs 5' Run one supervised Mike cycle"
+	@echo "  make mike-tmux-start Start Mike's dry-run daemon lane in tmux"
+	@echo "  make mike-tmux-stop  Stop Mike's tmux daemon lane"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
@@ -272,6 +278,24 @@ pr-run-claude:
 
 pr-merge:
 	$(PYTHON) scripts/runtime/pr_merge_control.py merge --pr "$${PR:?set PR=number}" $${ARGS:-}
+
+pr-mike:
+	$(PYTHON) scripts/runtime/pr_merge_control.py fanout $${ARGS:-}
+
+mike-wake:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py wake $${ARGS:-}
+
+mike-status:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py status $${ARGS:-}
+
+mike-cycle:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py cycle $${ARGS:-}
+
+mike-tmux-start:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py tmux-start $${ARGS:-}
+
+mike-tmux-stop:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py tmux-stop $${ARGS:-}
 
 memory-kernel-readiness:
 	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
