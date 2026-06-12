@@ -8982,6 +8982,9 @@ describe("App prompt submission", () => {
 
     try {
       await flushRender();
+      // F-172: ^T on the chat tab toggles trace expansion, so reach control via ^Y (runtime) then ^T.
+      stdin.write("\u0019");
+      await flushRender();
       stdin.write("\u0014");
       await flushRender();
       rendered = "";

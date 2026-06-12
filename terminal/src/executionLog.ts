@@ -420,9 +420,18 @@ function rawLines(raw: Record<string, unknown> | undefined): string[] {
 }
 
 type ChatTraceProjectionOptions = {
-  visibilityMode?: "compact" | "expanded";
+  expanded?: boolean;
   showRaw?: boolean;
+  routeLabel?: string;
 };
+
+// F-172: raw session/request hex IDs never render in the transcript, at any expansion state.
+const UUID_ID_PATTERN = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
+const HEX_ID_PATTERN = /[0-9a-fA-F]{12,}/g;
+
+export function scrubRawIdentifiers(text: string): string {
+  return text.replace(UUID_ID_PATTERN, "…").replace(HEX_ID_PATTERN, "…");
+}
 
 type TraceStep = {
   key: string;
@@ -442,6 +451,7 @@ type ChatTurn = {
   steps: TraceStep[];
   assistant?: string;
   assistantTimestamp?: string;
+  route?: string;
 };
 
 function mergeStepDetail(current: string[], incoming: string[] | undefined): string[] {
@@ -514,6 +524,9 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
       }
       continue;
     }
+    if (event.sourceEventType === "session.ack" && event.summary) {
+      activeTurn.route = event.summary;
+    }
     const nextStep = traceStepFromEvent(event);
     if (nextStep) {
       const existing = activeTurn.steps.find((step) => step.key === nextStep.key);
@@ -539,45 +552,60 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
   return turns.slice(-CHAT_TURN_RETENTION);
 }
 
+function turnGlyph(phase: ActivityPhase): string {
+  if (phase === "failed") {
+    return "✖";
+  }
+  if (phase === "complete") {
+    return "✓";
+  }
+  return "▶";
+}
+
+// F-172: the response is the star, the trace is one collapsed summary line beneath it.
 export function projectChatTraceLines(events: CanonicalExecutionEvent[], options: ChatTraceProjectionOptions = {}): TranscriptLine[] {
-  const visibilityMode = options.visibilityMode ?? "expanded";
+  const expanded = options.expanded ?? false;
   const showRaw = options.showRaw ?? false;
   const turns = projectChatTurns(events);
   const projected: TranscriptLine[] = [];
 
-  for (let index = 0; index < turns.length; index += 1) {
-    const turn = turns[index];
-    const turnLabel = turn.phase === "failed" ? "failed" : turn.phase === "complete" ? "complete" : "running";
-    projected.push(line("system", `## Turn ${index + 1} | ${turnLabel}`, turn.assistantTimestamp ?? turn.steps.at(-1)?.timestamp));
+  for (const turn of turns) {
     projected.push(line("user", `> ${turn.prompt}`));
-    projected.push(line("system", `- Trace ${visibilityMode === "compact" ? "compact" : "expanded"} | ${turn.steps.length} steps`));
 
+    if (turn.assistant) {
+      for (const responseLine of turn.assistant.split("\n")) {
+        projected.push(line("assistant", responseLine, turn.assistantTimestamp));
+      }
+    }
+
+    const stepCount = turn.steps.length;
+    const route = scrubRawIdentifiers(turn.route ?? options.routeLabel ?? "route pending");
+    projected.push(
+      line(
+        turn.phase === "failed" ? "error" : "system",
+        `${turnGlyph(turn.phase)} ${stepCount} ${stepCount === 1 ? "step" : "steps"} · ${route} · ^T ${expanded ? "collapse" : "expand"}`,
+        turn.assistantTimestamp ?? turn.steps.at(-1)?.timestamp,
+      ),
+    );
+
+    if (!expanded) {
+      continue;
+    }
     for (const step of turn.steps) {
       projected.push(
         line(
           step.phase === "failed" || step.kind === "error" ? "error" : step.kind === "tool_call" || step.kind === "tool_result" || step.kind === "approval" ? "tool" : "system",
-          `- ${stepGlyph(step.phase)} ${stepLabel({kind: step.kind} as CanonicalExecutionEvent)} | ${step.title}${step.summary ? ` | ${step.summary}` : ""}`,
+          scrubRawIdentifiers(`- ${stepGlyph(step.phase)} ${stepLabel({kind: step.kind} as CanonicalExecutionEvent)} | ${step.title}${step.summary ? ` | ${step.summary}` : ""}`),
           step.timestamp,
         ),
       );
-      if (visibilityMode === "expanded") {
-        for (const detailLine of step.detail) {
-          projected.push(line("system", `  - ${detailLine}`, step.timestamp));
-        }
-      } else if (step.detail[0]) {
-        projected.push(line("system", `  - ${step.detail[0]}`, step.timestamp));
+      for (const detailLine of step.detail) {
+        projected.push(line("system", scrubRawIdentifiers(`  - ${detailLine}`), step.timestamp));
       }
       if (showRaw) {
         for (const rawLine of rawLines(step.raw)) {
-          projected.push(line("system", `    ${rawLine}`, step.timestamp));
+          projected.push(line("system", scrubRawIdentifiers(`    ${rawLine}`), step.timestamp));
         }
-      }
-    }
-
-    if (turn.assistant) {
-      projected.push(line("system", "### Response", turn.assistantTimestamp));
-      for (const responseLine of turn.assistant.split("\n")) {
-        projected.push(line("assistant", responseLine, turn.assistantTimestamp));
       }
     }
   }

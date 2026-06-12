@@ -504,6 +504,7 @@ export type AppState = {
   routePolicy: RoutePolicyState;
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
+  chatTraceExpanded: boolean;
   sessionContinuity: SessionContinuityState;
   prompt: string;
   tabs: TabSpec[];
@@ -572,4 +573,5 @@ export type AppAction =
   | {type: "activity.ingest"; entries: ActivityEntry[]}
   | {type: "activity.visibility.toggle"}
   | {type: "activity.raw.toggle"}
+  | {type: "trace.toggle"}
   | {type: "outline.set"; outline: OutlineItem[]};

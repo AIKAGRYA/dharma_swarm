@@ -125,8 +125,18 @@ describe("reduceApp UI state", () => {
     });
 
     expect(state.chatTraceLines.some((line) => line.kind === "user" && line.text.includes("Inspect repo health"))).toBe(true);
-    expect(state.chatTraceLines.some((line) => line.kind === "system" && line.text.includes("Inspecting session continuity"))).toBe(true);
-    expect(state.chatTraceLines.some((line) => line.kind === "tool" && line.text.includes("exec_command"))).toBe(true);
+    // F-172: trace collapses to one summary line by default; trace.toggle (^T) expands the steps.
+    expect(state.chatTraceExpanded).toBe(false);
+    expect(state.chatTraceLines.filter((line) => /^[✓✖▶] \d+ steps? · .+ · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(state.chatTraceLines.some((line) => line.text.includes("Inspecting session continuity"))).toBe(false);
+    const expandedState = reduceApp(state, {type: "trace.toggle"});
+    expect(expandedState.chatTraceExpanded).toBe(true);
+    expect(expandedState.chatTraceLines.some((line) => line.kind === "system" && line.text.includes("Inspecting session continuity"))).toBe(true);
+    expect(expandedState.chatTraceLines.some((line) => line.kind === "tool" && line.text.includes("exec_command"))).toBe(true);
+    expect(expandedState.chatTraceLines.filter((line) => /^[✓✖▶] \d+ steps? · .+ · \^T collapse$/.test(line.text))).toHaveLength(1);
+    const recollapsedState = reduceApp(expandedState, {type: "trace.toggle"});
+    expect(recollapsedState.chatTraceExpanded).toBe(false);
+    expect(recollapsedState.chatTraceLines.some((line) => line.text.includes("Inspecting session continuity"))).toBe(false);
     expect(state.activityFeed.entries.some((entry) => entry.kind === "thinking")).toBe(true);
     expect(state.activityFeed.entries.some((entry) => entry.kind === "tool")).toBe(true);
     expect(state.activityFeed.entries.some((entry) => entry.kind === "status")).toBe(true);

@@ -1,7 +1,7 @@
 import {buildInitialOutline, buildInitialTabs} from "./mockContent";
 import type {ActivityEntry, AppAction, AppState, ApprovalQueueState, TabSpec} from "./types";
 import {mergeExecutionEvents, projectActivityEntries, projectChatTraceLines, projectPaneLines} from "./executionLog";
-import {defaultRoutePolicy, routePolicyWithConfig} from "./routePolicy";
+import {defaultRoutePolicy, routeLabel, routePolicyWithConfig} from "./routePolicy";
 
 const initialTabs = buildInitialTabs();
 const initialRoutePolicy = defaultRoutePolicy();
@@ -72,8 +72,9 @@ function activeTabId(state: AppState): string {
 
 function projectedChatTraceLines(state: AppState, executionEventLog: AppState["executionEventLog"]): AppState["chatTraceLines"] {
   return projectChatTraceLines(executionEventLog, {
-    visibilityMode: state.activityFeed.visibilityMode,
+    expanded: state.chatTraceExpanded,
     showRaw: state.activityFeed.showRaw,
+    routeLabel: routeLabel(state.routePolicy),
   });
 }
 
@@ -90,6 +91,7 @@ export const initialState: AppState = {
   routePolicy: initialRoutePolicy,
   executionEventLog: [],
   chatTraceLines: [],
+  chatTraceExpanded: false,
   sessionContinuity: {
     continuityMode: "fresh",
     boundedHistory: [],
@@ -621,14 +623,13 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           ...state.activityFeed,
           visibilityMode: state.activityFeed.visibilityMode === "compact" ? "expanded" : "compact",
         },
+      };
+    case "trace.toggle":
+      return {
+        ...state,
+        chatTraceExpanded: !state.chatTraceExpanded,
         chatTraceLines: projectedChatTraceLines(
-          {
-            ...state,
-            activityFeed: {
-              ...state.activityFeed,
-              visibilityMode: state.activityFeed.visibilityMode === "compact" ? "expanded" : "compact",
-            },
-          },
+          {...state, chatTraceExpanded: !state.chatTraceExpanded},
           state.executionEventLog,
         ),
       };

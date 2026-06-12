@@ -2961,6 +2961,12 @@ export function App(): React.ReactElement {
       return;
     }
     if (key.ctrl && input === "t") {
+      if ((activeTab?.id ?? "chat") === "chat") {
+        const nextExpanded = !stateRef.current.chatTraceExpanded;
+        dispatch({type: "trace.toggle"});
+        dispatch({type: "status.set", value: nextExpanded ? "trace expanded" : "trace collapsed"});
+        return;
+      }
       dispatch({type: "tab.activate", tabId: "control"});
       return;
     }

@@ -72,17 +72,23 @@ describe("canonicalEventsFromBridgeEvent", () => {
     ]);
 
     const chatLines = projectChatTraceLines(events);
+    const expandedChatLines = projectChatTraceLines(events, {expanded: true});
     const thinkingLines = projectPaneLines("thinking", events);
     const toolLines = projectPaneLines("tools", events);
     const timelineLines = projectPaneLines("timeline", events);
     const activityEntries = projectActivityEntries(events);
 
-    expect(chatLines.some((line) => line.kind === "system" && line.text.includes("Turn 1"))).toBe(true);
+    // F-172: collapsed by default — response above one trace summary line, no step detail.
     expect(chatLines.some((line) => line.kind === "user" && line.text.includes("Second prompt"))).toBe(true);
     expect(chatLines.some((line) => line.kind === "assistant" && line.text === "First answer")).toBe(true);
-    expect(chatLines.some((line) => line.kind === "system" && line.text.includes("Reasoning about the second prompt"))).toBe(true);
-    expect(chatLines.some((line) => line.kind === "tool" && line.text.includes("Tool | exec_command | working tree clean"))).toBe(true);
-    expect(chatLines.some((line) => line.kind === "tool" && line.text.includes("Approval | exec_command requires require_approval"))).toBe(true);
+    expect(chatLines.filter((line) => /^✓ \d+ steps? · .+ · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(chatLines.some((line) => line.text.includes("Reasoning about the second prompt"))).toBe(false);
+    expect(chatLines.some((line) => line.text.includes("Turn 1"))).toBe(false);
+    // ^T expanded view carries the step detail.
+    expect(expandedChatLines.some((line) => line.kind === "system" && line.text.includes("Reasoning about the second prompt"))).toBe(true);
+    expect(expandedChatLines.some((line) => line.kind === "tool" && line.text.includes("Tool | exec_command | working tree clean"))).toBe(true);
+    expect(expandedChatLines.some((line) => line.kind === "tool" && line.text.includes("Approval | exec_command requires require_approval"))).toBe(true);
+    expect(expandedChatLines.filter((line) => /^✓ \d+ steps? · .+ · \^T collapse$/.test(line.text))).toHaveLength(1);
     expect(thinkingLines.some((line) => line.text.includes("Reasoning about the second prompt"))).toBe(true);
     expect(toolLines.some((line) => line.text.includes("git status"))).toBe(true);
     expect(toolLines.some((line) => line.text.includes("working tree clean"))).toBe(true);
@@ -91,6 +97,63 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(activityEntries.some((entry) => entry.kind === "tool" && entry.correlationId === "tool-42")).toBe(true);
     expect(activityEntries.some((entry) => entry.kind === "approval" && entry.correlationId === "act-1")).toBe(true);
     expect(activityEntries.some((entry) => entry.kind === "status" && entry.title.includes("session ended"))).toBe(true);
+  });
+
+  test("F-172: completed turn renders response-first with exactly one trace summary line and zero raw id fields", () => {
+    const sessionHex = "9f86d081884c7d659a2feaa0c55ad015";
+    const events = [
+      userPromptExecutionEvent("hello?", "2026-06-12T10:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session.ack",
+        session_id: sessionHex,
+        provider: "codex",
+        model: "gpt-5.4",
+        request_id: "3",
+        created_at: "2026-06-12T10:00:01Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({type: "thinking_complete", content: "routing the greeting", created_at: "2026-06-12T10:00:02Z"}),
+      ...canonicalEventsFromBridgeEvent({
+        type: "tool_call_complete",
+        tool_name: "exec_command",
+        tool_call_id: "c0ffee00c0ffee00",
+        arguments: "{\"cmd\":\"true\"}",
+        created_at: "2026-06-12T10:00:03Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({
+        type: "tool_result",
+        tool_name: "exec_command",
+        tool_call_id: "c0ffee00c0ffee00",
+        success: true,
+        content: "ok",
+        created_at: "2026-06-12T10:00:04Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({type: "text_complete", content: "Hello! The Helm is listening.", created_at: "2026-06-12T10:00:05Z"}),
+      ...canonicalEventsFromBridgeEvent({type: "session_end", session_id: sessionHex, success: true, request_id: "3", created_at: "2026-06-12T10:00:06Z"}),
+    ];
+
+    const hexId = /[0-9a-f]{12,}/i;
+    const summaryPattern = /^[✓✖▶] \d+ steps? · .+ · \^T (expand|collapse)$/;
+
+    const collapsed = projectChatTraceLines(events);
+    expect(collapsed.filter((line) => summaryPattern.test(line.text))).toHaveLength(1);
+    const responseIndex = collapsed.findIndex((line) => line.text === "Hello! The Helm is listening.");
+    const summaryIndex = collapsed.findIndex((line) => summaryPattern.test(line.text));
+    expect(responseIndex).toBeGreaterThanOrEqual(0);
+    expect(responseIndex).toBeLessThan(summaryIndex);
+    expect(collapsed[summaryIndex]?.text).toMatch(/^✓ \d+ steps · codex:gpt-5\.4 · \^T expand$/);
+    expect(collapsed.some((line) => hexId.test(line.text))).toBe(false);
+    expect(collapsed.some((line) => line.text.includes("routing the greeting"))).toBe(false);
+
+    const expanded = projectChatTraceLines(events, {expanded: true});
+    expect(expanded.filter((line) => summaryPattern.test(line.text))).toHaveLength(1);
+    expect(expanded.some((line) => line.text.includes("routing the greeting"))).toBe(true);
+    expect(expanded.some((line) => hexId.test(line.text))).toBe(false);
+
+    const expandedRaw = projectChatTraceLines(events, {expanded: true, showRaw: true});
+    expect(expandedRaw.some((line) => hexId.test(line.text))).toBe(false);
+
+    const recollapsed = projectChatTraceLines(events, {expanded: false});
+    expect(recollapsed.some((line) => line.text.includes("routing the greeting"))).toBe(false);
   });
 
   test("deduplicates canonical execution events by id during merges", () => {
