@@ -1,0 +1,109 @@
+name: pr-dedupe
+
+# Duplicate automated-PR consolidation.
+#
+# Problem this solves:
+#   Automation lanes (spine-adoption refresh, docops refresh, etc.) sometimes
+#   open the same PR repeatedly under *different* branch prefixes
+#   (chore/governance/spine-adoption-metric-refresh, chore/spine-adoption-…,
+#   chore/auto-spine-adoption-…, ops/spine-adoption-metric-…). The headRef
+#   throttle in bot-pr-limit.yml only matches declared patterns, so renamed
+#   lanes slip through and the backlog fills with byte-identical refresh PRs
+#   (#559 / #571 / #580 / #583 were one such pile).
+#
+# What this does (mechanical, non-judgmental):
+#   Groups open PRs by normalized title (lowercased, whitespace collapsed) and,
+#   for every group with 2+ PRs whose title carries an automation marker
+#   ("[automated]" or "[auto]"), keeps ONLY the newest PR (highest number) and
+#   closes the rest with a governance comment + branch cleanup.
+#
+# What this does NOT do:
+#   - It never touches PRs without an automation marker in the title.
+#   - It never closes draft PRs.
+#   - It never merges anything (Merge Master Mike owns merges).
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+  schedule:
+    - cron: "15 */6 * * *"  # every 6 hours
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "If true, only report — don't close"
+        default: "false"
+
+concurrency:
+  group: pr-dedupe
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dedupe:
+    name: Close duplicate automated PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+    steps:
+      - name: Find and close duplicate automated PRs
+        run: |
+          set -euo pipefail
+
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,title,isDraft,headRefName,createdAt \
+            > /tmp/open_prs.json
+
+          # Normalize titles and group; only groups whose title carries an
+          # automation marker are eligible for dedupe.
+          jq -c '
+            [ .[]
+              | select(.isDraft == false)
+              | . + {norm: (.title | ascii_downcase | gsub("\\s+"; " ") | gsub("^ | $"; ""))}
+              | select(.norm | test("\\[automated\\]|\\[auto\\]"))
+            ]
+            | group_by(.norm)
+            | map(select(length > 1) | sort_by(.number))
+            | .[]
+          ' /tmp/open_prs.json > /tmp/dupe_groups.jsonl || true
+
+          closed_count=0
+          summary="## Duplicate Automated PR Dedupe\n\n"
+
+          if [ ! -s /tmp/dupe_groups.jsonl ]; then
+            summary+="No duplicate automated PRs found.\n"
+          fi
+
+          while IFS= read -r group; do
+            keep="$(echo "$group" | jq -r '.[-1].number')"
+            title="$(echo "$group" | jq -r '.[-1].title')"
+            summary+="### \`${title}\` — keeping #${keep}\n"
+            while IFS= read -r entry; do
+              number="$(echo "$entry" | jq -r '.number')"
+              head_ref="$(echo "$entry" | jq -r '.headRefName')"
+              summary+="- **CLOSED** #${number} (branch \`${head_ref}\`)\n"
+              if [ "$DRY_RUN" = "false" ]; then
+                close_msg="## 🗂️ Auto-closed: duplicate automated PR
+
+          This PR duplicates **#${keep}** (same automated intent, newer snapshot).
+          Per \`docs/governance/PR_QUALITY_GATES.md\` § Duplicate Automated PR Dedupe,
+          only the newest PR per automated intent stays open.
+
+          If this close is wrong, reopen and rename the title so it no longer
+          matches the duplicate group."
+                gh pr comment "$number" --repo "$GH_REPO" --body "$close_msg" || true
+                gh pr close "$number" --repo "$GH_REPO" || true
+                gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${head_ref}" 2>/dev/null || true
+                closed_count=$((closed_count + 1))
+              fi
+            done < <(echo "$group" | jq -c '.[:-1][]')
+          done < /tmp/dupe_groups.jsonl
+
+          summary+="\n**Summary:** ${closed_count} closed (dry_run=${DRY_RUN})\n"
+          echo -e "$summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "Closed: $closed_count"

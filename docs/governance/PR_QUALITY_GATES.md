@@ -23,6 +23,8 @@ must pass these gates before merge:
 | 8 | PR collision detect | `pr-collision-detect.yml` | Warning comment (non-blocking) |
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
+| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older duplicates of `[automated]`-titled PRs, keeping the newest |
+| 12 | Automerge lane | `automerge.yml` | On `automerge`/`bot-pr` label + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
 
 ### Local pre-flight
 
@@ -89,11 +91,17 @@ Declared lanes and limits (defined in `.github/workflows/bot-pr-limit.yml`):
 
 | Lane | headRef pattern | Max open |
 |---|---|---|
-| `spine-adoption-refresh` | `chore/governance*spine-adoption*` | 1 |
+| `spine-adoption-refresh` | `*spine-adoption*` (anywhere in headRef) | 1 |
 | `docops-autorefresh` | `chore/docops-autorefresh*` | 1 |
 | `verdict-inter-agent` | `verdict/inter_agent*` | 3 |
 | `chore-inter-agent` | `chore/inter-agent*` | 3 |
 | `spine-surface-join` | `chore/spine/*` | 2 |
+
+The spine-adoption lane was originally `chore/governance*spine-adoption*`, but
+the refresher spawned siblings under `chore/spine-adoption-…`,
+`chore/auto-spine-adoption-…`, and `ops/spine-adoption-metric-…`, all of which
+evaded the throttle (the #559/#571/#580/#583 pile). The pattern now matches
+the intent token anywhere in the headRef so renamed lanes cannot slip through.
 
 Human PRs on non-lane branches are unaffected. To add a new automation lane,
 add a `case` arm to the `Resolve intent from headRef` step and a row to this
@@ -110,6 +118,77 @@ The `pr-collision-detect.yml` workflow detects duplicate PRs by:
 When duplicates are detected, only the **latest/most complete** PR
 should remain open. Earlier attempts should be closed with a comment
 linking to the successor.
+
+### Duplicate Automated PR Dedupe (`pr-dedupe.yml`)
+
+The collision detector only warns. The `pr-dedupe.yml` workflow **acts**: it
+groups open non-draft PRs by normalized title and, for any group of 2+ PRs
+whose title carries an automation marker (`[automated]` or `[auto]`), closes
+all but the newest PR (highest number), comments a governance explanation,
+and deletes the orphaned branches. It runs on PR open/reopen, every 6 hours
+on a schedule, and on `workflow_dispatch` (with a `dry_run` input). PRs
+without an automation marker in the title are never touched, and nothing is
+ever merged by this lane.
+
+---
+
+## 2b. Automerge Lane (`automerge.yml`)
+
+The fully automated merge path for clean bot PRs and simple human PRs.
+Opt in by labeling a PR `automerge` (human work) or `bot-pr` (automation
+lanes should add it at creation time):
+
+```bash
+gh pr edit <N> --add-label automerge
+```
+
+Trigger surface: label added, ready-for-review, `check_suite` completion,
+review submitted/dismissed, plus an hourly sweep. When **all** status checks
+are green/completed, the PR is not a draft, and no review requests changes,
+the lane dispatches the existing Merge Master Mike router
+(`codex-mention-router.yml`) with `merge_when_clean: true` — once per head
+SHA (a marker comment prevents re-dispatch).
+
+Nothing is weakened: Mike still runs his full deterministic gate
+(fourfold-warrant, coherence-delta, CI rollup, unresolved review threads,
+reviewer receipts) before arming auto-merge. The lane never merges directly.
+Remove the label to leave the lane.
+
+### Required reviewer receipts
+
+Mike's required reviewer receipts are **`copilot,claude`**. Devin is a
+*committer* agent (it opens PRs); it does not post review receipts, so
+requiring a `devin` receipt left the gate permanently unclearable. If Devin
+gains a review surface later, add it back to `REQUIRED_REVIEWERS` in
+`codex-mention-router.yml` and the `merge-master-mike-backlog.yml` default.
+
+---
+
+## 2c. Merge Queue Readiness
+
+When the open-PR count floats high, sequential merging hits the rebase loop:
+each merge invalidates every other branch. The long-term fix is GitHub's
+**merge queue** + **auto-merge**, which batch-tests queued PRs against a
+temporary branch and merge them together.
+
+All gating workflows now carry the `merge_group:` trigger so the queue can be
+enabled without stranding required checks:
+
+- **Tree-shaped gates** (`tests`, `docops`, `test-hygiene`, `manifest-check`,
+  `semgrep`, `gitleaks`, `codeql`, `active-track`) run **fully** on the
+  queued batch — this is the point of the queue.
+- **PR-shaped gates** (`coherence-delta`, `fourfold-warrant`, `commit-lint`,
+  `structure`, `module-budget`) need PR context (body, base/head SHAs) that
+  a `merge_group` event does not carry. They already passed on the PR run
+  before the PR could be queued, so their jobs skip on `merge_group`
+  (skipped = satisfied for required checks).
+
+One-time repository settings (operator action, cannot be done from the repo):
+
+1. **Settings → General** → check **Allow auto-merge**.
+2. **Settings → Branches → `main` rule** → check **Require merge queue**.
+3. Keep the existing required status checks; they now report on
+   `merge_group` events.
 
 ---
 
