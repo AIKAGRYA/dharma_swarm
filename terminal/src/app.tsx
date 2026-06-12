@@ -3,7 +3,7 @@ import {Box, useApp, useInput} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -2469,6 +2469,9 @@ export function App(): React.ReactElement {
     resumeSessionId?: string;
   }>>([]);
   const queuedOfflineCounter = useRef(0);
+  // F-158: slash commands submitted while the bridge is offline wait here; the connect
+  // effect drains them — every queued command is dispatched (command.run) or marked failed.
+  const queuedOfflineCommands = useRef<Array<{queueId: string; command: string}>>([]);
   const pendingCommandStream = useRef<PendingCommandStream | null>(null);
   const bridgeRef = useRef<DharmaBridge | null>(null);
   const handshakeBackoffRef = useRef({attempt: 0, nextAllowedAt: 0});
@@ -2572,8 +2575,35 @@ export function App(): React.ReactElement {
 
   // F-157: bridge connect drains the offline prompt queue — each queued turn is
   // dispatched (session.bootstrap) or marked failed; no third silent state.
+  // F-158: queued offline slash commands drain the same way via command.run.
   useEffect(() => {
-    if (state.bridgeStatus !== "connected" || queuedOfflinePrompts.current.length === 0) {
+    if (
+      state.bridgeStatus !== "connected" ||
+      (queuedOfflinePrompts.current.length === 0 && queuedOfflineCommands.current.length === 0)
+    ) {
+      return;
+    }
+    const commandEntries = queuedOfflineCommands.current.splice(0, queuedOfflineCommands.current.length);
+    for (const entry of commandEntries) {
+      try {
+        markPendingCommandStream(pendingCommandStream, {command: entry.command});
+        bridge.send("command.run", {command: entry.command});
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "dispatched")]},
+        ]);
+      } catch {
+        queueAppActions(dispatch, [
+          {type: "execution.events.ingest", events: [queuedPromptExecutionEvent(entry.queueId, "failed")]},
+        ]);
+      }
+    }
+    if (commandEntries.length > 0) {
+      dispatch({
+        type: "status.set",
+        value: `dispatched ${commandEntries.length} queued command${commandEntries.length === 1 ? "" : "s"}`,
+      });
+    }
+    if (queuedOfflinePrompts.current.length === 0) {
       return;
     }
     const entries = queuedOfflinePrompts.current.splice(0, queuedOfflinePrompts.current.length);
@@ -2657,6 +2687,14 @@ export function App(): React.ReactElement {
         type: "modelPicker.open",
         returnTabId: stateRef.current.uiMode.activeTabId,
       });
+      // F-158: even the picker shortcut leaves a completed transcript turn — no
+      // slash command may resolve without an entry in the chat transcript.
+      queueAppActions(dispatch, [
+        {
+          type: "execution.events.ingest",
+          events: [userPromptExecutionEvent(submitted), localCommandResultExecutionEvent(submitted, "route picker opened")],
+        },
+      ]);
       bridge.send("model.policy", {
         provider: stateRef.current.routePolicy.provider,
         model: stateRef.current.routePolicy.model,
@@ -2666,7 +2704,34 @@ export function App(): React.ReactElement {
       return;
     }
     if (isSlashCommandPrompt(submitted)) {
+      const commandEchoLine: TranscriptLine = {
+        id: `user-${Date.now()}`,
+        kind: "user",
+        text: `> ${submitted}`,
+      };
+      // F-158: every slash command leaves a visible transcript turn — the echoed
+      // command plus a result, or an explicit queued/failed status. The silent
+      // zero-feedback branch (live tour finding 3) is banned.
+      if (state.bridgeStatus === "offline") {
+        queuedOfflineCounter.current += 1;
+        const queueId = `q${queuedOfflineCounter.current}-${Date.now().toString(36)}`;
+        queuedOfflineCommands.current.push({queueId, command: submitted});
+        queueAppActions(dispatch, [
+          {type: "tab.activate", tabId: "chat"},
+          {type: "tab.append", tabId: "chat", lines: [commandEchoLine]},
+          {
+            type: "execution.events.ingest",
+            events: [userPromptExecutionEvent(submitted), queuedPromptExecutionEvent(queueId)],
+          },
+          {type: "status.set", value: "command queued (backend offline)"},
+        ]);
+        return;
+      }
       queueAppActions(dispatch, slashCommandStartActions({command: submitted}, "command"));
+      queueAppActions(dispatch, [
+        {type: "tab.append", tabId: "chat", lines: [commandEchoLine]},
+        {type: "execution.events.ingest", events: [userPromptExecutionEvent(submitted)]},
+      ]);
       markPendingCommandStream(pendingCommandStream, {command: submitted});
       bridge.send("command.run", {command: submitted});
     } else {

@@ -1,3 +1,4 @@
+import {COMMAND_TAB_REGISTRY} from "./commandRegistry";
 import {freshnessToken, parseControlPulsePreview, parseRuntimeFreshness} from "./freshness";
 import {nonSelectableRouteTargets, routePolicyFromValue, selectableRouteTargets} from "./routePolicy";
 import type {
@@ -2420,66 +2421,14 @@ export function resolveEventActionType(event: Record<string, unknown>): string {
   return "";
 }
 
+// F-158: routing is table-driven through the explicit registry in commandRegistry.ts
+// so the registry-coverage test and this router can never drift apart.
 export function commandTargetTab(command: string): string {
   const normalized = normalizeCommandName(command);
-
-  if (["chat", "clear", "reset", "cancel", "paste", "copy", "copylast", "thread"].includes(normalized)) {
-    return "chat";
-  }
-
-  if (normalized === "runtime") {
-    return "runtime";
-  }
-
-  if (normalized === "git") {
-    return "repo";
-  }
-
-  if (normalized === "model" || normalized === "models") {
-    return "models";
-  }
-
-  if (["swarm", "agni", "gates", "witness", "openclaw", "hum"].includes(normalized)) {
-    return "agents";
-  }
-
-  if (["evolve", "loops", "cascade"].includes(normalized)) {
-    return "evolution";
-  }
-
-  if (
-    ["context", "foundations", "telos", "dharma", "corpus", "evidence", "moltbook"].includes(
-      normalized,
-    )
-  ) {
-    return "ontology";
-  }
-
-  if (normalized === "trishula") {
-    return "agents";
-  }
-
-  if (["sessions", "session", "notes", "memory", "archive", "darwin", "logs", "truth", "stigmergy"].includes(normalized)) {
-    return "sessions";
-  }
-
-  if (["approval", "approvals", "permission", "permissions"].includes(normalized)) {
-    return "approvals";
-  }
-
-  if (normalized === "help") {
-    return "chat";
-  }
-
-  if (["status", "dashboard"].includes(normalized)) {
-    return "control";
-  }
-
   if (!normalized) {
     return "chat";
   }
-
-  return "control";
+  return COMMAND_TAB_REGISTRY[normalized] ?? "control";
 }
 
 const VALID_TARGET_PANES = new Set([

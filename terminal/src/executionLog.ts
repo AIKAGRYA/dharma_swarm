@@ -151,6 +151,28 @@ export function queuedPromptExecutionEvent(
   };
 }
 
+// F-158: a slash command handled entirely client-side (e.g. the bare /model picker)
+// still leaves a completed transcript turn — this local result event closes the echoed
+// command turn so it never sits in a perpetual running state.
+export function localCommandResultExecutionEvent(
+  command: string,
+  summary: string,
+  timestamp = new Date().toISOString(),
+): CanonicalExecutionEvent {
+  return {
+    id: `command:local:${timestamp}:${command.slice(0, 24)}`,
+    sourceEventType: "local_command_result",
+    kind: "command",
+    phase: "complete",
+    title: `intent ${command}`,
+    summary,
+    content: summary,
+    detail: [`Command: ${command}`],
+    timestamp,
+    raw: {command, summary, created_at: timestamp, source: "local"},
+  };
+}
+
 export function canonicalEventsFromBridgeEvent(event: Record<string, unknown>): CanonicalExecutionEvent[] {
   const type = String(event.type ?? "");
 
@@ -547,6 +569,11 @@ function traceStepFromEvent(event: CanonicalExecutionEvent): TraceStep | undefin
   };
 }
 
+function slashCommandNameFromText(text: string): string {
+  const first = text.trim().split(/\s+/, 1)[0] ?? "";
+  return first.replace(/^\//, "").toLowerCase();
+}
+
 function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
   const turns: ChatTurn[] = [];
   let activeTurn: ChatTurn | undefined;
@@ -605,6 +632,27 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
     }
     if (event.kind === "error" || event.phase === "failed") {
       activeTurn.phase = "failed";
+    }
+    // F-158: a slash-command turn completes on its command result — commands have no
+    // session lifecycle, so the matching result event is the turn's terminal state and
+    // its text surfaces as the visible response (scrubbed: it is wire-derived trace).
+    if (event.kind === "command" && activeTurn.prompt.trim().startsWith("/")) {
+      const turnCommand = slashCommandNameFromText(activeTurn.prompt);
+      const eventCommand = slashCommandNameFromText(String(event.raw?.command ?? ""));
+      if (!eventCommand || eventCommand === turnCommand) {
+        if (!activeTurn.assistant) {
+          const responseText = (event.content ?? event.summary ?? "").trim();
+          if (responseText) {
+            activeTurn.assistant = scrubRawIdentifiers(responseText);
+            activeTurn.assistantTimestamp = event.timestamp;
+          }
+        }
+        if (activeTurn.phase !== "failed") {
+          activeTurn.phase = "complete";
+        }
+        activeTurn = undefined;
+        continue;
+      }
     }
     if (event.kind === "status" && /session (failed|ended)/i.test(event.title)) {
       activeTurn.phase = /failed/i.test(event.title) || event.phase === "failed" ? "failed" : activeTurn.phase === "failed" ? "failed" : "complete";

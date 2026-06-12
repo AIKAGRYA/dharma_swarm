@@ -2,7 +2,7 @@
 # ratchet.sh rewrites a value here automatically when a green run measures a
 # better (lower) count (F-011); commit the tightened file with the improving
 # change. Never raise a value.
-max_file_lines=4064
+max_file_lines=4013
 dup_functions=40
 record_unknown=97
 hex_violations=0
