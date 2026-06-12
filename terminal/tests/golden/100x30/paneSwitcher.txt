@@ -20,10 +20,10 @@
 │ unstaged n/a | un… |     │ ║ • 3. Repo                                                           ║
 │ topo n/a | lead n/a      │ ║   repo                                                              ║
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ >                                                                                                │
+│ >   Type a message · / commands · ? keys                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                │
+│ status  pane switcher ready                                                                      │
 │ route  ready | codex:gpt-5.4                                                                     │
 │ mode  pane switcher                                                                              │
 │ keys  j/k or ↑/↓ choose pane | Enter jump | Esc close | ^K switcher                              │

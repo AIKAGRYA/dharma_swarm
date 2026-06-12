@@ -110,7 +110,7 @@ describe("F-158 slash-command registry coverage", () => {
       ],
     );
     const mismatchedLines = projectChatTraceLines(mismatched).map((line) => line.text);
-    expect(mismatchedLines.some((text) => text.startsWith("▶"))).toBe(true);
+    expect(mismatchedLines.some((text) => text.startsWith("… thinking"))).toBe(true);
     expect(mismatchedLines.some((text) => text.startsWith("✓"))).toBe(false);
 
     // A natural-language prompt turn absorbs a command step WITHOUT closing —
@@ -128,7 +128,7 @@ describe("F-158 slash-command registry coverage", () => {
       ],
     );
     const promptLines = projectChatTraceLines(promptTurn).map((line) => line.text);
-    expect(promptLines.some((text) => text.startsWith("▶"))).toBe(true);
+    expect(promptLines.some((text) => text.startsWith("… thinking"))).toBe(true);
     const closed = mergeExecutionEvents(promptTurn, [
       ...canonicalEventsFromBridgeEvent({
         type: "session_end",

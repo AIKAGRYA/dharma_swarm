@@ -19,7 +19,7 @@ Chat [Mission] Repo Commands Models Ontology ▸
 │ Dirty staged n/a |       │ │ One state model. One bridge. Visible tools. Minimal chrome. No      │
 │ unstaged n/a | un… |     │ │ duplicate output.                                                   │
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ >                                                                                                │
+│ >   Type a message · / commands · ? keys                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                                                │

@@ -82,14 +82,14 @@ describe("canonicalEventsFromBridgeEvent", () => {
     // F-172: collapsed by default — response above one trace summary line, no step detail.
     expect(chatLines.some((line) => line.kind === "user" && line.text.includes("Second prompt"))).toBe(true);
     expect(chatLines.some((line) => line.kind === "assistant" && line.text === "First answer")).toBe(true);
-    expect(chatLines.filter((line) => /^✓ \d+ steps? · .+ · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(chatLines.filter((line) => /^✓ (\d+s|done) · .+ · \^T details$/.test(line.text))).toHaveLength(1);
     expect(chatLines.some((line) => line.text.includes("Reasoning about the second prompt"))).toBe(false);
     expect(chatLines.some((line) => line.text.includes("Turn 1"))).toBe(false);
     // ^T expanded view carries the step detail.
     expect(expandedChatLines.some((line) => line.kind === "system" && line.text.includes("Reasoning about the second prompt"))).toBe(true);
     expect(expandedChatLines.some((line) => line.kind === "tool" && line.text.includes("Tool | exec_command | working tree clean"))).toBe(true);
     expect(expandedChatLines.some((line) => line.kind === "tool" && line.text.includes("Approval | exec_command requires require_approval"))).toBe(true);
-    expect(expandedChatLines.filter((line) => /^✓ \d+ steps? · .+ · \^T collapse$/.test(line.text))).toHaveLength(1);
+    expect(expandedChatLines.filter((line) => /^✓ (\d+s|done) · .+ · \^T collapse$/.test(line.text))).toHaveLength(1);
     expect(thinkingLines.some((line) => line.text.includes("Reasoning about the second prompt"))).toBe(true);
     expect(toolLines.some((line) => line.text.includes("git status"))).toBe(true);
     expect(toolLines.some((line) => line.text.includes("working tree clean"))).toBe(true);
@@ -133,7 +133,7 @@ describe("canonicalEventsFromBridgeEvent", () => {
     ];
 
     const hexId = /[0-9a-f]{12,}/i;
-    const summaryPattern = /^[✓✖▶] \d+ steps? · .+ · \^T (expand|collapse)$/;
+    const summaryPattern = /^(✓ (\d+s|done)|✖ failed|… thinking) · .+( · \^T (details|collapse))?$/;
 
     const collapsed = projectChatTraceLines(events);
     expect(collapsed.filter((line) => summaryPattern.test(line.text))).toHaveLength(1);
@@ -141,7 +141,8 @@ describe("canonicalEventsFromBridgeEvent", () => {
     const summaryIndex = collapsed.findIndex((line) => summaryPattern.test(line.text));
     expect(responseIndex).toBeGreaterThanOrEqual(0);
     expect(responseIndex).toBeLessThan(summaryIndex);
-    expect(collapsed[summaryIndex]?.text).toMatch(/^✓ \d+ steps · codex:gpt-5\.4 · \^T expand$/);
+    // 10:00:00 prompt -> 10:00:06 session_end = a 6s turn.
+    expect(collapsed[summaryIndex]?.text).toMatch(/^✓ 6s · codex:gpt-5\.4 · \^T details$/);
     expect(collapsed.some((line) => hexId.test(line.text))).toBe(false);
     expect(collapsed.some((line) => line.text.includes("routing the greeting"))).toBe(false);
 
@@ -187,7 +188,7 @@ describe("canonicalEventsFromBridgeEvent", () => {
 
     const collapsed = projectChatTraceLines(events);
     const responseIndex = collapsed.findIndex((line) => line.kind === "assistant" && line.text === answer);
-    const summaryIndex = collapsed.findIndex((line) => /^✓ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text));
+    const summaryIndex = collapsed.findIndex((line) => /^✓ (\d+s|done) · codex:gpt-5\.4 · \^T details$/.test(line.text));
     expect(responseIndex).toBeGreaterThanOrEqual(0);
     expect(summaryIndex).toBeGreaterThanOrEqual(0);
     expect(responseIndex).toBeLessThan(summaryIndex);
@@ -213,10 +214,10 @@ describe("canonicalEventsFromBridgeEvent", () => {
     const collapsed = projectChatTraceLines(events);
     expect(collapsed.some((line) => line.kind === "error" && line.text === "✖ no response — turn ended without output")).toBe(true);
     // The turn's summary line carries the failed glyph — never a ✓-complete with an empty body.
-    expect(collapsed.filter((line) => /^✓ \d+ steps? · /.test(line.text))).toHaveLength(0);
-    expect(collapsed.filter((line) => /^✖ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(collapsed.filter((line) => /^✓ (\d+s|done) · /.test(line.text))).toHaveLength(0);
+    expect(collapsed.filter((line) => /^✖ failed · codex:gpt-5\.4 · \^T details$/.test(line.text))).toHaveLength(1);
     const markerIndex = collapsed.findIndex((line) => line.text.includes("no response"));
-    const summaryIndex = collapsed.findIndex((line) => /^✖ \d+ steps? · /.test(line.text));
+    const summaryIndex = collapsed.findIndex((line) => /^✖ failed · /.test(line.text));
     expect(markerIndex).toBeLessThan(summaryIndex);
 
     // A turn answered via a command/intent step (intent.result shortcut) is response-bearing — no marker.
@@ -232,7 +233,7 @@ describe("canonicalEventsFromBridgeEvent", () => {
     ];
     const commandCollapsed = projectChatTraceLines(commandTurn);
     expect(commandCollapsed.some((line) => line.text.includes("no response"))).toBe(false);
-    expect(commandCollapsed.filter((line) => /^✓ \d+ steps? · /.test(line.text))).toHaveLength(1);
+    expect(commandCollapsed.filter((line) => /^✓ (\d+s|done) · /.test(line.text))).toHaveLength(1);
   });
 
   test("F-157: a prompt queued while the bridge is offline renders the explicit queued state, never running", () => {
@@ -243,7 +244,7 @@ describe("canonicalEventsFromBridgeEvent", () => {
 
     const collapsed = projectChatTraceLines(events, {routeLabel: "codex:gpt-5.4"});
     // The turn row names the queued state explicitly.
-    expect(collapsed.filter((line) => /^○ queued \(backend offline\) · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(collapsed.filter((line) => /^○ queued \(backend offline\) · codex:gpt-5\.4 · \^T details$/.test(line.text))).toHaveLength(1);
     // Never a running glyph, the word running, or optimistic local steps on an offline turn.
     expect(collapsed.some((line) => line.text.includes("▶"))).toBe(false);
     expect(collapsed.some((line) => /running/i.test(line.text))).toBe(false);
@@ -265,7 +266,8 @@ describe("canonicalEventsFromBridgeEvent", () => {
     expect(dispatched).toHaveLength(2);
     const dispatchedLines = projectChatTraceLines(dispatched, {routeLabel: "codex:gpt-5.4"});
     expect(dispatchedLines.some((line) => line.text.includes("queued (backend offline)"))).toBe(false);
-    expect(dispatchedLines.filter((line) => /^▶ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    // FACE-1: a dispatched (running) turn shows the quiet thinking row — no glyph, no step count.
+    expect(dispatchedLines.filter((line) => /^… thinking · codex:gpt-5\.4$/.test(line.text))).toHaveLength(1);
 
     // The dispatched turn then completes normally once real bridge events stream in.
     const completed = mergeExecutionEvents(dispatched, [
@@ -274,13 +276,13 @@ describe("canonicalEventsFromBridgeEvent", () => {
     ]);
     const completedLines = projectChatTraceLines(completed, {routeLabel: "codex:gpt-5.4"});
     expect(completedLines.some((line) => line.kind === "assistant" && line.text === "The Helm hears you.")).toBe(true);
-    expect(completedLines.filter((line) => /^✓ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(completedLines.filter((line) => /^✓ (\d+s|done) · codex:gpt-5\.4 · \^T details$/.test(line.text))).toHaveLength(1);
 
     // Failed: explicit ✖ on the turn row, never a silent state.
     const failed = mergeExecutionEvents(base, [queuedPromptExecutionEvent("q1-test", "failed", "2026-06-12T12:00:30Z")]);
     const failedLines = projectChatTraceLines(failed, {routeLabel: "codex:gpt-5.4"});
     expect(failedLines.some((line) => line.text.includes("queued (backend offline)"))).toBe(false);
-    expect(failedLines.filter((line) => /^✖ \d+ steps? · codex:gpt-5\.4 · \^T expand$/.test(line.text))).toHaveLength(1);
+    expect(failedLines.filter((line) => /^✖ failed · codex:gpt-5\.4 · \^T details$/.test(line.text))).toHaveLength(1);
     const failedExpanded = projectChatTraceLines(failed, {expanded: true, routeLabel: "codex:gpt-5.4"});
     expect(failedExpanded.some((line) => line.text.includes("dispatch failed after reconnect"))).toBe(true);
   });

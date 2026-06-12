@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # L0 boot smoke (F-002): hermetic tmux boot of the Dharma Terminal at 80x24.
-# Green = the app renders a non-empty frame with graceful "backend offline"
-# degradation (no Python bridge present), then exits cleanly on Ctrl-C.
+# Green = the app renders a non-empty frame with graceful offline degradation
+# (no Python bridge present; the boot frame is ZEN, whose status line carries
+# the durable "offline" token — FACE-1), then exits cleanly on Ctrl-C.
 # Override the start command for negative checks: BOOT_SMOKE_START_CMD="..."
 set -u
 
@@ -38,15 +39,15 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     break # app process died before rendering — negative path
   fi
   frame=$(tmux capture-pane -t "$SESS" -p 2>/dev/null || true)
-  if printf '%s' "$frame" | grep -q "backend offline"; then
+  if printf '%s' "$frame" | grep -q "offline"; then
     break
   fi
   sleep 0.5
 done
 
 [ -n "$(printf '%s' "$frame" | tr -d '[:space:]')" ] || fail "captured frame is empty"
-printf '%s' "$frame" | grep -q "backend offline" \
-  || fail "frame lacks 'backend offline' degradation text; frame was: $(printf '%s' "$frame" | head -c 400)"
+printf '%s' "$frame" | grep -q "offline" \
+  || fail "frame lacks 'offline' degradation text; frame was: $(printf '%s' "$frame" | head -c 400)"
 
 printf '%s\n' "$frame"
 

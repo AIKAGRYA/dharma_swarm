@@ -526,7 +526,36 @@ type ChatTurn = {
   assistantTimestamp?: string;
   route?: string;
   endedWithoutResponse?: boolean;
+  promptMs?: number;
+  lastEventMs?: number;
 };
+
+// Wire timestamps arrive as ISO strings (local events) OR epoch-second floats
+// (python stream envelopes use time.time()); both must parse for turn timing.
+function parseEventTime(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    if (numeric > 1e12) {
+      return numeric;
+    }
+    if (numeric > 1e9) {
+      return numeric * 1000;
+    }
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function turnDurationSeconds(turn: ChatTurn): number | undefined {
+  if (turn.promptMs === undefined || turn.lastEventMs === undefined || turn.lastEventMs < turn.promptMs) {
+    return undefined;
+  }
+  return Math.max(1, Math.round((turn.lastEventMs - turn.promptMs) / 1000));
+}
 
 function mergeStepDetail(current: string[], incoming: string[] | undefined): string[] {
   const merged = [...current];
@@ -585,12 +614,17 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
         prompt: event.content ?? event.title,
         phase: "running",
         steps: [],
+        promptMs: parseEventTime(event.timestamp),
       };
       turns.push(activeTurn);
       continue;
     }
     if (!activeTurn) {
       continue;
+    }
+    const eventMs = parseEventTime(event.timestamp);
+    if (eventMs !== undefined) {
+      activeTurn.lastEventMs = Math.max(activeTurn.lastEventMs ?? 0, eventMs);
     }
     if (event.kind === "assistant_text") {
       const content = (event.content ?? "").trim();
@@ -671,17 +705,21 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
   return turns.slice(-CHAT_TURN_RETENTION);
 }
 
-function turnGlyph(phase: ActivityPhase): string {
-  if (phase === "failed") {
-    return "✖";
+// FACE-1 zen-pure: one quiet line per turn — waiting is "… thinking · <route>"
+// (no step counts, no glyph flicker), completion is "✓ <n>s · <route> · ^T details".
+function turnSummaryText(turn: ChatTurn, route: string, expanded: boolean): string {
+  const hint = expanded ? "^T collapse" : "^T details";
+  if (turn.phase === "queued") {
+    return `○ queued (backend offline) · ${route} · ${hint}`;
   }
-  if (phase === "complete") {
-    return "✓";
+  if (turn.phase === "running") {
+    return expanded ? `… thinking · ${route} · ${hint}` : `… thinking · ${route}`;
   }
-  if (phase === "queued") {
-    return "○";
+  if (turn.phase === "failed") {
+    return `✖ failed · ${route} · ${hint}`;
   }
-  return "▶";
+  const seconds = turnDurationSeconds(turn);
+  return `✓ ${seconds === undefined ? "done" : `${seconds}s`} · ${route} · ${hint}`;
 }
 
 // F-172: the response is the star, the trace is one collapsed summary line beneath it.
@@ -702,18 +740,14 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
       projected.push(line("error", "✖ no response — turn ended without output", turn.steps.at(-1)?.timestamp));
     }
 
-    const stepCount = turn.steps.length;
     const route = scrubRawIdentifiers(turn.route ?? options.routeLabel ?? "route pending");
     // F-157: a queued-offline turn names its state on the turn row — never a running
-    // glyph or step count while nothing has been dispatched.
-    const summaryBody =
-      turn.phase === "queued"
-        ? "queued (backend offline)"
-        : `${stepCount} ${stepCount === 1 ? "step" : "steps"}`;
+    // glyph or step count while nothing has been dispatched. The summary row renders
+    // dim (thinking kind) — it is quiet chrome, not conversation.
     projected.push(
       line(
-        turn.phase === "failed" ? "error" : "system",
-        `${turnGlyph(turn.phase)} ${summaryBody} · ${route} · ^T ${expanded ? "collapse" : "expand"}`,
+        turn.phase === "failed" ? "error" : "thinking",
+        turnSummaryText(turn, route, expanded),
         turn.assistantTimestamp ?? turn.steps.at(-1)?.timestamp,
       ),
     );

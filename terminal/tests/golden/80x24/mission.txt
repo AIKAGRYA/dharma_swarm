@@ -15,7 +15,7 @@ Chat [Mission] Repo Commands Models Ontology ▸
 │ ◇ Principles                                                                 │
 │ One state model. One bridge. Visible tools. Minimal chrome. No duplicate     │
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│ >                                                                            │
+│ >   Type a message · / commands · ? keys                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ status  backend offline, retrying                                            │

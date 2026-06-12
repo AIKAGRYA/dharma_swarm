@@ -18,7 +18,7 @@ TERMINAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SESS="helm-f158-$RANDOM"
 STATEDIR="$(mktemp -d)"
 CAPDIR="${SLASH_FEEDBACK_OUT_DIR:-$(mktemp -d)}"
-QUEUED_ROW='○ queued \(backend offline\) · .+ · \^T expand'
+QUEUED_ROW='○ queued \(backend offline\) · .+ · \^T details'
 
 cleanup() {
   tmux kill-session -t "$SESS" 2>/dev/null || true
@@ -74,7 +74,8 @@ tmux new-session -d -s "$SESS" -x 120 -y 40 \
 offline_seen=""
 for i in $(seq 1 40); do
   frame="$(capture 2>/dev/null || true)"
-  if echo "$frame" | grep -q "backend offline"; then
+  # FACE-1: zen boot frame carries the durable "offline" token in its status line.
+  if echo "$frame" | grep -q "offline"; then
     offline_seen=1
     break
   fi

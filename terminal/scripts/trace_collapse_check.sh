@@ -3,7 +3,7 @@
 # Boots the app against scripts/stub_bridge.py (scripted wire-protocol stub),
 # completes one turn, then asserts:
 #   1. response text renders ABOVE exactly one collapsed trace summary line
-#      matching '✓ .* · .* · ^T' (step count · route label · ^T hint);
+#      matching '✓ <n>s · <route> · ^T details' (FACE-1 zen summary);
 #   2. no hex-id token [0-9a-f]{12,} anywhere in the captured transcript frame;
 #   3. trace step detail absent before ^T, present after ^T, absent again
 #      after a second ^T — hex ids absent in BOTH expansion states.
@@ -16,7 +16,7 @@ STATEDIR="$(mktemp -d)"
 CAPDIR="${TRACE_CHECK_OUT_DIR:-$(mktemp -d)}"
 RESPONSE_TEXT="The Helm hears you loud and clear."
 STEP_DETAIL="weighing the reply"
-SUMMARY_EXPAND='✓ [0-9]+ steps? · .+ · \^T expand'
+SUMMARY_EXPAND='✓ ([0-9]+s|done) · .+ · \^T details'
 HEX_ID='[0-9a-fA-F]{12,}'
 
 cleanup() {
@@ -62,8 +62,9 @@ tmux new-session -d -s "$SESS" -x 100 -y 30 \
   || fail "tmux session failed to start"
 
 wait_for "Dharma Terminal" "app boot frame"
-# post-handshake status may already have advanced to the resync message — accept any of the three
-wait_for "backend connected|bridge ready|resyncing" "stub bridge handshake"
+# FACE-1: the zen status line shows the durable "live" token once connected
+# (transient statusLine text no longer renders in zen).
+wait_for "backend connected|bridge ready|resyncing|·  live  ·" "stub bridge handshake"
 
 tmux send-keys -t "$SESS" -l "what is the helm"
 sleep 0.5

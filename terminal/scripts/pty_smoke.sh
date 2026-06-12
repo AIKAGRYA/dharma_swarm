@@ -50,12 +50,13 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     break # app died before rendering — negative path
   fi
   frame=$(tmux capture-pane -t "$SESS" -p 2>/dev/null || true)
-  if printf '%s' "$frame" | grep -q "backend offline"; then
+  # FACE-1: zen boot frame carries the durable "offline" token in its status line.
+  if printf '%s' "$frame" | grep -q "offline"; then
     break
   fi
   sleep 0.5
 done
-printf '%s' "$frame" | grep -q "backend offline" \
+printf '%s' "$frame" | grep -q "offline" \
   || fail "app never rendered interactive frame; frame was: $(printf '%s' "$frame" | head -c 300)"
 
 # Send the probe one keystroke at a time through the pty (-l = literal).

@@ -21,8 +21,8 @@ STATEDIR="$(mktemp -d)"
 CAPDIR="${ASSISTANT_CHECK_OUT_DIR:-$(mktemp -d)}"
 ASSISTANT_TEXT="I am the Helm. Identity intents route straight through me."
 NO_RESPONSE_MARKER="no response — turn ended without output"
-SUMMARY_OK='✓ [0-9]+ steps? · .+ · \^T expand'
-SUMMARY_FAILED='✖ [0-9]+ steps? · .+ · \^T expand'
+SUMMARY_OK='✓ ([0-9]+s|done) · .+ · \^T details'
+SUMMARY_FAILED='✖ failed · .+ · \^T details'
 
 cleanup() {
   tmux kill-session -t "$SESS" 2>/dev/null || true
@@ -63,7 +63,8 @@ tmux new-session -d -s "$SESS" -x 100 -y 30 \
   || fail "tmux session failed to start"
 
 wait_for "Dharma Terminal" "app boot frame"
-wait_for "backend connected|bridge ready|resyncing" "stub bridge handshake"
+# FACE-1: the zen status line shows the durable "live" token once connected.
+wait_for "backend connected|bridge ready|resyncing|·  live  ·" "stub bridge handshake"
 
 # ---- turn 1: answered via the assistant event ----
 tmux send-keys -t "$SESS" -l "who are you and what can you do"

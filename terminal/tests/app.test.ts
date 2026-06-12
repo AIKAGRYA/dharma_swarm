@@ -9025,7 +9025,8 @@ describe("App prompt submission", () => {
 
       const normalized = normalizeTerminalText(rendered);
       expect(normalized).toContain("> Reply OK");
-      expect(normalized).toContain("bootstrapping codex:gpt-5.4");
+      // FACE-1: the zen frame shows the quiet waiting row, not transient statusLine spam.
+      expect(normalized).toContain("… thinking · codex:gpt-5.4");
     } finally {
       instance.unmount();
       instance.cleanup();

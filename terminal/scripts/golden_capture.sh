@@ -49,7 +49,7 @@ OVERLAY_TIMEOUT=${GOLDEN_OVERLAY_TIMEOUT:-25}
 # 80x24 frames; mock content from mockContent.ts and pane components).
 marker_for() {
   case $1 in
-    chat) printf 'Use plain prompts or slash commands' ;;
+    chat) printf 'F2 opens the cockpit' ;;  # FACE-1 zen welcome line 2 (mockContent.ts)
     mission) printf 'One state model. One bridge.' ;;
     repo) printf 'Workspace snapshot loading' ;;
     commands) printf 'Command graph loading' ;;
@@ -98,14 +98,15 @@ frame() {
 }
 
 # Poll until the frame contains marker $1 (literal) AND the steady
-# "backend offline" status AND two consecutive captures are byte-identical;
+# "offline" status (zen status token on chat, "backend offline" in cockpit
+# footers — FACE-1) AND two consecutive captures are byte-identical;
 # echoes the settled frame. Deadline seconds in $2.
 wait_settled() {
   local marker=$1 timeout=$2 prev="" cur="" deadline
   deadline=$(( $(date +%s) + timeout ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     cur=$(frame)
-    if [ -n "$cur" ] && printf '%s' "$cur" | grep -qF -- "$marker" && printf '%s' "$cur" | grep -q "backend offline"; then
+    if [ -n "$cur" ] && printf '%s' "$cur" | grep -qF -- "$marker" && printf '%s' "$cur" | grep -q "offline"; then
       if [ "$cur" = "$prev" ]; then
         printf '%s\n' "$cur"
         return 0
@@ -159,13 +160,13 @@ for size in $SIZES; do
   deadline=$(( $(date +%s) + BOOT_TIMEOUT ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     tmux has-session -t "$SESS" 2>/dev/null || fail "app died during boot at $size"
-    if frame | grep -q "backend offline"; then
+    if frame | grep -q "offline"; then
       booted=1
       break
     fi
     sleep 0.5
   done
-  [ "$booted" -eq 1 ] || fail "no 'backend offline' degradation within ${BOOT_TIMEOUT}s at $size"
+  [ "$booted" -eq 1 ] || fail "no 'offline' degradation within ${BOOT_TIMEOUT}s at $size"
 
   # Walk the 12 static tabs with forward Tab only (Shift-Tab is broken;
   # [ ] 1 2 3 are intercepted printables). Poll arrival before each capture.

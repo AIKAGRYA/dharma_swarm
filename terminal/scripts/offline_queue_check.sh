@@ -10,7 +10,7 @@
 # resolve to the stub's response text.
 #
 # Asserts:
-#   1. within 2s of Enter, the turn row matches '○ queued (backend offline) · <route> · ^T expand';
+#   1. within 2s of Enter, the turn row matches '○ queued (backend offline) · <route> · ^T details';
 #   2. at +10s the turn row is unchanged — no '▶' glyph and no 'running' text anywhere in the frame;
 #   3. no optimistic local steps (bootstrapping context / selecting route) in the expanded trace;
 #   4. after the gate opens, the turn transitions: response text renders with a ✓ summary,
@@ -25,9 +25,9 @@ WORKDIR="$(mktemp -d)"
 CAPDIR="${OFFLINE_QUEUE_OUT_DIR:-$(mktemp -d)}"
 GATE="$WORKDIR/python_gate"
 PROMPT="what is the helm"
-QUEUED_ROW='○ queued \(backend offline\) · .+ · \^T expand'
+QUEUED_ROW='○ queued \(backend offline\) · .+ · \^T details'
 RESPONSE_TEXT="The Helm hears you loud and clear."
-DONE_ROW='✓ [0-9]+ steps? · .+ · \^T expand'
+DONE_ROW='✓ ([0-9]+s|done) · .+ · \^T details'
 
 cleanup() {
   tmux kill-session -t "$SESS" 2>/dev/null || true
@@ -71,7 +71,8 @@ tmux new-session -d -s "$SESS" -x 120 -y 40 \
   "cd $TERMINAL_DIR && COLORTERM=truecolor DHARMA_PYTHON=$GATE DHARMA_TERMINAL_STATE_DIR=$STATEDIR DHARMA_TERMINAL_SUPERVISOR_STATE_DIR=$STATEDIR bun run start" \
   || fail "tmux session failed to start"
 
-wait_for "backend offline" "offline boot frame (status footer)" 40 0.5
+# FACE-1: the boot frame is zen — its status line carries the durable "offline" token.
+wait_for "offline" "offline boot frame (zen status line)" 40 0.5
 
 tmux send-keys -t "$SESS" -l "$PROMPT"
 sleep 0.3

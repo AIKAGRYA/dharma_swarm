@@ -3316,15 +3316,17 @@ export function App(): React.ReactElement {
     state.uiMode.activeOverlay.kind === "none"
   ) {
     const zenWindow = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - 7);
+    // FACE-1 zen-pure: the status line carries only durable state (route +
+    // bridge liveness) — transient statusLine spam ("route confirmed",
+    // "sidebar ->") must never churn the zen frame.
     const zenStatus = [
       "zen",
       routeLabel(state.routePolicy),
       state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
-      state.statusLine,
       "F2 cockpit · /tour",
-    ]
-      .filter(Boolean)
-      .join("  ·  ");
+    ].join("  ·  ");
+    // FACE-1 measure law: prose clamps to ~100 cols at wide terminals.
+    const zenWidth = Math.min(terminalWidth, 100);
     // Content-hugging like Claude Code: the composer sits directly under the
     // last message (operator: "still too bulky" — the old bottom-pin left a
     // dead gulf mid-screen). The frame stays full-height with the spacer BELOW
@@ -3332,7 +3334,7 @@ export function App(): React.ReactElement {
     // (zen->cockpit->zen left a stale cockpit frame on screen).
     return (
       <Box flexDirection="column" height={terminalHeight}>
-        <Box flexShrink={0} flexDirection="column">
+        <Box flexShrink={0} flexDirection="column" width={zenWidth}>
           <TranscriptPane
             frameless
             title="Chat"
