@@ -143,6 +143,9 @@ fi
 # Counter: hex_violations (F-012)
 theme_file="$TERMINAL_DIR/src/theme.ts"
 scenic_file="$TERMINAL_DIR/src/components/ScenicStrip.tsx"
+# scenicArt.ts is GENERATED image data (scripts/scenic_generate.py output —
+# Hokusai pixels as hex), not styling: same theme-law exemption as the strip.
+scenic_data_file="$TERMINAL_DIR/src/components/scenicArt.ts"
 HEX_RE='#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b'
 hex_violations=0
 hex_worst_file=""
@@ -157,7 +160,7 @@ while IFS= read -r src_file; do
     fi
   fi
 done < <(find "$TERMINAL_DIR/src" -type f \( -name '*.ts' -o -name '*.tsx' \) \
-  ! -path "$theme_file" ! -path "$scenic_file")
+  ! -path "$theme_file" ! -path "$scenic_file" ! -path "$scenic_data_file")
 
 baseline_hex_violations=$(read_baseline hex_violations)
 echo "hex_violations=$hex_violations"
