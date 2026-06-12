@@ -29,7 +29,8 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
+import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
 import {focusModeFor, footerHintFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
@@ -2782,6 +2783,33 @@ export function App(): React.ReactElement {
         runLocalUiAction(submitted, nlIntent);
         return;
       }
+    } else {
+      // Gauntlet finding 2026-06-12: a typo'd command (/hlep) must never yank
+      // the user into the Control pane — unknown commands answer in-chat with
+      // the nearest registered command.
+      const commandName = submitted.slice(1).split(/\s+/)[0]?.toLowerCase() ?? "";
+      if (commandName && !REGISTERED_SLASH_COMMANDS.includes(commandName) && !isBareModelCommand(submitted)) {
+        const suggestion = closestCommand(commandName, REGISTERED_SLASH_COMMANDS);
+        queueAppActions(dispatch, [
+          {
+            type: "execution.events.ingest",
+            events: [
+              userPromptExecutionEvent(submitted),
+              ...canonicalEventsFromBridgeEvent({
+                type: "assistant",
+                request_id: `local-unknown-${Date.now()}`,
+                message: suggestion
+                  ? `Unknown command /${commandName} — did you mean /${suggestion}? (/help lists everything)`
+                  : `Unknown command /${commandName}. /help lists everything; /tour gives the guided walkthrough.`,
+              }),
+              localCommandResultExecutionEvent(submitted, `unknown command /${commandName}`),
+            ],
+          },
+          {type: "tab.activate", tabId: "chat"},
+          {type: "status.set", value: `unknown command /${commandName}`},
+        ]);
+        return;
+      }
     }
     if (isBareModelCommand(submitted)) {
       dispatch({
@@ -3165,12 +3193,16 @@ export function App(): React.ReactElement {
       runPaneAction(paneActionsFor(activeTab?.id ?? "chat", state, shellControlOptions).tertiary);
       return;
     }
-    if (key.tab || key.rightArrow) {
-      dispatch({type: "tab.cycle", direction: 1});
-      return;
-    }
+    // F-159: the shift+tab branch must run BEFORE the plain-tab branch —
+    // Shift-Tab also sets key.tab, so the old order consumed it as forward
+    // (live tour finding 4: BTab navigated forward while the footer
+    // advertised reverse).
     if (key.leftArrow || (key.shift && key.tab)) {
       dispatch({type: "tab.cycle", direction: -1});
+      return;
+    }
+    if (key.tab || key.rightArrow) {
+      dispatch({type: "tab.cycle", direction: 1});
       return;
     }
     if (input === "[") {

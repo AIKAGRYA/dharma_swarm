@@ -1,6 +1,6 @@
 import {describe, expect, test} from "bun:test";
 
-import {matchUiIntent, tourLines} from "../src/uiIntents";
+import {closestCommand, matchUiIntent, tourLines} from "../src/uiIntents";
 import {reduceApp} from "../src/state";
 import {initialState} from "../src/state";
 import type {RouteTarget} from "../src/types";
@@ -35,6 +35,20 @@ describe("F-066 natural-language UI intents", () => {
   test("pane intents need a pane noun — bare titles stay chat", () => {
     expect(matchUiIntent("show me the models tab", PANES, TARGETS)).toEqual({kind: "pane", tabId: "models", title: "Models"});
     expect(matchUiIntent("show me what control means in cybernetics", PANES, TARGETS)).toBeNull();
+  });
+
+  test("filler words ride between verb and 'to': change models to claude opus", () => {
+    const intent = matchUiIntent("change models to claude opus", PANES, TARGETS);
+    expect(intent?.kind).toBe("model");
+    if (intent?.kind === "model") {
+      expect(intent.target.provider).toBe("claude_code");
+    }
+  });
+
+  test("typo'd commands resolve to the nearest registered command", () => {
+    expect(closestCommand("hlep", ["help", "git", "model"])).toBe("help");
+    expect(closestCommand("modle", ["help", "git", "model"])).toBe("model");
+    expect(closestCommand("zzzzzz", ["help", "git", "model"])).toBeNull();
   });
 
   test("operator example: switch to grok build 0.1 resolves a route target", () => {

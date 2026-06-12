@@ -15,7 +15,7 @@ export type UiIntent =
 
 type PaneRef = {id: string; title: string};
 
-const IMPERATIVE = /\b(open|show|switch|go|take|bring|give|jump|move|back)\b/i;
+const IMPERATIVE = /\b(open|show|switch|change|go|take|bring|give|jump|move|back)\b/i;
 
 const ZEN_WORDS = /\b(zen|traditional|simple|clean|minimal|normal)\b/i;
 const COCKPIT_WORDS = /\b(cockpit|dashboard|fusion|funky|full|mission control)\b/i;
@@ -73,7 +73,9 @@ export function matchUiIntent(
 
   // Model intents: "switch to <something>" where <something> fuzzy-matches a
   // selectable route target (alias, label, model, or provider:model tokens).
-  const switchMatch = text.match(/\b(?:switch|change|move)\s+(?:to|over to|onto)\s+(.{2,60})$/i);
+  // Up to two filler words ride between the verb and "to" so "change models
+  // to claude opus" and "switch the route to grok" both land.
+  const switchMatch = text.match(/\b(?:switch|change|move)\b(?:\s+\w+){0,2}?\s+(?:to|over to|onto)\s+(.{2,60})$/i);
   if (switchMatch) {
     const query = normalize(switchMatch[1]);
     const queryTokens = query.split(" ").filter((token) => token.length > 1);
@@ -97,6 +99,40 @@ export function matchUiIntent(
   }
 
   return null;
+}
+
+// Unknown slash commands stay in the conversation with a gentle suggestion
+// instead of detonating into the Control pane (gauntlet finding: /hlep yanked
+// a zen user into cockpit). Small edit-distance, registered names only.
+export function closestCommand(name: string, registered: readonly string[]): string | null {
+  const target = name.toLowerCase();
+  let best: {command: string; distance: number} | null = null;
+  for (const candidate of registered) {
+    const distance = editDistance(target, candidate);
+    if (!best || distance < best.distance) {
+      best = {command: candidate, distance};
+    }
+  }
+  return best && best.distance <= 2 ? best.command : null;
+}
+
+function editDistance(a: string, b: string): number {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const dist: number[] = Array.from({length: rows * cols}, (_, i) =>
+    i < cols ? i : i % cols === 0 ? Math.floor(i / cols) : 0,
+  );
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const substitution = a[i - 1] === b[j - 1] ? 0 : 1;
+      dist[i * cols + j] = Math.min(
+        dist[(i - 1) * cols + j] + 1,
+        dist[i * cols + (j - 1)] + 1,
+        dist[(i - 1) * cols + (j - 1)] + substitution,
+      );
+    }
+  }
+  return dist[rows * cols - 1];
 }
 
 // The guided tour transcript (operator example: "give me a guided tour through

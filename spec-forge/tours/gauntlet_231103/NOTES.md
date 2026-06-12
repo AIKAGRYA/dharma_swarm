@@ -1,0 +1,12 @@
+# Helm non-coder gauntlet — 2026-06-12T14:15:29Z
+- P0 FIXED-AT-LAUNCHER: claude route billed metered API (Credit balance too low) — ds now scrubs ANTHROPIC_API_KEY/AUTH_TOKEN (Max plan OAuth carries turns; verified live, no credit error).
+- P0 FELT: claude-route chat turn = fresh 'claude -p' AGENTIC session per message (allowedTools *, dangerously-skip-permissions, ~10KB bootstrap prompt) -> 3+ min for one sentence. Root = per-turn session teardown (F-174) + oversized bootstrap + full-agent mode for plain chat. ALSO safety smell: chat turns run with all tools enabled — sandbox-helm contract violation.
+- P1 FELT: unknown command /hlep yanks user out of zen into Control pane (commandTargetTab fallback=control + tab.activate). Non-coder typo = screen explosion. Fix: unknown slash -> stay in chat, 'unknown command, closest: /help'.
+- P1 BUG: route switch-back failed SILENTLY — 'Requesting route -> codex:gpt-5.4' then nothing; status stayed claude:claude-opus-4-6; next turns billed claude. F-158-class: route request needs confirmed/failed within Ns visible.
+- P2 FELT: ^U does not clear composer (bound to trace-compact); shell users expect clear-line. ? still types into composer (S7 help overlay pending).
+- P2: /cancel leaves '▶ 0 steps' pending turn + no explicit 'canceled ✓' — cancel feedback unclear.
+- P2 VISUAL: full header garbles at 120 cols inside cockpit/overlay ('DHARMA TERMINA LIV', 'focusChat', orphan '6' wrap). Compact threshold <118 too low — needs ~<126 or smarter segment dropping.
+- P0 CONFIRMED AGAIN: multi-line paste swallowed wholesale (0/3 lines landed) — F-171 is next-build material.
+- FIXED THIS ROUND (live-verified): F-159 BTab reverses (shift+tab branch ordering); /hlep-class typos stay in chat with 'did you mean /help'; NL router accepts 'change models to <x>' filler words; ds launcher scrubs metered Anthropic keys (Max plan carries claude turns).
+- WORKS WELL (non-coder lens): zen main stage; voice pane round-trips; tour; F2; /model picker opens+escapes; route picker via voice; turn honesty; clean ^C exit.
+- TOP REMAINING FELT GAPS (ranked): 1) F-174 session continuity + per-turn agentic claude -p with ~10KB bootstrap (minutes per turn; also allowedTools*+skip-permissions on a CHAT route = sandbox contract violation -> backend S1/S2 work); 2) silent route-switch failure (requesting->nothing); 3) F-171 paste; 4) header garble at 120cols; 5) /cancel feedback; 6) ^U expectation; 7) ? overlay (S7).
