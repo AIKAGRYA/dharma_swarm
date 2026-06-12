@@ -97,7 +97,7 @@ def test_response_failure_classes_are_separated(body: str, expected: str | None)
         ("HTTP error 429: too many requests", "rate_limited"),
         ("rate limit exceeded", "rate_limited"),
         ("insufficient_quota for this key", "quota_exhausted"),
-        ("your credit balance is too low", "quota_exhausted"),
+        ("your credit balance is too low", "billing_exhausted"),
         ("OPENROUTER_API_KEY not set", "missing_config"),
         ("all connection attempts failed", "unreachable"),
     ],
