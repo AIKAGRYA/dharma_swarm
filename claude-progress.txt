@@ -121,3 +121,16 @@
   lesson: tightening is DEFERRED - improvements collect in a string accumulator and the baselines file is rewritten only after every counter passes; a red run leaves the file byte-identical, so a mixed improve+regress change cannot half-tighten
   note: commit took 2 attempts: (1) docops FAIL manifest-markdown-lines 218652->218654 (trailing progress/RUN_RECEIPT/LESSONS lines riding), reconciled per prescribed step-10 path; (2) green - shakti warrant passed with NO skip.
 [2026-06-12T02:50:01Z] EVAL F-011 GREEN — criteria 9/9 pass (gates: typecheck 0, 0 new vs baseline-failures, 527/527 tests 0 fail, ratchets 4064/40/97 flat vs parent; feature: baselines file git-tracked, improvement probe dup 39 rewrote stored value exit 0, regression-vs-stored probe 40>39 exit 1 though original baseline 40 allowed, mixed improve+regress probe exit 1 with baselines sha byte-identical; 6/6 pre-theme goldens identical)
+[2026-06-12T02:56Z] F-012 implemented
+  evidence: bash scripts/ratchet.sh prints max_file_lines=4064 + dup_functions=40 + record_unknown=97 + hex_violations=0 + "ratchet: OK" exit 0 (terminal dir, repo root, direct-exec, post-revert, post-commit);
+            exclusion proof: ScenicStrip.tsx carries 21 hex occurrences (grep -oE per-file), theme.ts 0 (still named ANSI colors pre-S4) — counter reports 0, both allowlisted files excluded by exact -path in find;
+            violation probe: " // probe #DEADBE" appended to EXISTING line 1 of Sidebar.tsx (line count flat 2585) -> exit 1 "hex_violations 1 exceeds baseline 0 ... worst offender: src/components/Sidebar.tsx with 1", reverted byte-exact via git show HEAD: redirect (git status clean), re-run exit 0;
+            allowlist probe: hex #7FB4CA appended to theme.ts line 1 -> ratchet still green exit 0 (exclusion is live, not incidental), theme.ts restored clean;
+            baselines sha 89b23e92... identical before/after the red run (red runs never mutate, F-011 invariant holds for the new counter);
+            regex boundary checks: '#define' no-match, 5-digit '#abcde' no-match, 3/4/6/8-digit + #RRGGBBAA all match;
+            typecheck 0 errors; bun test 527 pass / 0 fail; failure-ratchet now-failures.txt 0 lines, comm vs baseline 0 lines; golden pre-theme git status clean; boot-smoke green pre-work (tmux one-liner) + pre-commit (scripts/boot_smoke.sh OK); commit 6972b6643
+  files: terminal/scripts/ratchet.sh (hex_violations counter + header doc), terminal/scripts/ratchet_baselines.txt (hex_violations=0), spec-forge/features.json (F-012 status only),
+         docs/docops/AUTO_INVENTORY.md + docs/governance/SOVEREIGN_MANIFEST.md (docops reconcile 218654->218656), claude-progress.txt + spec-forge/RUN_RECEIPT.md + terminal/LESSONS/LESSONS.md (F-011 + EVAL trailing entries rode this commit)
+  lesson: hex_violations baseline is 0 — the law is strict from day one; src outside theme.ts/ScenicStrip.tsx is ALREADY hex-clean, so any first hex anywhere else is an instant red, and S4's truecolor swap must put every literal in theme.ts only
+  note: commit took 2 attempts: (1) docops FAIL manifest-markdown-lines 218654->218656 (trailing progress/RUN_RECEIPT/LESSONS lines riding), reconciled per prescribed step-10 path; (2) green — shakti warrant passed with NO skip.
+[2026-06-12T03:03:14Z] EVAL F-012 GREEN — criteria 9/9 pass

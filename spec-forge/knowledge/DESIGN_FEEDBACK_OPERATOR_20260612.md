@@ -123,3 +123,27 @@ to 80x24). Frames at /tmp/helm_tour_*.txt. OBSERVED behaviors, not review opinio
    rows at 80x24) and the global cram prepended to it. Model-switch keybinds already
    exist (^X/^F) — S6 should build on them, not reinvent.
 10. **"T" sliver confirmed live** in every pane, all widths.
+
+## ABUSE ROUND 2 (conductor, 2026-06-12 ~11:57 local, visible-window computer-use)
+
+Frames: /tmp/abuse_paste.txt, /tmp/abuse_modelswitch.txt, /tmp/helm_abuse_live.png.
+Tour regression diff vs 10:12 tour: 0 diff lines on all frames (infrastructure features
+changed zero pixels — correct).
+
+11. **PASS — rapid-fire typing**: 60 chars sent with no inter-key delay landed intact
+    and instantly in the composer.
+12. **NEW P0 BUG — multi-line paste swallowed wholesale.** Bracketed paste of 3 lines
+    (incl. unicode ∿≋仏) produced ZERO occurrences anywhere — not in composer, not in
+    transcript, no error. Isolation: single-line paste works (bracketed AND raw); the
+    bug is newline handling in paste input. Parity contract #1 explicitly requires
+    multi-line paste — this needs a feature (F-171 candidate at next boundary):
+    multi-line paste shall land in the composer as a multi-line draft (or explicit
+    line-join), never be dropped.
+13. **BUG (same silent-swallow class as /help) — ^X model-switch gives no feedback
+    offline.** On Models pane, ^X (advertised "claude opus") changed nothing visible:
+    route display still codex:gpt-5.4, no queued/failed indication. Every advertised
+    action must produce visible feedback (extends F-158's rule beyond slash commands
+    to keybind actions).
+14. **Screenshot shows scrollback ghost-frames** above the live UI in the attached
+    terminal (stale earlier render visible above current frame) — same family as
+    F-170 boot-row discipline; alt-screen would fix both.
