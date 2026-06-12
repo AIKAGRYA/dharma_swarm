@@ -1,6 +1,6 @@
 {
   "schema": "dharma_swarm.trust_gate_status.v1",
-  "generated_at": "2026-06-11T16:18:29Z",
+  "generated_at": "2026-06-12T06:04:59Z",
   "fact_owner": "docs/vision_maps/NORTH_STAR.md \u00a78",
   "authority": "projection_only",
   "gate_open": false,
@@ -47,7 +47,7 @@
       "condition": "All seeded parts wired in and functioning consistently",
       "evidence": [
         "BROKEN_REGISTER: total=23 open-like=5 closed-like=8",
-        "remote heads: 251 total; seed/gold/vault-pattern unmerged-to-main candidates: 3",
+        "remote heads: 257 total; seed/gold/vault-pattern unmerged-to-main candidates: 3",
         "pattern branches: ['devin/1779281950-track-transition-and-seeds', 'feat/gplot-lodestone-seed', 'feat/knowledge-ops-organ-seed']"
       ],
       "score": 0.433,

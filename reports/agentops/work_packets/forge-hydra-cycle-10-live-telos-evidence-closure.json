@@ -1,0 +1,61 @@
+{
+  "schema": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-10-live-telos-evidence-closure",
+  "cycle": 10,
+  "created_at": "2026-06-01T15:57:00+08:00",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "mission": "Forge Hydra Long-Run Mission",
+  "scope": "Close the Cycle 9 v0.1.0 live-telos-gate evidence blocker by re-running focused verification and recording machine-readable passing evidence.",
+  "changed_files": [
+    "reports/forge/v0.1.0-live-telos-gate/verifier_artifact.json",
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/v0.1.0-live-telos-gate/cycle-10/verifier_artifact.json",
+    "reports/forge/v0.1.0-live-telos-gate/cycle-10/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-10-live-telos-evidence-closure.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "summary": "v0.1.0 now has acceptance.all_passed=true and all-zero test_exit_codes; pre-v1 audit reports complete internal v0.x evidence."
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_reward_forge_v0.py tests/test_evolution_promotion.py tests/test_dharma_eval.py tests/test_archive.py -q --tb=short",
+        "exit_code": 0,
+        "summary": "77 passed, 1 warning"
+      },
+      {
+        "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_pre_v1_audit.py -q --tb=short",
+        "exit_code": 0,
+        "summary": "5 passed, 1 warning"
+      },
+      {
+        "command": "Cycle 10 live allow/review/block probe through scripts/runtime/reward_forge_v0.py",
+        "exit_code": 0,
+        "summary": "allow->candidate_for_human_review; review->blocked; block->blocked; all fitness_correctness=0.0"
+      },
+      {
+        "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_pre_v1_audit.py --reports-root reports/forge --out reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+        "exit_code": 0,
+        "summary": "internal_v0x_evidence_complete=true; unproven_packets=[]"
+      }
+    ]
+  },
+  "canonical_receipt": {
+    "attempted": false,
+    "reason": "No mission id or goal id environment variable was present for ds-goal record."
+  },
+  "boundaries": {
+    "external_contact": false,
+    "commit_or_push": false,
+    "promotion": false,
+    "nonzero_fitness": false,
+    "payment_or_spend": false
+  },
+  "blockers": [
+    "forge_measurement_guardian countersign remains pending",
+    "v1.0 external threshold still requires operator-gated external acted receipts",
+    "GitNexus does not index /Users/dhyana/dharma_swarm"
+  ]
+}

@@ -38,6 +38,8 @@ from dharma_swarm.api_keys import (
     SILICONFLOW_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
     TOGETHER_BASE_URL_ENV,
+    env_value,
+    normalize_env_aliases,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.ollama_config import (
@@ -61,22 +63,24 @@ MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 CHUTES_BASE_URL = "https://api.chutes.ai/v1"
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
-    DEFAULT_MODELS,
+    default_model,
 )
 
 # Default models — sourced from model_hierarchy.py (the single source of truth)
-DEFAULT_CLAUDE_MODEL = DEFAULT_MODELS.get(ProviderType.ANTHROPIC, "claude-opus-4-6")
-DEFAULT_OPENAI_MODEL = DEFAULT_MODELS.get(ProviderType.OPENAI, "gpt-5")
-DEFAULT_OPENROUTER_MODEL = DEFAULT_MODELS.get(ProviderType.OPENROUTER, "xiaomi/mimo-v2-pro")
-DEFAULT_GROQ_MODEL = DEFAULT_MODELS.get(ProviderType.GROQ, "qwen/qwen3-32b")
-DEFAULT_CEREBRAS_MODEL = DEFAULT_MODELS.get(ProviderType.CEREBRAS, "qwen-3-235b-a22b-instruct-2507")
-DEFAULT_SILICONFLOW_MODEL = DEFAULT_MODELS.get(ProviderType.SILICONFLOW, "Qwen/Qwen3-Coder-480B-A35B-Instruct")
-DEFAULT_TOGETHER_MODEL = DEFAULT_MODELS.get(ProviderType.TOGETHER, "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8")
-DEFAULT_FIREWORKS_MODEL = DEFAULT_MODELS.get(ProviderType.FIREWORKS, "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct")
-DEFAULT_NIM_MODEL = DEFAULT_MODELS.get(ProviderType.NVIDIA_NIM, "meta/llama-3.3-70b-instruct")
-DEFAULT_SAMBANOVA_MODEL = DEFAULT_MODELS.get(ProviderType.SAMBANOVA, "Meta-Llama-3.3-70B-Instruct")
-DEFAULT_MISTRAL_MODEL = DEFAULT_MODELS.get(ProviderType.MISTRAL, "mistral-small-latest")
-DEFAULT_CHUTES_MODEL = DEFAULT_MODELS.get(ProviderType.CHUTES, "deepseek-ai/DeepSeek-R1")
+DEFAULT_CLAUDE_MODEL = default_model(ProviderType.ANTHROPIC)
+DEFAULT_OPENAI_MODEL = default_model(ProviderType.OPENAI)
+DEFAULT_OPENROUTER_MODEL = default_model(ProviderType.OPENROUTER)
+DEFAULT_GROQ_MODEL = default_model(ProviderType.GROQ)
+DEFAULT_CEREBRAS_MODEL = default_model(ProviderType.CEREBRAS)
+DEFAULT_SILICONFLOW_MODEL = default_model(ProviderType.SILICONFLOW)
+DEFAULT_TOGETHER_MODEL = default_model(ProviderType.TOGETHER)
+DEFAULT_FIREWORKS_MODEL = default_model(ProviderType.FIREWORKS)
+DEFAULT_NIM_MODEL = default_model(ProviderType.NVIDIA_NIM)
+DEFAULT_SAMBANOVA_MODEL = default_model(ProviderType.SAMBANOVA)
+DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
+DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
+DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
+DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
 
 # Provider ordering sourced from model_hierarchy.py — the single source of truth.
@@ -99,7 +103,7 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.MISTRAL,         # CHEAP
     ProviderType.GOOGLE_AI,       # CHEAP
     ProviderType.CHUTES,          # CHEAP
-    ProviderType.OPENROUTER,      # PAID (default: xiaomi/mimo-v2-pro)
+    ProviderType.OPENROUTER,      # PAID (default: moonshotai/kimi-k2.5)
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
 )
 
@@ -111,7 +115,7 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = 
     ProviderType.OPENROUTER_FREE,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
-    ProviderType.OPENROUTER,      # PAID (xiaomi/mimo-v2-pro)
+    ProviderType.OPENROUTER,      # PAID (moonshotai/kimi-k2.5)
     ProviderType.ANTHROPIC,
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
 )
@@ -133,8 +137,7 @@ class RuntimeProviderConfig:
 
 
 def _env_value(env: Mapping[str, str], key: str) -> str | None:
-    value = str(env.get(key, "")).strip()
-    return value or None
+    return env_value(key, env)
 
 
 def _resolve_cli_binary(name: str) -> str | None:
@@ -164,9 +167,22 @@ def resolve_runtime_provider_config(
 ) -> RuntimeProviderConfig:
     """Resolve runtime config for a provider from args + environment."""
 
-    env_map = env or os.environ
+    if env is None:
+        normalize_env_aliases()
+        env_map: Mapping[str, str] = os.environ
+    else:
+        copied_env = dict(env)
+        normalize_env_aliases(copied_env)
+        env_map = copied_env
     timeout = int(timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS)
     cwd = str(Path(working_dir or os.getcwd()))
+
+    # Route Anthropic/Claude to the Max subscription (claude_code CLI), not the
+    # metered API. The Max plan is flat-fee + effectively unlimited; the API key is
+    # last-resort. Escape hatch: DHARMA_FORCE_ANTHROPIC_API=1 forces the raw API.
+    # (operator: "anthropic needs to route to max plans", 2026-06-06)
+    if provider == ProviderType.ANTHROPIC and not _env_value(env_map, "DHARMA_FORCE_ANTHROPIC_API"):
+        provider = ProviderType.CLAUDE_CODE
 
     if provider == ProviderType.ANTHROPIC:
         token = api_key or _env_value(env_map, ANTHROPIC_API_KEY_ENV)
@@ -269,7 +285,7 @@ def resolve_runtime_provider_config(
         binary = _resolve_cli_binary("codex")
         return RuntimeProviderConfig(
             provider=provider,
-            default_model=model or _env_value(env_map, "DGC_DIRECTOR_CODEX_MODEL") or "gpt-5.4",
+            default_model=model or _env_value(env_map, "DGC_DIRECTOR_CODEX_MODEL") or DEFAULT_CODEX_MODEL,
             working_dir=cwd,
             timeout_seconds=timeout,
             binary_path=binary,
@@ -363,7 +379,7 @@ def resolve_runtime_provider_config(
             provider=provider,
             api_key=token,
             base_url=resolved_base,
-            default_model=model or "gemini-2.5-flash",
+            default_model=model or DEFAULT_GOOGLE_AI_MODEL,
             available=bool(token),
         )
 

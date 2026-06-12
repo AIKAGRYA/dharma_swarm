@@ -1,0 +1,66 @@
+{
+  "schema_version": "codex_agent_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-1",
+  "created_at": "2026-06-01T18:23:40+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "scope": "Live-score external GitHub targets, prepare one local external contribution if the readiness gate allows, and record the cycle.",
+  "target": {
+    "repository": "Yasuno-5555/Guild",
+    "issue": 1,
+    "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+    "local_branch": "codex/issue-1-invalid-bounty-fixtures"
+  },
+  "actions": [
+    "inspected dharma_swarm worktree without cleaning or reverting user changes",
+    "live-scored labmain/ai-agent-pay-demo issue 35 and related bounty issues",
+    "selected Yasuno-5555/Guild issue 1 as the strongest cycle target",
+    "cloned Yasuno-5555/Guild into the approved external beast state directory",
+    "prepared a local external clone patch for invalid BOUNTY.yml fixtures and validation coverage",
+    "wrote the target readiness packet and cycle report"
+  ],
+  "public_actions": [],
+  "verification": [
+    {
+      "command": "cargo test -p guild-spec",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo run -q -p guild-cli -- --format json bounty validate examples/invalid-fixtures/*.yml",
+      "outcome": "passed expected fixture exits and warning"
+    },
+    {
+      "command": "cargo check",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test -p guild-cli",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test --workspace --exclude guild-sandbox",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test",
+      "outcome": "failed: guild-sandbox test_sandbox_security_enforcement timed out locally"
+    }
+  ],
+  "readiness_gate": {
+    "passed": false,
+    "blocker": "Full local cargo test is not green because guild-sandbox::tests::test_sandbox_security_enforcement times out in the local Docker sandbox.",
+    "external_confirmed": false
+  },
+  "forbidden_state_changes": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_public_branch": false,
+    "opened_pr": false,
+    "posted_comment": false,
+    "set_external_confirmed": false,
+    "created_first_external_receipt_witness": false,
+    "set_nonzero_archive_fitness": false
+  }
+}

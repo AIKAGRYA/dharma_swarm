@@ -1,0 +1,167 @@
+{
+  "schema_version": "forge_reality_arena_master_cycle_receipt.v1",
+  "packet_id": "forge-reality-arena-master-cycle-17",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "cycle_requested": 3,
+  "cycle_recorded": 17,
+  "completed_at": "2026-06-02T07:55:23Z",
+  "bounded_packet": "Rung 2/Rung 4 - add reality-latency evidence-to-status correction fixture and capsule path",
+  "result": "Expanded the coordination gym to 16 deterministic scenarios with evidence_status_correction_latency, regenerated 128 local coordination episodes, added a reality_latency failure capsule to the canonical drill, refreshed status/AgentOps artifacts, and preserved the zero-fitness dense-training boundary.",
+  "changed_files": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "scripts/runtime/forge_failure_capsule.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-capsules/evidence_status_correction_latency-0c5acb932140.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-17.json"
+  ],
+  "metrics": {
+    "dense_reps": 100,
+    "transfer_passed_reps": 94,
+    "coordination_scenarios_run": 128,
+    "coordination_unique_scenarios": 16,
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_scenarios_passed": 128,
+    "coordination_scenarios_failed": 0,
+    "evidence_status_correction_latency_repetitions": 8,
+    "failure_capsules_written": 12,
+    "failure_capsule_failure_classes": 9,
+    "reality_latency_capsules": 1,
+    "failure_capsules_should_feed_fitness": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "docker_sandbox_smoke_passed": true,
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 94,
+    "fitness_eligible_receipts": 0,
+    "target_missing_count": 0,
+    "authority_scan_violations": 0
+  },
+  "acceptance": {
+    "new_reality_latency_fixture_added": true,
+    "canonical_failure_capsule_drill_expanded": true,
+    "coordination_unique_scenarios_16": true,
+    "coordination_episode_count_128": true,
+    "fitness_eligible_receipts_zero": true,
+    "actual_fitness_eligible_receipts_zero": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_confirmed_claims_absent": true,
+    "archive_fitness_mutation_claims_absent": true,
+    "generated_status_refreshed": true,
+    "canonical_ds_goal_context_available": false,
+    "repo_local_receipt_required": true,
+    "external_actions_performed": false,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "merged": false
+  },
+  "hashes": {
+    "scripts/runtime/forge_swarm_coordination_gym.py": "sha256:0d0d0a1272f3fb267e1e67ccb9711127e98506b3538dff84aa8549bd090d7a73",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:cbb59c8ce655b5b123bc0d3a802d8d33de2da3a426eb54564e017bc2666fcfcc",
+    "scripts/runtime/forge_failure_capsule.py": "sha256:b174db67a6b28e2b783fd55cd613d9629324c0b5d51f0c6ce163e14ac240757c",
+    "tests/test_forge_swarm_coordination_gym.py": "sha256:066fdbdf791f7b65780bd00e333fa31613050a63c4167bd4d189a8d275319960",
+    "tests/test_forge_reality_arena_status.py": "sha256:098cd3fbe84effa1484a2745d63ebd2c4f27f41784e38075d5c50cec41070f7e",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md": "sha256:4e98bced36f091c8d3ae400f96d4dd5c750f5fd37a5861c10b6e4d8dc940a0eb",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:fdbabb04173a7596d07b8345afa0983b8f7baf269be32be6935ab6a147973a03",
+    "reports/forge/forge-reality-arena/failure-capsule-drill/verifier_artifact.json": "sha256:4d9a339c968bc2e0d8628b11c24426a59ba3a2d7d1c3561113ac50396753b288",
+    "reports/forge/forge-reality-arena/failure-capsules/evidence_status_correction_latency-0c5acb932140.json": "sha256:c12a2a8111965667cf3d2eb6dcbc77f7f63822866d235d0ac5606c081d406cd1",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json": "sha256:1876b49a8a43902d6b1bea9565bafff664cd00d0e671172ff5423381423f2705",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json": "sha256:b59c12a7bf16d774071bbdbd413fb4c23d2af85996415694cda6e2034c6ae848",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json": "sha256:52524f50f9e12202dc74fb45494dfbef6f7e76ab74de0c06b74a3a20630039ee",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:69cd87fc89e7b54284936fbcb69cf237d6984f614d1824d0bd851963a9d3c72e",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:c248f8b7713eddbfc8178c29879112016a6c8e6c18f9d72ee5ec48b7df37cb1f",
+    "reports/forge/forge-reality-arena/status.md": "sha256:c4605f542a7fec0c753a70f179c1549169519293e11a23d18b42aa84aea6992f",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:241d72593abffc5afe8da2cffe3d8378190ec84ff9f2238209b4cb868b7a7718"
+  },
+  "tests": [
+    {
+      "command": "make onboard",
+      "result": "passed; DRF active track shippable and dirty tree observed"
+    },
+    {
+      "command": "mcp__gitnexus.impact(repo=/Users/dhyana/dharma_swarm,target=run_coordination_gym,file_path=scripts/runtime/forge_swarm_coordination_gym.py)",
+      "result": "blocked: active checkout repo not found in GitNexus MCP index; manual file-level impact used"
+    },
+    {
+      "command": "rg blast scan for SCENARIOS, SCENARIO_EXPANSION_TARGET, FAILURE_CAPSULE_DRILL_TARGET, run_coordination_gym, run_failure_capsule_drill, status metrics, and tests",
+      "result": "passed; affected surface stayed within Arena runtime, focused tests, docs, generated status, and receipts"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py scripts/runtime/forge_failure_capsule.py scripts/runtime/forge_dense_eval_normalizer.py scripts/runtime/forge_docker_sandbox.py scripts/runtime/forge_benchmark_adapter.py scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py -q --tb=short",
+      "result": "35 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "python3 -m pytest tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "result": "7 passed; pytest timeout config warning observed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "result": "passed; regenerated 128 live coordination episodes across 16 scenarios"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-capsule-drill",
+      "result": "passed; canonical drill now writes 12 capsules including reality_latency"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "result": "passed; regenerated dense event ledger"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_docker_sandbox.py",
+      "result": "passed; local Docker smoke stayed internal"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_benchmark_adapter.py",
+      "result": "passed; benchmark adapter artifact refreshed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "result": "passed; dry run refreshed with actual_fitness_eligible_receipts=0"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py",
+      "result": "passed; status artifacts and AgentOps status packet refreshed"
+    },
+    {
+      "command": "structured authority scan over regenerated Arena JSON artifacts",
+      "result": "passed; scanned 25 files, 0 authority violations"
+    }
+  ],
+  "blockers": [
+    {
+      "blocker": "GitNexus MCP index still does not include active /Users/dhyana/dharma_swarm.",
+      "impact": "One bounded impact probe was attempted; impact was then handled by manual file-level scan and focused tests."
+    },
+    {
+      "blocker": "Cycle receipts 1-16 already existed in the dirty checkout.",
+      "impact": "This repo-local receipt was written as cycle 17 to avoid overwriting existing artifacts while preserving cycle_requested=3."
+    }
+  ],
+  "notes": [
+    "No external actions, payments, pushes, merges, public claims, or archive fitness mutations were performed.",
+    "The new fixture covers reality latency: contradictory evidence must update belief/status promptly or remain blocked as stale.",
+    "The reality_latency failure class is a learning-capsule category only; should_feed_fitness remains false."
+  ],
+  "next_packet": "Rung 2/Rung 4 - add a transfer_probe or artifact_usefulness fixture that tests whether a passed local repair generalizes to a sibling task without bespoke prompt rescue."
+}

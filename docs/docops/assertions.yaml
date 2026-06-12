@@ -6,91 +6,91 @@
     {
       "id": "manifest-total-python-modules",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Total Python modules \\| \\*\\*(\\d+)\\*\\*",
+      "regex": "Total Python modules \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "dharma_python_modules",
-      "verify": "find dharma_swarm -name \"*.py\" -type f | wc -l"
+      "verify": "git ls-files dharma_swarm | rg '\\.py$' | wc -l"
     },
     {
       "id": "manifest-top-level-python-modules",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Top-level \\(flat\\) modules \\| \\*\\*(\\d+)",
+      "regex": "Top-level \\(flat\\) modules \\| \\*\\*([\\d,]+)",
       "metric": "dharma_top_level_python_modules",
-      "verify": "find dharma_swarm -maxdepth 1 -name \"*.py\" -type f | wc -l"
+      "verify": "git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l"
     },
     {
       "id": "manifest-test-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Test files \\| \\*\\*(\\d+)\\*\\*",
+      "regex": "Test files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "test_files",
-      "verify": "find tests -name \"*.py\" -type f | wc -l"
+      "verify": "git ls-files tests | rg '\\.py$' | wc -l"
     },
     {
       "id": "manifest-test-functions",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Test functions \\| \\*\\*([\\d,]+) `def test_`",
       "metric": "test_def_occurrences",
-      "verify": "rg \"def test_\" tests | wc -l"
+      "verify": "git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l"
     },
     {
       "id": "manifest-markdown-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Markdown files \\| \\*\\*(\\d+)\\*\\*",
+      "regex": "Markdown files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "markdown_files",
-      "verify": "find . -name \"*.md\" -type f ! -path \"./reports/docops/*\" | wc -l"
+      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l"
     },
     {
       "id": "manifest-markdown-lines",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
       "regex": "Markdown total lines \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "markdown_total_lines",
-      "verify": "find . -name \"*.md\" -type f ! -path \"./reports/docops/*\" -print0 | xargs -0 wc -l"
+      "verify": "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l"
     },
     {
       "id": "manifest-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Bridge files \\| \\*\\*(\\d+)\\*\\*",
+      "regex": "Bridge files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
     {
       "id": "manifest-axiom-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "repo currently has \\*\\*(\\d+) bridge files\\*\\*",
+      "regex": "repo currently has \\*\\*([\\d,]+) bridge files\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
     {
       "id": "manifest-domain-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "\\*\\*(\\d+) bridge files\\*\\* \\(V\\), \\*\\*[\\d,]+ total LOC\\*\\*",
+      "regex": "\\*\\*([\\d,]+) bridge files\\*\\* \\(V\\), \\*\\*[\\d,]+ total LOC\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
     {
       "id": "manifest-prior-audit-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "\"17 bridge files\" / \"19 bridge files\" \\(self-contradicting\\) \\| \\*\\*(\\d+) bridge files\\*\\*",
+      "regex": "\"17 bridge files\" / \"19 bridge files\" \\(self-contradicting\\) \\| \\*\\*([\\d,]+) bridge files\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
     {
       "id": "manifest-phase3a-bridge-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Bridge count of \"30\" \\(Phase 3A\\) \\| \\*\\*(\\d+) actual bridge files\\*\\*",
+      "regex": "Bridge count of \"30\" \\(Phase 3A\\) \\| \\*\\*([\\d,]+) actual bridge files\\*\\*",
       "metric": "bridge_files",
       "verify": "find dharma_swarm -name \"*bridge*.py\" -type f | wc -l"
     },
     {
       "id": "manifest-adapter-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Adapter files \\| \\*\\*(\\d+)",
+      "regex": "Adapter files \\| \\*\\*([\\d,]+)",
       "metric": "adapter_files",
       "verify": "find dharma_swarm -type f | rg -i \"adapter\" | wc -l"
     },
     {
       "id": "manifest-router-files",
       "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
-      "regex": "Router files \\| \\*\\*(\\d+)\\*\\*",
+      "regex": "Router files \\| \\*\\*([\\d,]+)\\*\\*",
       "metric": "router_files",
       "verify": "find dharma_swarm -type f | rg -i \"rout\" | wc -l"
     }
@@ -145,7 +145,14 @@
       "seams/**",
       "dharma_swarm/inter_agent/**",
       "inter_agent/**",
-      "docs/ops/**"
+      "docs/ops/**",
+      ".swarm_collab/**",
+      "docs/agent_tasks/**",
+      "docs/inside_swarm/**",
+      "docs/plans/**",
+      "docs/specs/**",
+      "docs/sovereign_holons/**",
+      "dharma_swarm/chetana/claude_code_plugin/**"
     ],
       "registered": [
         "AGENTS.md",
@@ -171,12 +178,17 @@
         "docs/governance/MMM_CHARTER.md",
         "docs/governance/README.md",
         "docs/governance/SOVEREIGN_MANIFEST.md",
+      "docs/architecture/SPINE_ADOPTION_NARRATIVE.md",
+      "docs/missions/SAB_DHARMIC_AGORA_REMOTE_HANDOFF_2026-06-11.md",
       "docs/MEGAFILE_INDEX.md",
       "docs/plans/2026-06-11-fable5-master-prompt.md",
       "docs/plans/2026-06-11-vwrite-v3-refinery-design.md",
       "docs/vision_maps/NORTH_STAR.md",
       "docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md",
       "docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md",
+      "docs/vision_maps/MASTER_2026-06-10_anatomy_altitude_integration.md",
+      "docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md",
+      "INTERFACE_MISMATCH_MAP.md",
       "docs/state/LIVE_OPS_DASHBOARD.md",
       "docs/state/BROKEN_REGISTER.md",
       "docs/governance/CANONICAL_DOC_STACK.md",

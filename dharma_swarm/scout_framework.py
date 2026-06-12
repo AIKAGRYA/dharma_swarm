@@ -312,8 +312,6 @@ def _recover_truncated_json_array(text: str) -> list[dict] | None:
 
     return _try_parse_json(truncated)
 
-    return findings
-
 
 # ---------------------------------------------------------------------------
 # Core Scout Runner

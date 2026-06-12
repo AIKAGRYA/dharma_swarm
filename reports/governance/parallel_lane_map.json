@@ -1,0 +1,4636 @@
+{
+  "schema": "dharma.parallel_lane_map.v1",
+  "generated_at": "2026-06-06T04:57:56Z",
+  "doctrine": {
+    "model": "one strategic active track; many coordinated work lanes",
+    "active_track_role": "north-star, acceptance gates, non-goals, authority boundaries",
+    "lane_rule": "parallel work is allowed only when owned, scoped, isolated, verified, and receipted",
+    "cleanup_rule": "never delete branches/worktrees from this report without receipt review and explicit operator approval"
+  },
+  "summary": {
+    "active_branch": "qwen/spine-adoption",
+    "head": "aa5a8e82b0",
+    "worktree_count": 92,
+    "branch_count_sampled": 200,
+    "open_pr_count": 3,
+    "dirty_count_current_worktree": 236,
+    "cleanup_candidate_count": 52,
+    "lane_count": 12
+  },
+  "warnings": [],
+  "dirty_current_worktree": {
+    "count": 236,
+    "states": {
+      "unstaged": 13,
+      "untracked": 223
+    },
+    "categories": {
+      "agentops_work_packets": 189,
+      "tests": 12,
+      "governance_scripts": 7,
+      "runtime_scripts": 6,
+      "governance_docs": 5,
+      "governance_reports": 4,
+      "capital_lab": 2,
+      "forge_measurement": 2,
+      "reports": 2,
+      "tools": 2,
+      "repo_root": 1,
+      "research_docs": 1,
+      "examples": 1,
+      "hooks": 1,
+      "references": 1
+    },
+    "items_sample": [
+      {
+        "status": " M",
+        "path": "CLAUDE.md",
+        "category": "governance_docs"
+      },
+      {
+        "status": " M",
+        "path": "Makefile",
+        "category": "repo_root"
+      },
+      {
+        "status": " M",
+        "path": "docs/governance/ACTIVE_TRACK.yaml",
+        "category": "governance_docs"
+      },
+      {
+        "status": " M",
+        "path": "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+        "category": "governance_docs"
+      },
+      {
+        "status": " M",
+        "path": "docs/governance/SOVEREIGN_MANIFEST.md",
+        "category": "governance_docs"
+      },
+      {
+        "status": " M",
+        "path": "docs/governance/proposed_tracks/README.md",
+        "category": "governance_docs"
+      },
+      {
+        "status": " M",
+        "path": "reports/governance/active_track_evidence.json",
+        "category": "governance_reports"
+      },
+      {
+        "status": " M",
+        "path": "reports/governance/active_track_evidence.md",
+        "category": "governance_reports"
+      },
+      {
+        "status": " M",
+        "path": "scripts/governance/agent_onboard.py",
+        "category": "governance_scripts"
+      },
+      {
+        "status": " M",
+        "path": "scripts/governance/check_track_status.py",
+        "category": "governance_scripts"
+      },
+      {
+        "status": " M",
+        "path": "scripts/governance/render_active_track_includes.py",
+        "category": "governance_scripts"
+      },
+      {
+        "status": " M",
+        "path": "tests/test_active_track_governance.py",
+        "category": "tests"
+      },
+      {
+        "status": " M",
+        "path": "tests/test_agent_onboard.py",
+        "category": "tests"
+      },
+      {
+        "status": "??",
+        "path": "dharma_swarm/capital_lab/",
+        "category": "capital_lab"
+      },
+      {
+        "status": "??",
+        "path": "docs/research/persistent_agents_census_2026-05/",
+        "category": "research_docs"
+      },
+      {
+        "status": "??",
+        "path": "docs/specs/forge_packets/",
+        "category": "forge_measurement"
+      },
+      {
+        "status": "??",
+        "path": "examples/agents/qwen_code.registration.json",
+        "category": "examples"
+      },
+      {
+        "status": "??",
+        "path": "hooks/codex_dharma_bridge.py",
+        "category": "hooks"
+      },
+      {
+        "status": "??",
+        "path": "references/",
+        "category": "references"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/collaboration-scorecard-v1.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-1.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-10.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-11.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-12.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-13.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-14.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-15.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-16.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-17.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-18.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-19.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-2.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-20.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-22.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-23.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-24.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-25.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-26.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-27.json",
+        "category": "agentops_work_packets"
+      },
+      {
+        "status": "??",
+        "path": "reports/agentops/work_packets/forge-external-beast-cycle-3.json",
+        "category": "agentops_work_packets"
+      }
+    ]
+  },
+  "lanes": {
+    "forge-measurement": {
+      "worktrees": 0,
+      "branches": 1,
+      "open_prs": 0,
+      "recent_commits": 0
+    },
+    "governance": {
+      "worktrees": 2,
+      "branches": 12,
+      "open_prs": 0,
+      "recent_commits": 7
+    },
+    "live-ops-cockpit": {
+      "worktrees": 3,
+      "branches": 8,
+      "open_prs": 0,
+      "recent_commits": 4
+    },
+    "living-agent-kernel": {
+      "worktrees": 2,
+      "branches": 2,
+      "open_prs": 0,
+      "recent_commits": 5
+    },
+    "merge-master-mike": {
+      "worktrees": 0,
+      "branches": 8,
+      "open_prs": 0,
+      "recent_commits": 3
+    },
+    "parked-cleanup": {
+      "worktrees": 18,
+      "branches": 30,
+      "open_prs": 0,
+      "recent_commits": 0
+    },
+    "pr-repair-backlog": {
+      "worktrees": 10,
+      "branches": 18,
+      "open_prs": 0,
+      "recent_commits": 12
+    },
+    "research": {
+      "worktrees": 1,
+      "branches": 5,
+      "open_prs": 0,
+      "recent_commits": 18
+    },
+    "rss-followups": {
+      "worktrees": 18,
+      "branches": 17,
+      "open_prs": 0,
+      "recent_commits": 0
+    },
+    "runtime-truth-spine": {
+      "worktrees": 3,
+      "branches": 19,
+      "open_prs": 1,
+      "recent_commits": 7
+    },
+    "spine-adoption": {
+      "worktrees": 5,
+      "branches": 7,
+      "open_prs": 2,
+      "recent_commits": 13
+    },
+    "unclassified": {
+      "worktrees": 30,
+      "branches": 73,
+      "open_prs": 0,
+      "recent_commits": 91
+    }
+  },
+  "open_prs": [
+    {
+      "number": 514,
+      "title": "[codex] add runtime-truth NATS transport",
+      "url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/514",
+      "head": "codex/runtime-truth-nats-adapter-20260606",
+      "base": "main",
+      "author": "AmitabhainArunachala",
+      "is_draft": true,
+      "merge_state": "CLEAN",
+      "updated_at": "2026-06-06T02:33:31Z",
+      "lane": "runtime-truth-spine",
+      "check_summary": {
+        "SUCCESS": 26
+      }
+    },
+    {
+      "number": 513,
+      "title": "chore(governance): refresh spine adoption metric 81.2% (+6.2pp) [automated]",
+      "url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/513",
+      "head": "chore/spine-adoption-metric-20260606",
+      "base": "main",
+      "author": "AmitabhainArunachala",
+      "is_draft": true,
+      "merge_state": "BLOCKED",
+      "updated_at": "2026-06-06T00:02:08Z",
+      "lane": "spine-adoption",
+      "check_summary": {
+        "FAILURE": 1,
+        "SKIPPED": 1,
+        "SUCCESS": 23
+      }
+    },
+    {
+      "number": 512,
+      "title": "chore(governance): refresh spine adoption metric 81.2% (+6.2pp) [automated]",
+      "url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/512",
+      "head": "chore/spine-adoption-metric-20260605",
+      "base": "main",
+      "author": "AmitabhainArunachala",
+      "is_draft": true,
+      "merge_state": "BLOCKED",
+      "updated_at": "2026-06-06T00:02:28Z",
+      "lane": "spine-adoption",
+      "check_summary": {
+        "FAILURE": 1,
+        "SKIPPED": 1,
+        "SUCCESS": 23
+      }
+    }
+  ],
+  "worktrees": [
+    {
+      "path": "/Users/dhyana/dharma_swarm",
+      "head": "aa5a8e82b0c9c0a36b9c6e3585b9bcd16f6fb296",
+      "branch": "qwen/spine-adoption",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "spine-adoption",
+      "state": "current",
+      "committed_at": "2026-06-06",
+      "subject": "feat(go-ingest): wire idea spark ingest spine (#474)",
+      "age_days": 0
+    },
+    {
+      "path": "/private/tmp/lane-wt-2026-06-06",
+      "head": "3ff3d44b4f60450e3f94e97d3ad8577549f4e3ab",
+      "branch": "governance/parallel-lane-policy-2026-06-06",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "governance",
+      "state": "worktree",
+      "committed_at": "2026-06-06",
+      "subject": "governance: support 1-10 active_tracks (schema v2, primary alias)",
+      "age_days": 0
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-CONDUCTOR-MALFORMED-DB",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-CONDUCTOR-MALFORMED-DB",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-CONDUCTOR-UTF8",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-CONDUCTOR-UTF8",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-CQ-PASSPORT-COUNT",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-CQ-PASSPORT-COUNT",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-CQ-PASSPORT-COUNT-review",
+      "head": "4ee828e0369f1140d2f14b35b73cb27883ddd8dc",
+      "detached": true,
+      "branch": null,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "detached",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-CRON-HANDLERS",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-CRON-HANDLERS",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-GOV-MODULE-BUDGET",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-GOV-MODULE-BUDGET",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SEAM-KEY-CONTRACT",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SEAM-KEY-CONTRACT",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SMOKE-PROFILE-ENUM",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SMOKE-PROFILE-ENUM",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SMOKE-SLEEPCYCLE-SIG",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SMOKE-SLEEPCYCLE-SIG",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SPINE-CORRELATION-JOIN",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SPINE-CORRELATION-JOIN",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SPINE-DB-PATH",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SPINE-DB-PATH",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-STIG-SCHEMA-BACKEND",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-STIG-SCHEMA-BACKEND",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-STIG-WRITE-PATH",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-STIG-WRITE-PATH",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-SUBPROC-NULLBYTE",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-SUBPROC-NULLBYTE",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-TOOL-LOOP-CONVERGE",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-TOOL-LOOP-CONVERGE",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-WIRE-MINIMAX",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-WIRE-MINIMAX",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-WIRE-XAI",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-WIRE-XAI",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/rss-wt-FU-WIRE-ZAI",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "rss/FU-WIRE-ZAI",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "rss-followups",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/private/tmp/runtime-truth-nats-adapter-20260606",
+      "head": "cee160f24fe3fe3ed73c905b4ddc95d2f33e7685",
+      "branch": "codex/runtime-truth-nats-adapter-20260606",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "runtime-truth-spine",
+      "state": "open_pr",
+      "committed_at": "2026-06-06",
+      "subject": "chore(governance): refresh spine metric after NATS ack fix",
+      "age_days": 0
+    },
+    {
+      "path": "/Users/dhyana/.dharma/codex_lanes/worktrees/cleanup-audit",
+      "head": "fa97bfc1ceb39f40cf18c1082d54b4b38a4f8f47",
+      "branch": "codex-lane/cleanup-audit",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-13",
+      "subject": "Merge pull request #275 from AmitabhainArunachala/feat/world-signal-receipt-projection",
+      "age_days": 24
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_codex_lane_runner",
+      "head": "8c2629ad4d01cc7c12361bb7f42598cf6b783270",
+      "branch": "feat/codex-lane-runner-2026-05-13",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-14",
+      "subject": "fix(codex-lane): close subprocess stdin",
+      "age_days": 23
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_identity",
+      "head": "e7c7535fc7c465c9579a1c11b5887711a1dffa08",
+      "branch": "cleanup/identity-onboarding-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "docs(identity): add agent online identity anchor [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_interop_fleet",
+      "head": "58e809eef5f8e95cf9c56b539c773fa9f970508a",
+      "branch": "review/interop-fleet-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "chore(interop): park fleet interop control surface [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_memory_kernel_default_context_20260523",
+      "head": "0b0cd8b9a3d7e1b1c6c7ae542f455ada42c6e262",
+      "branch": "codex/memory-kernel-default-context-20260523",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into codex/memory-kernel-default-context-20260523",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_memory_kernel_hardening_20260523",
+      "head": "6a861e1b61a695352f334ee4786df54e79bac1ec",
+      "branch": "cleanup/memory-kernel-release-split-2026-05-17",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-23",
+      "subject": "test(memory): lock prod bar before kernel merge",
+      "age_days": 14
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_memory_kernel_preflight_20260516",
+      "head": "b1d20ccb314d60446dd368400f45cea2098d95ae",
+      "branch": "cleanup/memory-kernel-preflight-lane-2026-05-16",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-16",
+      "subject": "fix(memory): require strict readiness in operator smoke [impact-checked]",
+      "age_days": 21
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_memory_knowledge",
+      "head": "479528df50646021d094d0fcb45af6f231c1c52f",
+      "branch": "review/memory-knowledge-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-13",
+      "subject": "chore(memory): preserve context admission residue [impact-checked]",
+      "age_days": 24
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_pr_queue_probe2_20260524",
+      "head": "4e5fe81a48987084fe92de4564a1fd326c084a09",
+      "detached": true,
+      "branch": null,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "detached",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_pr_queue_probe_20260524",
+      "head": "531d9b59c2331184d1f94e832fcc1b2d89dfde01",
+      "detached": true,
+      "branch": null,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "detached",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_proof_artifacts",
+      "head": "6f6603c043a5c7a072e59610cb473cc9e52a9a34",
+      "branch": "review/proof-artifacts-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "chore(proof): park agentic immune proof artifacts [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_recursive_discovery",
+      "head": "3c28ddaeec3d92ee4a44144299c16be75f112bfa",
+      "branch": "feat/recursive-discovery-shadow-2026-05-14",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-14",
+      "subject": "merge main into recursive discovery branch [impact-checked]",
+      "age_days": 23
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_recursive_evolution_20260516",
+      "head": "b1d20ccb314d60446dd368400f45cea2098d95ae",
+      "branch": "cleanup/recursive-evolution-lane-2026-05-16",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-16",
+      "subject": "fix(memory): require strict readiness in operator smoke [impact-checked]",
+      "age_days": 21
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr314",
+      "head": "49f09b6cba9ab396c6783317f022fedb668944c1",
+      "branch": "repair/pr-314-router-docs",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-314-router-docs",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr320",
+      "head": "00761d15084665aab517e16b02a4eb2a2d48e7be",
+      "branch": "repair/pr-320-adr7",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-320-adr7",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr323",
+      "head": "d6f1a4eedc313a030eb3cc5c1acd17549712c0bb",
+      "branch": "repair/pr-323-dkeys",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/devin/1779352298-dkeys-env-normalization' into repair/pr-323-dkeys",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr324",
+      "head": "414ea93268012ef62a2b36782d626cecd931d33f",
+      "branch": "repair/pr-324-cwt",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-324-cwt",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr325",
+      "head": "548123e10b4c7cdbe75fe34a430bf31667c07048",
+      "branch": "repair/pr-325-toolbelt",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-325-toolbelt",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr326",
+      "head": "5d0e75d9614e3737e6da831ff33268e05ce89eff",
+      "branch": "repair/pr-326-hotlist",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-326-hotlist",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr327",
+      "head": "0c96a075043ef95e8d456bae7c8719502792ca09",
+      "branch": "repair/pr-327-status",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-327-status",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr328",
+      "head": "4a18096859b324414bbbdf7cb8bc5a38fcb475e2",
+      "branch": "repair/pr-328-adr",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-328-adr",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr338",
+      "head": "0485454ec7471e8e81218b0e682aa4e4b9482bbb",
+      "branch": "repair/pr-338-devin-md",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-338-devin-md",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_repair_pr341",
+      "head": "e233a62de5ec68e2a4364f6eb35b34e1d7ede68e",
+      "branch": "repair/pr-341-guardian",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "pr-repair-backlog",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-341-guardian",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_root_governance_residue",
+      "head": "af374d10882dce6a2a29a1219bea711b259db408",
+      "branch": "review/root-governance-residue-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "governance",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "chore(governance): park root cleanup residue [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_route_witness",
+      "head": "252beccd84421173f2eb5e8477a1ec48ede16dc1",
+      "branch": "cleanup/route-witness-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "feat(routing): add route witness telemetry [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_route_witness_main",
+      "head": "56ec13647c18680917de2607d88f7fc060850252",
+      "branch": "cleanup/route-witness-main-2026-05-13",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-13",
+      "subject": "docs(docops): refresh route witness inventory [impact-checked]",
+      "age_days": 24
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_viz_invariant",
+      "head": "3d0868587061a784f8588cda34a4f4e6301d0469",
+      "branch": "cleanup/viz-invariant-projection-2026-05-12",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-12",
+      "subject": "feat(viz): project invariant measurements [impact-checked]",
+      "age_days": 25
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_worker4_pr323_codeql",
+      "head": "b286943111e9b6bdab203fe5cfe6a25c5fdbb7e3",
+      "branch": "worker4/pr323-codeql",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "fix(security): keep dkeys export output analyzer-safe [impact-checked]",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_worker4_pr332_codeql",
+      "head": "e8ab4bed0d0c91412bfe8a3bbe04fb7acfdfa13e",
+      "branch": "worker4/pr332-codeql",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "worktree",
+      "committed_at": "2026-05-24",
+      "subject": "fix(docops): merge latest main into pr332",
+      "age_days": 13
+    },
+    {
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_world_radar_live",
+      "head": "1ff15b98d9689df7753128d5158d9761b0528b8d",
+      "branch": "feat/world-radar-live-integration-2026-05-13",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "parked-cleanup",
+      "state": "stale_review",
+      "committed_at": "2026-05-13",
+      "subject": "feat(world): consolidate live radar shakti telos lane [impact-checked]",
+      "age_days": 24
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm-go-ingest-spine-clean",
+      "head": "0fe69fc3d2fc14701d13eb7e18ce1ec6fb857d29",
+      "branch": "codex/go-idea-spark-ingest-spine-clean-20260604",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "spine-adoption",
+      "state": "worktree",
+      "committed_at": "2026-06-04",
+      "subject": "chore(go-ingest): satisfy CI governance gates",
+      "age_days": 2
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_action_authority_spec",
+      "head": "32e3eb2248b8e09fcf3eff0d59f919ddb4b42f6d",
+      "branch": "chore/action-authority-gate-spec",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_boardstore_spec",
+      "head": "8191db2516203a773ee2f5e390a000af41849f2f",
+      "branch": "spec/boardstore-facade",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-20",
+      "subject": "fix(docops): ignore local agent files in inventory [impact-checked]",
+      "age_days": 17
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_brakes",
+      "head": "d8a5cdcb071b47c028bce5be619f6e465902efff",
+      "branch": "chore/brake-stabilization",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_budget_fix",
+      "head": "94f79b40777b796e4beac80103e87c91e1d27e53",
+      "branch": "chore/opportunity-dispatcher-budget-fix",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_codex_mention_main",
+      "head": "910b1e36f7c7524d21bf6d0d57cc782ed53c5910",
+      "branch": "codex-mention-router-main",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-20",
+      "subject": "fix: avoid hosted codex trigger collision",
+      "age_days": 17
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_core_scan",
+      "head": "40ea317ffb35be5b146cbfce6c36a038b29cfb01",
+      "branch": "feat/core-operating-circuit-proof",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-09",
+      "subject": "Merge pull request #179 from AmitabhainArunachala/feat/go-adapter-contract-harness",
+      "age_days": 28
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_cwt_v0",
+      "head": "242b67ce2796c58aac5dd908eb98f2a47189612d",
+      "branch": "feat/cwt-v0-collector",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-21",
+      "subject": "feat(governance): CWT v0 read-only collector + report renderer [impact-checked]",
+      "age_days": 16
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_dgmd_smoke_20260514T045353Z",
+      "head": "f3baf95876a8a75b3ea4dbca8d8c7336ee391dfd",
+      "detached": true,
+      "branch": null,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "detached",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_governed_memory_recursive_integration",
+      "head": "8dca25eab619e475a472376cdeacaf5a2111ed30",
+      "branch": "feat/governed-recursive-proof-tightening",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-17",
+      "subject": "feat(governance): integrate recursive memory preflight proof [impact-checked]",
+      "age_days": 20
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_governed_recursive_proof",
+      "head": "37424404db6546cc23df59433ff02da3a08ef335",
+      "branch": "feat/governed-recursive-proof-v0",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-17",
+      "subject": "feat(recursive): add governed recursive proof packet [impact-checked]",
+      "age_days": 20
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_integrate_chetana",
+      "head": "bf180444fab90154d79911a010da31e046d83e83",
+      "branch": "codex/module-metabolism-strategy",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "living-agent-kernel",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_kaizen_review",
+      "head": "f01b79851d8b4386dc48d729a1eda0ee8698a016",
+      "branch": "chore/kaizen-review-v0",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_lak_e2e",
+      "head": "2742aaad8a8c7cee5846a6e336760d56d08fe69b",
+      "branch": "lak-e2e",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "living-agent-kernel",
+      "state": "worktree",
+      "committed_at": "2026-06-06",
+      "subject": "feat(lak-e2e): metabolism-namespace-ledger \u2014 Hash-chained per-agent learning ledger store (single durable write surface; dependency root for ALL metabolism + the LEARN executor)",
+      "age_days": 0
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_main_cutover",
+      "head": "2c48c5208b37f15f433a583eca0389da73bad721",
+      "branch": "runtime/main-live-20260511",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-11",
+      "subject": "docs(state): clarify manifest versus ops brief [impact-checked]",
+      "age_days": 26
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_main_verify",
+      "head": "23cc8c060056590bf2eaeeec016ef430dba25fca",
+      "branch": "codex/fix-main-docops-20260601",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-31",
+      "subject": "fix(docops): sync markdown counts after doctrine merge",
+      "age_days": 6
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_moltbook_research_wt",
+      "head": "2b6c3776adbe345b27145557aa4d3a863c121b34",
+      "branch": "research/moltbook-investigation",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "research",
+      "state": "worktree",
+      "committed_at": "2026-05-20",
+      "subject": "docs(research): round 1 follow-up \u2014 R_V calibration, schemas, corrections log",
+      "age_days": 17
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_opus_traverse",
+      "head": "4bb47aeddf180975689702fc30414989d0170838",
+      "branch": "opus/traverse-fix-20260605",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "age_days": 3
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr319",
+      "head": "8aa9e33ba08d8c8b4fff90a3d23742aa9c149657",
+      "branch": "devin/1779281950-track-transition-and-seeds",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-20",
+      "subject": "fix(board): back event log scaffold with SQLite [impact-checked]",
+      "age_days": 17
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr326",
+      "head": "b25a8b739bb78758acfba05e4a9e0617e9e9d1c5",
+      "detached": true,
+      "branch": null,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "detached",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr_392",
+      "head": "236e9e8ef09bfe77f1a489eed3e49d24019fd58e",
+      "branch": "codex/repair-pr-392",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-31",
+      "subject": "fix(guardian): refresh docops after dedup tests",
+      "age_days": 6
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr_398",
+      "head": "a39fde8638aaa790aa1060b9564be4bd772d57fe",
+      "branch": "codex/fix-pr-398-coherence",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-31",
+      "subject": "docs: refresh docops counts for perplexity reply",
+      "age_days": 6
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr_399",
+      "head": "066157dd966ca1ff60a135be86fabe36af065518",
+      "branch": "codex/repair-pr-399",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-31",
+      "subject": "docs(track): refresh proposed cloud bridge docops",
+      "age_days": 6
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_pr_review_control",
+      "head": "a4d07e879fd698c925a021da6fb1de8e5252ed66",
+      "branch": "main",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-06-02",
+      "subject": "Merge pull request #436 from AmitabhainArunachala/spine-adoption/slice-c-mapping-receipts",
+      "age_days": 4
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_substrate_spec",
+      "head": "8837a3fbffac83a113d2e39a959552283e320110",
+      "branch": "docs/swarm-substrate-spec-2026-05-20",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-20",
+      "subject": "chore(governance): make `make onboard` the single entrypoint and remove stale governance pointers",
+      "age_days": 17
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_tcs_heartbeat",
+      "head": "3befc1e9698ea490eb6e3a396eebc1e7611e2688",
+      "branch": "feat/world-radar-shakti-safe-convergence-2026-05-13",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-13",
+      "subject": "merge main into world radar branch [impact-checked]",
+      "age_days": 24
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_toolbelt_push",
+      "head": "8fc17f2bc456ce146d2171ec76f0dbbea8772a18",
+      "branch": "codex/toolbelt-onboarding",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-21",
+      "subject": "docs(ops): publish Codex toolbelt onboarding",
+      "age_days": 16
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_trace_attractor_causal_spine",
+      "head": "71652c8f8c56f936984d659b5f36c638d619dca0",
+      "branch": "trace-attractor-causal-spine-2026-05",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-05-21",
+      "subject": "Merge pull request #317 from AmitabhainArunachala/spec/shakti-ginko-organ",
+      "age_days": 16
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_truth_spine",
+      "head": "fdd97f4bf54584dcb05432c67f48514352d1f3ac",
+      "branch": "chore/agent-truth-spine",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": null,
+      "subject": null,
+      "age_days": null
+    },
+    {
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g06_local_model_inventory",
+      "head": "bb2f19d2a7b4aad766ff3661b1d2e06100cc9292",
+      "branch": "feat/go-local-model-runtime-inventory",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-09",
+      "subject": "feat(go): add GitHub evidence ingestor [impact-checked]",
+      "age_days": 28
+    },
+    {
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_mask_prereg",
+      "head": "a47574e3a51295b4db279b0fe1bf608fa2a14260",
+      "branch": "experiments/mask-rv-whitebox-prereg",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-15",
+      "subject": "experiment(mask-rv-whitebox): RESULTS \u2014 primary test null, published per pre-reg [impact-checked]",
+      "age_days": 22
+    },
+    {
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_runtime_projector",
+      "head": "ddd674d5a069f7e1a336d6aa5e6245f0bff6b823",
+      "branch": "feat/runtime-result-projector",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "stale_review",
+      "committed_at": "2026-05-10",
+      "subject": "feat(selection): catalytic-graph parent-selection bias (spine \u00a79 closure) [impact-checked]",
+      "age_days": 27
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_kaizen_exec_loop_pr",
+      "head": "4d66682e1d113d95acbb63f723d5f4968f51a4e9",
+      "branch": "codex/kaizen-exec-loop-20260601",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "unclassified",
+      "state": "worktree",
+      "committed_at": "2026-06-01",
+      "subject": "feat(kaizen): bind reviews to runtime truth refs",
+      "age_days": 5
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_live_ops_cockpit_v1",
+      "head": "03c077ecef083377a54ab13d4defbc51dfd4a468",
+      "branch": "codex/live-ops-cockpit-v1",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "live-ops-cockpit",
+      "state": "worktree",
+      "committed_at": "2026-06-03",
+      "subject": "chore(ops): satisfy live cockpit PR gates",
+      "age_days": 3
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_live_ops_cockpit_v1_docops_fix",
+      "head": "8c5c27bb4d744979f140c6539f71b0098da7b695",
+      "branch": "codex/live-ops-cockpit-v1-docops-fix",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "live-ops-cockpit",
+      "state": "worktree",
+      "committed_at": "2026-06-05",
+      "subject": "chore(ops): fix live cockpit docops gate",
+      "age_days": 1
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_live_ops_cockpit_v2",
+      "head": "c673578cf5092651b3f66e812fddf4f13c7e6ec5",
+      "branch": "codex/live-ops-cockpit-v2-slice-d",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "live-ops-cockpit",
+      "state": "worktree",
+      "committed_at": "2026-06-05",
+      "subject": "feat(ops): add live cockpit decision buckets",
+      "age_days": 1
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_runtime_truth_spine_v1",
+      "head": "7198f340ce623124c75c945b21a950634619783a",
+      "branch": "codex/runtime-truth-spine-v1",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "runtime-truth-spine",
+      "state": "worktree",
+      "committed_at": "2026-06-01",
+      "subject": "feat(ontology): OMS hardening \u2014 TypeStatus lifecycle, api_name, uniqueness guard (#409)",
+      "age_days": 5
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_runtime_truth_spine_v2",
+      "head": "2ea5a8e8fdd222f3df70c87cf0f0803ec894397f",
+      "branch": "codex/runtime-truth-spine-v2",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "runtime-truth-spine",
+      "state": "worktree",
+      "committed_at": "2026-06-01",
+      "subject": "feat(runtime): add execution identity spine v2 [impact-checked]",
+      "age_days": 5
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_spine_slice_a",
+      "head": "dafa4ca49a5910b939b83225816167d2b5e241ae",
+      "branch": "spine-adoption/slice-a-legacy-bypass",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "spine-adoption",
+      "state": "worktree",
+      "committed_at": "2026-06-01",
+      "subject": "chore(spine): retrigger slice A checks [impact-checked]",
+      "age_days": 5
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_spine_slice_b",
+      "head": "6c793fabd54bd1f3f39532b892c1dde430128fed",
+      "branch": "spine-adoption/slice-b-adapter-saturation",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "spine-adoption",
+      "state": "worktree",
+      "committed_at": "2026-06-02",
+      "subject": "chore(spine): tighten slice B runlog wording [impact-checked]",
+      "age_days": 4
+    },
+    {
+      "path": "/Users/dhyana/worktrees/dharma_swarm_spine_slice_c",
+      "head": "71120f9f41a0a23123423f00b712d22f43666d7e",
+      "branch": "spine-adoption/slice-c-mapping-receipts",
+      "detached": false,
+      "prunable": false,
+      "prunable_reason": "",
+      "lane": "spine-adoption",
+      "state": "worktree",
+      "committed_at": "2026-06-02",
+      "subject": "chore(spine): tighten slice C runlog wording [impact-checked]",
+      "age_days": 4
+    }
+  ],
+  "recent_branches": [
+    {
+      "committed_at": "2026-06-06",
+      "name": "trust-build-compass",
+      "sha": "a3ea1ee9a",
+      "subject": "doctrine(governance): implement multi-track with parallel_lane_policy (v2 schema)",
+      "lane": "governance",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "lak-e2e",
+      "sha": "2742aaad8",
+      "subject": "feat(lak-e2e): metabolism-namespace-ledger \u2014 Hash-chained per-agent learning ledger store (single durable write surface; dependency root for ALL metabolism + the LEARN executor)",
+      "lane": "living-agent-kernel",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "governance/parallel-lane-policy-2026-06-06",
+      "sha": "3ff3d44b4",
+      "subject": "governance: support 1-10 active_tracks (schema v2, primary alias)",
+      "lane": "governance",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "codex/runtime-truth-nats-adapter-20260606",
+      "sha": "cee160f24",
+      "subject": "chore(governance): refresh spine metric after NATS ack fix",
+      "lane": "runtime-truth-spine",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "qwen/spine-adoption",
+      "sha": "aa5a8e82b",
+      "subject": "feat(go-ingest): wire idea spark ingest spine (#474)",
+      "lane": "spine-adoption",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "pr-474-backlog",
+      "sha": "c33d8758b",
+      "subject": "chore(docops): refresh counts for PR474 rebase",
+      "lane": "pr-repair-backlog",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-06",
+      "name": "pr-495-backlog",
+      "sha": "489f51ad8",
+      "subject": "chore(mike): retrigger coherence delta",
+      "lane": "pr-repair-backlog",
+      "age_days": 0
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "pr-465-backlog",
+      "sha": "8ea05b1f9",
+      "subject": "chore(ops): repair live cockpit rebase gates",
+      "lane": "pr-repair-backlog",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "pr-388-backlog",
+      "sha": "807040cc0",
+      "subject": "chore(docops): refresh counts for PR388 rebase",
+      "lane": "pr-repair-backlog",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "pr-384-backlog",
+      "sha": "3f0497add",
+      "subject": "chore(docops): refresh counts for PR384 rebase",
+      "lane": "pr-repair-backlog",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "pr-344-backlog",
+      "sha": "2076897a7",
+      "subject": "chore(docops): refresh counts for PR344 rebase",
+      "lane": "pr-repair-backlog",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/fix-docops-autorefresh-repo-arg-20260605",
+      "sha": "6fecf9624",
+      "subject": "fix(ci): resolve docops manual dispatch repo context",
+      "lane": "unclassified",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/fix-docops-autorefresh-dispatch-20260605",
+      "sha": "a6561b3f6",
+      "subject": "fix(ci): repair docops autorefresh dispatch",
+      "lane": "unclassified",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/aci-ci-truth-mike-20260605",
+      "sha": "52c821c51",
+      "subject": "feat(governance): add CI truth gate for Mike",
+      "lane": "governance",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/runtime-truth-projector-v1-20260605",
+      "sha": "996d30ce7",
+      "subject": "Merge remote-tracking branch 'origin/main' into codex/runtime-truth-projector-v1-20260605",
+      "lane": "runtime-truth-spine",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/provider-parser-content-fix-20260605",
+      "sha": "dc485c693",
+      "subject": "Merge remote-tracking branch 'origin/main' into codex/provider-parser-content-fix-20260605",
+      "lane": "unclassified",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "mmm-visible-backlog-router",
+      "sha": "11f68953b",
+      "subject": "Make Mike mentions visibly route backlog requests",
+      "lane": "pr-repair-backlog",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "_rtmp",
+      "sha": "eb6d8d883",
+      "subject": "fix(ops): restrict review mark authority to operator [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v2-slice-d",
+      "sha": "c673578cf",
+      "subject": "feat(ops): add live cockpit decision buckets",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v2-slice-b",
+      "sha": "27861e0bc",
+      "subject": "feat(ops): project PR queue into live cockpit",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v2-slice-c",
+      "sha": "1d2049d3c",
+      "subject": "feat(ops): add live ops proposal packets",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v2-slice-a",
+      "sha": "8f67f8630",
+      "subject": "feat(ops): add live ops state authority model",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v1-docops-fix-mainbase",
+      "sha": "dd47d7f00",
+      "subject": "chore(ops): fix live cockpit docops gate",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/live-ops-cockpit-v1-docops-fix",
+      "sha": "8c5c27bb4",
+      "subject": "chore(ops): fix live cockpit docops gate",
+      "lane": "live-ops-cockpit",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "mmm-nats-mike-credentials",
+      "sha": "ab3fe2006",
+      "subject": "fix: use Mike NATS credentials for backlog fanout",
+      "lane": "runtime-truth-spine",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "mmm-nats-ca-pem",
+      "sha": "2eb6133d8",
+      "subject": "fix: trust private CA for Mike NATS fanout",
+      "lane": "runtime-truth-spine",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "mmm-nats-aiohttp",
+      "sha": "eb9d8fa81",
+      "subject": "fix: install aiohttp for Mike NATS websocket",
+      "lane": "runtime-truth-spine",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-05",
+      "name": "codex/runtime-truth-spine-e2e-20260604T143553Z",
+      "sha": "601b72cf6",
+      "subject": "fix: bound Mike A2A publish deadline (#479)",
+      "lane": "runtime-truth-spine",
+      "age_days": 1
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "mmm-nats-publish-deadline",
+      "sha": "a32127ab7",
+      "subject": "fix: bound Mike A2A publish deadline",
+      "lane": "runtime-truth-spine",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "mmm-pin-actions",
+      "sha": "fbc3a4e11",
+      "subject": "fix: pin Mike workflow actions",
+      "lane": "merge-master-mike",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "mmm-a2a-conditional-merge",
+      "sha": "2c1aab8f0",
+      "subject": "feat: add Merge Master Mike A2A merge automation",
+      "lane": "merge-master-mike",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "repair/pr413-docops-rebase",
+      "sha": "b1cd7076b",
+      "subject": "research(palantir-ontology): auto-grounding for PR#409 \u2014 gaps surfaced",
+      "lane": "research",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/runtime-truth-spine-e2e-20260604T143105Z",
+      "sha": "9846f1b13",
+      "subject": "Merge pull request #470 from AmitabhainArunachala/devin/1780551922-spine-a2a-hardening",
+      "lane": "runtime-truth-spine",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/pr470-after-468-fix",
+      "sha": "a2a92a246",
+      "subject": "merge main into #470 after spine RFC merge",
+      "lane": "unclassified",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/pr468-docops-clean",
+      "sha": "7a19c7c3e",
+      "subject": "docs(spine): resolve #468 DocOps conflicts after matrix merge",
+      "lane": "unclassified",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/go-idea-spark-ingest-spine-clean-20260604",
+      "sha": "0fe69fc3d",
+      "subject": "chore(go-ingest): satisfy CI governance gates",
+      "lane": "spine-adoption",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/pr470-docops-review",
+      "sha": "043c27037",
+      "subject": "docs(spine): refresh DocOps counts after invariant tests",
+      "lane": "unclassified",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/pr471-docops-clean",
+      "sha": "d360fe660",
+      "subject": "docs(matrix): refresh DocOps inventory",
+      "lane": "unclassified",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-04",
+      "name": "codex/pr473-closed-inspect",
+      "sha": "a8292ba6e",
+      "subject": "test(spine): persistence invariant \u2014 one RuntimeReceipt + IdempotencyRecord per dispatch",
+      "lane": "unclassified",
+      "age_days": 2
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "codex/live-ops-cockpit-v1",
+      "sha": "03c077ece",
+      "subject": "chore(ops): satisfy live cockpit PR gates",
+      "lane": "live-ops-cockpit",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "archive/trust-build-compass-20260605",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "parked-cleanup",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "opus/traverse-fix-20260605",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "unclassified",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-CONDUCTOR-MALFORMED-DB",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-CONDUCTOR-UTF8",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-CQ-PASSPORT-COUNT",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-CRON-HANDLERS",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-GOV-MODULE-BUDGET",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SEAM-KEY-CONTRACT",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SMOKE-PROFILE-ENUM",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SMOKE-SLEEPCYCLE-SIG",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SPINE-CORRELATION-JOIN",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SPINE-DB-PATH",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-STIG-SCHEMA-BACKEND",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-STIG-WRITE-PATH",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-SUBPROC-NULLBYTE",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-TOOL-LOOP-CONVERGE",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-WIRE-MINIMAX",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-WIRE-XAI",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-03",
+      "name": "rss/FU-WIRE-ZAI",
+      "sha": "4bb47aedd",
+      "subject": "docs(operator-os): close eight-hour mission",
+      "lane": "rss-followups",
+      "age_days": 3
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "_rebase_tmp",
+      "sha": "31f0b8d1a",
+      "subject": "fix(docops): correct manifest counts from docops metrics",
+      "lane": "unclassified",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-grounding/combined-production-grounding",
+      "sha": "146f1b733",
+      "subject": "chore(ci): rerun warrant with impact acknowledgement",
+      "lane": "unclassified",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-grounding/slice-2-runtime-recovery",
+      "sha": "6564af509",
+      "subject": "chore(spine): retrigger slice 2 warrant [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-grounding/slice-3-tollbooth-gateway",
+      "sha": "e558ac92c",
+      "subject": "docs(spine): log slice 3 tollbooth PR",
+      "lane": "unclassified",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-grounding/slice-1-adoption-gate",
+      "sha": "b8990c4bf",
+      "subject": "docs(spine): log slice 1 adoption gate PR",
+      "lane": "unclassified",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "main",
+      "sha": "a4d07e879",
+      "subject": "Merge pull request #436 from AmitabhainArunachala/spine-adoption/slice-c-mapping-receipts",
+      "lane": "spine-adoption",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr436-linear",
+      "sha": "342124dc0",
+      "subject": "feat(spine): add runtime identity mapping receipts [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr436-restack",
+      "sha": "b122f276c",
+      "subject": "feat(spine): restack mapping receipt slice [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr435-linear",
+      "sha": "f49e0c6fa",
+      "subject": "feat(spine): saturate runtime boundary adapters [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr435-restack",
+      "sha": "0e2ed53b3",
+      "subject": "feat(spine): restack adapter saturation slice [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr398-linear",
+      "sha": "227d40e33",
+      "subject": "docs(agent-tasks): land perplexity reply as dated context [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-adoption/slice-b-adapter-saturation",
+      "sha": "6c793fabd",
+      "subject": "chore(spine): tighten slice B runlog wording [impact-checked]",
+      "lane": "spine-adoption",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "spine-adoption/slice-c-mapping-receipts",
+      "sha": "71120f9f4",
+      "subject": "chore(spine): tighten slice C runlog wording [impact-checked]",
+      "lane": "spine-adoption",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr399-linear",
+      "sha": "f76df77b6",
+      "subject": "docs(governance): propose cloud agent NATS bridge [impact-checked]",
+      "lane": "runtime-truth-spine",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-02",
+      "name": "merge-master/pr399-restack",
+      "sha": "5d5711b3c",
+      "subject": "docs(governance): restack cloud bridge proposal [impact-checked]",
+      "lane": "governance",
+      "age_days": 4
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "merge-master/pr411-restack",
+      "sha": "aeabeec3f",
+      "subject": "chore(inter-agent): restack inbound status after outbound merge [impact-checked]",
+      "lane": "merge-master-mike",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/kaizen-exec-loop-20260601",
+      "sha": "4d66682e1",
+      "subject": "feat(kaizen): bind reviews to runtime truth refs",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "spine-adoption/slice-a-legacy-bypass",
+      "sha": "dafa4ca49",
+      "subject": "chore(spine): retrigger slice A checks [impact-checked]",
+      "lane": "spine-adoption",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr393c",
+      "sha": "11647bcc5",
+      "subject": "chore(inter-agent): restack outbound responses after ops refresh",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr411b",
+      "sha": "ff8cd9e36",
+      "subject": "chore(inter-agent): restack inbound status after ops refresh",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr393b",
+      "sha": "322cfe6c5",
+      "subject": "Merge pull request #395 from AmitabhainArunachala/devin/1780214121-refresh-operational-docs",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "spine-adoption/slice-d-metric-ci-gate",
+      "sha": "322cfe6c5",
+      "subject": "Merge pull request #395 from AmitabhainArunachala/devin/1780214121-refresh-operational-docs",
+      "lane": "spine-adoption",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr373",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr388",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr393",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr395",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr411",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "review-pr418",
+      "sha": "a919852df",
+      "subject": "Merge pull request #427 from AmitabhainArunachala/codex/runtime-truth-spine-v2",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/runtime-truth-spine-v2",
+      "sha": "2ea5a8e8f",
+      "subject": "feat(runtime): add execution identity spine v2 [impact-checked]",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/pr388-disambig",
+      "sha": "f24a2adf3",
+      "subject": "test(receipts): add pr388 merge proof",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/pr408-schema-align",
+      "sha": "598f05643",
+      "subject": "fix(governance): distinguish stale ontology branches",
+      "lane": "governance",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/runtime-truth-spine-v1",
+      "sha": "7198f340c",
+      "subject": "feat(ontology): OMS hardening \u2014 TypeStatus lifecycle, api_name, uniqueness guard (#409)",
+      "lane": "runtime-truth-spine",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "codex/pr409-oms-hardening",
+      "sha": "0f2525880",
+      "subject": "fix(ontology): preserve adapter idempotency",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "feat/ontology-telos-gate-hardwire",
+      "sha": "592e7af48",
+      "subject": "docs(governance): refresh telos count stamp",
+      "lane": "governance",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "proto/ontology-evolution-write-through",
+      "sha": "87a279693",
+      "subject": "fix(ontology): clarify telos gate receipts [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "docs/adr-008-ontology-api-grammar",
+      "sha": "ec4b4fb39",
+      "subject": "docs(adr): ADR-008 \u2014 resolve open-Q3 sibling api_name conventions (Palantir-grounded)",
+      "lane": "research",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-06-01",
+      "name": "pr-406-review-20260531",
+      "sha": "d960d2fb6",
+      "subject": "feat(ontology): hard-wire telos gate into execute_action (W1)",
+      "lane": "pr-repair-backlog",
+      "age_days": 5
+    },
+    {
+      "committed_at": "2026-05-31",
+      "name": "forge/dharma-reward-forge-v0",
+      "sha": "236006e54",
+      "subject": "feat(forge): Dharma Reward Forge v0 \u2014 close the sealed-task loop",
+      "lane": "forge-measurement",
+      "age_days": 6
+    },
+    {
+      "committed_at": "2026-05-31",
+      "name": "codex/repair-pr-392",
+      "sha": "236e9e8ef",
+      "subject": "fix(guardian): refresh docops after dedup tests",
+      "lane": "unclassified",
+      "age_days": 6
+    },
+    {
+      "committed_at": "2026-05-31",
+      "name": "codex/repair-pr-399",
+      "sha": "066157dd9",
+      "subject": "docs(track): refresh proposed cloud bridge docops",
+      "lane": "unclassified",
+      "age_days": 6
+    },
+    {
+      "committed_at": "2026-05-31",
+      "name": "codex/fix-pr-398-coherence",
+      "sha": "a39fde863",
+      "subject": "docs: refresh docops counts for perplexity reply",
+      "lane": "unclassified",
+      "age_days": 6
+    },
+    {
+      "committed_at": "2026-05-31",
+      "name": "codex/fix-main-docops-20260601",
+      "sha": "23cc8c060",
+      "subject": "fix(docops): sync markdown counts after doctrine merge",
+      "lane": "unclassified",
+      "age_days": 6
+    },
+    {
+      "committed_at": "2026-05-30",
+      "name": "telosproof-v1-verification-substrate",
+      "sha": "c8efcff28",
+      "subject": "TelosProof v1 (increment 2): mutation-kill suite + close the aliased-import false-negative",
+      "lane": "unclassified",
+      "age_days": 7
+    },
+    {
+      "committed_at": "2026-05-30",
+      "name": "telosproof-v0-advisory-spike",
+      "sha": "634495425",
+      "subject": "TelosProof v0: advisory proof-carrying-telos gate (prove the body, not the ghost)",
+      "lane": "unclassified",
+      "age_days": 7
+    },
+    {
+      "committed_at": "2026-05-28",
+      "name": "feat/a2a-correlation-spine-phase2a",
+      "sha": "98d9cf416",
+      "subject": "docs(a2a): correlation spine architecture anchor note",
+      "lane": "unclassified",
+      "age_days": 9
+    },
+    {
+      "committed_at": "2026-05-28",
+      "name": "feat/chetana-restoration-from-4c70456e",
+      "sha": "a41149c2c",
+      "subject": "docs(a2a): correlation spine architecture anchor note",
+      "lane": "unclassified",
+      "age_days": 9
+    },
+    {
+      "committed_at": "2026-05-25",
+      "name": "chore/devin-inbound-11-step-audit",
+      "sha": "d0cccf727",
+      "subject": "chore(devin): add inbound audit task",
+      "lane": "unclassified",
+      "age_days": 12
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "codex/memory-kernel-default-context-20260523",
+      "sha": "0b0cd8b9a",
+      "subject": "Merge remote-tracking branch 'origin/main' into codex/memory-kernel-default-context-20260523",
+      "lane": "unclassified",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-338-devin-md",
+      "sha": "0485454ec",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-338-devin-md",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-327-status",
+      "sha": "0c96a0750",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-327-status",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-326-hotlist",
+      "sha": "5d0e75d96",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-326-hotlist",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "worker4/pr323-codeql",
+      "sha": "b28694311",
+      "subject": "fix(security): keep dkeys export output analyzer-safe [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "worker4/pr332-codeql",
+      "sha": "e8ab4bed0",
+      "subject": "fix(docops): merge latest main into pr332",
+      "lane": "unclassified",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-328-adr",
+      "sha": "4a1809685",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-328-adr",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-320-adr7",
+      "sha": "00761d150",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-320-adr7",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-323-dkeys",
+      "sha": "d6f1a4eed",
+      "subject": "Merge remote-tracking branch 'origin/devin/1779352298-dkeys-env-normalization' into repair/pr-323-dkeys",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-325-toolbelt",
+      "sha": "548123e10",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-325-toolbelt",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-314-router-docs",
+      "sha": "49f09b6cb",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-314-router-docs",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-324-cwt",
+      "sha": "414ea9326",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-324-cwt",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-24",
+      "name": "repair/pr-341-guardian",
+      "sha": "e233a62de",
+      "subject": "Merge remote-tracking branch 'origin/main' into repair/pr-341-guardian",
+      "lane": "pr-repair-backlog",
+      "age_days": 13
+    },
+    {
+      "committed_at": "2026-05-23",
+      "name": "cleanup/memory-kernel-release-split-2026-05-17",
+      "sha": "6a861e1b6",
+      "subject": "test(memory): lock prod bar before kernel merge",
+      "lane": "parked-cleanup",
+      "age_days": 14
+    },
+    {
+      "committed_at": "2026-05-22",
+      "name": "chore/command-plane-nav-trim",
+      "sha": "b7ab21759",
+      "subject": "feat(cockpit): consume /api/manifest/command-plane via CommandPlaneTruthPanel",
+      "lane": "live-ops-cockpit",
+      "age_days": 15
+    },
+    {
+      "committed_at": "2026-05-21",
+      "name": "codex/toolbelt-onboarding",
+      "sha": "8fc17f2bc",
+      "subject": "docs(ops): publish Codex toolbelt onboarding",
+      "lane": "unclassified",
+      "age_days": 16
+    },
+    {
+      "committed_at": "2026-05-21",
+      "name": "feat/cwt-v0-collector",
+      "sha": "242b67ce2",
+      "subject": "feat(governance): CWT v0 read-only collector + report renderer [impact-checked]",
+      "lane": "governance",
+      "age_days": 16
+    },
+    {
+      "committed_at": "2026-05-21",
+      "name": "trace-attractor-causal-spine-2026-05",
+      "sha": "71652c8f8",
+      "subject": "Merge pull request #317 from AmitabhainArunachala/spec/shakti-ginko-organ",
+      "lane": "unclassified",
+      "age_days": 16
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "codex-mention-router-main",
+      "sha": "910b1e36f",
+      "subject": "fix: avoid hosted codex trigger collision",
+      "lane": "unclassified",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "devin/1779281950-track-transition-and-seeds",
+      "sha": "8aa9e33ba",
+      "subject": "fix(board): back event log scaffold with SQLite [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "spec/boardstore-facade",
+      "sha": "8191db251",
+      "subject": "fix(docops): ignore local agent files in inventory [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "research/persistent-agents-2026-05",
+      "sha": "39291ad3d",
+      "subject": "Add persistent agents landscape survey",
+      "lane": "research",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "research/persistent-agents-deepdive-2026-05",
+      "sha": "39291ad3d",
+      "subject": "Add persistent agents landscape survey",
+      "lane": "research",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "spec/shakti-ginko-organ",
+      "sha": "22951df4b",
+      "subject": "fix(docops): register 3 new architecture docs in canonical_guard",
+      "lane": "unclassified",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "research/moltbook-investigation",
+      "sha": "2b6c3776a",
+      "subject": "docs(research): round 1 follow-up \u2014 R_V calibration, schemas, corrections log",
+      "lane": "research",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-20",
+      "name": "docs/swarm-substrate-spec-2026-05-20",
+      "sha": "8837a3fbf",
+      "subject": "chore(governance): make `make onboard` the single entrypoint and remove stale governance pointers",
+      "lane": "governance",
+      "age_days": 17
+    },
+    {
+      "committed_at": "2026-05-17",
+      "name": "feat/governed-memory-recursive-preflight",
+      "sha": "8dca25eab",
+      "subject": "feat(governance): integrate recursive memory preflight proof [impact-checked]",
+      "lane": "governance",
+      "age_days": 20
+    },
+    {
+      "committed_at": "2026-05-17",
+      "name": "feat/governed-recursive-proof-tightening",
+      "sha": "8dca25eab",
+      "subject": "feat(governance): integrate recursive memory preflight proof [impact-checked]",
+      "lane": "governance",
+      "age_days": 20
+    },
+    {
+      "committed_at": "2026-05-17",
+      "name": "feat/governed-recursive-proof-v0",
+      "sha": "37424404d",
+      "subject": "feat(recursive): add governed recursive proof packet [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 20
+    },
+    {
+      "committed_at": "2026-05-16",
+      "name": "cleanup/memory-kernel-preflight-lane-2026-05-16",
+      "sha": "b1d20ccb3",
+      "subject": "fix(memory): require strict readiness in operator smoke [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 21
+    },
+    {
+      "committed_at": "2026-05-16",
+      "name": "cleanup/memory-kernel-shadow-context-main-2026-05-13",
+      "sha": "b1d20ccb3",
+      "subject": "fix(memory): require strict readiness in operator smoke [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 21
+    },
+    {
+      "committed_at": "2026-05-16",
+      "name": "cleanup/recursive-evolution-lane-2026-05-16",
+      "sha": "b1d20ccb3",
+      "subject": "fix(memory): require strict readiness in operator smoke [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 21
+    },
+    {
+      "committed_at": "2026-05-15",
+      "name": "experiments/mask-rv-whitebox-prereg",
+      "sha": "a47574e3a",
+      "subject": "experiment(mask-rv-whitebox): RESULTS \u2014 primary test null, published per pre-reg [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 22
+    },
+    {
+      "committed_at": "2026-05-14",
+      "name": "feat/recursive-discovery-shadow-2026-05-14",
+      "sha": "3c28ddaee",
+      "subject": "merge main into recursive discovery branch [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 23
+    },
+    {
+      "committed_at": "2026-05-14",
+      "name": "feat/codex-lane-runner-2026-05-13",
+      "sha": "8c2629ad4",
+      "subject": "fix(codex-lane): close subprocess stdin",
+      "lane": "unclassified",
+      "age_days": 23
+    },
+    {
+      "committed_at": "2026-05-14",
+      "name": "backup/memory-kernel-prep-2026-05-14",
+      "sha": "b14bea571",
+      "subject": "feat(memory): add context shadow sweep [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 23
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-safe-convergence-2026-05-13",
+      "sha": "3befc1e96",
+      "subject": "merge main into world radar branch [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/route-witness-main-2026-05-13",
+      "sha": "56ec13647",
+      "subject": "docs(docops): refresh route witness inventory [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/memory-kernel-context-eval-2026-05-13",
+      "sha": "71ca01d72",
+      "subject": "feat(memory): shadow context reads and sentinel ci [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "backup/route-witness-pr297-pre-rebase-2026-05-13",
+      "sha": "7b2c08f9d",
+      "subject": "docs(docops): refresh route witness inventory [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "codex-lane/cleanup-audit",
+      "sha": "fa97bfc1c",
+      "subject": "Merge pull request #275 from AmitabhainArunachala/feat/world-signal-receipt-projection",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-live-integration-2026-05-13",
+      "sha": "1ff15b98d",
+      "subject": "feat(world): consolidate live radar shakti telos lane [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-signal-receipt-projection",
+      "sha": "3fb6132f1",
+      "subject": "feat(control-surface): project Go world signal receipts [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/main-recurring-live-salvage-2026-05-13",
+      "sha": "9848011cf",
+      "subject": "chore(cleanup): preserve recurring live main residue [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/runtime-result-projector-salvage-2026-05-13",
+      "sha": "4666be110",
+      "subject": "chore(cleanup): preserve runtime result projector lane [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/go-local-model-runtime-inventory-salvage-2026-05-13",
+      "sha": "9919a1f4f",
+      "subject": "chore(cleanup): preserve go local model inventory lane [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/agent-truth-spine-salvage-2026-05-13",
+      "sha": "64f86b4bd",
+      "subject": "chore(cleanup): preserve agent truth spine lane [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/kaizen-review-v0-salvage-2026-05-13",
+      "sha": "be2571eae",
+      "subject": "chore(cleanup): preserve kaizen review human yds lane [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/module-metabolism-strategy-salvage-2026-05-13",
+      "sha": "e28a4bbd2",
+      "subject": "docs(cleanup): preserve core four ontology strategy notes [impact-checked]",
+      "lane": "living-agent-kernel",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/core-operating-circuit-proof-salvage-2026-05-13",
+      "sha": "ac21e6fae",
+      "subject": "chore(cleanup): preserve core operating circuit proof [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/opportunity-dispatcher-budget-fix-salvage-2026-05-13",
+      "sha": "2593169b9",
+      "subject": "chore(cleanup): preserve opportunity dispatcher budget lane [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/brake-stabilization-salvage-2026-05-13",
+      "sha": "1976329e1",
+      "subject": "chore(cleanup): preserve brake stabilization residue [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/go-world-signal-receipts",
+      "sha": "171d594bf",
+      "subject": "feat(go): add world signal receipt ingestor [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-final-residue-2026-05-13",
+      "sha": "b913b957a",
+      "subject": "feat(world): preserve final scoring zeitgeist residue [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-live-2026-05-13",
+      "sha": "b6e0342e0",
+      "subject": "feat(world): preserve live recurring radar state [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-docs-tests-2026-05-13",
+      "sha": "4c4eeb01c",
+      "subject": "docs(world): preserve zeitgeist docs test residue [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-residual-2026-05-13",
+      "sha": "86d1c0330",
+      "subject": "feat(world): preserve runtime residual wiring [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-followup-2026-05-13",
+      "sha": "0200888a4",
+      "subject": "feat(world): preserve recurring signal followup [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/action-authority-salvage-2026-05-13",
+      "sha": "afc962e22",
+      "subject": "chore(cleanup): preserve action authority runtime wiring [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "review/memory-knowledge-2026-05-12",
+      "sha": "479528df5",
+      "subject": "chore(memory): preserve context admission residue [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "cleanup/root-memory-context-salvage-2026-05-13",
+      "sha": "2427abe0f",
+      "subject": "chore(memory): preserve context admission residue [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "backup/route-witness-main-pre-rebase-2026-05-13",
+      "sha": "caf59efc2",
+      "subject": "feat(routing): add route witness telemetry [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "feat/world-radar-shakti-telos-2026-05-13",
+      "sha": "be5ef013e",
+      "subject": "feat(world): preserve radar shakti telos build lane [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-13",
+      "name": "devin/1778506748-control-surface-projector",
+      "sha": "7141c72c8",
+      "subject": "fix(control-surface): project merged Go receipt lane [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 24
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/main-late-dirty-salvage-2026-05-12",
+      "sha": "77aba9243",
+      "subject": "chore(cleanup): preserve late dirty main work",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/root-mixed-salvage-2026-05-12",
+      "sha": "8a083dcd2",
+      "subject": "chore(cleanup): preserve late root residue",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "review/root-governance-residue-2026-05-12",
+      "sha": "af374d108",
+      "subject": "chore(governance): park root cleanup residue [impact-checked]",
+      "lane": "governance",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "review/proof-artifacts-2026-05-12",
+      "sha": "6f6603c04",
+      "subject": "chore(proof): park agentic immune proof artifacts [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "review/interop-fleet-2026-05-12",
+      "sha": "58e809eef",
+      "subject": "chore(interop): park fleet interop control surface [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/identity-onboarding-2026-05-12",
+      "sha": "e7c7535fc",
+      "subject": "docs(identity): add agent online identity anchor [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/viz-invariant-projection-2026-05-12",
+      "sha": "3d0868587",
+      "subject": "feat(viz): project invariant measurements [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/route-witness-2026-05-12",
+      "sha": "252beccd8",
+      "subject": "feat(routing): add route witness telemetry [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "cleanup/main-dirty-salvage-2026-05-12",
+      "sha": "49248cae1",
+      "subject": "chore: preserve dirty main work for triage",
+      "lane": "parked-cleanup",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-12",
+      "name": "codex/pr183-hardening",
+      "sha": "a4aa32f9e",
+      "subject": "test(go): harden G4 cache handling [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 25
+    },
+    {
+      "committed_at": "2026-05-11",
+      "name": "runtime/main-live-20260511",
+      "sha": "2c48c5208",
+      "subject": "docs(state): clarify manifest versus ops brief [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 26
+    },
+    {
+      "committed_at": "2026-05-11",
+      "name": "devin/1778497802-manifest-health-api",
+      "sha": "cee03a335",
+      "subject": "ci: retrigger warrant with impact marker [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 26
+    },
+    {
+      "committed_at": "2026-05-11",
+      "name": "devin/1778426210-ship-revenue-wedge-report",
+      "sha": "e447becf2",
+      "subject": "docs: refresh revenue wedge docops counts [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 26
+    },
+    {
+      "committed_at": "2026-05-11",
+      "name": "devin/1777971460-decompose-dgc-cli",
+      "sha": "f89de6dd2",
+      "subject": "fix(cli): keep cron list tolerant of scheduler dicts [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 26
+    },
+    {
+      "committed_at": "2026-05-11",
+      "name": "devin/1778037205-marathon-cleanup",
+      "sha": "c5f138117",
+      "subject": "docs: refresh DocOps counts (556 modules, 567 test files, 688 md files) [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 26
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "codex/slop-verification-main",
+      "sha": "056b01f03",
+      "subject": "feat(slop): promote verification system to main [impact-checked] [large-diff-ack]",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "feat/knowledge-ops-organ-seed",
+      "sha": "6cd8fac0a",
+      "subject": "Merge remote-tracking branch 'origin/feat/knowledge-ops-organ-seed' into feat/knowledge-ops-organ-seed",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "design/routing-fusion-spine-pr",
+      "sha": "84dfd7ae4",
+      "subject": "docs(routing): satisfy fusion governance gates [impact-checked]",
+      "lane": "governance",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "cutover/lf5-runtime-on-main-20260510",
+      "sha": "4a31d0e78",
+      "subject": "feat(runtime): port lf5 daemon spine onto main cutover [impact-checked] [structural-delete-approved]",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "cutover/lf5-runtime-on-main-20260510-integrate-main",
+      "sha": "4a31d0e78",
+      "subject": "feat(runtime): port lf5 daemon spine onto main cutover [impact-checked] [structural-delete-approved]",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "design/routing-fusion-spine",
+      "sha": "5781c0f12",
+      "subject": "docs(routing): open fusion spine workspace [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "audit/runtime-truth-2026-04-26",
+      "sha": "60666c387",
+      "subject": "fix(runtime): normalize executive campaign datetimes [impact-checked]",
+      "lane": "runtime-truth-spine",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "cleanup/mixed-quality-recovery-2026-05-10",
+      "sha": "ddd674d5a",
+      "subject": "feat(selection): catalytic-graph parent-selection bias (spine \u00a79 closure) [impact-checked]",
+      "lane": "parked-cleanup",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-10",
+      "name": "feat/runtime-result-projector",
+      "sha": "ddd674d5a",
+      "subject": "feat(selection): catalytic-graph parent-selection bias (spine \u00a79 closure) [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 27
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/go-github-repo-ingestor",
+      "sha": "bb2f19d2a",
+      "subject": "feat(go): add GitHub evidence ingestor [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 28
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/go-local-model-runtime-inventory",
+      "sha": "bb2f19d2a",
+      "subject": "feat(go): add GitHub evidence ingestor [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 28
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/core-operating-circuit-proof",
+      "sha": "40ea317ff",
+      "subject": "Merge pull request #179 from AmitabhainArunachala/feat/go-adapter-contract-harness",
+      "lane": "unclassified",
+      "age_days": 28
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/go-adapter-contract-harness",
+      "sha": "7ea9808d8",
+      "subject": "feat(go): add source adapter contract harness [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 28
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/board-feedback-edge",
+      "sha": "8fa7b1fe0",
+      "subject": "docs: add contemplative spine boot packet [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 28
+    },
+    {
+      "committed_at": "2026-05-09",
+      "name": "feat/go-receipt-sdk",
+      "sha": "0bd9c2218",
+      "subject": "feat(go): add receipt SDK for sense organs [impact-checked]",
+      "lane": "unclassified",
+      "age_days": 28
+    }
+  ],
+  "recent_commits": [
+    {
+      "sha": "84fc4afef",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "index on qwen/spine-adoption: aa5a8e82b feat(go-ingest): wire idea spark ingest spine (#474)",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "a3ea1ee9a",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "doctrine(governance): implement multi-track with parallel_lane_policy (v2 schema)",
+      "lane": "governance"
+    },
+    {
+      "sha": "2742aaad8",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "feat(lak-e2e): metabolism-namespace-ledger \u2014 Hash-chained per-agent learning ledger store (single durable write surface; dependency root for ALL metabolism + the LEARN executor)",
+      "lane": "living-agent-kernel"
+    },
+    {
+      "sha": "c9fe74186",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "feat(lak-e2e): wire-in-real-agent-governed-run \u2014 a real PersistentAgent task is governed end-to-end by the kernel and leaves durable receipts",
+      "lane": "living-agent-kernel"
+    },
+    {
+      "sha": "e0e3ce254",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "feat(lak-e2e): wire-in-persistent-adapter \u2014 PersistentAgent -> kernel wake-payload adapter (dependency root of the WIRE-IN axis)",
+      "lane": "living-agent-kernel"
+    },
+    {
+      "sha": "3ff3d44b4",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "governance: support 1-10 active_tracks (schema v2, primary alias)",
+      "lane": "governance"
+    },
+    {
+      "sha": "95c7b5bcf",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "chore(lak-e2e): seed E2E base with committed slice-2 provider tool-call gate",
+      "lane": "living-agent-kernel"
+    },
+    {
+      "sha": "758fd5fc8",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "governance: preserve codex #1 parallel-lane-policy + multi-lane onboarding",
+      "lane": "governance"
+    },
+    {
+      "sha": "4ee828e03",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "feat(operator-core): add living agent kernel os slice",
+      "lane": "living-agent-kernel"
+    },
+    {
+      "sha": "cee160f24",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "chore(governance): refresh spine metric after NATS ack fix",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "4b86b8aef",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "fix(a2a): persist NATS consume ack intent before broker ack",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "96d942bb3",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "chore(governance): refresh spine adoption receipt",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "25510113e",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "feat(a2a): add runtime-truth NATS transport",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "2613498b9",
+      "committed_at": "2026-06-06",
+      "author": "AmitabhainArunachala",
+      "subject": "chore(governance): refresh spine adoption metric [automated]",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "eab8c15f6",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "chore(governance): refresh spine adoption metric [automated]",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "aa5a8e82b",
+      "committed_at": "2026-06-06",
+      "author": "AmitabhainArunachala",
+      "subject": "feat(go-ingest): wire idea spark ingest spine (#474)",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "c33d8758b",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR474 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "5e001e996",
+      "committed_at": "2026-06-04",
+      "author": "Dhyana",
+      "subject": "chore(go-ingest): satisfy CI governance gates",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "fbdf59544",
+      "committed_at": "2026-06-04",
+      "author": "Dhyana",
+      "subject": "docs(go-ingest): add idea spark integration spec",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "ea108c4bd",
+      "committed_at": "2026-06-04",
+      "author": "Dhyana",
+      "subject": "test(go-ingest): cover ingest spine receipts and transport",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "2abf817c1",
+      "committed_at": "2026-06-04",
+      "author": "Dhyana",
+      "subject": "feat(go-ingest): wire receipt-first ingest spine",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "018517f12",
+      "committed_at": "2026-06-05",
+      "author": "Copilot",
+      "subject": "Collaborating with @merge_master_mike for PR updates (#495)",
+      "lane": "merge-master-mike"
+    },
+    {
+      "sha": "489f51ad8",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "chore(mike): retrigger coherence delta",
+      "lane": "merge-master-mike"
+    },
+    {
+      "sha": "2762e4fb4",
+      "committed_at": "2026-06-06",
+      "author": "Dhyana",
+      "subject": "docs(mike): use canonical backlog mention",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "bfd261a65",
+      "committed_at": "2026-06-05",
+      "author": "copilot-swe-agent[bot]",
+      "subject": "fix merge master mike backlog defaults",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "141337bbf",
+      "committed_at": "2026-06-05",
+      "author": "copilot-swe-agent[bot]",
+      "subject": "plan merge master mike defaults",
+      "lane": "merge-master-mike"
+    },
+    {
+      "sha": "5be923958",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "feat(ops): add read-only live ops cockpit (#465)",
+      "lane": "live-ops-cockpit"
+    },
+    {
+      "sha": "8ea05b1f9",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(ops): repair live cockpit rebase gates",
+      "lane": "live-ops-cockpit"
+    },
+    {
+      "sha": "c8e7b5cc2",
+      "committed_at": "2026-06-03",
+      "author": "Dhyana",
+      "subject": "chore(ops): satisfy live cockpit PR gates",
+      "lane": "live-ops-cockpit"
+    },
+    {
+      "sha": "0ac4b2bca",
+      "committed_at": "2026-06-02",
+      "author": "Dhyana",
+      "subject": "feat(ops): add read-only live ops cockpit",
+      "lane": "live-ops-cockpit"
+    },
+    {
+      "sha": "21b185ec3",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "PR-H1: disambiguate ClosureEvidenceReceipt from spine EvidenceReceipt (#388)",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "807040cc0",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR388 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "b6e522e8a",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "docs(receipts): clarify closure receipt behavior change",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "af22825dd",
+      "committed_at": "2026-05-30",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "PR-H1: disambiguate ClosureEvidenceReceipt from spine EvidenceReceipt",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "9255d6bcd",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "ci: retrigger with [impact-checked] in PR body",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "0c848bc8f",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "PR-H2: manifest_check enforces ACTIVE_SURFACE_MANIFEST <-> repo reality (#384)",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "3f0497add",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR384 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "75f67ac46",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "ci: retrigger with [impact-checked] in PR body",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "88707455d",
+      "committed_at": "2026-05-30",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "PR-H2: manifest_check enforces ACTIVE_SURFACE_MANIFEST <-> repo reality",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "996c96a9c",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "[codex] Default runtime context through Memory Kernel (#344)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "2076897a7",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR344 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "812bd9823",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "chore: remove accidental package-lock.json",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "774bdaa05",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "style: remove 9 redundant blank lines from orchestrator.py to fit module-line-budget",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "d9b03271b",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "refactor(memory): split default context helpers [impact-checked]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "9b58aa3b0",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "feat(memory): default context through memory kernel [impact-checked]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "37e01a77f",
+      "committed_at": "2026-06-05",
+      "author": "Copilot",
+      "subject": "feat(governance): PR quality gates, bot-pr-limit, stale-pr lifecycle & onboard rules (#394)",
+      "lane": "governance"
+    },
+    {
+      "sha": "8f9b8cd8d",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR394 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "5fbb6bcb2",
+      "committed_at": "2026-05-31",
+      "author": "copilot-swe-agent[bot]",
+      "subject": "feat(governance): add PR quality gates, bot-pr-limit, stale-pr lifecycle, and onboard hygiene section",
+      "lane": "governance"
+    },
+    {
+      "sha": "8313ae273",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "[codex] publish Codex toolbelt onboarding (#325)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "ee3160a5a",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR325 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "9a2064640",
+      "committed_at": "2026-05-21",
+      "author": "John Shrader",
+      "subject": "fix(docops): register ops onboarding docs in canonical guard + ownership map",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "7b5d9f717",
+      "committed_at": "2026-05-21",
+      "author": "Dhyana",
+      "subject": "docs(ops): publish Codex toolbelt onboarding",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "2f235bdfc",
+      "committed_at": "2026-06-05",
+      "author": "devin-ai-integration[bot]",
+      "subject": "fix(providers): dkeys \u2194 dharma_swarm env alias normalization + dashboard fidelity audit [impact-checked] (#323)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "3e9833db8",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "fix(env): repair dkeys alias export table after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "8e03c30f3",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "fix(security): keep dkeys export output analyzer-safe [impact-checked]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "6c6893c36",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "fix(security): avoid logging env alias secrets",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "dbe6820b0",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "fix(security): avoid logging credential aliases [impact-checked]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "ad29a2244",
+      "committed_at": "2026-05-21",
+      "author": "John Shrader",
+      "subject": "fix(security): remove sensitive values from log/print output [impact-checked]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "6a6a5b644",
+      "committed_at": "2026-05-21",
+      "author": "John Shrader",
+      "subject": "fix(api_keys): use target directly instead of snapshot copy in normalize_env_aliases",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "dedb50f14",
+      "committed_at": "2026-05-21",
+      "author": "John Shrader",
+      "subject": "ci: retrigger warrant with [impact-checked] in PR title",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "d61d610d6",
+      "committed_at": "2026-05-21",
+      "author": "John Shrader",
+      "subject": "fix(providers): dkeys \u2194 dharma_swarm env alias normalization + fidelity audit",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "211c6b9ea",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "ADR-008 (PROPOSED): ontology api_name grammar \u2014 PascalCase, no version suffix (#412)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "352b311fc",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR412 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "784737ca9",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "docs(adr): ADR-008 \u2014 resolve open-Q3 sibling api_name conventions (Palantir-grounded)",
+      "lane": "research"
+    },
+    {
+      "sha": "8df946135",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "docs(adr): ADR-008 \u2014 resolve open-Q1 api_name mutability via #413 Palantir grounding",
+      "lane": "research"
+    },
+    {
+      "sha": "bfc788c76",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "fix(docops): soften reserved authority terms in ADR-008 + regen auto-inventory",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "bba865e72",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "docs(adr): ADR-008 ontology api_name grammar + status-lifecycle + SEMVER [PROPOSED]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "424284156",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "design(perplexity-computer): autonomous-loop addendum + flip agent card to live NATS endpoint (#402)",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "bae59b51e",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "fix(docops): register perplexity autonomous loop doc",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "b98baa3d5",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "design(perplexity-computer): mark \u00a79 Q2 RESOLVED \u2192 agni VPS (option b)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "cd1176294",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "deploy(perplexity-computer): pick option (b) agni VPS as autonomous-loop daemon home",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "2b7015f4c",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "fuse(consolidation): Karpathy LLM Wiki as spine, OpenClaw Dreaming as gate, Codex deferred-write as cache discipline",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "7237f3493",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "design(perplexity-computer): autonomous-loop addendum + flip agent card to live NATS endpoint",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "1a35e96a9",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): auto-grounding for PR #431 (#432)",
+      "lane": "research"
+    },
+    {
+      "sha": "123de18c7",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR432 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "53a8c848c",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): auto-grounding for PR #431 \u2014 gaps surfaced",
+      "lane": "research"
+    },
+    {
+      "sha": "7ae592446",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "feat(kaizen): bind reviews to runtime truth refs (#431)",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "013228412",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR431 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "88666af0d",
+      "committed_at": "2026-06-01",
+      "author": "Dhyana",
+      "subject": "feat(kaizen): bind reviews to runtime truth refs",
+      "lane": "runtime-truth-spine"
+    },
+    {
+      "sha": "f31ed4746",
+      "committed_at": "2026-06-05",
+      "author": "devin-ai-integration[bot]",
+      "subject": "test: expand coverage \u2014 contracts/runtime, revenue/spine, cascade_domains/skill (#450)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "e144753e8",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR450 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "2e2e50a0b",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "test: Pass 3 \u2014 engine/events, auto_research/engine, auto_grade/engine",
+      "lane": "research"
+    },
+    {
+      "sha": "e130c208a",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "test: Pass 2 \u2014 auto_research/search, cascade_domains/meta, cascade_domains/code",
+      "lane": "research"
+    },
+    {
+      "sha": "8ddbbf1e0",
+      "committed_at": "2026-06-02",
+      "author": "John Shrader",
+      "subject": "test: add coverage for contracts/runtime, revenue/spine, cascade_domains/skill",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "1d3ced1b2",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "PR-H5 (scaffold): openapi-typescript codegen pipeline (#391)",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "6d86d1ecb",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR391 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "1aa119e47",
+      "committed_at": "2026-05-30",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "PR-H5 (scaffold): openapi-typescript codegen pipeline",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "69176ecff",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "PR-H4 (scaffold): storage_schema_registry contract for piecewise storage unification (#390)",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "854c64ee0",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR390 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "e5457b11f",
+      "committed_at": "2026-05-30",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "PR-H4 (scaffold): storage_schema_registry contract for piecewise storage unification",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "88933c40a",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "PR-H3 (scaffold): provider_registry contract for piecewise providers.py split (#389)",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "af7098859",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR389 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "e5f191aeb",
+      "committed_at": "2026-05-30",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "PR-H3 (scaffold): provider_registry contract for piecewise providers.py split",
+      "lane": "pr-repair-backlog"
+    },
+    {
+      "sha": "f0f71e71e",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "docs: Wedge re-survey \u2014 30-day time-to-first-dollar (supersedes #372, sibling to #370) (#373)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "fcaba3400",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR373 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "b81e3d83d",
+      "committed_at": "2026-05-29",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "docs: Wedge re-survey \u2014 30-day time-to-first-dollar (supersedes #372)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "8bbdaeeb9",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "docs(reports): autonomous activation architect \u2014 3 deliverables (#370)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "dcb0e1cf6",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR370 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "ba29375be",
+      "committed_at": "2026-05-30",
+      "author": "AmitabhainArunachala",
+      "subject": "docs: Proof-Artifact Pivot \u2014 become the evaluator, not the contestant (#382)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "48e68a9df",
+      "committed_at": "2026-05-28",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "docs(reports): autonomous activation architect \u2014 3 deliverables",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "7272f258c",
+      "committed_at": "2026-05-28",
+      "author": "Devin (Roaming) AGT-DEVIN_ROAMING_2987D222",
+      "subject": "docs(reports): add autonomous expansion seed audit + activation plan",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "881b2f9a2",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "seam(spine-adoption): consolidate deliverables into seams/spine-adoption/ for build pack (#426)",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "a0616febf",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR426 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "757afb10c",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "seam(spine-adoption): consolidate three deliverables into single folder for build pack",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "ef66e800f",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(spine-adoption): master spec + codex 5.5 plan for runtime spine saturation phase (#425)",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "d79153a5d",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR425 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "d10d0e56e",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(spine-adoption): master spec + codex 5.5 plan for runtime spine saturation phase",
+      "lane": "spine-adoption"
+    },
+    {
+      "sha": "001ea16ed",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "Seed: The Self-Reference Attractor \u2014 keystone synthesis (SRA_001) (#461)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "26159e0d8",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "fix(docops): register SRA authority indexes",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "74f6a849d",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR461 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "d43a3ce80",
+      "committed_at": "2026-06-03",
+      "author": "Perplexity Computer",
+      "subject": "seed(lodestones): Self-Reference Attractor keystone (SRA_001)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "e219d61c9",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(clean-main-audit): land v0.0.3.3 FIRST REAL audit on d5ebc456 + perplexity grounding companion (#422)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "e141d9b78",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR422 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "090721dba",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(clean-main-audit): land v0.0.3.3 audit on d5ebc456 + perplexity grounding companion",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "16dccc488",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(layer-2): vocabulary inhabitation census \u2014 22 types, narrative form (#414)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "055933f47",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR414 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "f29f12e67",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "andon(reconciliation): A/B/C verdicts in \u2014 Codex directionally right, evidentially sloppy",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "ca5be1887",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "andon(verdict): perplexity-C \u2014 authority & execution slice [C1 overstated, C2 confirmed, C3 partially_confirmed, C4 wrong]",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "fd1386913",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "andon: status tracker \u2014 line stopped, 3 verdicts in flight",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "9dae70f27",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "andon(audit-verification): pull cord \u2014 verify Codex audit before Layer-2 Revision 3",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "077398c3a",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(layer-2): governance revision \u2014 6 new types + gate count correction (option B)",
+      "lane": "governance"
+    },
+    {
+      "sha": "2f9572610",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(layer-2): add 6th tension \u2014 governance vocabulary depth (per PR #415 cron grounding)",
+      "lane": "governance"
+    },
+    {
+      "sha": "eb09bb692",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(layer-2): vocabulary inhabitation census \u2014 22 types, narrative form",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "fd2688c14",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): PhD-grade trio + executive brief grounding PR #408 + PR #409 (#410)",
+      "lane": "research"
+    },
+    {
+      "sha": "2f2d0888e",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR410 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "1e7cbf418",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): PhD-grade trio + executive brief grounding PR #408 + PR #409",
+      "lane": "research"
+    },
+    {
+      "sha": "66afaa11b",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): PhD-grade foundations grounding (#405)",
+      "lane": "research"
+    },
+    {
+      "sha": "965fc1b68",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR405 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "17ab74d41",
+      "committed_at": "2026-05-31",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): PhD-grade foundations grounding \u2014 7635 words, 49 citations, 41 sources",
+      "lane": "research"
+    },
+    {
+      "sha": "335d375c0",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "fix(guardian): bulletproof dedup \u2014 exact-title-match + PR-awareness + circuit breaker (#392)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "b32ec5d0f",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR392 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "9bca169ab",
+      "committed_at": "2026-05-30",
+      "author": "perplexity-computer",
+      "subject": "fix(guardian): bulletproof dedup \u2014 open issues + open PRs + circuit breaker",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "96f8e9005",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "fix(guardian): recognize @dataclass-synthesized __init__ (closes 29 dupe issues) (#383)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "06e69ac92",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR383 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "234762a0e",
+      "committed_at": "2026-05-30",
+      "author": "perplexity-computer",
+      "subject": "fix(guardian): recognize @dataclass-synthesized __init__ (closes 29 dupes)",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "1d078315b",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): auto-grounding for PR #436 (#442)",
+      "lane": "research"
+    },
+    {
+      "sha": "bfa1cfc18",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR442 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "c3c54e1b4",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): auto-grounding for PR #436 \u2014 gaps surfaced",
+      "lane": "research"
+    },
+    {
+      "sha": "02db9a5ba",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): auto-grounding for PR #435 (#439)",
+      "lane": "research"
+    },
+    {
+      "sha": "786f968b7",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR439 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "3030c1b68",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): auto-grounding for PR #435 \u2014 gaps surfaced",
+      "lane": "research"
+    },
+    {
+      "sha": "de6f3c430",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): auto-grounding for PR #433 (#434)",
+      "lane": "research"
+    },
+    {
+      "sha": "cefd7f15e",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR434 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "2192ed839",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): auto-grounding for PR #433 \u2014 gaps surfaced",
+      "lane": "research"
+    },
+    {
+      "sha": "d2e085432",
+      "committed_at": "2026-06-05",
+      "author": "AmitabhainArunachala",
+      "subject": "research(palantir-ontology): auto-grounding for PR #388 (#424)",
+      "lane": "research"
+    },
+    {
+      "sha": "9e25515fd",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "8cc029878",
+      "committed_at": "2026-06-05",
+      "author": "Dhyana",
+      "subject": "chore(docops): refresh counts for PR424 rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "4f9f787b9",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "138d71036",
+      "committed_at": "2026-06-01",
+      "author": "perplexity-computer",
+      "subject": "research(palantir-ontology): auto-grounding for PR #388 \u2014 gaps surfaced",
+      "lane": "research"
+    },
+    {
+      "sha": "19bdbb51e",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "ceea3e080",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "b7de14132",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts after rebase",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "0265d4e46",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): render active track includes + refresh manifest counts",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "1bc7ebf9d",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): render active track includes + refresh manifest counts",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "a4f399e3c",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): render active track includes + refresh manifest counts",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "9af7dd596",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): render active track includes + refresh manifest counts",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "acece249c",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): correct manifest counts from docops metrics",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "6052e5178",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): correct manifest counts from docops metrics",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "cf2446d7c",
+      "committed_at": "2026-06-05",
+      "author": "John Shrader",
+      "subject": "chore(docops): refresh manifest counts for PR #323 rebase onto main",
+      "lane": "unclassified"
+    },
+    {
+      "sha": "277bc5cc7",
+      "committed_at": "2026-05-24",
+      "author": "Dhyana",
+      "subject": "fix(security): keep dkeys export output analyzer-safe [impact-checked]",
+      "lane": "unclassified"
+    }
+  ],
+  "cleanup_candidates": [
+    {
+      "kind": "worktree",
+      "path": "/private/tmp/rss-wt-FU-CQ-PASSPORT-COUNT-review",
+      "branch": null,
+      "reason": "detached",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/.dharma/codex_lanes/worktrees/cleanup-audit",
+      "branch": "codex-lane/cleanup-audit",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_codex_lane_runner",
+      "branch": "feat/codex-lane-runner-2026-05-13",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_identity",
+      "branch": "cleanup/identity-onboarding-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_interop_fleet",
+      "branch": "review/interop-fleet-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_memory_knowledge",
+      "branch": "review/memory-knowledge-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_pr_queue_probe2_20260524",
+      "branch": null,
+      "reason": "detached",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_pr_queue_probe_20260524",
+      "branch": null,
+      "reason": "detached",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_proof_artifacts",
+      "branch": "review/proof-artifacts-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_recursive_discovery",
+      "branch": "feat/recursive-discovery-shadow-2026-05-14",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_root_governance_residue",
+      "branch": "review/root-governance-residue-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_route_witness",
+      "branch": "cleanup/route-witness-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_route_witness_main",
+      "branch": "cleanup/route-witness-main-2026-05-13",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_viz_invariant",
+      "branch": "cleanup/viz-invariant-projection-2026-05-12",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/cleanup_worktrees/dharma_swarm_world_radar_live",
+      "branch": "feat/world-radar-live-integration-2026-05-13",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/dharma_swarm_core_scan",
+      "branch": "feat/core-operating-circuit-proof",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/dharma_swarm_dgmd_smoke_20260514T045353Z",
+      "branch": null,
+      "reason": "detached",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/dharma_swarm_main_cutover",
+      "branch": "runtime/main-live-20260511",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/dharma_swarm_pr326",
+      "branch": null,
+      "reason": "detached",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/dharma_swarm_tcs_heartbeat",
+      "branch": "feat/world-radar-shakti-safe-convergence-2026-05-13",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_go_g06_local_model_inventory",
+      "branch": "feat/go-local-model-runtime-inventory",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_mask_prereg",
+      "branch": "experiments/mask-rv-whitebox-prereg",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "worktree",
+      "path": "/Users/dhyana/promotion_worktrees/dharma_swarm_runtime_projector",
+      "branch": "feat/runtime-result-projector",
+      "reason": "stale_review",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "backup/memory-kernel-prep-2026-05-14",
+      "reason": "23d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/route-witness-main-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/memory-kernel-context-eval-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "backup/route-witness-pr297-pre-rebase-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/main-recurring-live-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/runtime-result-projector-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/go-local-model-runtime-inventory-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/agent-truth-spine-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/kaizen-review-v0-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/module-metabolism-strategy-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/core-operating-circuit-proof-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/opportunity-dispatcher-budget-fix-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/brake-stabilization-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/action-authority-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "review/memory-knowledge-2026-05-12",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/root-memory-context-salvage-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "backup/route-witness-main-pre-rebase-2026-05-13",
+      "reason": "24d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/main-late-dirty-salvage-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/root-mixed-salvage-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "review/root-governance-residue-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "review/proof-artifacts-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "review/interop-fleet-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/identity-onboarding-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/viz-invariant-projection-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/route-witness-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/main-dirty-salvage-2026-05-12",
+      "reason": "25d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "branch",
+      "branch": "cleanup/mixed-quality-recovery-2026-05-10",
+      "reason": "27d old, no open PR head",
+      "review_only": true
+    },
+    {
+      "kind": "duplicate_pr_intent",
+      "title_key": "chore(governance): refresh spine adoption metric 81.2% (+6.2pp) [automated]",
+      "prs": [
+        513,
+        512
+      ],
+      "reason": "multiple open PRs normalize to same title",
+      "review_only": true
+    },
+    {
+      "kind": "dirty_pressure",
+      "category": "agentops_work_packets",
+      "count": 189,
+      "reason": "large untracked receipt/work-packet backlog needs lane ownership or archival",
+      "review_only": true
+    }
+  ]
+}

@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -120,6 +120,154 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
+
+**Next items:**
+
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+
+**Non-goals:**
+
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
+
+### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
+
+**Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
+**Moves vital signs:** quality_gates, eval_coverage
+
+Operator-instructed campaign (2026-06-11 master prompt): wire all 13
+cybernetic loops in CYBERNETIC_LOOP_MAP.md until each runs
+sense->interpret->constrain->act->adapt on real data with receipts to
+its declared owner surface and an automated closure check.
+
+Phase 0 (research dossier, no build code) ships first. Phases proceed
+in dependency-lattice order: Loop 1 trunk (provider chain + dispatch),
+then the fed cascade (6,2,5,9 -> 3,4,7 -> 8,10,11), then Loops 12/13
+gated behind the One Wire external-receipt quorum (N>=5, M>=3).
+
+Invariant that must hold throughout:
+  Internal artifacts never touch archive fitness; only countersigned
+  external acted receipts above quorum do.
+
+**Next items:**
+
+- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
+- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
+- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+
+**Non-goals:**
+
+- Do not weaken, bypass, or hard-code any telos gate to close a loop.
+- Do not let internal artifacts touch archive fitness (One Wire quorum stands).
+- Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+- Do not commit provider API keys or any credentials.
+- Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
+
+### Orientation Graph — whole-system view served on token one
+
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
+
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
+
+The track creates NO new truth store and NO authority surface. It
+projects from the existing owners only: foundations/THE_ORGANISM.md
+and docs/vision_maps/NORTH_STAR.md (identity),
+docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
+docs/governance/ACTIVE_TRACK.yaml (tracks),
+docs/docops/assertions.yaml canonical_guard.registered + the worktree
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
+
+Doctrine line that must hold (same as the reconciliation lane's):
+  Read models project truth from owners; they do not become authority.
+
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
+
+**Next items:**
+
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
+- Do not touch operator_core/** or runtime_state.py.
+
+### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
+
+**Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
+**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
+
+Build A from the composer convergence: merge Verified Composer Command
+Spine v1 with the Sovereign Holon Orchestrator target, bringing
+fable_composer and codex_composer up as the first read-only composer
+holon pair. The track is active as a scoped longrun lane, not as a new
+receipt owner. Command receipts are projections of spine.EvidenceReceipt.
+
+The clean GitHub-main mirror remains the merge target; the active build
+lane currently lives on qwen/spine-adoption because that lane contains
+the holon docs, modules, and verifier tests. The lane must reconcile back
+to main through the normal review path before it is called shipped.
+
+**Next items:**
+
+- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
+- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
+- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
+- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+
+**Non-goals:**
+
+- Do not create a new durable receipt store; project over spine.EvidenceReceipt.
+- Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
+- Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
+- Do not merge holon substrate to main without the frozen verifier runbook passing.
 
 **Recently closed tracks:**
 

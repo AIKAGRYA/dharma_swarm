@@ -1,0 +1,133 @@
+{
+  "acceptance": {
+    "archive_fitness_mutated": false,
+    "benchmark_adapter_verified": true,
+    "canonical_ds_goal_context_available": false,
+    "coordination_20_run_target_met": true,
+    "docker_smoke_passed": true,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "fitness_eligible_receipts": 0,
+    "public_benchmark_submission": false,
+    "repo_local_receipt_required": true,
+    "target_missing": []
+  },
+  "agent": "codex_5_5_cli",
+  "artifact_hashes": {
+    "benchmark_adapter_manifest": "sha256:f7c3a9571a2aa3fd5e2da78ccf256d729746f890202daff26ac37c8d731b934b",
+    "benchmark_adapter_verifier": "sha256:022c7259398faaa82c0d0bc26fd2b7b6c483ae7acb852eba15264fe63634b69a",
+    "coordination_gym_verifier": "sha256:9d0956d62d605052ffbe54c8b557d5a884bafd8632eab11427a59032d7b0605d",
+    "dense_events": "sha256:4696d3a8db8781e3e2b3e1b63eba4db368bed2a928c4c5892ebe7b60cda3c2ae",
+    "docker_sandbox_verifier": "sha256:ac9e94ca1918df067c61d1ee22516873e6c2e9f8a89169f41b001c261d74b2ca",
+    "status_artifact": "sha256:9db527cb794df49d69ca105956388a866774ea9825e125802023f4d5b5a543fc",
+    "status_markdown": "sha256:be59aaa949acc27abacd97825ac4137f73916a9bac9546eeb582dd8e3e9a96e7",
+    "status_packet": "sha256:13f0d75c14991095cd45522b6ba1aee5bd7dc68f5327a950091e7975c267cee9"
+  },
+  "authority": "evidence-only",
+  "blockers": [
+    "GitNexus MCP impact/detect-change registry still does not expose /Users/dhyana/dharma_swarm after npx gitnexus analyze; MCP lists only sibling dharma_swarm worktrees. CLI indexing itself completed successfully for this checkout.",
+    "ruff is not installed in the active venv, so ruff verification could not run."
+  ],
+  "canonical_ds_goal_context_available": false,
+  "created_at_utc": "2026-06-02T04:12:13Z",
+  "cycle": 3,
+  "external_boundary": {
+    "archive_fitness_changed": false,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "external_repo_contact": false,
+    "merged": false,
+    "payment_action": false,
+    "public_benchmark_submission": false,
+    "published": false,
+    "pushed": false
+  },
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra master spec",
+  "outputs": [
+    "scripts/runtime/forge_benchmark_adapter.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_benchmark_adapter.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_HYDRA_MASTER_SPEC.md",
+    "docs/architecture/NAVIGATION.md",
+    "reports/forge/forge-reality-arena/benchmark-adapter/sealed_task_manifest.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "packet_id": "forge-reality-arena-master-cycle-3",
+  "repo_local_receipt_required": true,
+  "result": "Added and verified a local benchmark adapter prep path with a sealed Terminal-Bench-style command fixture, a SWE-style micro-repair fixture, deterministic verifier artifact, and status/AgentOps visibility. The regenerated status reports no internal target gaps, zero fitness-eligible receipts, and no external authority actions.",
+  "role": "codex_forgewright",
+  "schema_version": "agentops_work_packet.v1",
+  "status_snapshot": {
+    "autonomous_relaunch_useful": false,
+    "benchmark_adapter_blockers": 0,
+    "benchmark_adapter_status": "verified",
+    "benchmark_adapter_tasks": 2,
+    "coordination_scenarios_run": 20,
+    "coordination_unique_scenarios": 10,
+    "dense_reps": 9,
+    "docker_sandbox_status": "smoke_passed",
+    "external_anchors_observed_not_owned": 2,
+    "fitness_eligible_receipts": 0,
+    "target_missing": []
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0
+    },
+    {
+      "command": "npx gitnexus analyze",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_benchmark_adapter.py scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_benchmark_adapter.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "13 passed, 1 pytest config warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "25 passed, 1 pytest config warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 2",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m ruff check scripts/runtime/forge_benchmark_adapter.py scripts/runtime/forge_reality_arena_status.py tests/test_forge_benchmark_adapter.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 1,
+      "summary": "No module named ruff"
+    }
+  ],
+  "tooling_notes": [
+    "MCP impact analysis was attempted before edits and failed to bind to /Users/dhyana/dharma_swarm.",
+    "npx gitnexus analyze completed for the checkout but did not refresh the MCP repo list in this session."
+  ],
+  "track": "dharma-reward-forge-v0"
+}

@@ -1,0 +1,254 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-41",
+  "cycle": 41,
+  "recorded_at": "2026-06-02T04:46:36+08:00",
+  "observed_at_utc": "2026-06-01T20:46:36Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "active_pr_recheck_evaleval_candidate_prepared_no_public_action",
+  "public_action_taken": false,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": false,
+  "automated_external_services_observed": true,
+  "non_maintainer_human_review_observed": true,
+  "human_maintainer_action_observed": false,
+  "new_pr_accepted_or_merged": false,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-041.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-041-active-pr-ledger.md",
+      "kind": "active_external_pr_ledger"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/evaleval-every-eval-ever-issue-152/cycle-041-readiness.md",
+      "kind": "target_readiness_packet_failed_gate"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-41.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-041-status/status_artifact.json",
+      "kind": "read_only_status_snapshot",
+      "sha256": "9a047e873de2f907d87502d565abfc93d63fc2c61f427e5f8ef31ad3c7e04a4a",
+      "status_hash": "sha256:5ea0200f2b06cd0814ecfbc9e2da24367d9fcec9e7e17f1bf8e19b9aa08a179f"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-041-status/status.md",
+      "kind": "read_only_status_snapshot_markdown",
+      "sha256": "f4bc1501293f3196547674e46ecf9d94192eb2db8cbf94d3b38d251c7235bdf6"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "dharma_impact_analysis_required": false
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "pr_number": 222,
+      "pr_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/pull/222",
+      "branch": "codex/issue-219-normalize-relationship-tests",
+      "head_sha": "39719a3c3405f8f7cb1d24e9184dab5a3db155e3",
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks": {
+        "CodeRabbit": "SUCCESS",
+        "GitGuardian Security Checks": "SUCCESS"
+      },
+      "linked_issue_state": "OPEN",
+      "linked_issue_locked": false,
+      "external_non_maintainer_review_observed": true,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "issue_number": 3,
+      "pr_number": 5,
+      "pr_url": "https://github.com/nakamekun/app-store-monitor/pull/5",
+      "branch": "codex/issue-3-troubleshooting-guide",
+      "head_sha": "14a36ce3513a9f5e25ba990945cc7e4822ee0237",
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks": {},
+      "linked_issue_state": "OPEN",
+      "linked_issue_locked": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "issue_number": 4,
+      "pr_number": 6,
+      "pr_url": "https://github.com/avanlolee/open-dtc-ops/pull/6",
+      "branch": "codex/issue-4-numeric-validation",
+      "head_sha": "5bed1aeb9c4db910328f1f70d7bc21b2671c8333",
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "UNSTABLE",
+      "checks": {},
+      "linked_issue_state": "OPEN",
+      "linked_issue_locked": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 11,
+      "pr_number": 22,
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "branch": "codex/issue-11-admin-plugins-list-tests",
+      "head_sha": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks": {
+        "Test (Python 3.9)": "SUCCESS",
+        "Test (Python 3.10)": "SUCCESS",
+        "Test (Python 3.11)": "SUCCESS",
+        "Test (Python 3.12)": "SUCCESS",
+        "Publish to PyPI": "SKIPPED"
+      },
+      "linked_issue_state": "OPEN",
+      "linked_issue_locked": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 7,
+      "pr_number": 23,
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/23",
+      "branch": "codex/issue-7-admin-dashboard-tests",
+      "head_sha": "12b87ab1f96cb02da0217aff7af2aead22967f66",
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks": {
+        "Test (Python 3.9)": "SUCCESS",
+        "Test (Python 3.10)": "SUCCESS",
+        "Test (Python 3.11)": "SUCCESS",
+        "Test (Python 3.12)": "SUCCESS",
+        "Publish to PyPI": "SKIPPED"
+      },
+      "linked_issue_state": "OPEN",
+      "linked_issue_locked": false,
+      "external_human_comment_observed": true,
+      "treated_as_maintainer_acceptance": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "labmain_recheck": {
+    "repo": "labmain/ai-agent-pay-demo",
+    "issue_number": 35,
+    "issue_url": "https://github.com/labmain/ai-agent-pay-demo/issues/35",
+    "state": "OPEN",
+    "locked": false,
+    "assignees": [],
+    "labels": [
+      "bounty:$50"
+    ],
+    "comments_count": 11,
+    "updated_at": "2026-05-31T03:46:50Z",
+    "open_prs_referencing_issue": 17,
+    "open_pr_numbers_referencing_issue": [
+      36,
+      51,
+      53,
+      59,
+      61,
+      62,
+      66,
+      67,
+      68,
+      72,
+      76,
+      79,
+      80,
+      83,
+      85,
+      86,
+      88
+    ],
+    "disqualified": true,
+    "disqualification_reason": "high competition"
+  },
+  "prepared_candidate": {
+    "repo": "evaleval/every_eval_ever",
+    "issue_number": 152,
+    "issue_url": "https://github.com/evaleval/every_eval_ever/issues/152",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/evaleval-every_eval_ever",
+    "local_branch": "codex/issue-152-docs-url",
+    "local_commit": "7b8dffd66f2c7df2d2ef7b892f00d10f88fbf229",
+    "public_action_taken": false,
+    "readiness_passed": false,
+    "readiness_failures": [
+      "direct competing PR #154 opened before public action",
+      "exact Docker Ruby 3.2 frozen Pages build failed compiling locked eventmachine 1.2.7 dependency"
+    ],
+    "fork_created": false,
+    "branch_pushed": false,
+    "pr_opened": false
+  },
+  "status_projection": {
+    "status_artifact_sha256": "9a047e873de2f907d87502d565abfc93d63fc2c61f427e5f8ef31ad3c7e04a4a",
+    "status_markdown_sha256": "f4bc1501293f3196547674e46ecf9d94192eb2db8cbf94d3b38d251c7235bdf6",
+    "status_hash": "sha256:5ea0200f2b06cd0814ecfbc9e2da24367d9fcec9e7e17f1bf8e19b9aa08a179f",
+    "acted_receipts": 3,
+    "external_humans_or_orgs_acted": 3,
+    "internal_build_items": 0,
+    "internal_repair_items": 0,
+    "pending_countersign_items": 6,
+    "external_authority_blocked_items": 1,
+    "autonomous_cycle_useful": false
+  },
+  "guardrails": {
+    "money_spent_or_requested": false,
+    "payment_claimed": false,
+    "private_credentials_submitted": false,
+    "protected_branch_pushed_or_merged": false,
+    "broad_claims_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "archive_fitness_nonzero_set": false,
+    "v2_autonomy_escalated": false
+  },
+  "blockers": [
+    "active external PRs still lack maintainer acceptance, merge, approval, or material review",
+    "labmain issue 35 remains overcrowded with 17 competing open PRs",
+    "evaleval candidate failed readiness due to competing PR 154 and exact Pages build blocker"
+  ]
+}

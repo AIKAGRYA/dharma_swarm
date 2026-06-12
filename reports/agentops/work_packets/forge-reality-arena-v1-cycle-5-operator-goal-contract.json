@@ -1,0 +1,109 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-5-operator-goal-contract",
+  "created_at_utc": "2026-06-02T14:25:23Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "internal-only evidence-only",
+  "mission": "Forge Reality Arena v1",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "operator_goal_id": "",
+  "operator_goal_id_present": false,
+  "operator_goal_id_status": "unavailable",
+  "operator_goal_id_unavailable_reason": "not_recorded_in_autonomy_mission",
+  "result": "Cycle 5 tightened the mission identity contract: the v1 scorecard and AgentOps status packet now expose operator_goal_id_present, operator_goal_id_status, operator_goal_id_unavailable_reason, mission_id_source, mission_ref, mission_status, and canonical_ds_goal_context_available instead of leaving operator_goal_id as an unexplained empty string.",
+  "score_status": {
+    "score": 100,
+    "completion_state": "internal_exhausted_external_gated",
+    "score_delta": "none",
+    "remaining_internal_packets": [],
+    "remaining_external_gates": [
+      "guardian_or_external_acted_receipt_required",
+      "guardian_countersign_required_before_archive_fitness_mutation",
+      "operator_external_action_lease_required_before_sparse_lane_action"
+    ]
+  },
+  "files_changed": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-5-operator-goal-contract.json"
+  ],
+  "tests": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "outcome": "passed: 24 tests"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "outcome": "passed; read-only census reported mission.forge_reality_arena source-cache mismatch from the previous heartbeat"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check -- scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py reports/forge/forge-reality-arena/status_artifact.json reports/forge/forge-reality-arena/v1_scorecard.json reports/forge/forge-reality-arena/v1_scorecard.md reports/agentops/work_packets/forge-reality-arena-status.json",
+      "outcome": "passed"
+    }
+  ],
+  "receipts": [
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-5-operator-goal-contract.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json"
+  ],
+  "acceptance": {
+    "mission_id_present": true,
+    "operator_goal_id_unavailable_marker_present": true,
+    "scorecard_has_operator_goal_id_present": true,
+    "agentops_has_operator_goal_id_present": true,
+    "dynamic_v1_cycle_receipt_indexing": true,
+    "external_actions_performed": false,
+    "archive_fitness_changed": false,
+    "fitness_mutation_performed": false,
+    "external_confirmed_set": false
+  },
+  "impact_check": {
+    "gitnexus_status": "blocked_for_active_checkout",
+    "gitnexus_probe": "mcp__gitnexus.impact target=summarize_reality_arena_status returned target not found against sibling index /Users/dhyana/worktrees/dharma_swarm_runtime_truth_spine_v2",
+    "manual_impact": "rg found direct usage limited to scripts/runtime/forge_reality_arena_status.py and tests/test_forge_reality_arena_status.py"
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "push_merge_publish": false,
+    "dry_run_only": true
+  },
+  "blockers": [
+    "not_recorded_in_autonomy_mission",
+    "guardian_countersign_not_observed",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next": "External Beast / Measurement Guardian lease packet: request explicit operator approval before any external action or archive fitness mutation."
+}

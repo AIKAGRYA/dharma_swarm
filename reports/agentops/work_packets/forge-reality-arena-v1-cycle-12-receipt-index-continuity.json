@@ -1,0 +1,94 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-12-receipt-index-continuity",
+  "created_at_utc": "2026-06-02T15:40:19Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "cycle": {
+    "v1_cycle": 12,
+    "operator_cycle": 12,
+    "label": "receipt-index-continuity"
+  },
+  "result": "Cycle 12 made v1 cycle receipt indexing durable after verified negative-result packets. The scorecard/status contract now exposes latest_v1_cycle_receipt_ref, orders v1 cycle receipts by numeric cycle, and includes watchdog-idle negative receipts when artifacts are regenerated.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-12-receipt-index-continuity.json"
+  ],
+  "verification": [
+    {
+      "command": "GitNexus impact _collect_v1_receipt_refs",
+      "exit_code": 0,
+      "result": "tool returned target not found; manual file-level blast radius used"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "25 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --refresh-runtime-truth",
+      "exit_code": 0,
+      "result": "regenerated status_artifact, scorecard, AgentOps status, runtime truth snapshots, and Control Watch Tower readout"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "exit_code": 0,
+      "result": "dharma-reward-forge-v0 and goodworks-dgm-core-2026-05 reported shippable by local criteria"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "result": "pass; wrote reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "result": "pass; wrote reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "exit_code": 0,
+      "result": "pass; source_cache_mismatches=[] and probe_failures=[]"
+    },
+    {
+      "command": "make onboard > /Users/dhyana/.dharma/forge_reality_arena_master/cycle_012_make_onboard.txt",
+      "exit_code": 0,
+      "result": "pass; onboard output captured under the v1 writable state dir"
+    }
+  ],
+  "evidence": {
+    "run_id": "20260602T133721Z",
+    "state_dir": "/Users/dhyana/.dharma/forge_reality_arena_master",
+    "status_artifact_ref": "reports/forge/forge-reality-arena/status_artifact.json",
+    "scorecard_ref": "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "onboard_capture_ref": "/Users/dhyana/.dharma/forge_reality_arena_master/cycle_012_make_onboard.txt",
+    "previous_negative_result_ref": "reports/agentops/work_packets/forge-reality-arena-v1-cycle-11-watchdog-idle-negative.json"
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "dry_run_only": true
+  },
+  "score_delta": "none; score remains 100/100 and internal_exhausted_external_gated",
+  "blockers": [
+    "GitNexus active checkout target lookup still cannot resolve _collect_v1_receipt_refs",
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next_packet": "Let the 10h supervisor continue only for external-gated monitoring receipts, or stop/escalate to an operator-approved External Beast or Measurement Guardian lease packet."
+}

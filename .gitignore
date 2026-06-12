@@ -41,6 +41,16 @@ external/
 .dharma_witness_link
 .memory_fallback/
 
+# Hyperfile branch runtime state (heartbeats, pids, ephemeral vision dumps).
+# These were committed by mistake; they are machine-local agent state, not source.
+.dharma_psmv_hyperfile_branch/
+.dharma_psmv_hyperfile_branch_v2/
+
+# Raw model output dumps from the telos engine (NDJSON traces).
+# These are runtime artifacts, not authored documentation. If a packet needs
+# to cite a specific output, promote a curated excerpt into a tracked .md.
+docs/telos-engine/.raw-outputs/
+
 # Build artifacts
 .next/
 node_modules/
@@ -57,6 +67,8 @@ reports/psmv_hyperfiles_20260313/graphs/*.json
 reports/memory_kernel/
 reports/docops/
 reports/system_map/latest.json
+reports/revenue_wedge/
+reports/forge/
 results.tsv
 run.log
 synthesizer_memory.json
@@ -91,3 +103,7 @@ results/*/
 
 # Paper drafts (kept local until promoted to a tracked branch).
 paper/
+.cursor/
+tools/world_scout_go/world_scout_go
+tools/evidence_ingestor_go/evidence_ingestor_go
+reports/capital_lab/goal_a_12h/session_logs/*.log

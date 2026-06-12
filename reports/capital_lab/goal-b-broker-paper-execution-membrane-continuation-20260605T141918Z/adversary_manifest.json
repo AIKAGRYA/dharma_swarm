@@ -1,0 +1,46 @@
+{
+  "schema_version": "goal_b.adversary_manifest.v1",
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "task_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation-t03-adversary",
+  "agent_uid": "hermes-m5",
+  "generated_at": "2026-06-05T14:29:51Z",
+  "status": "completed_by_receipt",
+  "ds_goal_receipt_id": "r-bc66f87e85b968b8",
+  "supersedes_receipt_id": "r-112047492b716310",
+  "amendment_reason": "Planner lane restored contract/schema artifacts after initial adversary scan; packet and report were amended before final handoff.",
+  "verdict": "block_clean_status",
+  "live_readiness": 0,
+  "live_authority": false,
+  "broker_write_authority": false,
+  "clean": false,
+  "artifacts": [
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/adversary_packet.json",
+      "sha256": "4f8fa366a1caba2db0f45296a414eebdb399d14f541beaa34281fbe2afda3cdc"
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/adversary_report.md",
+      "sha256": "4fd678172a3b38ebab16576b0272324586aa1efa6ba74800fb095d7ad7e495da"
+    }
+  ],
+  "verification": {
+    "command": "python3 scripts/runtime/autonomy_spine.py verify --mission-id 20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation --phase ready --json",
+    "ready_valid": true,
+    "blockers": [],
+    "counts_after_receipt": {
+      "blocked": 1,
+      "claimed": 1,
+      "completed": 3,
+      "failed": 0,
+      "open": 0,
+      "total": 5
+    }
+  },
+  "non_actions": [
+    "No live orders placed.",
+    "No live broker keys read.",
+    "No secret values recorded.",
+    "No NATS or A2A live collaboration claimed.",
+    "No profit, alpha, or live-readiness claim made."
+  ]
+}

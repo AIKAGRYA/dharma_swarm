@@ -67,6 +67,10 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 **Status:** CANONICAL
 **Audience:** Engineer, Operator, Agent
 **Read for:** the field-level "what is this trying to become" — recognition-mediated autopoiesis / Attractor Closure.
+**Current operator-authored vision layer (read first within this slot):**
+- `dharma_swarm/docs/vision_maps/NORTH_STAR.md` (operator-authored, 2026-06-11 — telos, trust gate, canon-metabolism rule, organ table)
+- `dharma_swarm/foundations/THE_ORGANISM.md` (identity map — the one-line and the genome hierarchy)
+- `dharma_swarm/docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md` (the binocular frame)
 **Substrate referenced from this slot:**
 - `dharma_swarm/docs/vision_maps/MASTER_2026-05-07_attractor_closure.md` (predecessor A)
 - `dharma_swarm/docs/vision_maps/2026-05-07_attractor_closure/01..06_*.md` (six child maps)

@@ -60,6 +60,46 @@ def test_resolve_runtime_provider_config_for_openrouter_uses_canonical_base(monk
     assert cfg.available is True
 
 
+def test_resolve_runtime_provider_config_normalizes_alias_env() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.GOOGLE_AI,
+        env={"GEMINI_API_KEY": "gemini-key"},
+    )
+
+    assert cfg.api_key == "gemini-key"
+    assert cfg.available is True
+
+
+def test_anthropic_routes_to_claude_code_by_default(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_provider._resolve_cli_binary",
+        lambda name: f"/usr/bin/{name}",
+    )
+
+    cfg = resolve_runtime_provider_config(
+        ProviderType.ANTHROPIC,
+        env={"ANTHROPIC_API_KEY": "metered-key"},
+    )
+
+    assert cfg.provider == ProviderType.CLAUDE_CODE
+    assert cfg.api_key is None
+    assert cfg.available is True
+
+
+def test_anthropic_api_escape_hatch_keeps_raw_api() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.ANTHROPIC,
+        env={
+            "ANTHROPIC_API_KEY": "metered-key",
+            "DHARMA_FORCE_ANTHROPIC_API": "1",
+        },
+    )
+
+    assert cfg.provider == ProviderType.ANTHROPIC
+    assert cfg.api_key == "metered-key"
+    assert cfg.available is True
+
+
 def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
     monkeypatch,
     tmp_path,
@@ -79,6 +119,7 @@ def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
 
 def test_runtime_provider_openrouter_default_model_matches_canonical_hierarchy() -> None:
     assert DEFAULT_OPENROUTER_MODEL == DEFAULT_MODELS[ProviderType.OPENROUTER]
+    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.5"
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkeypatch) -> None:
