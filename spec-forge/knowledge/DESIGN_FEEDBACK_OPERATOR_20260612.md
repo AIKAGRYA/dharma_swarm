@@ -147,3 +147,40 @@ changed zero pixels — correct).
 14. **Screenshot shows scrollback ghost-frames** above the live UI in the attached
     terminal (stale earlier render visible above current frame) — same family as
     F-170 boot-row discipline; alt-screen would fix both.
+
+## OPERATOR LIVE VERDICT + CONDUCTOR REAL-BACKEND SESSION (2026-06-12 ~12:30)
+
+**THE OPERATOR FLUNKED THE CURRENT APP** using it live against the real backend:
+"totally flunking grade... terrible... super confusing... not even interactive...
+slow and clunky." This verdict is the grading baseline. His screenshot + the
+conductor's own real-backend session (operator lane, real bridge, real codex)
+decoded it into named causes:
+
+15. **Trace noise IS the chat.** "hello?" produced 11 lines of plumbing (Trace
+    expanded by default, raw session hex IDs, request numbers, "Turn completed")
+    with the actual reply buried beneath. Operator-facing rule: response is the
+    star, trace is ONE collapsed line (`✓ 2.3s · codex:gpt-5.4 · ^T details`);
+    raw IDs NEVER render in the transcript.
+16. **CONFIRMED LIVE — the silent answer drop (worst bug).** Conductor asked the
+    real system "who are you and what can you do?" → backend routed it as an
+    identity intent → answered via an `assistant` event → TS layer does not handle
+    `assistant` events (bridge_events.md unhandled list) → the answer was DISCARDED
+    and the turn rendered as "◇ Turn 1 | complete" with NO response text at all.
+    The system speaks; the TUI throws the words away and stamps it complete.
+17. **No conversation memory + per-turn session teardown.** Both operator turns and
+    conductor turns show full bootstrap→session-ended per message (the wire
+    mismatch: TS sends history, Python ignores it). Operator's "not interactive"
+    = same canned router monologue twice + multi-second-to-minutes turn latency
+    dominated by session startup.
+18. **Raw JSON error blob dumped into chat** (conductor's first sandboxed attempt):
+    a full pretty-printed error object incl. schema_version/timestamps rendered in
+    the conversation; AND the failure carried a ✓ checkmark ("✓ Status | session
+    failed") with "Turn failed" as a buried sub-bullet. Errors render as one human
+    line + status color; glyphs must match semantics; turn state must be loud.
+19. **Scenic strip shatters on the operator's actual terminal font** — renders as
+    confetti blocks, not Fuji/waves. Art must degrade gracefully or be absent
+    (zen default); never assume glyph coverage.
+20. **Reprioritization (operator word, 2026-06-12): the felt experience is the
+    priority axis.** The chat-experience cluster (trace collapse, assistant-event
+    handling, session continuity, turn honesty, zen mode, one-line tabs) is pulled
+    forward in pick order ahead of remaining infrastructure depth.
