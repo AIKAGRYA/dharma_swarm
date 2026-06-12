@@ -2039,14 +2039,25 @@ class ModelRouter:
             return "provider_timeout"
         if body.startswith("error:") or body.startswith("error (rc="):
             return "provider_error"
-        # Detect billing/credit failures returned as content (not exceptions)
+        # Three orthogonal failure classes (a quota exhaustion is not a
+        # circuit failure, and a rate limit is neither):
+        #   rate_limited     -- transient; back off / fall through, never fast-trip
+        #   quota_exhausted  -- permanent until operator refills; fast-trip
+        #   billing_exhausted-- permanent until operator pays/re-enables; fast-trip
+        _RATE_LIMIT_MARKERS = (
+            "rate_limit_exceeded",
+            "rate limit",
+            "too many requests",
+            "429",
+        )
+        _QUOTA_MARKERS = (
+            "insufficient_quota",
+            "you exceeded your current quota",
+        )
         _BILLING_MARKERS = (
             "credit balance is too low",
             "credit balance",
-            "insufficient_quota",
-            "you exceeded your current quota",
             "billing hard limit",
-            "rate_limit_exceeded",
             "your api key has been disabled",
         )
         _ACCESS_DENIED_MARKERS = (
@@ -2057,6 +2068,12 @@ class ModelRouter:
             "unauthorized",
         )
         if len(body) < 300:
+            for marker in _RATE_LIMIT_MARKERS:
+                if marker in body:
+                    return "rate_limited"
+            for marker in _QUOTA_MARKERS:
+                if marker in body:
+                    return "quota_exhausted"
             for marker in _BILLING_MARKERS:
                 if marker in body:
                     return "billing_exhausted"
@@ -2777,15 +2794,18 @@ class ModelRouter:
                 latency_ms = (time.monotonic() - attempt_started) * 1000.0
                 response_error = self._response_indicates_failure(response)
                 if response_error:
-                    # Fast-trip circuit for billing exhaustion and permanent 403s.
-                    # Don't waste 8 retries on a dead provider — trip immediately
-                    # so the router falls through to the next working provider.
+                    # Fast-trip circuit for billing/quota exhaustion and
+                    # permanent 403s. Don't waste 8 retries on a dead provider —
+                    # trip immediately so the router falls through to the next
+                    # working provider. rate_limited is transient: record one
+                    # failure (the breaker opens only on sustained pressure)
+                    # and fall through without poisoning the lane.
                     _is_permanent = response_error in (
-                        "billing_exhausted", "access_denied", "quota_exceeded"
+                        "billing_exhausted", "access_denied", "quota_exhausted"
                     )
                     if _is_permanent:
                         # Force circuit open by recording enough failures at once
-                        for _ in range(breaker._config.min_samples):
+                        for _ in range(breaker.config.min_samples):
                             breaker.record_failure()
                         logger.warning(
                             "Fast-tripped circuit breaker for %s: %s",
@@ -2793,7 +2813,8 @@ class ModelRouter:
                         )
                     else:
                         breaker.record_failure()
-                    self._update_reward(provider_type, reward_model, -0.50)
+                    _penalty = -0.15 if response_error == "rate_limited" else -0.50
+                    self._update_reward(provider_type, reward_model, _penalty)
                     self._record_routing_memory_outcome(
                         provider=provider_type,
                         model=reward_model,
