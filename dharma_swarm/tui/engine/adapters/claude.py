@@ -220,8 +220,13 @@ class ClaudeAdapter(ProviderAdapter):
         # Increase StreamReader line limit to tolerate large NDJSON tool-result
         # events (default is 64 KiB and can fail on large file reads).
         stream_limit = int(self._config.extra.get("stream_reader_limit", 2_000_000))
+        # stdin MUST be detached: the prompt rides argv (-p). Without this the
+        # child inherits the bridge's own stdin (the TS<->python socket), and
+        # the claude CLI blocks forever waiting for that stream's EOF — the
+        # live "turn never resolves" hang found 2026-06-13.
         return await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(self._workdir),
@@ -232,6 +237,13 @@ class ClaudeAdapter(ProviderAdapter):
     def _build_env(self, request: CompletionRequest) -> dict[str, str]:
         env = dict(os.environ)
         env.pop("CLAUDECODE", None)
+        # Max-plan routing guard (MODEL_KEY_ROUTING canon): an inherited
+        # metered API key silently rebills turns onto the API account
+        # ("Credit balance is too low" incident, 2026-06-12). Chat-safe lanes
+        # opt in to scrubbing; DHARMA_FORCE_ANTHROPIC_API=1 is the escape hatch.
+        if request.provider_options.get("scrub_metered_keys") and env.get("DHARMA_FORCE_ANTHROPIC_API") != "1":
+            env.pop("ANTHROPIC_API_KEY", None)
+            env.pop("ANTHROPIC_AUTH_TOKEN", None)
         internet_enabled = bool(request.provider_options.get("internet_enabled", True))
         if internet_enabled:
             env.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
@@ -270,6 +282,20 @@ class ClaudeAdapter(ProviderAdapter):
         max_turns = request.provider_options.get("max_turns")
         if isinstance(max_turns, int) and max_turns > 0:
             cmd.extend(["--max-turns", str(max_turns)])
+
+        # Chat-lane safety surface: callers can pin the built-in tool set
+        # (`tools: ""` disables all tools), cap spend, and drop MCP servers.
+        tools_value = request.provider_options.get("tools")
+        if tools_value is not None:
+            cmd.extend(["--tools", str(tools_value)])
+        budget = request.provider_options.get("max_budget_usd")
+        if budget is not None:
+            cmd.extend(["--max-budget-usd", str(budget)])
+        if request.provider_options.get("strict_mcp_config"):
+            cmd.extend(["--strict-mcp-config", "--mcp-config", json.dumps({"mcpServers": {}})])
+        setting_sources = request.provider_options.get("setting_sources")
+        if setting_sources is not None:
+            cmd.extend(["--setting-sources", str(setting_sources)])
 
         if request.system_prompt:
             cmd.extend(["--append-system-prompt", request.system_prompt])

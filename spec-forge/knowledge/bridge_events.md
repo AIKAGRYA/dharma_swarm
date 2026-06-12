@@ -300,7 +300,7 @@ Dispatch is the if-chain in `_handle_request` (`terminal_bridge.py:290-370`). Ex
 | 9 | `agent.routes` | — | `agent.routes.result` | yes (:125, :852, :2087) |
 | 10 | `evolution.surface` | — | `evolution.surface.result` | yes (:126, :2102) |
 | 11 | `session.bootstrap` | `prompt` (required), `active_tab?`, `provider?`, `model?`, `strategy?` — **`resume_session_id` is sent by TS (:2649) but IGNORED by `_build_session_bootstrap`** | `session.bootstrap.result` | yes (:2643) |
-| 12 | `session.start` | `prompt` (required), `provider? ("codex")`, `model?`, `session_id?`, `bootstrap?: object`, `system_prompt?`, `enable_thinking?: boolean`, `resume_session_id?`, `provider_options?: object` — **`messages` is sent by TS (:2091-2123) but IGNORED by Python** (`:807-814` builds messages from `prompt` only) | `session.ack` → stream events → `session_end`; or intent shortcuts (`intent.result`+`command.result`+synth `session_end`, or `assistant`+synth `session_end`); or `bridge.error` | yes (:2090, :2105, :2116) |
+| 12 | `session.start` | `prompt` (required), `provider? ("codex")`, `model?`, `session_id?`, `bootstrap?: object`, `system_prompt?`, `enable_thinking?: boolean`, `resume_session_id?`, `provider_options?: object` — `messages?: [{role,content}]` — CONSUMED since 2026-06-13 for chat-intent turns (lightweight chat lane: history + slim prompt + no tools; bridge also keeps a per-process rolling history with assistant replies); non-chat intents still build from `prompt` only | `session.ack` → stream events → `session_end`; or intent shortcuts (`intent.result`+`command.result`+synth `session_end`, or `assistant`+synth `session_end`); or `bridge.error` | yes (:2090, :2105, :2116) |
 | 13 | `session.catalog` | `cwd?: string`, `limit?: number (20)` | `session.catalog.result` | yes (:858) |
 | 14 | `session.detail` | `session_id` (required), `transcript_limit?: number (80)` | `session.detail.result` \| `bridge.error` | yes (:869) |
 | 15 | `session.cancel` | — | `session.cancelled` | **no** |
@@ -325,7 +325,7 @@ Dispatch is the if-chain in `_handle_request` (`terminal_bridge.py:290-370`). Ex
 
 ## 4. Mismatches & gaps surfaced by this inventory (feed into F-023..F-028 acceptance)
 
-1. **TS `messages` ignored**: app.tsx sends conversation history in `session.start.messages`; Python builds `messages=[{role:"user",content:prompt}]` only (`terminal_bridge.py:807-814`). Continuity is currently prompt-string-only on the wire.
+1. **RESOLVED 2026-06-13 — TS `messages` consumed for chat intents**: `_run_chat_turn` merges the bridge's rolling history (user+assistant) with TS-sent `messages`, rides a no-tools lane ladder (configured-if-cheap -> model_hierarchy free-first openrouter -> claude Max no-tools w/ session resume), and answers in seconds. Non-chat intents keep the rich agentic path.
 2. **`resume_session_id` ignored in `session.bootstrap`** (used only in `session.start` → CompletionRequest).
 3. **Dead `content`**: workspace/runtime snapshot handlers compute rendered text and drop it (`:417-422`, `:447`); TS fallbacks reading `event.content` for those events are dead code.
 4. **Unhandled on TS side** (must still be union members): `intent.result`, `assistant`, `session.cancelled`, `status.result`, `operator.snapshot.result`, stream `usage`, `rate_limit`, `tool_args_delta`, `tool_progress`, live `session_start`.
@@ -469,7 +469,7 @@ export type DharmaBridgeRequest =
   | { type:"session.bootstrap"; prompt:string; active_tab?:string; provider?:string; model?:string; strategy?:string }
   | { type:"session.start"; prompt:string; provider?:string; model?:string; session_id?:string;
       bootstrap?:Record<string,unknown>; system_prompt?:string; enable_thinking?:boolean;
-      resume_session_id?:string; provider_options?:Record<string,unknown> }     // NOTE: `messages` not consumed by Python
+      resume_session_id?:string; provider_options?:Record<string,unknown> }     // `messages` consumed for chat intents since 2026-06-13
   | { type:"session.catalog"; cwd?:string; limit?:number }
   | { type:"session.detail"; session_id:string; transcript_limit?:number }
   | { type:"session.cancel" }

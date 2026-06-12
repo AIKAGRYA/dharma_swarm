@@ -14,6 +14,7 @@ from dataclasses import asdict, is_dataclass
 import importlib.util
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -53,7 +54,9 @@ from dharma_swarm.operator_core import (
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm.provider_matrix import build_default_matrix_targets
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
+from dharma_swarm.model_hierarchy import DEFAULT_MODELS as HIERARCHY_DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
+from dharma_swarm import api_keys
 from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
@@ -67,11 +70,19 @@ from dharma_swarm.operator_core import build_session_catalog, build_session_deta
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_control import load_terminal_control_state
 from dharma_swarm.tui.engine.events import (
+    ErrorEvent,
     PermissionDecisionEvent,
     PermissionOutcomeEvent,
     PermissionResolutionEvent,
+    SessionEnd,
+    SessionStart,
+    TextComplete,
     ToolCallComplete,
 )
+
+# Chat-lane sizing: messages sent per turn / retained per bridge process.
+CHAT_HISTORY_SEND_LIMIT = 24
+CHAT_HISTORY_RETAIN = 48
 
 def _json_default(value: object) -> object:
     if is_dataclass(value):
@@ -109,6 +120,8 @@ class TerminalBridge:
         self._package_root = Path(__file__).resolve().parent
         self._state_dir = Path.home() / ".dharma" / "terminal"
         self._session_store = SessionStore()
+        self._chat_history: list[dict[str, str]] = []
+        self._claude_chat_session_id: str | None = None
         self._ensure_adapters()
 
     def _load_repo_guidance(self, limit_chars: int = 2400) -> str:
@@ -284,7 +297,19 @@ class TerminalBridge:
                     }
                 )
                 continue
-            await self._handle_request(request)
+            try:
+                await self._handle_request(request)
+            except Exception as exc:
+                # A handler crash must never kill the bridge silently: emit an
+                # explicit failure tied to the request and keep serving.
+                self._emit(
+                    {
+                        "type": "bridge.error",
+                        "request_id": str(request.get("id", "") or ""),
+                        "code": "handler_exception",
+                        "message": f"{type(exc).__name__}: {exc}",
+                    }
+                )
         return 0
 
     async def _handle_request(self, request: dict[str, Any]) -> None:
@@ -486,6 +511,17 @@ class TerminalBridge:
     async def _handle_action_run(self, request_id: str, request: dict[str, Any]) -> None:
         action_type = str(request.get("action_type", "") or "").strip().lower()
         result = await asyncio.to_thread(self._run_action, action_type, request)
+        if action_type == "model.set" and not bool(result.get("ok")):
+            # A failed route switch must render in the conversation, not just
+            # in the models pane: the assistant wire shape (F-173) lands on
+            # the open chat turn.
+            self._emit(
+                {
+                    "type": "assistant",
+                    "request_id": request_id,
+                    "message": f"✖ {result.get('summary', 'route change failed')}. {result.get('output', '')}".strip(),
+                }
+            )
         if action_type == "approval.resolve" and isinstance(result.get("payload"), dict):
             runtime_enforcement = await self._record_runtime_approval_resolution(result["payload"])
             result["payload"]["enforcement_state"] = runtime_enforcement["enforcement_state"]
@@ -790,6 +826,15 @@ class TerminalBridge:
             )
             return
 
+        intent_kind = str(intent.get("kind", "chat")) if isinstance(intent, dict) else "chat"
+        if intent_kind == "chat":
+            # Conversational turns ride the lightweight completion path:
+            # conversation history, slim system prompt, no tools, no agentic
+            # session boot. Operational intents (command/agent/evolution)
+            # keep the rich path below.
+            await self._run_chat_turn(request_id, request)
+            return
+
         session_id = str(request.get("session_id", "") or uuid.uuid4().hex)
         self._active_session_id = session_id
         self._active_provider_id = provider_id
@@ -822,6 +867,255 @@ class TerminalBridge:
                 self._emit(payload)
         finally:
             self._active_session_id = None
+
+    async def _run_chat_turn(self, request_id: str, request: dict[str, Any]) -> None:
+        """Lightweight conversational turn: history, slim prompt, no tools.
+
+        Lanes are tried in canon order (configured-if-cheap, then the
+        model_hierarchy free-first choice, then the claude Max-plan no-tools
+        lane). Each lane's events are buffered; only the winning lane (or the
+        final failing lane) is emitted, so the TS sees exactly one coherent
+        session lifecycle per request.
+        """
+        prompt = str(request.get("prompt", "") or "").strip()
+        active_tab = str(request.get("active_tab", "") or "chat")
+        requested_provider = str(request.get("provider", "") or "").strip().lower()
+        requested_model = str(request.get("model", "") or "").strip()
+        lanes = self._chat_lanes(requested_provider, requested_model)
+        session_id = str(request.get("session_id", "") or uuid.uuid4().hex)
+        if not lanes:
+            self._emit(
+                {
+                    "type": "bridge.error",
+                    "request_id": request_id,
+                    "code": "no_chat_route",
+                    "message": "no chat-capable provider adapter is available",
+                }
+            )
+            self._emit(
+                {
+                    "type": "session_end",
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "success": False,
+                    "error_code": "no_chat_route",
+                    "error_message": "no chat-capable provider adapter is available",
+                }
+            )
+            return
+
+        base_messages = self._build_chat_messages(request, prompt)
+        self._emit(
+            {
+                "type": "session.ack",
+                "request_id": request_id,
+                "session_id": session_id,
+                "provider": lanes[0][0],
+                "model": lanes[0][1],
+                "mode": "chat",
+            }
+        )
+
+        lane_queue = list(lanes)
+        lane_failures: list[str] = []
+        last_buffer: list[dict[str, Any]] = []
+        index = 0
+        while index < len(lane_queue):
+            provider_id, model_id, options, note = lane_queue[index]
+            index += 1
+            adapter = self._adapters.get(provider_id)
+            if adapter is None:
+                continue
+            messages = base_messages
+            system_prompt: str | None = self._render_chat_system_prompt(
+                provider_id=provider_id,
+                model_id=model_id,
+                active_tab=active_tab,
+                note=note,
+            )
+            resume_id: str | None = None
+            if provider_id == "claude":
+                resume_id = self._claude_chat_session_id
+                if resume_id:
+                    # The CLI session already holds the conversation; send only
+                    # the newest user message and skip re-appending the prompt.
+                    messages = base_messages[-1:]
+                    system_prompt = None
+            completion = self._completion_request_cls(
+                messages=messages,
+                model=model_id,
+                system_prompt=system_prompt,
+                resume_session_id=resume_id,
+                provider_options=dict(options),
+            )
+            buffer: list[dict[str, Any]] = []
+            reply_parts: list[str] = []
+            success: bool | None = None
+            failure_text = ""
+            self._active_session_id = session_id
+            self._active_provider_id = provider_id
+            self._active_model_id = model_id
+            try:
+                async for event in adapter.stream(completion, session_id=session_id):
+                    if (
+                        isinstance(event, SessionStart)
+                        and provider_id == "claude"
+                        and event.provider_session_id
+                    ):
+                        self._claude_chat_session_id = event.provider_session_id
+                    if isinstance(event, TextComplete) and event.role == "assistant" and event.content.strip():
+                        reply_parts.append(event.content)
+                    if isinstance(event, ErrorEvent) and not failure_text:
+                        failure_text = event.message
+                    if isinstance(event, SessionEnd):
+                        success = bool(event.success)
+                        if not event.success and not failure_text:
+                            failure_text = str(event.error_message or event.error_code or "provider failed")
+                    payload = asdict(event)
+                    payload["request_id"] = request_id
+                    buffer.append(payload)
+            except Exception as exc:
+                success = False
+                failure_text = f"{type(exc).__name__}: {exc}"
+            finally:
+                self._active_session_id = None
+            if success:
+                for payload in buffer:
+                    self._emit(payload)
+                self._remember_chat_exchange(prompt, "\n\n".join(reply_parts).strip())
+                return
+            lane_failures.append(f"{provider_id}:{model_id} — {failure_text or 'failed'}")
+            last_buffer = buffer
+            if provider_id == "claude" and resume_id is not None:
+                # A stale resume id must not burn the lane: retry once fresh.
+                self._claude_chat_session_id = None
+                lane_queue.insert(index, (provider_id, model_id, options, f"{note} (fresh session retry)"))
+
+        emitted_session_end = False
+        for payload in last_buffer:
+            if str(payload.get("type", "")) == "session_end":
+                emitted_session_end = True
+            self._emit(payload)
+        if not emitted_session_end:
+            message = "; ".join(lane_failures) or "no chat lane produced a response"
+            self._emit(
+                {
+                    "type": "error",
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "provider_id": lane_queue[-1][0] if lane_queue else "",
+                    "code": "chat_lanes_exhausted",
+                    "message": message,
+                    "retryable": True,
+                }
+            )
+            self._emit(
+                {
+                    "type": "session_end",
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "success": False,
+                    "error_code": "chat_lanes_exhausted",
+                    "error_message": message,
+                }
+            )
+
+    def _chat_lanes(self, requested_provider: str, requested_model: str) -> list[tuple[str, str, dict[str, Any], str]]:
+        lanes: list[tuple[str, str, dict[str, Any], str]] = []
+        seen: set[tuple[str, str]] = set()
+
+        def add(provider_id: str, model_id: str, options: dict[str, Any], note: str) -> None:
+            if provider_id not in self._adapters or not model_id:
+                return
+            key = (provider_id, model_id)
+            if key in seen:
+                return
+            seen.add(key)
+            lanes.append((provider_id, model_id, options, note))
+
+        openrouter_ready = api_keys.provider_available("openrouter")
+        free_model = HIERARCHY_DEFAULT_MODELS.get(ProviderType.OPENROUTER_FREE, "")
+        if requested_provider == "openrouter" and openrouter_ready:
+            add("openrouter", requested_model or free_model, {}, "configured route")
+        if requested_provider == "claude":
+            add(
+                "claude",
+                requested_model or self._chat_claude_model(),
+                self._chat_claude_options(),
+                "configured route, chat-safe (no tools)",
+            )
+        if openrouter_ready:
+            add("openrouter", free_model, {}, "free-first chat lane (model_hierarchy)")
+        add(
+            "claude",
+            self._chat_claude_model(),
+            self._chat_claude_options(),
+            "subscription chat lane (claude Max, no tools)",
+        )
+        return lanes
+
+    def _chat_claude_model(self) -> str:
+        for target in model_routing.fallback_chain("", "", strategy="cost"):
+            if target.provider_id == "claude":
+                return target.model_id
+        adapter = self._adapters.get("claude")
+        if adapter is None:
+            return ""
+        return str(adapter.get_profile(None).model_id)
+
+    def _chat_claude_options(self) -> dict[str, Any]:
+        try:
+            budget = float(os.environ.get("DHARMA_CHAT_MAX_BUDGET_USD", "") or 0.25)
+        except ValueError:
+            budget = 0.25
+        return {
+            "permission_mode": "default",
+            "tools": "",
+            "max_budget_usd": budget,
+            "strict_mcp_config": True,
+            "max_turns": 1,
+            "scrub_metered_keys": True,
+            "setting_sources": "",
+        }
+
+    def _build_chat_messages(self, request: dict[str, Any], prompt: str) -> list[dict[str, str]]:
+        ts_messages: list[dict[str, str]] = []
+        raw = request.get("messages")
+        if isinstance(raw, list):
+            for item in raw:
+                if not isinstance(item, dict):
+                    continue
+                role = str(item.get("role", "") or "").strip().lower()
+                content = item.get("content")
+                if role not in {"user", "assistant"} or not isinstance(content, str):
+                    continue
+                text = content.strip()
+                if text:
+                    ts_messages.append({"role": role, "content": text})
+        history = [dict(item) for item in self._chat_history]
+        if not history and ts_messages:
+            # Bridge restarted mid-conversation: seed from the history the TS
+            # already sends (user turns at minimum).
+            history = ts_messages
+            if history and history[-1]["role"] == "user" and history[-1]["content"] == prompt:
+                history = history[:-1]
+        history = history[-(CHAT_HISTORY_SEND_LIMIT - 1):]
+        return [*history, {"role": "user", "content": prompt}]
+
+    def _remember_chat_exchange(self, prompt: str, reply: str) -> None:
+        self._chat_history.append({"role": "user", "content": prompt})
+        if reply.strip():
+            self._chat_history.append({"role": "assistant", "content": reply.strip()})
+        self._chat_history = self._chat_history[-CHAT_HISTORY_RETAIN:]
+
+    def _render_chat_system_prompt(self, *, provider_id: str, model_id: str, active_tab: str, note: str) -> str:
+        lines = [
+            "You are the Dharma Helm — the conversational operator assistant of the dharma_swarm terminal, speaking in its chat pane.",
+            f"Route: {provider_id}:{model_id} ({note}). Active tab: {active_tab}.",
+            "Stay conversational and concise; keep continuity with the conversation history provided.",
+            "This is a tool-free chat turn: do not pretend to run anything. For repo or runtime operations, point the operator at the matching slash command (/status, /git, /model, /runtime).",
+        ]
+        return "\n".join(lines)[:1000]
 
     async def _handle_session_catalog(self, request_id: str, request: dict[str, Any]) -> None:
         cwd = str(request.get("cwd", "") or "").strip() or None
@@ -2038,9 +2332,38 @@ class TerminalBridge:
             provider = str(request.get("provider", "") or model_routing.default_target().provider_id).strip().lower()
             model = str(request.get("model", "") or model_routing.default_target().model_id).strip()
             strategy = model_routing.resolve_strategy(str(request.get("strategy", "") or "")) or "responsive"
+            requested_route = f"{provider}:{model}"
+            try:
+                policy = self._build_model_policy_summary(selected_provider=provider, selected_model=model, strategy=strategy)
+            except Exception as exc:
+                self._remember_action(f"model.set FAILED {requested_route} ({type(exc).__name__})")
+                return {
+                    "ok": False,
+                    "summary": f"route change failed: {requested_route}",
+                    "target_pane": "models",
+                    "output": f"Route change to {requested_route} failed: {type(exc).__name__}: {exc}",
+                    "requested_route": requested_route,
+                }
+            if str(policy.get("selected_route", "")) != requested_route:
+                # The policy builder silently rewrites unavailable routes to a
+                # fallback; surfacing that as success is the silent
+                # route-switch failure the operator hit. Refuse honestly.
+                active_provider = self._active_provider_id or str(policy.get("selected_provider", ""))
+                active_model = self._active_model_id or str(policy.get("selected_model", ""))
+                self._remember_action(f"model.set REFUSED {requested_route} (unavailable)")
+                return {
+                    "ok": False,
+                    "summary": f"route change failed: {requested_route} is not available",
+                    "target_pane": "models",
+                    "output": (
+                        f"Route {requested_route} is not available on this bridge "
+                        f"(providers: {', '.join(sorted(self._adapters)) or 'none'}). "
+                        f"Staying on {active_provider}:{active_model}."
+                    ),
+                    "requested_route": requested_route,
+                }
             self._active_provider_id = provider
             self._active_model_id = model
-            policy = self._build_model_policy_summary(selected_provider=provider, selected_model=model, strategy=strategy)
             self._remember_action(f"model.set -> {provider}:{model} ({strategy})")
             return {
                 "ok": True,
