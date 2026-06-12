@@ -462,6 +462,14 @@ def _build_status_data() -> dict:
     except Exception:
         pass
 
+    # Running package provenance (which code is the interpreter actually serving?)
+    try:
+        from dharma_swarm.manifest_health import running_package_provenance
+
+        data["running_package"] = running_package_provenance()
+    except Exception as exc:
+        data["running_package_error"] = str(exc)
+
     # AGNI
     agni = HOME / "agni-workspace"
     if agni.exists():

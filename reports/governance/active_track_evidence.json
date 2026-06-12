@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T11:51:38+09:00",
+  "generated_at": "2026-06-12T20:05:25+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,7 +95,7 @@
     }
   ],
   "portfolio_summary": {
-    "active": 2,
+    "active": 3,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 2
@@ -122,7 +122,7 @@
   ],
   "spine_coverage": {
     "substrate-nativeness": true,
-    "revenue-external-humans-served": false,
+    "revenue-external-humans-served": true,
     "research-depth": false
   },
   "vital_signs": {
@@ -301,6 +301,122 @@
           "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
         }
       ]
+    },
+    {
+      "id": "go-ingest-intelligence-flow-2026-06",
+      "name": "Go Ingest Intelligence Flow \u2014 receipt-first multi-domain consumers",
+      "status": "ACTIVE",
+      "serves": "revenue-external-humans-served",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md",
+        "docs/architecture/WORLD_ZEITGEIST.md",
+        "docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md",
+        "tools/go_sdk/**",
+        "tools/evidence_ingestor_go/**",
+        "tools/github_ingestor_go/**",
+        "tools/world_signal_ingestor_go/**",
+        "tools/world_scout_go/**",
+        "dharma_swarm/world_radar/**",
+        "dharma_swarm/revenue/**",
+        "tests/test_go_*.py",
+        "tests/test_world_radar_go_bridge.py",
+        "tests/test_revenue_scout_daemon.py"
+      ],
+      "moves_vital_signs": [
+        "tool_coverage",
+        "quality_gates",
+        "memory_persistence",
+        "cost_efficiency"
+      ],
+      "verified_at": "2026-06-12",
+      "ttl_days": 21,
+      "owner": "@codex",
+      "shippable": false,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 4,
+        "total": 7
+      },
+      "criteria": [
+        {
+          "id": "go_idea_spark_master_spec_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md present"
+        },
+        {
+          "id": "world_zeitgeist_contract_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/architecture/WORLD_ZEITGEIST.md present"
+        },
+        {
+          "id": "business_intelligence_noticers_contract_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md present"
+        },
+        {
+          "id": "venture_cell_portfolio_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml present"
+        },
+        {
+          "id": "world_scout_declared_in_go_ci",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'GO_WORLD_SCOUT_MODULE' found in Makefile"
+        },
+        {
+          "id": "go_ci_covers_world_scout",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'GO_MODULES :=.*GO_WORLD_SCOUT_MODULE' found in Makefile"
+        },
+        {
+          "id": "spool_replay_idempotency_tested",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'TestReplayPendingIsIdempotentAfterDelivery' found in tools/go_sdk/spool/spool_test.go"
+        },
+        {
+          "id": "world_receipt_projection_bridge_present",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'project_world_signal_receipts' found in dharma_swarm/world_radar/go_bridge.py"
+        },
+        {
+          "id": "ingest_cost_idempotency_tested",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_record_ingest_cost_event_is_idempotent' found in tests/test_world_radar_go_bridge.py"
+        },
+        {
+          "id": "multi_domain_e2e_test_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "tests/test_go_ingest_intelligence_flow_e2e.py MISSING"
+        },
+        {
+          "id": "e2e_feeds_venture_consumer",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "tests/test_go_ingest_intelligence_flow_e2e.py missing"
+        },
+        {
+          "id": "e2e_runtime_receipt_association",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "tests/test_go_ingest_intelligence_flow_e2e.py missing"
+        }
+      ]
     }
   ],
   "findings": [
@@ -308,12 +424,6 @@
       "severity": "WARN",
       "check": "spine-uncovered:research-depth",
       "message": "Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).",
-      "criterion_id": null
-    },
-    {
-      "severity": "WARN",
-      "check": "spine-uncovered:revenue-external-humans-served",
-      "message": "Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).",
       "criterion_id": null
     },
     {
@@ -326,6 +436,12 @@
       "severity": "INFO",
       "check": "track-shippable:runtime-truth-nats-2026-06",
       "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:go-ingest-intelligence-flow-2026-06",
+      "message": "[go-ingest-intelligence-flow-2026-06] 4/7 completion criteria pass.",
       "criterion_id": null
     }
   ]

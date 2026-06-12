@@ -15,7 +15,9 @@ from dharma_swarm.manifest_health import (
     _observed_status,
     _compute_gap,
     build_health_report,
+    check_runtime_package_currency,
     load_manifest,
+    running_package_provenance,
     run_checks_for_entity,
 )
 
@@ -174,3 +176,19 @@ class TestBuildHealthReport:
                 assert "observed_status" in entity
                 assert "gap" in entity
                 assert "health_checks" in entity
+
+
+class TestRunningPackageProvenance:
+    def test_provenance_has_required_fields(self) -> None:
+        prov = running_package_provenance()
+        assert "ok" in prov
+        assert "repo_root" in prov
+        assert "git_head" in prov
+        assert "canonical_worktree" in prov
+        assert "package_origin" in prov
+
+    def test_currency_check_returns_tuple(self) -> None:
+        passed, evidence = check_runtime_package_currency()
+        assert isinstance(passed, bool)
+        assert isinstance(evidence, str)
+        assert evidence

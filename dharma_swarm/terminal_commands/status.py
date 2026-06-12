@@ -77,6 +77,25 @@ def cmd_status(*, as_json: bool = False) -> None:
         line += f" (as of {ll['age_min']}m ago, pid {ll['pid']})"
         print(line)
 
+    if "running_package" in data:
+        rp = data["running_package"]
+        head = rp.get("git_head") or "?"
+        branch = rp.get("git_branch") or "?"
+        deploy = rp.get("deploy_status") or "unknown"
+        line = f"Running package: {branch}@{head}"
+        if rp.get("behind_main"):
+            line += f" | behind origin/main: {rp['behind_main']}"
+        if rp.get("dirty_file_count"):
+            line += f" | dirty: {rp['dirty_file_count']}"
+        line += f" | deploy: {deploy}"
+        if not rp.get("ok"):
+            issues = rp.get("issues") or []
+            if issues:
+                line += f" | DRIFT: {'; '.join(issues[:2])}"
+        print(line)
+    elif data.get("running_package_error"):
+        print(f"Running package: unavailable ({data['running_package_error']})")
+
     agni = data.get("agni", {})
     if agni.get("synced"):
         if agni.get("working_md_age_min") is not None:

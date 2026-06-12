@@ -18,12 +18,12 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
-- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
 - `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
 
 ### Runtime Truth Reconciliation — operator-visible truth packets
@@ -91,6 +91,43 @@ operator_core read models the reconciliation lane owns.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
 
+### Go Ingest Intelligence Flow — receipt-first multi-domain consumers
+
+**Track id:** `go-ingest-intelligence-flow-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-06-12 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md, docs/architecture/WORLD_ZEITGEIST.md, docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md, tools/go_sdk/**, tools/evidence_ingestor_go/**, tools/github_ingestor_go/**, tools/world_signal_ingestor_go/**, tools/world_scout_go/**, dharma_swarm/world_radar/**, dharma_swarm/revenue/**, tests/test_go_*.py, tests/test_world_radar_go_bridge.py, tests/test_revenue_scout_daemon.py
+**Moves vital signs:** tool_coverage, quality_gates, memory_persistence, cost_efficiency
+
+Long-running controller track for making the Go ingest family feed a
+real intelligence-flow system instead of isolated receipt demos. The
+target consumers are operator/product surfaces for POIA/cofounder-style
+venture intelligence: opportunity cards, world-radar briefs, venture-cell
+evidence, memory/retrieval context, and economic/revenue feedback.
+
+The authority boundary is strict. Go may collect, normalize, hash, spool,
+and transport evidence. Python remains the owner of telos/policy gates,
+RuntimeState/receipt association, ontology and memory writes, Idea Spark
+triage, economics, and promotion. This track must not create a new command
+ledger, memory authority, ontology writer, or Go control plane.
+
+Repo-native long-run mission:
+  go-ingest-intelligence-flow-longrun-20260612
+
+**Next items:**
+
+- [test] (blocker) Add the multi-domain E2E test that proves receipts feed a venture-intelligence consumer.
+- [code] (blocker) Harden spool replay and duplicate/reject/partial-failure fixtures across Go and Python bridge paths.
+- [code] (blocker) Wire consumer feedback/economic signal so an ingest outcome can change later opportunity prioritization.
+
+**Non-goals:**
+
+- Do not let Go write ontology, memory, runtime DB, or trusted semantic state directly.
+- Do not make NATS a default ingest authority or claim live transport without ack proof.
+- Do not claim POIA/cofounder-style product readiness without consumer-use evidence.
+- Do not claim revenue, market proof, or external humans served without external receipts.
+- Do not merge stale Go/world/sense branches as-is; cherry-pick only after fresh diff review.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
@@ -108,10 +145,10 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 These are immutable engineering laws for this repository. Violation = architectural regression.
 
 ### A1: NO FLAT-PACKAGE GROWTH
-The `dharma_swarm/` package currently has **398 files at its top level (57.3% of 695 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
+The `dharma_swarm/` package currently has **398 files at its top level (56.9% of 700 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **5 orchestrator files** (V), **22 adapter files** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **25 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **5 orchestrator files** (V), **25 adapter files** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -155,13 +192,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **700** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **398 (56.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **296,465** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **296,651** | wc -l across dharma_swarm Python modules |
 | Test files | **685** | find tests -name "*.py" -type f |
-| Test functions | **11,389 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test functions | **11,391 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **897** | find . -name "*.md" -type f |
-| Markdown total lines | **221,331** | wc -l across all .md |
+| Markdown total lines | **221,461** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |

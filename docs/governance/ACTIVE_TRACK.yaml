@@ -290,6 +290,121 @@ active_tracks:
         kind: code
         blocker: false
 
+  - id: go-ingest-intelligence-flow-2026-06
+    name: Go Ingest Intelligence Flow — receipt-first multi-domain consumers
+    status: ACTIVE
+    opened_at: "2026-06-12"
+    verified_at: "2026-06-12"
+    ttl_days: 21
+    owner: "@codex"
+    serves: revenue-external-humans-served
+    complements:
+      - runtime-truth-reconciliation-2026-06
+      - runtime-truth-nats-2026-06
+    owned_surfaces:
+      - docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md
+      - docs/architecture/WORLD_ZEITGEIST.md
+      - docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md
+      - tools/go_sdk/**
+      - tools/evidence_ingestor_go/**
+      - tools/github_ingestor_go/**
+      - tools/world_signal_ingestor_go/**
+      - tools/world_scout_go/**
+      - dharma_swarm/world_radar/**
+      - dharma_swarm/revenue/**
+      - tests/test_go_*.py
+      - tests/test_world_radar_go_bridge.py
+      - tests/test_revenue_scout_daemon.py
+    moves_vital_signs:
+      - tool_coverage
+      - quality_gates
+      - memory_persistence
+      - cost_efficiency
+
+    description: |
+      Long-running controller track for making the Go ingest family feed a
+      real intelligence-flow system instead of isolated receipt demos. The
+      target consumers are operator/product surfaces for POIA/cofounder-style
+      venture intelligence: opportunity cards, world-radar briefs, venture-cell
+      evidence, memory/retrieval context, and economic/revenue feedback.
+
+      The authority boundary is strict. Go may collect, normalize, hash, spool,
+      and transport evidence. Python remains the owner of telos/policy gates,
+      RuntimeState/receipt association, ontology and memory writes, Idea Spark
+      triage, economics, and promotion. This track must not create a new command
+      ledger, memory authority, ontology writer, or Go control plane.
+
+      Repo-native long-run mission:
+        go-ingest-intelligence-flow-longrun-20260612
+
+    prerequisites:
+      - id: go_idea_spark_master_spec_exists
+        kind: file_exists
+        file: docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md
+      - id: world_zeitgeist_contract_exists
+        kind: file_exists
+        file: docs/architecture/WORLD_ZEITGEIST.md
+      - id: business_intelligence_noticers_contract_exists
+        kind: file_exists
+        file: docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md
+      - id: venture_cell_portfolio_exists
+        kind: file_exists
+        file: docs/governance/VENTURE_CELL_PORTFOLIO.yaml
+      - id: world_scout_declared_in_go_ci
+        kind: file_contains
+        file: Makefile
+        pattern: "GO_WORLD_SCOUT_MODULE"
+
+    completion_criteria:
+      - id: go_ci_covers_world_scout
+        kind: file_contains
+        file: Makefile
+        pattern: "GO_MODULES :=.*GO_WORLD_SCOUT_MODULE"
+      - id: spool_replay_idempotency_tested
+        kind: file_contains
+        file: tools/go_sdk/spool/spool_test.go
+        pattern: "TestReplayPendingIsIdempotentAfterDelivery"
+      - id: world_receipt_projection_bridge_present
+        kind: file_contains
+        file: dharma_swarm/world_radar/go_bridge.py
+        pattern: "project_world_signal_receipts"
+      - id: ingest_cost_idempotency_tested
+        kind: file_contains
+        file: tests/test_world_radar_go_bridge.py
+        pattern: "test_record_ingest_cost_event_is_idempotent"
+      - id: multi_domain_e2e_test_exists
+        kind: file_exists
+        file: tests/test_go_ingest_intelligence_flow_e2e.py
+      - id: e2e_feeds_venture_consumer
+        kind: file_contains
+        file: tests/test_go_ingest_intelligence_flow_e2e.py
+        pattern: "test_ingest_flow_feeds_venture_consumer"
+      - id: e2e_runtime_receipt_association
+        kind: file_contains
+        file: tests/test_go_ingest_intelligence_flow_e2e.py
+        pattern: "RuntimeStateStore"
+
+    non_goals:
+      - Do not let Go write ontology, memory, runtime DB, or trusted semantic state directly.
+      - Do not make NATS a default ingest authority or claim live transport without ack proof.
+      - Do not claim POIA/cofounder-style product readiness without consumer-use evidence.
+      - Do not claim revenue, market proof, or external humans served without external receipts.
+      - Do not merge stale Go/world/sense branches as-is; cherry-pick only after fresh diff review.
+
+    next_items:
+      - id: 1
+        what: "Add the multi-domain E2E test that proves receipts feed a venture-intelligence consumer."
+        kind: test
+        blocker: true
+      - id: 2
+        what: "Harden spool replay and duplicate/reject/partial-failure fixtures across Go and Python bridge paths."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Wire consumer feedback/economic signal so an ingest outcome can change later opportunity prioritization."
+        kind: code
+        blocker: true
+
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------

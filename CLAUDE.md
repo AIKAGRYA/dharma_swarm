@@ -21,12 +21,12 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 2 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 3 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
 - `substrate-nativeness` — Substrate nativeness — runtime flows through the ontology/spine, not around it (covered)
-- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (**no active track**)
+- `revenue-external-humans-served` — Revenue & external humans served — value leaves the house and someone acts on it (covered)
 - `research-depth` — Research depth — the contemplative-mechanistic bridge (R_V, geometric lens) deepens (**no active track**)
 
 ### Runtime Truth Reconciliation — operator-visible truth packets
@@ -93,6 +93,43 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+
+### Go Ingest Intelligence Flow — receipt-first multi-domain consumers
+
+**Track id:** `go-ingest-intelligence-flow-2026-06` · **Status:** ACTIVE · **Owner:** @codex
+**Serves spine objective:** `revenue-external-humans-served` · **Verified at:** 2026-06-12 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md, docs/architecture/WORLD_ZEITGEIST.md, docs/architecture/BUSINESS_INTELLIGENCE_NOTICERS.md, tools/go_sdk/**, tools/evidence_ingestor_go/**, tools/github_ingestor_go/**, tools/world_signal_ingestor_go/**, tools/world_scout_go/**, dharma_swarm/world_radar/**, dharma_swarm/revenue/**, tests/test_go_*.py, tests/test_world_radar_go_bridge.py, tests/test_revenue_scout_daemon.py
+**Moves vital signs:** tool_coverage, quality_gates, memory_persistence, cost_efficiency
+
+Long-running controller track for making the Go ingest family feed a
+real intelligence-flow system instead of isolated receipt demos. The
+target consumers are operator/product surfaces for POIA/cofounder-style
+venture intelligence: opportunity cards, world-radar briefs, venture-cell
+evidence, memory/retrieval context, and economic/revenue feedback.
+
+The authority boundary is strict. Go may collect, normalize, hash, spool,
+and transport evidence. Python remains the owner of telos/policy gates,
+RuntimeState/receipt association, ontology and memory writes, Idea Spark
+triage, economics, and promotion. This track must not create a new command
+ledger, memory authority, ontology writer, or Go control plane.
+
+Repo-native long-run mission:
+  go-ingest-intelligence-flow-longrun-20260612
+
+**Next items:**
+
+- [test] (blocker) Add the multi-domain E2E test that proves receipts feed a venture-intelligence consumer.
+- [code] (blocker) Harden spool replay and duplicate/reject/partial-failure fixtures across Go and Python bridge paths.
+- [code] (blocker) Wire consumer feedback/economic signal so an ingest outcome can change later opportunity prioritization.
+
+**Non-goals:**
+
+- Do not let Go write ontology, memory, runtime DB, or trusted semantic state directly.
+- Do not make NATS a default ingest authority or claim live transport without ack proof.
+- Do not claim POIA/cofounder-style product readiness without consumer-use evidence.
+- Do not claim revenue, market proof, or external humans served without external receipts.
+- Do not merge stale Go/world/sense branches as-is; cherry-pick only after fresh diff review.
 
 **Recently closed tracks:**
 

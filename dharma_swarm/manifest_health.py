@@ -12,7 +12,10 @@ to run; this module maps them to Python functions.
 from __future__ import annotations
 
 import importlib
+import importlib.util
+import json
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _MANIFEST_PATH = _REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
+CANONICAL_RUNTIME_WORKTREE = Path.home() / "dharma_swarm_main"
+_DEPLOY_RECEIPT_PATH = Path.home() / ".dharma" / "ops" / "deploy_receipt.json"
 
 
 # ── Manifest loader ──────────────────────────────────────────────
@@ -150,6 +155,160 @@ _HEALTH_CHECK_REGISTRY: dict[
     "ontology_db_present": _check_ontology_db_present,
     "api_health_responds": _check_api_health_responds,
 }
+
+
+# ── Running package provenance ───────────────────────────────────
+
+
+def _git_field(repo_root: Path, *args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _repo_root_from_spec_origin(origin: str) -> Path | None:
+    path = Path(origin).resolve()
+    if path.name == "__init__.py" and path.parent.name == "dharma_swarm":
+        return path.parent.parent
+    if path.name.endswith(".py") and path.parent.name == "dharma_swarm":
+        return path.parent.parent
+    return None
+
+
+def _resolve_package_init() -> Path | None:
+    """Resolve the served dharma_swarm package root file."""
+    spec = importlib.util.find_spec("dharma_swarm")
+    if spec is not None and spec.origin and spec.origin.endswith("__init__.py"):
+        return Path(spec.origin).resolve()
+
+    try:
+        import dharma_swarm as pkg
+
+        if pkg.__file__:
+            return Path(pkg.__file__).resolve()
+    except ImportError:
+        pass
+
+    # Namespace / editable edge cases: anchor on a core submodule file.
+    for submodule in ("manifest_health", "orchestrator", "status"):
+        try:
+            mod = importlib.import_module(f"dharma_swarm.{submodule}")
+            mod_file = getattr(mod, "__file__", None)
+            if not mod_file:
+                continue
+            pkg_dir = Path(mod_file).resolve().parent
+            if pkg_dir.name == "dharma_swarm":
+                init = pkg_dir / "__init__.py"
+                if init.is_file():
+                    return init
+        except ImportError:
+            continue
+    return None
+
+
+def _read_deploy_receipt() -> dict[str, Any] | None:
+    if not _DEPLOY_RECEIPT_PATH.is_file():
+        return None
+    try:
+        return json.loads(_DEPLOY_RECEIPT_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def running_package_provenance(
+    *,
+    canonical_worktree: Path | None = None,
+) -> dict[str, Any]:
+    """Resolve the interpreter's dharma_swarm package to git + deploy truth."""
+    canonical = (canonical_worktree or CANONICAL_RUNTIME_WORKTREE).resolve()
+    init_path = _resolve_package_init()
+    if init_path is None:
+        return {
+            "ok": False,
+            "issues": ["dharma_swarm not importable"],
+            "canonical_worktree": str(canonical),
+        }
+
+    origin = str(init_path)
+    repo_root = _repo_root_from_spec_origin(origin)
+    if repo_root is None:
+        return {
+            "ok": False,
+            "issues": [f"could not derive repo root from {origin}"],
+            "package_origin": origin,
+            "canonical_worktree": str(canonical),
+        }
+
+    repo_root = repo_root.resolve()
+    head = _git_field(repo_root, "rev-parse", "--short=10", "HEAD")
+    branch = _git_field(repo_root, "symbolic-ref", "--short", "HEAD")
+    dirty = _git_field(repo_root, "status", "--porcelain")
+    ahead_behind = _git_field(
+        repo_root, "rev-list", "--left-right", "--count", "HEAD...origin/main",
+    )
+    behind = ahead = None
+    if ahead_behind:
+        parts = ahead_behind.split()
+        if len(parts) == 2:
+            ahead, behind = int(parts[0]), int(parts[1])
+
+    receipt = _read_deploy_receipt() or {}
+    deploy_status = receipt.get("status")
+    deploy_note = receipt.get("note", "")
+
+    issues: list[str] = []
+    if repo_root != canonical:
+        issues.append(
+            f"running repo {repo_root} != canonical {canonical}",
+        )
+    if dirty:
+        issues.append(f"running worktree dirty ({len(dirty.splitlines())} files)")
+    if behind and behind > 0:
+        issues.append(f"{behind} commit(s) behind origin/main")
+    if deploy_status in {"blocked", "error"}:
+        issues.append(f"deploy receipt status={deploy_status}")
+    if deploy_status == "paused":
+        issues.append("deploy paused (kill switch)")
+
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "package_origin": origin,
+        "repo_root": str(repo_root),
+        "canonical_worktree": str(canonical),
+        "canonical_match": repo_root == canonical,
+        "git_head": head,
+        "git_branch": branch or "(detached)",
+        "dirty_file_count": len(dirty.splitlines()) if dirty else 0,
+        "ahead_of_main": ahead,
+        "behind_main": behind,
+        "deploy_status": deploy_status,
+        "deploy_note": deploy_note,
+    }
+
+
+def check_runtime_package_currency(
+    *,
+    canonical_worktree: Path | None = None,
+) -> tuple[bool, str]:
+    """Return (passed, evidence) for dgc health / manifest checks."""
+    prov = running_package_provenance(canonical_worktree=canonical_worktree)
+    if prov.get("ok"):
+        head = prov.get("git_head", "?")
+        branch = prov.get("git_branch", "?")
+        return True, f"canonical match @ {branch}/{head}"
+    issues = prov.get("issues") or ["unknown provenance failure"]
+    return False, "; ".join(str(i) for i in issues)
 
 
 # ── Check runner ─────────────────────────────────────────────────
