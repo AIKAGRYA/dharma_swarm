@@ -116,6 +116,12 @@ def _classify_error(exc: Exception | str) -> str:
         return "insufficient_credits"
     if "not set" in text:
         return "missing_config"
+    if "http error 429" in text or "too many requests" in text or "rate limit" in text:
+        return "rate_limited"
+    if "credit balance" in text or "billing hard limit" in text:
+        return "billing_exhausted"
+    if "insufficient_quota" in text or "exceeded your current quota" in text:
+        return "quota_exhausted"
     if any(marker in text for marker in _OLLAMA_ROOT_ERROR_MARKERS):
         return "misconfigured"
     if "http error 404" in text or "no endpoints found" in text:
