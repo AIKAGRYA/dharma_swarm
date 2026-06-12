@@ -1,8 +1,5 @@
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA  OFF | codex:gpt-5.4 | REA | Ontology                                 │
-│ tab navigation | responsive                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯
- loop unknown  verify unknown  runtime idle  approvals clear
+ ◆ DHARMA  ·  Ontology  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
 ◂ Commands Models [Ontology] Runtime Sessions Approva… ▸
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ Ontology                                                                     │
@@ -10,15 +7,18 @@
 │                                                                              │
 │ Ontology snapshot loading...                                                 │
 │ The shell should surface DHARMA concepts, not just provider chat.            │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
-
-
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                            │
-│ route  ready | codex:gpt-5.4                                                 │
-│ keys  Tab tabs | Enter send | ^B side | ↑/↓ scroll                           │
-╰──────────────────────────────────────────────────────────────────────────────╯
+ compose  ·  route codex:gpt-5.4  ·  ○ offline

@@ -213,5 +213,7 @@ export function focusModeFor(activeTab: TabSpec | undefined, state: AppState): s
   if (activeTab?.kind === "agents") {
     return "agent route selection";
   }
-  return "tab navigation";
+  // Design truth #6: the user-facing "tab navigation mode" concept is dead —
+  // printable keys always reach the composer; chords navigate.
+  return "compose";
 }

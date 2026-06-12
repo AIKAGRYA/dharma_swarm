@@ -1,30 +1,30 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA  OFF | codex:gpt-5.4 | REA | Chat                                                         │
-│ route selection | responsive                                                                     │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown   │
-│ runtime idle  approvals clear  sessions 0                                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA COMMAND POST  ·  Chat  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
 [Chat] Mission Repo Commands Models Ontology ▸
-╔══════════════════════════════════════════════════════════════════════════════════════════════════╗
-║ Model Picker                                                                                     ║
-║ Enter apply | Esc close | j/k or arrows move | 1-9 direct | 0 routes                             ║
-║                                                                                                  ║
-║ No model targets loaded.                                                                         ║
-╚══════════════════════════════════════════════════════════════════════════════════════════════════╝
-
-
-
-
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Model Picker                                                                                     │
+│ Enter apply | Esc close | j/k or arrows move | 1-9 direct | 0 routes                             │
+│                                                                                                  │
+│ No model targets loaded.                                                                         │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                                         │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                │
-│ route  ready | codex:gpt-5.4                                                                     │
-│ mode  route selection                                                                            │
-│ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R │
-│  ^O ^M ^A ^P ^E ^T ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh shell | ^U compact │
-│  trace | ^I raw on                                                                               │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ route selection  ·  route codex:gpt-5.4  ·  ○ offline  ·  responsive

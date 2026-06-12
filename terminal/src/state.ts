@@ -82,7 +82,9 @@ export const initialState: AppState = {
   uiMode: {
     activeTabId: "chat",
     activeOverlay: {kind: "none"},
-    sidebarVisible: "collapsed",
+    // FACE-2 command post: sidebar is OFF by default — the data panes carry
+    // the information; the sidebar is an explicit opt-in (^B).
+    sidebarVisible: "hidden",
     sidebarMode: "toc",
     focusedPaneId: "chat",
     compactMode: false,
@@ -302,7 +304,9 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
     case "footer.set":
       return {...state, footerHint: action.value};
     case "sidebar.toggle": {
-      const cycle = {visible: "collapsed", collapsed: "hidden", hidden: "visible"} as const;
+      // F-162: the "collapsed" sliver state is dead — the sidebar is either
+      // visible or zero-width hidden. Legacy "collapsed" resolves to hidden.
+      const cycle = {visible: "hidden", collapsed: "hidden", hidden: "visible"} as const;
       return {
         ...state,
         uiMode: {

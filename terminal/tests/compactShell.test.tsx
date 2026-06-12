@@ -175,19 +175,24 @@ async function renderShellAt(
 
 function summaryStripLines(frame: string): string[] {
   // "loop unknown" is the boot-deterministic summary item (sandboxed empty
-  // supervisor state); inside the bordered band the item can wrap onto its own
-  // row, so the anchor must be a single item, not the loop+verify pair.
+  // supervisor state) and exists ONLY in the cockpit chrome — zen has no
+  // band, so it doubles as the cockpit-arrival marker.
   return frame.split("\n").filter((line) => line.includes("loop unknown"));
 }
 
-test("80x24 boots the compact shell: compact brand, OFF label, one-line tab bar, borderless summary strip", async () => {
-  const frame = await renderShellAt(80, 24, (current) => /\bOFF\b/.test(current));
+function cockpitSettled(frame: string): boolean {
+  return frame.includes("loop unknown") && frame.includes("offline");
+}
 
-  expect(frame).toContain("DHARMA");
-  expect(frame).not.toContain("DHARMA TERMINAL");
-  // Compact status label is OFF, never the wide OFFLINE (\bOFF\b cannot match
-  // inside OFFLINE: F-L has no word boundary).
-  expect(/\bOFF\b/.test(frame)).toBe(true);
+test("80x24 boots the compact command post: compact brand, lowercase offline gate, one-line tab bar, borderless strip", async () => {
+  const frame = await renderShellAt(80, 24, cockpitSettled);
+
+  expect(frame).toContain("◆ DHARMA");
+  // FACE-2 compact brand drops the COMMAND POST suffix below the threshold.
+  expect(frame).not.toContain("COMMAND POST");
+  // F-164 status single-source: the gate word is lowercase "offline" in the
+  // ONE bottom status row; the shouting wide header label is gone for good.
+  expect(frame).toContain("○ offline");
   expect(frame).not.toContain("OFFLINE");
   // One-line tab bar law: the bracketed active tab shares its row with the
   // next tab titles instead of a bordered pill per tab.
@@ -206,10 +211,10 @@ test("80x24 boots the compact shell: compact brand, OFF label, one-line tab bar,
 });
 
 test("width 90 still degrades to the compact shell (threshold inclusive)", async () => {
-  const frame = await renderShellAt(90, 24, (current) => /\bOFF\b/.test(current));
+  const frame = await renderShellAt(90, 24, cockpitSettled);
 
-  expect(frame).toContain("DHARMA");
-  expect(frame).not.toContain("DHARMA TERMINAL");
+  expect(frame).toContain("◆ DHARMA");
+  expect(frame).not.toContain("COMMAND POST");
   const stripLines = summaryStripLines(frame);
   expect(stripLines.length).toBeGreaterThan(0);
   for (const line of stripLines) {
@@ -217,26 +222,32 @@ test("width 90 still degrades to the compact shell (threshold inclusive)", async
   }
 });
 
-test("width 91 leaves the compact shell: summary band regains its border", async () => {
-  // The header keeps compact copy below 118 cols (F-021), so the band border
-  // is the discriminator that pins compactShell's <=90 edge from above.
-  const frame = await renderShellAt(91, 24, (current) => summaryStripLines(current).length > 0);
+test("width 91 leaves the compact shell: full brand appears, band stays borderless (F-165)", async () => {
+  // The wide brand suffix is the discriminator that pins compactShell's <=90
+  // edge from above — the band is borderless at EVERY width now, so it can
+  // no longer discriminate.
+  const frame = await renderShellAt(91, 24, (current) => cockpitSettled(current) && current.includes("COMMAND POST"));
 
+  expect(frame).toContain("◆ DHARMA");
+  expect(frame).toContain("COMMAND POST");
   const stripLines = summaryStripLines(frame);
   expect(stripLines.length).toBeGreaterThan(0);
   for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(true);
+    expect(line.trimStart().startsWith("│")).toBe(false);
   }
 });
 
-test("wide boot renders the full shell (lever sanity: the stub reaches App)", async () => {
-  const frame = await renderShellAt(220, 60, (current) => current.includes("OFFLINE"));
+test("wide boot renders the full command post (lever sanity: the stub reaches App)", async () => {
+  const frame = await renderShellAt(220, 60, (current) => cockpitSettled(current) && current.includes("COMMAND POST"));
 
-  expect(frame).toContain("DHARMA TERMINAL");
-  expect(frame).toContain("OFFLINE");
+  expect(frame).toContain("COMMAND POST");
+  expect(frame).toContain("○ offline");
+  // The shouting status header is gone at every width (F-164/F-165).
+  expect(frame).not.toContain("OFFLINE");
+  expect(frame).not.toContain("DHARMA TERMINAL");
   const stripLines = summaryStripLines(frame);
   expect(stripLines.length).toBeGreaterThan(0);
   for (const line of stripLines) {
-    expect(line.trimStart().startsWith("│")).toBe(true);
+    expect(line.trimStart().startsWith("│")).toBe(false);
   }
 });

@@ -65,7 +65,7 @@ export function TranscriptPane({
     );
   }
   return (
-    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={accentColor} paddingX={1}>
+    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
       <Text color={accentColor} bold>{title}</Text>
       {subtitle ? <Text color={THEME.stone}>{subtitle}</Text> : <Text color={THEME.stone}> </Text>}
       {subtitle ? <Text color={THEME.stone}> </Text> : null}

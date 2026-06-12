@@ -175,7 +175,7 @@ export function ActivityPane({title, paneKind, feed, scrollOffset = 0, windowSiz
   const visible = visibleWindow(groups, scrollOffset, windowSize);
 
   return (
-    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.indigo} paddingX={1}>
+    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
       <Text color={THEME.wave} bold>{title}</Text>
       <Text color={THEME.stone}>
         {entries.length} items | {groups.length} threads | {feed.visibilityMode} detail | raw {feed.showRaw ? "on" : "off"}
@@ -189,7 +189,7 @@ export function ActivityPane({title, paneKind, feed, scrollOffset = 0, windowSiz
               ▾ {group.label} <Text color={THEME.stone}>({group.entries.length})</Text>
             </Text>
             {(feed.visibilityMode === "expanded" ? group.entries : group.entries.slice(0, 1)).map((entry) => (
-              <Box key={entry.id} flexDirection="column" marginTop={1} borderStyle="round" borderColor={colorForKind(entry.kind)} paddingX={1}>
+              <Box key={entry.id} flexDirection="column" marginTop={1} paddingLeft={1}>
                 <Text color={colorForKind(entry.kind)} bold>
                   {glyphForEntry(entry)} {labelForKind(entry.kind)}
                   <Text color={THEME.foam}> {"  "}{entry.title}</Text>
@@ -211,7 +211,7 @@ export function ActivityPane({title, paneKind, feed, scrollOffset = 0, windowSiz
                       </Text>
                     ) : null}
                 {feed.showRaw && rawLines(entry).map((line, index) => (
-                  <Text key={`${entry.id}-raw-${index}`} color={THEME.river}>
+                  <Text key={`${entry.id}-raw-${index}`} color={THEME.stone} dimColor>
                     {"    "}{line}
                   </Text>
                 ))}

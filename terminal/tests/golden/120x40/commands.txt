@@ -1,40 +1,40 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Command  |  mode tab navigation  |  panes15 │
-│                                                                                                                      │
-│ operator shell | route truth | execution trace                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown  runtime idle         │
-│ approvals clear  sessions 0                                                                                          │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA COMMAND POST  ·  Commands  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
 ◂ Mission Repo [Commands] Models Ontology Runtime ▸
-╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│ Context                  │ │ Commands                                                                                │
-│                          │ │ Registered command graph and operational affordances.                                   │
-│ Active                   │ │                                                                                         │
-│ Commands | bridge        │ │ Command graph loading...                                                                │
-│ offline                  │ │ Plain language should resolve into Dharma-native commands when confidence is high.      │
-│ Model codex gpt-5.4      │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
-│ Repo Preview             │
-│ Git n/a@n/a | n/a | sync │
-│  n/a                     │
-│ Dirty staged n/a |       │
-│ unstaged n/a | un… |     │
-│ topo n/a | lead n/a      │
-│ Snapshot branch n/a@n/a  │
-│ | n/a                    │
-│ Snapshot sync n/a |      │
-│ +n/a/-n/a | n/a          │
-│ Snapshot branch sync n/a │
-│  | +n/a/-n/a | n/a       │
-│ Snapshot dirty n/a |     │
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Commands                                                                                                             │
+│ Registered command graph and operational affordances.                                                                │
+│                                                                                                                      │
+│ Command graph loading...                                                                                             │
+│ Plain language should resolve into Dharma-native commands when confidence is high.                                   │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                                    │
-│ route  ready | codex:gpt-5.4                                                                                         │
-│ mode  tab navigation                                                                                                 │
-│ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T   │
-│ ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh commands | ^X /runtime | ^F /git | ^V /foundations        │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ compose  ·  route codex:gpt-5.4  ·  ○ offline  ·  responsive

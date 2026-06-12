@@ -25,7 +25,9 @@ const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(THIS_DIR, "..");
 const REPO_ROOT = path.resolve(TERMINAL_ROOT, "..");
 const STATE_PATH = path.join(TERMINAL_ROOT, ".dharma-terminal-state.json");
-const STATE_VERSION = 3;
+// v4 (FACE-2 command post): sidebar defaults OFF; legacy v3 state (which
+// carried test-residue "visible"/"collapsed" sidebars) is discarded on load.
+const STATE_VERSION = 4;
 const MAX_STATE_BYTES = 128 * 1024;
 const SUPERVISOR_STATE_ENV_VARS = ["DHARMA_TERMINAL_SUPERVISOR_STATE_DIR", "DHARMA_TERMINAL_STATE_DIR"];
 const DEFAULT_SUPERVISOR_ROOT = path.join(os.homedir(), ".dharma", "terminal_supervisor");
@@ -145,8 +147,11 @@ export function loadStoredState(): RestoredState | null {
     if (decoded.version !== STATE_VERSION) {
       return null;
     }
+    // F-162/FACE-2: legacy "collapsed" (the 3-col "T" sliver) restores as
+    // hidden — the command post defaults sidebar-off; only an explicit
+    // "visible" survives the round-trip.
     return {
-      sidebarVisible: typeof decoded.sidebarVisible === "string" ? (decoded.sidebarVisible as "visible" | "collapsed" | "hidden") : decoded.sidebarVisible === false ? "hidden" : "collapsed",
+      sidebarVisible: decoded.sidebarVisible === "visible" || decoded.sidebarVisible === true ? "visible" : "hidden",
       sidebarMode: decoded.sidebarMode ?? "toc",
     };
   } catch {

@@ -1,40 +1,40 @@
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA TERMINA  OFFLINE  |  route codex:gpt-5.  |  state READY  |  focus Session  |  mode session list  |  panes 15  │
-│                                                                                                                      │
-│ operator shell | route truth | execution trace                                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ bridge offline  route codex:gpt-5.4 (ready)  strategy responsive  loop unknown  verify unknown  runtime idle         │
-│ approvals clear  sessions 0                                                                                          │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ◆ DHARMA COMMAND POST  ·  Sessions  ·  panes 15  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear   sessions 0
 ◂ Ontology Runtime [Sessions] Approvals Control Agents ▸
-╭──────────────────────────╮ ╭─────────────────────────────────────────────────────────────────────────────────────────╮
-│ Context                  │ │ Sessions                                                                                │
-│                          │ │ 0 sessions | j/k select | enter refresh detail                                          │
-│ Active                   │ │                                                                                         │
-│ Sessions | bridge        │ │ ┌────────────────────────────┐ ┌──────────────────────────────────────────────────────┐ │
-│ offline                  │ │ │ Catalog                    │ │ Drilldown                                            │ │
-│ Model codex gpt-5.4      │ │ │ recent sessions and replay │ │ identity, replay, compaction, and recent events      │ │
-│ Repo Preview             │ │ │ health                     │ │ No selected session.                                 │ │
-│ Git n/a@n/a | n/a | sync │ │ │ No sessions.               │ │                                                      │ │
-│  n/a                     │ │ └────────────────────────────┘ └──────────────────────────────────────────────────────┘ │
-│ Dirty staged n/a |       │ ╰─────────────────────────────────────────────────────────────────────────────────────────╯
-│ unstaged n/a | un… |     │
-│ topo n/a | lead n/a      │
-│ Snapshot branch n/a@n/a  │
-│ | n/a                    │
-│ Snapshot sync n/a |      │
-│ +n/a/-n/a | n/a          │
-│ Snapshot branch sync n/a │
-│  | +n/a/-n/a | n/a       │
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Sessions                                                                                                             │
+│ 0 sessions | j/k select | enter refresh detail                                                                       │
+│                                                                                                                      │
+│  Catalog                                  Drilldown                                                                  │
+│  recent sessions and replay health        identity, replay, compaction, and recent events                            │
+│  No sessions.                             No selected session.                                                       │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                                                             │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                                                                    │
-│ route  ready | codex:gpt-5.4                                                                                         │
-│ mode  session list                                                                                                   │
-│ keys  Keys: Tab/Shift-Tab tabs | ←/→ tabs | ^K switch panes | ^B sidebar | 1/2/3 sidebar | ^G ^R ^O ^M ^A ^P ^E ^T   │
-│ ^Y panes | ^H ^J ^N transparency | ↑/↓ scroll | ^L refresh sessions | j/k or ↑/↓ select | Enter refresh detail | ^F  │
-│ /archive | ^V /memory                                                                                                │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ session list  ·  route codex:gpt-5.4  ·  ○ offline  ·  responsive

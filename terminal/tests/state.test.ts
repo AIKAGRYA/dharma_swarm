@@ -41,17 +41,21 @@ describe("reduceApp UI state", () => {
     expect(closed.uiMode.activeOverlay).toEqual({kind: "none"});
   });
 
-  test("toggles sidebar visibility through 3 states and forces visibility when switching sidebar modes", () => {
-    const hidden = reduceApp(initialState, {type: "sidebar.toggle"});
-    expect(hidden.uiMode.sidebarVisible).toBe("hidden");
+  test("toggles sidebar visible<->hidden (FACE-2: collapsed sliver is dead, default is hidden)", () => {
+    // Command-post default: sidebar OFF — data panes carry the info.
+    expect(initialState.uiMode.sidebarVisible).toBe("hidden");
 
-    const visible = reduceApp(hidden, {type: "sidebar.toggle"});
+    const visible = reduceApp(initialState, {type: "sidebar.toggle"});
     expect(visible.uiMode.sidebarVisible).toBe("visible");
 
-    const collapsed = reduceApp(visible, {type: "sidebar.toggle"});
-    expect(collapsed.uiMode.sidebarVisible).toBe("collapsed");
+    const hiddenAgain = reduceApp(visible, {type: "sidebar.toggle"});
+    expect(hiddenAgain.uiMode.sidebarVisible).toBe("hidden");
 
-    const contextMode = reduceApp(hidden, {type: "sidebar.mode", mode: "context"});
+    // Legacy "collapsed" (the 3-col "T" sliver, F-162) resolves to hidden.
+    const legacy: AppState = {...initialState, uiMode: {...initialState.uiMode, sidebarVisible: "collapsed"}};
+    expect(reduceApp(legacy, {type: "sidebar.toggle"}).uiMode.sidebarVisible).toBe("hidden");
+
+    const contextMode = reduceApp(hiddenAgain, {type: "sidebar.mode", mode: "context"});
     expect(contextMode.uiMode.sidebarMode).toBe("context");
     expect(contextMode.uiMode.sidebarVisible).toBe("visible");
   });

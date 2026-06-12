@@ -57,7 +57,6 @@ const REPO_ROOT_COMPACT = REPO_ROOT.length <= 24 ? REPO_ROOT : `${REPO_ROOT.slic
 const TESTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const TERMINAL_ROOT = path.resolve(TESTS_DIR, "..");
 const TERMINAL_STATE_PATH = path.join(TERMINAL_ROOT, ".dharma-terminal-state.json");
-const DEFAULT_ROUTE_LABEL = "codex:gpt-5.4 (ready)";
 
 type LegacyActiveTabState = AppState & {activeTabId?: string};
 
@@ -841,7 +840,7 @@ describe("snapshotActionsForBridgeEvent", () => {
 
     persistRepoPreview(bootstrapWorkspacePreview);
     persistControlPreview(bootstrapRuntimePreview);
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
     const originalSend = DharmaBridge.prototype.send;
@@ -928,7 +927,7 @@ describe("snapshotActionsForBridgeEvent", () => {
     process.env.DHARMA_TERMINAL_SUPERVISOR_STATE_DIR = stateDir;
 
     persistControlPreview(bootstrapRuntimePreview);
-    saveTerminalStateOverride({version: 3, sidebarVisible: "hidden", sidebarMode: "toc"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "hidden", sidebarMode: "toc"});
 
     const originalSend = DharmaBridge.prototype.send;
     const originalClose = DharmaBridge.prototype.close;
@@ -2070,9 +2069,6 @@ test("operator summary surfaces live loop, verification, and runtime state from 
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 7 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 3/4 passing", tone: "critical"},
     {label: "runtime", value: "22 sessions | 3 runs | 1 active", tone: "live"},
@@ -2093,9 +2089,6 @@ test("operator summary falls back to neutral loop and runtime state when control
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "booting", tone: "critical"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "unknown", tone: "neutral"},
     {label: "verify", value: "unknown", tone: "neutral"},
     {label: "runtime", value: "idle", tone: "neutral"},
@@ -2121,9 +2114,6 @@ test("operator summary preserves generic verification fallback before detailed c
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 8 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "ok", tone: "live"},
     {label: "runtime", value: "3 sessions | 1 runs | 1 active", tone: "live"},
@@ -2149,9 +2139,6 @@ test("operator summary derives verification state from an explicit durable bundl
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 8 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 2/3 passing", tone: "critical"},
     {label: "runtime", value: "3 sessions | 1 runs | 1 active", tone: "live"},
@@ -2179,9 +2166,6 @@ test("operator summary derives verification state from passing and failing detai
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 10 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 2/3 passing", tone: "critical"},
     {label: "runtime", value: "4 sessions | 2 runs | 1 active", tone: "live"},
@@ -2210,9 +2194,6 @@ test("operator summary derives loop and verification state from compact runtime 
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 11 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 2/3 passing", tone: "critical"},
     {label: "runtime", value: "2 sessions | 1 runs | 1 active", tone: "live"},
@@ -2246,9 +2227,6 @@ test("operator summary falls back to the persisted control preview when live con
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "degraded", tone: "warn"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 9 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 2/3 passing", tone: "critical"},
     {label: "runtime", value: "5 sessions | 1 runs | 1 active", tone: "live"},
@@ -2287,9 +2265,6 @@ test("operator summary prefers non-placeholder control tab preview values over g
   };
 
   expect(buildOperatorSummaryItems(state)).toEqual([
-    {label: "bridge", value: "connected", tone: "live"},
-    {label: "route", value: DEFAULT_ROUTE_LABEL, tone: "neutral"},
-    {label: "strategy", value: "responsive", tone: "neutral"},
     {label: "loop", value: "cycle 12 waiting_for_verification", tone: "warn"},
     {label: "verify", value: "1 failing, 2/3 passing", tone: "critical"},
     {label: "runtime", value: "4 sessions | 2 runs | 1 active", tone: "live"},
@@ -10158,7 +10133,7 @@ Workflows: 1
       "Topology peers":
         "dharma_swarm (canonical_core, main...origin/main, dirty True); dgc-core (operator_shell, detached, dirty False)",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
     const originalSend = DharmaBridge.prototype.send;
@@ -10240,7 +10215,7 @@ Workflows: 1
       Ahead: "2",
       Behind: "0",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     const bootState = createInitialAppState(initialState);
     const visibleSidebarLines = buildVisibleContextSidebarLines(
@@ -10321,7 +10296,7 @@ Workflows: 1
       Ahead: "2",
       Behind: "0",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     let state = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -10464,7 +10439,7 @@ Workflows: 1
       "Topology pressure preview": "1 warning | dharma_swarm Δ563 (517 modified, 46 untracked)",
       "Primary changed hotspot": "terminal (274)",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     const sentMessages: Array<{type: string; payload: Record<string, unknown>}> = [];
     const originalSend = DharmaBridge.prototype.send;
@@ -10543,7 +10518,7 @@ Workflows: 1
       "Branch divergence": "local +2/-0 | peer dgc-core detached",
       "Detached peers": "dgc-core detached",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     let state = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -10719,7 +10694,7 @@ Git sync: origin/main | ahead 2 | behind 0
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview(bootstrapWorkspacePreview);
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     let state = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -10839,7 +10814,7 @@ Workflows: 1
       Ahead: "2",
       Behind: "0",
     });
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     let state = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];
@@ -11015,7 +10990,7 @@ Git sync: origin/main | ahead 2 | behind 0`,
       Updated: "2026-04-03T01:15:00Z",
     });
     persistRepoPreview(bootstrapWorkspacePreview);
-    saveTerminalStateOverride({version: 3, sidebarVisible: "visible", sidebarMode: "context"});
+    saveTerminalStateOverride({version: 4, sidebarVisible: "visible", sidebarMode: "context"});
 
     let state = createInitialAppState(initialState);
     const sent: Array<{type: string; payload: Record<string, unknown>}> = [];

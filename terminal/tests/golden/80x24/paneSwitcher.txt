@@ -1,24 +1,24 @@
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ DHARMA  OFF | codex:gpt-5.4 | REA | Chat                                     │
-│ pane switcher | responsive                                                   │
-╰──────────────────────────────────────────────────────────────────────────────╯
- loop unknown  verify unknown  runtime idle  approvals clear
+ ◆ DHARMA  ·  Chat  ·  F2 zen · ^K panes
+ loop unknown   verify unknown   runtime idle   approvals clear
 [Chat] Mission Repo Commands Models Ontology ▸
-╔══════════════════════════════════════════════════════════════════════════════╗
-║ Pane Switcher                                                                ║
-║ Enter jump | Esc close | j/k or arrows move | 15 panes                       ║
-║                                                                              ║
-║ ▶ 1. Chat                                                                    ║
-║   chat                                                                       ║
-║                                                                              ║
-║ • 2. Mission                                                                 ║
-║   mission                                                                    ║
-║                                                                              ║
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Pane Switcher                                                                │
+│ Enter jump | Esc close | j/k or arrows move | 15 panes                       │
+│                                                                              │
+│ ▶ 1. Chat                                                                    │
+│   chat                                                                       │
+│                                                                              │
+│ • 2. Mission                                                                 │
+│   mission                                                                    │
+│                                                                              │
+│ • 3. Repo                                                                    │
+│   repo                                                                       │
+│                                                                              │
+│ • 4. Commands                                                                │
+│   commands                                                                   │
+│                                                                              │
+│ • 5. Models                                                                  │
 ╭──────────────────────────────────────────────────────────────────────────────╮
 │ >   Type a message · / commands · ? keys                                     │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ status  backend offline, retrying                                            │
-│ route  ready | codex:gpt-5.4                                                 │
-│ keys  j/k choose | Enter jump | Esc close                                    │
-╰──────────────────────────────────────────────────────────────────────────────╯
+ pane switcher  ·  route codex:gpt-5.4  ·  ○ offline

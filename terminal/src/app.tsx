@@ -33,7 +33,7 @@ import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiInten
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
-import {focusModeFor, footerHintFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
+import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
 import {
   buildVerificationSummaryRows,
   isGenericVerificationLabel,
@@ -600,18 +600,14 @@ function operatorSummaryPreview(state: AppState): TabPreview | undefined {
 export function buildOperatorSummaryItems(state: AppState): Array<{label: string; value: string; tone?: "live" | "warn" | "critical" | "neutral"}> {
   const pendingApprovals = state.approvalPane.order.filter((actionId) => state.approvalPane.entriesByActionId[actionId]?.pending).length;
   const sessionCount = state.sessionPane.catalog?.count ?? state.sessionPane.catalog?.sessions.length ?? 0;
-  const route = routeLabel(state.routePolicy);
   const preview = operatorSummaryPreview(state);
   const loop = operatorLoopSummary(preview);
   const verification = operatorVerificationSummary(preview);
   const runtime = operatorRuntimeSummary(preview, sessionCount);
   const approvalsTone = pendingApprovals > 0 ? "warn" : "live";
-  const bridgeTone =
-    state.bridgeStatus === "connected" ? "live" : state.bridgeStatus === "degraded" ? "warn" : "critical";
+  // F-164 status single-source: bridge/route/strategy live EXCLUSIVELY in the
+  // bottom status row — the summary band carries operational data only.
   return [
-    {label: "bridge", value: state.bridgeStatus, tone: bridgeTone},
-    {label: "route", value: `${route} (${state.routePolicy.routeState})`, tone: "neutral"},
-    {label: "strategy", value: state.routePolicy.strategy, tone: "neutral"},
     {label: "loop", value: loop.value, tone: loop.tone},
     {label: "verify", value: verification.value, tone: verification.tone},
     {label: "runtime", value: runtime.value, tone: runtime.tone},
@@ -2770,7 +2766,8 @@ export function App(): React.ReactElement {
   function localUiSlashIntent(submitted: string): UiIntent | null {
     const text = submitted.trim().toLowerCase();
     if (text === "/zen") return {kind: "layout", mode: "zen"};
-    if (text === "/cockpit") return {kind: "layout", mode: "cockpit"};
+    // FACE-2: /post is the command-post alias for /cockpit.
+    if (text === "/cockpit" || text === "/post") return {kind: "layout", mode: "cockpit"};
     if (text === "/tour") return {kind: "tour"};
     return null;
   }
@@ -3381,14 +3378,9 @@ export function App(): React.ReactElement {
           Without it Yoga crushes the header/footer when pane content overflows. */}
       <Box flexDirection="column" flexShrink={0}>
         <ShellHeader
-          routePolicy={state.routePolicy}
-          bridgeStatus={state.bridgeStatus}
           activeTitle={activeTab?.title ?? "Workspace"}
-          focusMode={focusModeFor(activeTab, state)}
           activeCount={state.tabs.length}
-          // F-021: the full header line needs ~118 cols; below that Yoga
-          // squeezes its segments into garble — fall back to the compact copy.
-          compact={compactShell || terminalWidth < 118}
+          compact={compactShell}
         />
         <OperatorSummaryBand items={operatorSummaryItems} compact={compactShell} />
         <TabBar tabs={state.tabs} activeTabId={state.uiMode.activeTabId} compact={compactShell} />
@@ -3400,7 +3392,10 @@ export function App(): React.ReactElement {
         ) : null}
       </Box>
       <Box flexGrow={1} overflow="hidden">
-        {state.uiMode.sidebarVisible !== "hidden" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
+        {/* FACE-2 command post: sidebar is OFF by default (data panes carry
+            the info) and renders ONLY when explicitly visible — F-162: a
+            collapsed sidebar renders zero-width, never a 3-col "T" sliver. */}
+        {state.uiMode.sidebarVisible === "visible" && state.uiMode.activeOverlay.kind !== "modelPicker" && !compactShell ? (
           // clip-don't-squeeze: the row stretches children to its height, and
           // Yoga then crushes their inner columns into overlapping rows. The
           // wrapper clips at natural height instead.
@@ -3417,13 +3412,16 @@ export function App(): React.ReactElement {
                 repoPreview={decorateSurfacePreview(state.liveRepoPreview, "repo", state.bridgeStatus, state.authoritativeSurfaces)}
                 controlPreview={decorateSurfacePreview(state.liveControlPreview, "control", state.bridgeStatus, state.authoritativeSurfaces)}
                 compact={compactShell}
-                collapsed={state.uiMode.sidebarVisible === "collapsed"}
               />
             </Box>
           </Box>
         ) : null}
         <Box flexGrow={1} flexDirection="column" overflow="hidden">
-        <Box flexShrink={0} flexDirection="column">
+        {/* FACE-2 fill law: flexGrow stretches a SHORT pane to claim the spare
+            height (no dead gulf above the composer); flexShrink 0 keeps tall
+            content at natural height so the outer overflow CLIPS instead of
+            Yoga crushing columns into garble (F-022 clip-don't-squeeze). */}
+        <Box flexShrink={0} flexGrow={1} flexDirection="column">
         {state.uiMode.activeOverlay.kind === "paneSwitcher" ? (
           <PaneSwitcher
             tabs={state.tabs}
@@ -3507,11 +3505,15 @@ export function App(): React.ReactElement {
       </Box>
       <Box flexDirection="column" flexShrink={0}>
         <Composer prompt={state.prompt} compact={compactShell} />
+        {/* F-110: exactly ONE status row at every size — the single source
+            (F-164) for mode, route, gate state, and provider summary. */}
         <StatusFooter
-          statusLine={state.statusLine}
-          routeSummary={routeSummary(state.routePolicy)}
-          focusMode={focusModeFor(activeTab, state)}
-          footerHint={footerHintFor(activeTab?.id ?? "chat", state, shellControlOptions, compactShell)}
+          mode={focusModeFor(activeTab, state)}
+          routeLabel={routeLabel(state.routePolicy)}
+          bridgeStatus={state.bridgeStatus}
+          routeState={state.routePolicy.routeState}
+          strategy={state.routePolicy.strategy}
+          reason={state.routePolicy.availabilityReason}
           compact={compactShell}
         />
       </Box>

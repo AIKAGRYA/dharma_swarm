@@ -13,7 +13,7 @@ export function PaneSwitcher({tabs, selectedIndex}: Props): React.ReactElement {
   const start = Math.max(0, Math.min(selectedIndex - 4, Math.max(tabs.length - 10, 0)));
   const visible = tabs.slice(start, start + 10);
   return (
-    <Box flexGrow={1} flexDirection="column" borderStyle="double" borderColor={THEME.parchment} paddingX={1}>
+    <Box flexGrow={1} flexDirection="column" borderStyle="round" borderColor={THEME.ridge} paddingX={1}>
       <Text color={THEME.parchment} bold>Pane Switcher</Text>
       <Text color={THEME.stone}>Enter jump | Esc close | j/k or arrows move | {tabs.length} panes</Text>
       <Text color={THEME.stone}> </Text>
