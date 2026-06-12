@@ -45,9 +45,11 @@
   owned_surfaces:
     - scripts/governance/hygiene/ratchet.py
     - scripts/governance/hygiene/ratchet_counters.py
+    - scripts/governance/assurance_boundary.py
     - docs/governance/hygiene/ratchet_baselines.json
     - docs/quality/SATTVA_STYLE.md
     - tests/test_quality_ratchet.py
+    - tests/test_assurance_boundary.py
     - tests/properties/test_ratchet_properties.py
 
   completion_criteria:
@@ -63,10 +65,14 @@
       kind: file_contains
       file: docs/governance/hygiene/ratchet_baselines.json
       pattern: '"silent_exception_swallows": (1[0-1][0-9]|[0-9]{1,2})\b'
-    - id: canon_tier1_counters_live
+    - id: spine_layer_contract_drained
       kind: file_contains
-      file: scripts/governance/hygiene/ratchet_counters.py
-      pattern: 'unsupervised_spawn_sites'
+      file: docs/governance/hygiene/ratchet_baselines.json
+      pattern: '"boundary_contract_violations": 0'
+    - id: boundary_swallows_drained
+      kind: file_contains
+      file: docs/governance/hygiene/ratchet_baselines.json
+      pattern: '"boundary_unwitnessed_swallows": 0'
 
   non_goals:
     - Do not gate on judgment qualities (naming, design depth); counters
