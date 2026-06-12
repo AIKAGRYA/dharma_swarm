@@ -67,3 +67,13 @@
   files: terminal/package.json (packageManager line only), spec-forge/features.json (F-006 status only), claude-progress.txt (EVAL F-005 trailing line rode this commit)
   lesson: pre-commit green on FIRST attempt - no docops drift fired and fourfold-shakti-warrant passed with no skip (F-002's flagged text finally outside staged-hunk context range); the skip ritual is not automatic anymore
 [2026-06-12T01:38:34Z] EVAL F-006 GREEN — criteria 10/10 pass
+[2026-06-12T01:45Z] F-007 implemented
+  evidence: git ls-files terminal/bun.lock returns path; bun install --frozen-lockfile exit 0 (19 packages installed, node_modules was incomplete); sha256 of bun.lock identical at 3 points
+            (pre-add, post-install, git show HEAD:terminal/bun.lock) = 5f7a421c237f... — added as-is, zero regeneration; typecheck 0 errors; bun test 527 pass / 0 fail;
+            failure-ratchet now-failures.txt 0 lines, comm vs baseline empty; ratchets flat: protocol.ts 4064, Sidebar/RepoPane dup fns 40, Record<string, unknown> 97;
+            golden pre-theme git status/diff clean; boot_smoke.sh exit 0 pre-work + pre-commit; commit c750537e5
+  files: terminal/bun.lock (tracked as-is, 477 lines), spec-forge/features.json (F-007 status only), docs/docops/AUTO_INVENTORY.md + docs/governance/SOVEREIGN_MANIFEST.md (docops reconcile 218464->218465),
+         claude-progress.txt + terminal/LESSONS/LESSONS.md (F-006 + EVAL trailing entries rode this commit)
+  lesson: docops drift returns whenever trailing LESSONS/progress entries ride a commit (218464->218465 here); manifest count lives at SOVEREIGN_MANIFEST.md:201 comma-formatted (218,465) — grep the comma form, not the raw integer
+  note: commit took 2 attempts: (1) docops FAIL manifest-markdown-lines, reconciled per prescribed step-10 path; (2) green — shakti warrant passed with NO skip, second consecutive session
+[2026-06-12T01:48:41Z] EVAL F-007 GREEN — criteria 8/8 pass

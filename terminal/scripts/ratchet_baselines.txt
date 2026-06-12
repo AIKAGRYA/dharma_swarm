@@ -1,0 +1,3 @@
+# Ratchet baselines — counters move DOWN only (see scripts/ratchet.sh).
+# Tighten a value here when the measured counter falls below it; never raise one.
+max_file_lines=4064
