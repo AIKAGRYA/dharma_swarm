@@ -209,6 +209,8 @@ Any other test edit must be demanded by the feature's own steps.
 
 Read terminal/src/theme.ts before any UI code; never hardcode a hex outside theme.ts and ScenicStrip.tsx.
 
+Design truth for all S4/S7/UX work: spec-forge/knowledge/DESIGN_FEEDBACK_OPERATOR_20260612.md — read it before any UI feature.
+
 That sentence is the first line of every coder session for a reason: the token
 file, not prose, holds 30+ fresh contexts to one visual identity.
 

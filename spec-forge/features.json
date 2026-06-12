@@ -2918,5 +2918,284 @@
     "priority": "P2",
     "status": "not_started",
     "verified": false
+  },
+  {
+    "id": "F-157",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "A prompt sent while the bridge is down shall render as `queued (backend offline)` within 2 seconds and shall NEVER display a perpetual `running` state (live tour finding 2: Turn 1 showed `running` plus optimistic trace steps forever while offline); when the bridge connects, queued turns shall either dispatch or be marked failed — no third silent state.",
+    "steps": [
+      "Boot the app hermetically offline (DHARMA_PYTHON=/nonexistent, temp state dirs) in tmux at 120x40 per the tour frames 02/03 pattern",
+      "Type a prompt into the composer and press Enter; poll-capture within 2s and observe the turn status reads queued (backend offline), not running",
+      "Wait 10s and re-capture; observe the turn still shows queued — no perpetual running and no optimistic trace steps (bootstrapping context / selecting route) on an offline turn",
+      "Start or simulate a bridge connection and observe each queued turn transitions to dispatched or failed"
+    ],
+    "verification": "tmux offline hermetic boot at 120x40; send-keys a prompt + Enter; poll-capture (no fixed-sleep-only race): frame within 2s contains 'queued (backend offline)' on the turn row; a capture at +10s contains no 'running' status on that turn; a unit test covers the queued->dispatched/failed transition on bridge connect",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-158",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Every slash command shall produce visible feedback in the transcript — an echoed turn plus a result, or an explicit queued/failed status; zero-visible-feedback command handling is banned (live tour finding 3: /help offline was silently swallowed — no echo, no response, no error). Graded by /help offline producing a visible response.",
+    "steps": [
+      "Boot the app hermetically offline in tmux per the tour frames 02/03 pattern",
+      "Type /help and press Enter; poll-capture and observe the command echoed as a turn in the transcript with a visible response, or an explicit queued/failed status — never an unchanged frame",
+      "Add a test over the slash-command registry asserting every registered command path produces a transcript entry (result, queued, or failed) — no silent-swallow branch survives"
+    ],
+    "verification": "tmux offline hermetic boot; send-keys '/help' + Enter; poll-capture: frame contains the echoed /help turn AND a visible response or 'queued (backend offline)'/'failed' status; script exits nonzero if the transcript is unchanged after the send; registry-coverage test green in bun test",
+    "dependencies": [
+      "F-002",
+      "F-157"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-159",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "BTab (Shift-Tab) shall move focus to the PREVIOUS tab — reverse of Tab (live tour finding 4: from Repo, BTab x2 landed FORWARD on Models while the keys line advertised reverse navigation); forward-then-back shall return to the origin tab.",
+    "steps": [
+      "Boot the app in tmux and capture the active tab marker per the tour frames 05/06 pattern",
+      "Send Tab; poll-capture and observe the NEXT tab active",
+      "Send BTab; poll-capture and observe focus returned to the ORIGIN tab (not advanced further forward)",
+      "Send BTab from the origin tab and observe the PREVIOUS tab in the documented order becomes active"
+    ],
+    "verification": "tmux session: capture active tab; send-keys Tab, poll-capture (next tab active); send-keys BTab, poll-capture: active tab equals the origin tab; a further BTab lands on the previous tab in registry order; script exits nonzero on any forward movement from BTab",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-160",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Every pane's description string shall describe THAT pane (live tour finding 5: the Models pane currently describes itself as 'Structured operator transcript' — copy-pasted from Chat); all 15 pane registry descriptions audited, accurate, and mutually unique.",
+    "steps": [
+      "Locate the pane registry holding the 15 pane description strings",
+      "Audit each description against its pane's actual content and rewrite the copy-pasted ones (Models first)",
+      "Add a unit test asserting all pane description strings are non-empty and mutually unique"
+    ],
+    "verification": "bun test green on a unit test asserting the pane registry's description strings are non-empty and pairwise unique, and that the Models pane description differs from the Chat/transcript description; grep of the pane registry shows no duplicated description string",
+    "dependencies": [],
+    "estimated_minutes": 15,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-161",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "No pane shall display a perpetual 'loading...' while the bridge is down (live tour finding 6: perpetual 'Model policy loading...' in the Models pane offline — same dishonest-pending class as the lying turn); offline panes shall show `no signal (backend offline)` instead.",
+    "steps": [
+      "Boot the app hermetically offline in tmux",
+      "Navigate to the Models pane (and each data-backed pane) and poll-capture after 5s",
+      "Observe no 'loading' text anywhere in the frame; panes without data render 'no signal (backend offline)'",
+      "Add a test asserting projection-backed panes map bridge-down state to the no-signal message, never a pending/loading state"
+    ],
+    "verification": "tmux offline hermetic boot; navigate to the Models pane; capture at +5s: frame contains 'no signal (backend offline)' and contains no 'loading' token; unit test maps bridge-down to no-signal for projection-backed panes; script exits nonzero on any 'loading' match offline",
+    "dependencies": [
+      "F-157"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-162",
+    "component": "s3-interaction",
+    "category": "visual",
+    "description": "The collapsed sidebar shall render zero-width or a clean rail — NEVER a 3-column bordered box containing a lone 'T' (the 'T' sliver, confirmed live in every pane at all widths, tour finding 10); boot frames at all three graded sizes contain no 2-4-column bordered fragment.",
+    "steps": [
+      "Reproduce the sliver in boot captures at 80x24, 100x30, and 120x40",
+      "Fix the collapsed-pane rendering so the collapsed state is zero-width or a clean unbordered rail",
+      "Re-capture boot frames at all 3 sizes and observe no narrow bordered fragment at the chat pane's left edge"
+    ],
+    "verification": "boot frames captured at 80x24, 100x30, and 120x40: an assertion script finds no 2-4-column bordered fragment (border glyphs enclosing a 1-2 char interior such as a lone 'T') in any frame; exits nonzero on a match",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P0",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-163",
+    "component": "s7-ux",
+    "category": "visual",
+    "description": "Fill law: the transcript shall flexGrow to claim all spare vertical height, the composer shall be pinned directly beneath it, and the status line shall be bottom-anchored — zero dead rows below the status line at a 120x40 capture (and graded at larger sizes, e.g. 244x68, when available); the stack is height-blind in neither direction.",
+    "steps": [
+      "Make the transcript container flexGrow to absorb spare height in zen mode",
+      "Pin the composer immediately beneath the transcript and bottom-anchor the status line",
+      "Capture at 120x40 and observe the status line is the last non-empty row with zero dead rows below it",
+      "When a larger capture size is available (244x68), repeat the dead-row count there"
+    ],
+    "verification": "tmux capture at 120x40: the status line is the final non-empty row of the frame and the row count below it is exactly 0; script exits nonzero on any dead row below the status line",
+    "dependencies": [
+      "F-002",
+      "F-021"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-164",
+    "component": "s5-projections",
+    "category": "functional",
+    "description": "Status single-source: one StatusModel projection shall be the sole source of connection/model/readiness status for every surface; offline, the model name, and ready shall each appear EXACTLY once per rendered frame (pixel review found offline said 3x, model 3x, ready 3x, mode 2x across 3 surfaces), with READY suppressed entirely while the bridge is down.",
+    "steps": [
+      "Introduce a StatusModel projection deriving connection state, active model, and readiness from existing owners",
+      "Route every status-rendering surface (header, summary, status line) through StatusModel and delete duplicate renders",
+      "Capture an offline boot frame and count: 'offline' appears exactly once, the model name exactly once, and 'READY' zero times (suppressed offline)",
+      "Capture a connected frame and count offline/model/ready each appearing exactly once"
+    ],
+    "verification": "tmux capture (offline boot): grep -c 'offline' == 1, model-name token count == 1, 'READY' count == 0; with a connected bridge: offline 0, model 1, ready 1; unit tests cover StatusModel derivation; script exits nonzero on any duplicate status token",
+    "dependencies": [
+      "F-102",
+      "F-110"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-165",
+    "component": "s7-ux",
+    "category": "visual",
+    "description": "De-border: at most 2 bordered containers shall render per frame — the focused composer plus at most one focused pane (pixel review counted 21 bordered containers: container soup, shipped); header, operator summary, and footer shall become unbordered lines separated by spacing — borders are not separators, space is.",
+    "steps": [
+      "Remove per-widget borders from header, operator summary, footer, and unfocused panes",
+      "Keep the accent border on the focused composer and the ridge border on at most one focused pane",
+      "Capture frames at 80x24, 100x30, and 120x40 and count bordered containers in each: <= 2"
+    ],
+    "verification": "frame captures at all 3 graded sizes: a counter script tallies bordered containers (top-left corner glyph runs) and asserts <= 2 per frame; exits nonzero above 2",
+    "dependencies": [
+      "F-021"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-166",
+    "component": "s7-ux",
+    "category": "visual",
+    "description": "Max-width measure: prose/transcript content shall clamp to ~100 columns at wide terminals — no full-width border rules; surplus width becomes gutter (or cockpit side panes), eliminating the 74%-dead-band failure mode at 244 columns.",
+    "steps": [
+      "Clamp the transcript/prose measure to ~100 columns when the terminal is wider",
+      "Remove any horizontal border rule that spans the full terminal width",
+      "Capture at the widest available graded size (>= 120 cols) and observe no transcript text line exceeding the clamp and no full-width rule"
+    ],
+    "verification": "tmux capture at >= 120 cols with long transcript content: no prose/transcript line renders text beyond ~100 columns (clamp +/- padding) and no border rule spans the full frame width; script exits nonzero on violation",
+    "dependencies": [
+      "F-021"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-167",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "Offline that breathes: while the bridge is down the status line shall show `○ bridge offline — retry N in Ns · ^R now · input queued` with a LIVE retry counter and countdown; ^R shall trigger an immediate retry; the ink ○ glyph replaces vermilion for expected hermetic-offline.",
+    "steps": [
+      "Render the offline status line from live retry state: attempt counter, countdown seconds, ^R hint, input-queued promise",
+      "Capture twice ~3s apart while offline and observe the countdown/counter values CHANGED between captures",
+      "Press ^R and observe an immediate retry attempt reflected in the status line",
+      "Observe the ○ glyph (not vermilion text) carries the offline state"
+    ],
+    "verification": "tmux offline hermetic boot: two captures 3s apart both match '○ bridge offline' with 'retry' counter, '^R' hint, and 'input queued'; the countdown/counter value differs between the two captures (live, not frozen); send-keys C-r produces a visible immediate retry within one poll interval",
+    "dependencies": [
+      "F-110",
+      "F-157"
+    ],
+    "estimated_minutes": 30,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-168",
+    "component": "s3-interaction",
+    "category": "functional",
+    "description": "Keymap collision fix: ^I, ^M, and ^H shall be removed from advertised chords (byte-identical to Tab, Enter, and Backspace in legacy encoding — three live collisions in the footer); the footer keys line shall be <= 1 row containing <= 5 contextual hints plus a permanent `? help`; all remaining bindings live only behind the (separately planned) ? overlay.",
+    "steps": [
+      "Remove ^I/^M/^H from the advertised binding set in the keybinding registry (the underlying Tab/Enter/Backspace actions keep working)",
+      "Cap the footer to one row: <= 5 contextual hints for the focused pane plus a permanent '? help'",
+      "Capture frames at 80x24, 100x30, and 120x40 and observe the footer occupies one row with no unlabeled chord runs",
+      "Add a registry test asserting no advertised binding renders as ^I, ^M, or ^H"
+    ],
+    "verification": "frame captures at all 3 sizes: footer keys line occupies <= 1 row, contains <= 5 hints plus '? help', and matches none of '^I', '^M', '^H'; registry unit test asserting the advertised set excludes the three byte-collision chords is green in bun test",
+    "dependencies": [
+      "F-056",
+      "F-129"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-169",
+    "component": "s7-ux",
+    "category": "e2e",
+    "description": "Resize settle bound: after a live terminal resize, stale frame fragments shall clear within 1 second (live tour finding 8: stale 120-wide pill fragments floated ~2-5s after a 120x40 -> 80x24 resize before compact mode rendered); the settle-time bound is graded as part of resize integrity (parity contract 3).",
+    "steps": [
+      "Boot the app in tmux at 120x40 and capture a steady frame per the tour frames 08/09 pattern",
+      "Resize the tmux window to 80x24",
+      "Capture at +1s and observe the compact layout rendered with NO stale fragments from the 120-wide layout (no orphan pill fragments, no content beyond 80 columns)",
+      "Repeat in the widening direction (80x24 -> 120x40) with the same 1s bound"
+    ],
+    "verification": "tmux: boot at 120x40, resize-window to 80x24, sleep 1, capture-pane: frame contains no stale wide-layout fragments (no line content beyond 80 cols, no orphaned pill fragments) and renders the compact one-line tab bar; same check widening 80x24 -> 120x40 at +1s; script exits nonzero on any stale artifact",
+    "dependencies": [
+      "F-002",
+      "F-144"
+    ],
+    "estimated_minutes": 25,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
+  },
+  {
+    "id": "F-170",
+    "component": "s7-ux",
+    "category": "functional",
+    "description": "Boot row discipline: the first rendered frame row shall be app-owned via the alternate screen (or equivalent) — no shell echo, command echo, or prompt text shall appear above the UI in boot captures at any graded size (or an explicit accepted-inline decision is recorded in its place).",
+    "steps": [
+      "Enter the alternate screen (or equivalent first-row ownership) before the first paint on boot",
+      "Capture boot frames at 80x24, 100x30, and 120x40",
+      "Observe row 1 of every capture belongs to the app shell — no shell prompt, no echoed launch command above the UI",
+      "Confirm Ctrl+C exit still releases the alternate screen cleanly (no regression of the exit contract)"
+    ],
+    "verification": "boot captures at all 3 graded sizes: line 1 of each frame is app chrome (header/canvas), matching no shell-echo patterns (e.g. 'bun run start', '$ ', '% '); script exits nonzero on shell text above the UI; boot smoke and exit-cleanliness checks remain green",
+    "dependencies": [
+      "F-002"
+    ],
+    "estimated_minutes": 20,
+    "priority": "P1",
+    "status": "not_started",
+    "verified": false
   }
 ]
