@@ -3,6 +3,7 @@ name: fourfold-warrant
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**", "codex/**"]
+  merge_group:
 
 concurrency:
   group: fourfold-warrant-${{ github.ref }}
@@ -16,6 +17,9 @@ jobs:
   fourfold-warrant:
     name: Fourfold Shakti Warrant
     runs-on: ubuntu-latest
+    # PR diff/body warrant already passed before queueing.
+    # merge_group has no pull_request body/base/head SHA context.
+    if: github.event_name != 'merge_group'
     timeout-minutes: 8
     steps:
       - name: Checkout full history

@@ -399,6 +399,8 @@ def summarize_runtime_truth_packets(
             "latest_receipt": (latest.receipt_refs or [""])[0],
             "run_id": latest.run_id,
             "task_id": latest.task_id,
+            "mission_id": latest.mission_id,
+            "artifact_refs": list(latest.artifact_refs or ()),
             "correlation_id": latest.correlation_id,
             "heartbeat": latest.heartbeat_state.value,
             "progress": latest.progress_state.value,
@@ -413,6 +415,8 @@ def summarize_runtime_truth_packets(
             "latest_receipt": None,
             "run_id": None,
             "task_id": None,
+            "mission_id": None,
+            "artifact_refs": [],
             "correlation_id": None,
             "heartbeat": store.heartbeat_state.value,
             "progress": store.progress_state.value,
@@ -577,10 +581,7 @@ def _packet_from_latest_runtime_receipt(
     stale = _is_stale(_field(claim, "stale_after"))
     latest_artifact_at = _field(artifacts[0], "created_at") if artifacts else ""
     receipt_ref = f"runtime_receipts:{receipt['receipt_id']}"
-    artifact_refs = [
-        _artifact_ref(artifact)
-        for artifact in artifacts
-    ]
+    artifact_refs = _artifact_refs(artifacts, run)
     missing = _missing_fields(
         run_id=run_id,
         task_id=task_id,
@@ -590,7 +591,7 @@ def _packet_from_latest_runtime_receipt(
         idempotency=idem,
         claim=claim,
         run=run,
-        artifacts=artifacts,
+        artifact_refs=artifact_refs,
     )
     return ProjectionRuntimeTruthPacket(
         surface_id="runtime_state.latest_receipt",
@@ -608,7 +609,11 @@ def _packet_from_latest_runtime_receipt(
         runner_id=runner_id,
         receipt_refs=[receipt_ref],
         artifact_refs=artifact_refs,
-        source_refs=[RUNTIME_DB_SOURCE, str(path)],
+        source_refs=[
+            RUNTIME_DB_SOURCE,
+            str(path),
+            *([_idempotency_ref(idem)] if idem is not None else []),
+        ],
         heartbeat_state=_heartbeat_state(claim, stale=stale),
         readiness_state=ProjectionRuntimeTruthState.READY_BY_PROBE,
         progress_state=_progress_state(run, artifacts, stale=stale),
@@ -632,6 +637,12 @@ def _packet_from_latest_runtime_receipt(
             "receipt_type": str(receipt["receipt_type"]),
             "receipt_status": str(receipt["status"]),
             "idempotency_status": _field(idem, "status"),
+            "idempotency_record_ref": _idempotency_ref(idem) if idem is not None else "",
+            "idempotency_result_receipt_ref": (
+                f"runtime_receipts:{_field(idem, 'result_receipt_id')}"
+                if _field(idem, "result_receipt_id")
+                else ""
+            ),
             "side_effect_key": side_effect_key,
             "delegation_status": _field(run, "status"),
             "task_claim_status": _field(claim, "status"),
@@ -920,11 +931,28 @@ def _retry_state(record: sqlite3.Row | None) -> ProjectionRuntimeTruthState:
     return ProjectionRuntimeTruthState.OBSERVED
 
 
+def _artifact_refs(artifacts: list[sqlite3.Row], run: sqlite3.Row | None) -> list[str]:
+    refs = [_artifact_ref(artifact) for artifact in artifacts]
+    current_artifact_id = _field(run, "current_artifact_id")
+    if current_artifact_id and not any(current_artifact_id in ref for ref in refs):
+        run_id = _field(run, "run_id")
+        refs.append(f"delegation_runs:{run_id}:current_artifact_id:{current_artifact_id}")
+    return refs
+
+
 def _artifact_ref(artifact: sqlite3.Row) -> str:
     path = _field(artifact, "payload_path") or _field(artifact, "manifest_path")
     if path:
         return f"artifact_records:{artifact['artifact_id']}:{path}"
     return f"artifact_records:{artifact['artifact_id']}"
+
+
+def _idempotency_ref(idempotency: sqlite3.Row) -> str:
+    return (
+        "idempotency_records:"
+        f"{_field(idempotency, 'idempotency_key')}:"
+        f"{_field(idempotency, 'side_effect_key')}"
+    )
 
 
 def _missing_fields(
@@ -937,7 +965,7 @@ def _missing_fields(
     idempotency: sqlite3.Row | None,
     claim: sqlite3.Row | None,
     run: sqlite3.Row | None,
-    artifacts: list[sqlite3.Row],
+    artifact_refs: list[str],
 ) -> list[str]:
     fields: list[str] = []
     if not run_id:
@@ -956,7 +984,7 @@ def _missing_fields(
         fields.append("task_claim")
     if run is None:
         fields.append("delegation_run")
-    if not artifacts:
+    if not artifact_refs:
         fields.append("artifact_refs")
     return fields
 

@@ -209,18 +209,12 @@ def test_known_joined_surfaces() -> None:
         )
 
 
-def test_nats_is_scoped_out() -> None:
-    """NATS is explicitly scoped out per active track non-goals.
-
-    It has no source files so the metric correctly marks it 'missing'.
-    This is acceptable — the adoption formula (joined + adapter_ready) / total
-    accounts for it.  If NATS source files appear later, quarantine evidence
-    patterns should be added to the SurfaceRule.
-    """
+def test_nats_jetstream_transport_is_joined() -> None:
+    """NATS JetStream is now part of the joined transport cutover surface."""
     report = _generate()
     nats = next((s for s in report["surfaces"] if s["id"] == "nats_jetstream_transport"), None)
     assert nats is not None
-    assert nats["status"] in ("missing", "quarantine")
+    assert nats["status"] == "joined"
 
 
 # ---------------------------------------------------------------------------

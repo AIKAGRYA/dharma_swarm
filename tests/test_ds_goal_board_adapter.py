@@ -72,6 +72,21 @@ def test_ds_goal_task_to_card_maps_kernel_closeback_to_done_with_result_ref(tmp_
     assert result_refs[0].checksum == "sha256:proof"
 
 
+def test_ds_goal_task_to_card_requires_kernel_ref_for_done_projection(tmp_path):
+    mission_dir, mission, task = _write_mission(tmp_path)
+    task["status"] = "done"
+
+    card = ds_goal_task_to_card(task, mission=mission, mission_dir=mission_dir)
+
+    assert card.status == "review"
+
+    task.pop("status")
+    task["kernel_result_status"] = "completed"
+    card = ds_goal_task_to_card(task, mission=mission, mission_dir=mission_dir)
+
+    assert card.status == "review"
+
+
 def test_adapter_lists_cards_across_state_root(tmp_path):
     _write_mission(tmp_path)
 

@@ -37,6 +37,7 @@ The default local sessions are:
 | `dharma-control` | repo control lane: onboarding, governance checks, git state |
 | `dharma-agents` | safe shells for Hermes, Codex, A2A, and NATS observation |
 | `dharma-vps` | SSH coordination lanes for `agni` and `rushabdev` |
+| `dharma_a2a_inbox_bridge_hermes_m5` | optional Hermes A2A inbox delivery bridge lane |
 
 VPS hosts should expose the same substrate shape when SSH is available:
 
@@ -86,6 +87,19 @@ available.
 `make tmux-status` reports installed version, config state, local sessions, and
 optional VPS probes. It must distinguish "tmux installed" from "agent work
 proved".
+
+The Hermes A2A inbox delivery bridge is intentionally operator-started, not
+auto-installed as a daemon:
+
+```bash
+bash scripts/start_a2a_inbox_bridge_tmux.sh
+bash scripts/status_a2a_inbox_bridge_tmux.sh
+bash scripts/stop_a2a_inbox_bridge_tmux.sh
+```
+
+The lane is inspectable tmux execution only. A2A contact proof remains in
+`reports/a2a/inbox_bridge_receipts/`, sender receipts, and NATS consumer state.
+The bridge proves filesystem delivery/handler ack, not semantic peer reasoning.
 
 ## Unified Substrate Projection
 

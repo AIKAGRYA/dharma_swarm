@@ -2,11 +2,11 @@
 
 **Purpose**: This document is the absolute ground truth for the dharma_swarm repository. All AI agents, regardless of model or tab, MUST ingest, comprehend, and adhere to this context before outputting a single line of code.
 
-**Generated**: 2026-04-04 | Count refresh: 2026-06-09 filesystem verification
+**Generated**: 2026-04-04 | Count refresh: 2026-06-12 filesystem verification
 **Prior audit**: 2026-04-04 | 5-model convergent audit (Claude, DeepSeek, GPT-OSS, Codex, RUFLO)
 **Authority**: This file + `CLAUDE.md` are the two canonical governance surfaces. When they conflict, `CLAUDE.md` wins on behavioral rules; this file wins on architectural truth.
 
-**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-06-09. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
+**Verification method**: Count-sensitive claims below were refreshed against the filesystem on 2026-06-12. Architecture prose still reflects the 2026-04-04 audit unless specifically marked otherwise. Recheck counts before citing them in future work.
 
 **Substrate-nativeness status**: The current runtime is ~10–15% ontology-native; ~85–90% of runtime work bypasses substrate. See [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) for the audit that established this estimate.
 
@@ -132,7 +132,7 @@ No single file should exceed 3,000 lines. Current violations (V):
 **148 files exceed 500 lines; 39 exceed 1,000; 7 exceed 3,000** (V). These must be decomposed over time, not grown further.
 
 ### A6: DOCS DECAY -- CHECK BEFORE CITING
-All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **310 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
+All numerical claims in docs become stale within weeks. Before citing module counts, test counts, or line counts from any doc (including this one), verify against the actual filesystem. See `REPO_GOVERNANCE_AUDIT.md` for the current staleness log. The current DocOps inventory reports **394 Markdown files containing at least one reserved trust-language term** (V). Treat these as authority-scope review candidates, not confirmed repo-wide authority.
 
 ### A7: NO CIRCULAR IMPORTS
 The repo has **9 verified circular dependency chains** (V). The worst:
@@ -143,27 +143,27 @@ The repo has **9 verified circular dependency chains** (V). The worst:
 All 9 cycles were independently confirmed with exact import lines. Most are mitigated by lazy imports but remain architectural debt. **New code must not create circular imports.**
 
 ### A8: FRONTMATTER DISCIPLINE
-Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **218 of 877 Markdown files start with YAML frontmatter; 15 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
+Do not inject machine-readable YAML frontmatter into governance or architecture docs unless explicitly requested. Current state: **218 of 897 Markdown files start with YAML frontmatter; 15 docs/architecture Markdown files do so** (V). Long frontmatter remains an authority/noise risk even when the prose is useful.
 
 ---
 
-## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-12 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **695** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **398 (57.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **294,219** | wc -l across dharma_swarm Python modules |
-| Test files | **667** | find tests -name "*.py" -type f |
-| Test functions | **11,295 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **700** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **398 (56.9%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **296,465** | wc -l across dharma_swarm Python modules |
+| Test files | **685** | find tests -name "*.py" -type f |
+| Test functions | **11,389 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **877** | find . -name "*.md" -type f |
-| Markdown total lines | **219,324** | wc -l across all .md |
+| Markdown files | **897** | find . -name "*.md" -type f |
+| Markdown total lines | **221,331** | wc -l across all .md |
 | Bridge files | **25** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **22** | find dharma_swarm -type f \| rg -i "adapter" |
+| Adapter files | **25** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** (6,034 LOC total) | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |

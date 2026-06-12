@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "codex-semantic-receipt-runner-v7-typed-failure-20260611T160525Z",
+  "created_at": "2026-06-11T16:25:43Z",
+  "critic_agent_id": "unavailable:missing-model",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md"
+  ],
+  "explicit_disagreement": "RuntimeError: provider is not supported by this runner: unavailable",
+  "failure_reason": "RuntimeError: provider is not supported by this runner: unavailable",
+  "failure_type": "provider_unavailable",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 0,
+  "model_identity": {
+    "model": "missing-model",
+    "provider": "unavailable"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "38389a0a61b7a0070e3a30507c2bd55bdab12cc587e651430338a13808e6bbef",
+  "raw_response_sha256": "",
+  "receipt_id": "semr_f2db898f66a8421cb0b8705a539c340a",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "RuntimeError: provider is not supported by this runner: unavailable"
+    }
+  ],
+  "reply_to": "",
+  "review_target": "semantic-receipt-runner-v7-provider-failure-smoke",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: provider_unavailable",
+  "understood_request": false,
+  "verdict": "blocked"
+}

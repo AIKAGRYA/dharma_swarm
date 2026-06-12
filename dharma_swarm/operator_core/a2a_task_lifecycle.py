@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.operator_core.return_address import build_return_address
 
 TaskStatus = Literal["pending", "open", "ready", "claimed", "completed", "failed", "blocked"]
@@ -58,7 +59,7 @@ def _content_hash(payload: dict[str, Any]) -> str:
 
 
 def default_state_root() -> Path:
-    return Path.home() / ".dharma"
+    return dharma_state_dir("DHARMA_STATE_DIR", "DHARMA_HOME")
 
 
 def queue_path(state_root: Path | str | None = None) -> Path:

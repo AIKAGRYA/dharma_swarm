@@ -38,12 +38,14 @@ ingest before any action. They are:
 
 1. The onboarding command output (`make onboard`)
 2. [`CLAUDE.md`](../../CLAUDE.md) — behavioural contract for coding agents
-3. [`docs/governance/SOVEREIGN_MANIFEST.md`](SOVEREIGN_MANIFEST.md) — architecture, axioms, invariants
+3. [`docs/governance/SWARM_GENOME.md`](SWARM_GENOME.md) — compact first-token map and claim-language guard
 4. [`docs/governance/ACTIVE_TRACK.yaml`](ACTIVE_TRACK.yaml) — active build track
 5. [`docs/governance/ANTI_SLOP_RULES.md`](ANTI_SLOP_RULES.md) — what not to do
 
 Everything else in `docs/governance/`, `docs/doctrine/`, and `docs/architecture/`
 is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
+`SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority; it
+is no longer a forced first-read surface.
 
 ---
 
@@ -58,6 +60,9 @@ is **depth-on-demand**. Read it when you need it. Do not memorise a read order.
 | Behavioural contract (coding agents) | `CLAUDE.md` | — |
 | Operational manual (Devin sessions) | `DEVIN.md` | Defers to `CLAUDE.md` on repo governance |
 | Behavioural contract (cross-agent) | `AGENTS.md` (root), `docs/AGENTS.md` | — |
+| First-token organism map / claim-language guard | `docs/governance/SWARM_GENOME.md` | Defers to owners for live state and doctrine |
+| Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
+| Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |

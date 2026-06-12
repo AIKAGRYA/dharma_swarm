@@ -53,10 +53,18 @@ def _identifier(value: str) -> str:
     return "".join(chars).strip("_") or stable_payload_hash(value)[:18].replace(":", "_")
 
 
+def _has_kernel_result_ref(task: dict[str, Any]) -> bool:
+    ref = task.get("kernel_result_ref")
+    if not isinstance(ref, dict):
+        return False
+    return bool(ref.get("run_id") or ref.get("receipt_id") or ref.get("proof_entry_hash"))
+
+
 def _task_status(task: dict[str, Any]) -> CardStatus:
+    has_kernel_ref = _has_kernel_result_ref(task)
     result_status = str(task.get("kernel_result_status") or "").strip().lower()
     if result_status == "completed":
-        return "done"
+        return "done" if has_kernel_ref else "review"
     if result_status == "failed":
         return "failed"
     if result_status == "blocked":
@@ -66,7 +74,7 @@ def _task_status(task: dict[str, Any]) -> CardStatus:
 
     status = str(task.get("status") or "").strip().lower()
     if status in {"done", "completed", "closed"}:
-        return "done"
+        return "done" if has_kernel_ref else "review"
     if status in {"failed", "error"}:
         return "failed"
     if status in {"blocked"}:

@@ -389,7 +389,7 @@ def fetch_pr_view(pr_number: int) -> dict[str, Any]:
         "view",
         str(pr_number),
         "--json",
-        "number,title,body,author,baseRefName,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+        "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
     ])
 
 
@@ -1054,6 +1054,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "coherence": current_coherence,
         "ci_truth": current_ci_truth,
         "required_reviewers": required_reviewers,
+        "head_sha": current_pr.get("headRefOid") or "",
         "review_threads": {
             "ok": current_threads.get("ok"),
             "unresolved_count": unresolved_count,
@@ -1212,10 +1213,18 @@ def render_github_comment(
     return "\n".join(lines) + "\n"
 
 
-def gh_merge_command(pr_number: int, *, method: str = "squash", auto: bool = True) -> list[str]:
+def gh_merge_command(
+    pr_number: int,
+    *,
+    method: str = "squash",
+    auto: bool = True,
+    match_head_commit: str = "",
+) -> list[str]:
     cmd = ["gh", "pr", "merge", str(pr_number), f"--{method}", "--delete-branch"]
     if auto:
         cmd.insert(4, "--auto")
+    if match_head_commit:
+        cmd.extend(["--match-head-commit", match_head_commit])
     return cmd
 
 
@@ -1227,7 +1236,13 @@ def run_mike_merge_authority(
     auto: bool,
     runner: Callable[..., CommandResult] = run,
 ) -> dict[str, Any]:
-    command = gh_merge_command(pr_number, method=method, auto=auto)
+    match_head_commit = str(gate.get("head_sha") or "")
+    command = gh_merge_command(
+        pr_number,
+        method=method,
+        auto=auto,
+        match_head_commit=match_head_commit,
+    )
     receipt: dict[str, Any] = {
         "schema": "dharma.pr_review.mike_merge_receipt.v1",
         "generated_at": utc_now(),
@@ -1238,6 +1253,7 @@ def run_mike_merge_authority(
         "auto": auto,
         "gate_decision": gate.get("decision"),
         "gate_packet_dir": gate.get("packet_dir"),
+        "head_sha": match_head_commit,
         "required_reviewers": gate.get("required_reviewers", []),
         "risk": gate.get("risk", {}),
         "command": command,
@@ -1388,7 +1404,12 @@ def cmd_merge(args: argparse.Namespace) -> int:
         return 2
     if not args.execute:
         print("decision=MERGE_CANDIDATE")
-        command = gh_merge_command(args.pr, method=args.method, auto=args.auto)
+        command = gh_merge_command(
+            args.pr,
+            method=args.method,
+            auto=args.auto,
+            match_head_commit=str(gate.get("head_sha") or ""),
+        )
         print(f"dry_run=true command={' '.join(shlex.quote(part) for part in command)}")
         write_json(
             out_dir / "MIKE_MERGE_RECEIPT.json",
@@ -1401,6 +1422,7 @@ def cmd_merge(args: argparse.Namespace) -> int:
                 "method": args.method,
                 "auto": args.auto,
                 "gate_decision": gate.get("decision"),
+                "head_sha": gate.get("head_sha", ""),
                 "required_reviewers": gate.get("required_reviewers", []),
                 "status": "DRY_RUN",
                 "command": command,
@@ -1493,6 +1515,8 @@ def cmd_run_agent(args: argparse.Namespace) -> int:
 def parse_csv_tokens(value: str | None, *, default: tuple[str, ...]) -> list[str]:
     if not value:
         return list(default)
+    if value.strip().lower() in {"none", "no-reviewers", "no_reviewers", "-"}:
+        return []
     tokens = [item.strip() for item in value.split(",") if item.strip()]
     return tokens or list(default)
 

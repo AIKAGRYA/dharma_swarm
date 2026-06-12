@@ -355,6 +355,37 @@ class TestLoadIntoRegistry:
         assert len(history) == 1
         assert history[0].action_name == "Run"
 
+    def test_load_into_registry_skips_malformed_object_properties(
+        self,
+        hub: OntologyHub,
+        sample_objects: list[OntologyObj],
+    ) -> None:
+        hub.store_object(sample_objects[0])
+        hub._conn.execute(
+            """INSERT INTO objects
+               (id, type_name, properties, created_at, created_by, updated_at, version)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                "obj-malformed",
+                "Experiment",
+                "not-json",
+                "2026-06-11T06:55:00Z",
+                "test",
+                "2026-06-11T06:55:00Z",
+                1,
+            ),
+        )
+        hub._conn.commit()
+
+        registry = OntologyRegistry()
+        counts = hub.load_into_registry(registry)
+
+        assert counts["objects_loaded"] == 1
+        assert counts["objects_skipped"] == 1
+        assert registry.get_object("obj-alpha") is not None
+        assert registry.get_object("obj-malformed") is None
+        assert hub.load_object("obj-malformed") is None
+
 
 # ---------------------------------------------------------------------------
 # Restart persistence

@@ -23,6 +23,8 @@ must pass these gates before merge:
 | 8 | PR collision detect | `pr-collision-detect.yml` | Warning comment (non-blocking) |
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
+| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Dry-run by default; closes older non-draft `[automated]` duplicates only when manually dispatched with `dry_run=false` |
+| 12 | Docs-low automerge dispatcher | `automerge.yml` | Label-gated; dispatches MMM only for green docs/report projection PRs |
 
 ### Local pre-flight
 
@@ -89,7 +91,7 @@ Declared lanes and limits (defined in `.github/workflows/bot-pr-limit.yml`):
 
 | Lane | headRef pattern | Max open |
 |---|---|---|
-| `spine-adoption-refresh` | `chore/governance*spine-adoption*` | 1 |
+| `spine-adoption-refresh` | `*spine-adoption*` | 1 |
 | `docops-autorefresh` | `chore/docops-autorefresh*` | 1 |
 | `verdict-inter-agent` | `verdict/inter_agent*` | 3 |
 | `chore-inter-agent` | `chore/inter-agent*` | 3 |
@@ -98,6 +100,12 @@ Declared lanes and limits (defined in `.github/workflows/bot-pr-limit.yml`):
 Human PRs on non-lane branches are unaffected. To add a new automation lane,
 add a `case` arm to the `Resolve intent from headRef` step and a row to this
 table in the same PR.
+
+The spine-adoption refresher has used several branch prefixes
+(`chore/governance/...`, `chore/auto-spine-adoption...`, and
+`ops/spine-adoption-metric...`). The throttle matches the intent token anywhere
+in the headRef so renamed refresher branches cannot evade the one-open-PR
+limit.
 
 ### Rule: Deduplication by intent
 
@@ -110,6 +118,58 @@ The `pr-collision-detect.yml` workflow detects duplicate PRs by:
 When duplicates are detected, only the **latest/most complete** PR
 should remain open. Earlier attempts should be closed with a comment
 linking to the successor.
+
+### Duplicate Automated PR Dedupe
+
+`pr-dedupe.yml` groups open non-draft PRs by normalized title and only considers
+titles carrying `[automated]` or `[auto]`. It reports every six hours. It closes
+older duplicates only when a maintainer manually dispatches the workflow with
+`dry_run=false`. It never merges and never deletes branches.
+
+---
+
+## 2b. Docs-Low Automerge Dispatcher
+
+GitHub auto-merge is allowed at the repository level, but Merge Master Mike
+remains the merge authority. `.github/workflows/automerge.yml` is only a
+dispatcher:
+
+1. A PR must carry `automerge` or `bot-pr`.
+2. The PR must be non-draft, mergeable, have no `CHANGES_REQUESTED` review
+   decision, and have all non-automerge checks green.
+3. Changed files must be limited to `docs/`, `reports/governance/`, or
+   markdown projection files. Hot paths such as `.github/`, `scripts/`,
+   `dharma_swarm/`, `tests/`, `api/`, and `dashboard/` are skipped.
+4. The dispatcher invokes `codex-mention-router.yml` with
+   `merge_when_clean=true` and `required_reviewers=none`.
+5. Mike still runs the deterministic gate and arms GitHub auto-merge using the
+   current head commit. A later push must re-dispatch for the new head SHA.
+
+Non-docs-low PRs should use the normal local Mike review lane:
+
+```bash
+make pr-mike
+make pr-run-codex PR=<number>
+make pr-run-claude PR=<number>
+make pr-gate PR=<number>
+make pr-merge PR=<number> ARGS="--confirm merge-pr-<number> --auto --execute"
+```
+
+---
+
+## 2c. Merge Queue Readiness
+
+The repository workflows now include `merge_group:` triggers so `main` can use
+GitHub's merge queue. Tree-level checks run against the queued batch. PR-shaped
+checks that require PR body or base/head SHA context skip their job on
+`merge_group`; they already passed on the PR before queueing.
+
+One repository setting remains an operator/admin action:
+
+1. Settings -> Branches -> `main` protection.
+2. Enable **Require merge queue**.
+3. Start with squash merge, build concurrency `2`, maximum merge group size
+   `1` or `2`, and only non-failing PRs enabled.
 
 ---
 

@@ -29,7 +29,7 @@ on:
       required_reviewers:
         description: Required reviewer receipt names before Mike may merge
         required: true
-        default: copilot,claude,devin
+        default: codex,claude
         type: string
       merge_mode:
         description: Mike merge authority mode

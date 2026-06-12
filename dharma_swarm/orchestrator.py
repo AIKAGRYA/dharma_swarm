@@ -1946,6 +1946,7 @@ class Orchestrator:
             requirement_refs=[f"task:{td.task_id}", f"agent:{td.agent_id}"],
         )
         logger.info("_assign_dispatch(%s): gate=%.2fs total=%.2fs", td.task_id[:8], _adt.monotonic() - _gate_t0, _adt.monotonic() - _ad0)
+        logger.info("_assign_dispatch(%s): gate_decision=%s reason=%s", td.task_id[:8], gate.result.decision.value, gate.result.reason[:80] if gate.result.reason else "none")
 
         # Yield after sync gate check so other coroutines can progress
         await asyncio.sleep(0)
@@ -2231,6 +2232,43 @@ class Orchestrator:
         # Observable for the verifier + downstream truth packets (no new store).
         self._last_evidence_receipt = receipt
         td.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+        # Persist to delegation_runs.receipt_json — the operator-witnessable record
+        # (GATE 1 watches this column; orchestrator-surface witness — the A2A
+        # surface persists via RuntimeReceipt instead, see spine/persistence.py).
+        # CRITICAL: write to the SAME store record_delegation_run used (the
+        # configurable store db_path, not a hardcoded default) — writer and
+        # witnessed column must be the same file by construction. persist_receipt
+        # raises on a 0-row match so a missing row cannot masquerade as success.
+        # Fail-open: a persistence error must never break dispatch (receipt stays
+        # in memory; the gap shows up as a warning + non-incrementing witness).
+        try:
+            import aiosqlite
+
+            from dharma_swarm.spine.persistence import (
+                ensure_receipt_column,
+                persist_receipt,
+            )
+
+            _store = self._runtime_lifecycle._runtime_state_store()
+            _db_path = getattr(_store, "db_path", None)
+            if _db_path is None:
+                raise RuntimeError(
+                    "no runtime-state store available for receipt persistence"
+                )
+            # Explicit, SHORT lock budget: the interpreter default busy_timeout is
+            # 5000ms, which would stall this dispatch coroutine up to ~5s when a
+            # sync fleet writer holds the WAL write lock (empirically reproduced).
+            # 2s bounds the tail latency; a stuck writer fails open in bounded time.
+            async with aiosqlite.connect(_db_path, timeout=2.0) as _receipt_db:
+                await _receipt_db.execute("PRAGMA busy_timeout=2000")
+                await ensure_receipt_column(_receipt_db)
+                await persist_receipt(receipt, _receipt_db)
+        except Exception:
+            logger.warning(
+                "spine: EvidenceReceipt produced but NOT persisted (task_id=%s)",
+                td.task_id,
+                exc_info=True,
+            )
         if "exc" in captured:
             raise captured["exc"]
         return captured["result"]
@@ -2499,7 +2537,7 @@ class Orchestrator:
                 cg.load()
                 quality = min(1.0, len(result or "") / 2000.0)
                 cg.add_edge(
-                    source=f"agent:{agent_name}",
+                    source=f"agent:{td.agent_id}",
                     target=f"task:{task.title[:40]}",
                     edge_type="enables",
                     strength=round(max(0.1, quality), 2),

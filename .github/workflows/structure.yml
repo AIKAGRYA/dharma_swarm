@@ -3,6 +3,7 @@ name: structure
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+  merge_group:
 
 concurrency:
   group: structure-${{ github.ref }}
@@ -16,6 +17,9 @@ jobs:
   no-root-markdown:
     name: Rule 8 — no new root markdown
     runs-on: ubuntu-latest
+    # PR diff rule already passed before queueing.
+    # merge_group has no pull_request base/head SHA context.
+    if: github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -76,6 +80,9 @@ jobs:
   no-committed-guardian-report:
     name: Rule 9 — no GUARDIAN_REPORT.md outside reports/
     runs-on: ubuntu-latest
+    # PR diff rule already passed before queueing.
+    # merge_group has no pull_request base/head SHA context.
+    if: github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
       - name: Checkout
