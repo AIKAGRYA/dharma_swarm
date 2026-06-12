@@ -15,6 +15,13 @@
 #                    src/protocol.ts plus its successor src/protocol/
 #                    modules (grep -c semantics). Baseline 97; end
 #                    target <=1 at the single typed ingress.
+#   hex_violations — hex color literal occurrences (#RGB/#RGBA/#RRGGBB/
+#                    #RRGGBBAA) across terminal/src EXCLUDING the two
+#                    allowlisted files src/theme.ts and
+#                    src/components/ScenicStrip.tsx (the theme law:
+#                    colors are consumed via THEME tokens). Baseline 0 —
+#                    already at the end target, so any hex outside the
+#                    allowlist is an immediate regression.
 #
 # Baseline persistence (F-011): baselines live in the git-tracked
 # scripts/ratchet_baselines.txt. A regression versus a stored value exits 1.
@@ -22,9 +29,6 @@
 # baselines file together with the improving change, making every ratchet
 # one-directional. Tightening happens only at the end of a fully green run;
 # a red run never mutates the baselines file.
-#
-# F-012 (hex_violations) extends this script with its own counter when
-# it lands.
 set -u
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -133,6 +137,37 @@ fi
 if [ "$record_unknown" -lt "$baseline_record_unknown" ]; then
   echo "ratchet: record_unknown improved ($record_unknown < baseline $baseline_record_unknown) — tightening $BASELINES_FILE" >&2
   TIGHTENS="${TIGHTENS}record_unknown $record_unknown
+"
+fi
+
+# Counter: hex_violations (F-012)
+theme_file="$TERMINAL_DIR/src/theme.ts"
+scenic_file="$TERMINAL_DIR/src/components/ScenicStrip.tsx"
+HEX_RE='#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})\b'
+hex_violations=0
+hex_worst_file=""
+hex_worst_count=0
+while IFS= read -r src_file; do
+  hex_count=$(( $(grep -oE "$HEX_RE" "$src_file" | wc -l) ))
+  if [ "$hex_count" -gt 0 ]; then
+    hex_violations=$(( hex_violations + hex_count ))
+    if [ "$hex_count" -gt "$hex_worst_count" ]; then
+      hex_worst_count=$hex_count
+      hex_worst_file=$src_file
+    fi
+  fi
+done < <(find "$TERMINAL_DIR/src" -type f \( -name '*.ts' -o -name '*.tsx' \) \
+  ! -path "$theme_file" ! -path "$scenic_file")
+
+baseline_hex_violations=$(read_baseline hex_violations)
+echo "hex_violations=$hex_violations"
+
+if [ "$hex_violations" -gt "$baseline_hex_violations" ]; then
+  fail "hex_violations $hex_violations exceeds baseline $baseline_hex_violations (hex color literals are banned outside theme.ts/ScenicStrip.tsx — use THEME tokens; worst offender: ${hex_worst_file#"$TERMINAL_DIR"/} with $hex_worst_count)"
+fi
+if [ "$hex_violations" -lt "$baseline_hex_violations" ]; then
+  echo "ratchet: hex_violations improved ($hex_violations < baseline $baseline_hex_violations) — tightening $BASELINES_FILE" >&2
+  TIGHTENS="${TIGHTENS}hex_violations $hex_violations
 "
 fi
 
