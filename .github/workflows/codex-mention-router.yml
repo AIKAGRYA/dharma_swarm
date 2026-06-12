@@ -130,7 +130,10 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
           MERGE_WHEN_CLEAN: ${{ steps.command.outputs.merge_when_clean }}
           BACKLOG_REQUESTED: ${{ steps.command.outputs.backlog_requested }}
-          REQUIRED_REVIEWERS: copilot,claude,devin
+          # Devin commits and opens PRs but does not post review receipts, so
+          # requiring a devin receipt left the gate permanently unclearable.
+          # Required receipts = the agents that actually review (see #559 pile).
+          REQUIRED_REVIEWERS: copilot,claude
           MERGE_METHOD: squash
           MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
           MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}

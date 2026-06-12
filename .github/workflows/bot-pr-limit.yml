@@ -39,8 +39,14 @@ jobs:
           limit=""
           pattern=""
           case "$HEAD_REF" in
-            chore/governance*spine-adoption*)
-              key="spine-adoption-refresh"; limit="1"; pattern="chore/governance.*spine-adoption" ;;
+            # Catch-all FIRST: the spine-adoption refresher has spawned PRs
+            # under chore/governance/…, chore/spine-adoption-…,
+            # chore/auto-spine-adoption-…, ops/spine-adoption-metric-… and
+            # qwen/spine-adoption. Match the intent anywhere in the headRef so
+            # renamed lanes can no longer evade the throttle (see #559/#571/
+            # #580/#583 pile).
+            *spine-adoption*)
+              key="spine-adoption-refresh"; limit="1"; pattern="spine-adoption" ;;
             chore/docops-autorefresh*)
               key="docops-autorefresh";     limit="1"; pattern="chore/docops-autorefresh" ;;
             verdict/inter_agent*)
