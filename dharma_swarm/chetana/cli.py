@@ -253,12 +253,12 @@ def _cmd_approve(args: argparse.Namespace) -> int:
             path.unlink()
         except OSError as e:
             print(f"warning: failed to remove staged file {path}: {e}")
-        print(f"approved (was {current_status}) → {trusted_path}")
+        print("approved → trusted layer")
     else:
         # Write back in place
         from .provenance import assemble_atom
         path.write_text(assemble_atom(new_schema, body), encoding="utf-8")
-        print(f"approved (was {current_status}) → {path}")
+        print("approved (updated in place)")
     return 0
 
 
@@ -333,9 +333,9 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             else:
                 buckets["kernel-drift"].append(str(p))
         except Exception as e:
-            buckets["schema-error"].append(f"{p}: {type(e).__name__}: {e}")
+            buckets["schema-error"].append(f"{p}: {type(e).__name__}")
 
-    print(f"# chetana verify\n- current kernel sig: {current_kernel_sig[:16]}...")
+    print("# chetana verify\n- current kernel sig: <redacted; compare via dgc dharma status>")
     for label in ("verified", "zero-sig", "kernel-drift", "no-provenance", "schema-error"):
         rows = buckets[label]
         print(f"- {label:14s}: {len(rows)}")
