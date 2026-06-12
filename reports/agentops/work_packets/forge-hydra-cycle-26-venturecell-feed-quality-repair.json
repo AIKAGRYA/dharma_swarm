@@ -1,0 +1,35 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-26-venturecell-feed-quality-repair",
+  "cycle": 26,
+  "agent": "codex_forgewright",
+  "created_at_utc": "2026-06-01T11:25:47Z",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "objective": "Repair v0.1.8 VentureCell Forge-feed from binary admission to deterministic quality grading.",
+  "status": "completed_pending_decorrelated_countersign",
+  "files": [
+    "dharma_swarm/fractal/fractal_room.py",
+    "tests/test_fractal_room.py",
+    "reports/forge/v0.1.8-venturecell-forge-feed/venturecell_feed_probe.json",
+    "reports/forge/v0.1.8-venturecell-forge-feed/verifier_artifact.json",
+    "reports/forge/v0.1.8-venturecell-forge-feed/cycle-26/verifier_artifact.json",
+    "reports/forge/v0.1.8-venturecell-forge-feed/cycle-26/completion_audit.md",
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-26/verifier_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-26/completion_audit.md"
+  ],
+  "tests": [
+    "py_compile clean",
+    "tests/test_fractal_room.py: 77 passed, 1 warning",
+    "broader Forge receipt/eval slice: 158 passed, 1 warning",
+    "Context+ static analysis: no issues",
+    "pre-v1 audit and Hydra status regenerated"
+  ],
+  "blockers": [
+    "decorrelated re-audit still required before clearing refuted countersign",
+    "external acted receipt witness remains operator/external-authority gated",
+    "canonical ds-goal receipt unavailable without mission/task identifiers"
+  ]
+}

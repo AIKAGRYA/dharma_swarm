@@ -275,7 +275,9 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.manifest import router as manifest_router
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
+    from api.routers.holon import router as holon_router
 
+    api_app.include_router(holon_router)
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
     api_app.include_router(evolution_router)

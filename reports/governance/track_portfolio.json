@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T12:47:03+09:00",
+  "generated_at": "2026-06-12T10:49:47+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,10 +95,10 @@
     }
   ],
   "portfolio_summary": {
-    "active": 4,
+    "active": 6,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 3
+    "shippable": 4
   },
   "spine_objectives": [
     {
@@ -303,6 +303,100 @@
       ]
     },
     {
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "name": "Runtime Truth Spine \u2014 Adoption (god objects flow through invoke_agent)",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/spine/**",
+        "dharma_swarm/a2a/a2a_bridge.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/agent_runner.py",
+        "scripts/uplift_guards/check_spine_ownership.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "tool_coverage"
+      ],
+      "verified_at": "2026-06-10",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 7,
+        "total": 8
+      },
+      "criteria": [
+        {
+          "id": "spine_package_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/spine/__init__.py present"
+        },
+        {
+          "id": "invoke_agent_defined",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
+        },
+        {
+          "id": "a2a_bridge_calls_spine",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
+        },
+        {
+          "id": "orchestrator_calls_spine",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
+        },
+        {
+          "id": "agent_runner_calls_spine",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
+        },
+        {
+          "id": "dispatch_emits_evidence_receipt",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py"
+        },
+        {
+          "id": "zero_dropoff_sources",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py"
+        },
+        {
+          "id": "bypass_allowlist_empty",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py"
+        },
+        {
+          "id": "adoption_narrative_docs",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present"
+        },
+        {
+          "id": "gate1_witnessed",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/governance/GATE1_WITNESSED.md present"
+        }
+      ]
+    },
+    {
       "id": "loop-closure-2026-06",
       "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
       "status": "ACTIVE",
@@ -450,9 +544,106 @@
           "detail": "pattern 'NORTH_STAR.md' found in docs/MEGAFILE_INDEX.md"
         }
       ]
+    },
+    {
+      "id": "composer-holon-spine-longrun-2026-06",
+      "name": "Composer Holon Spine Longrun \u2014 fable/codex pair over verified command receipts",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [
+        "runtime-truth-spine-adoption-2026-06"
+      ],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "docs/sovereign_holons/**",
+        "reports/sovereign_holons/**",
+        "dharma_swarm/holon_*.py",
+        "scripts/holon_*.py",
+        "tests/test_holon_*.py"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "tool_coverage",
+        "memory_persistence"
+      ],
+      "verified_at": "2026-06-11",
+      "ttl_days": 14,
+      "owner": "@AmitabhainArunachala",
+      "shippable": true,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 6,
+        "total": 6
+      },
+      "criteria": [
+        {
+          "id": "evidence_receipt_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py"
+        },
+        {
+          "id": "holon_orchestrator_spec_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present"
+        },
+        {
+          "id": "holon_runtime_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/holon_runtime.py present"
+        },
+        {
+          "id": "readiness_packet_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present"
+        },
+        {
+          "id": "receipt_profile_documented",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
+        },
+        {
+          "id": "frozen_verifier_runbook_present",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md"
+        },
+        {
+          "id": "holon_bridge_verifier_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_holon_bridge.py present"
+        },
+        {
+          "id": "holon_runtime_verifier_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_holon_runtime.py present"
+        },
+        {
+          "id": "composer_wake_witness_pending",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
+        }
+      ]
     }
   ],
   "findings": [
+    {
+      "severity": "WARN",
+      "check": "wip-high",
+      "message": "6 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
+      "criterion_id": null
+    },
     {
       "severity": "WARN",
       "check": "spine-uncovered:research-depth",
@@ -479,6 +670,12 @@
     },
     {
       "severity": "INFO",
+      "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
+      "message": "[runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
       "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
       "criterion_id": null
@@ -487,6 +684,12 @@
       "severity": "INFO",
       "check": "track-shippable:orientation-graph-2026-06",
       "message": "[orientation-graph-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     }
   ]

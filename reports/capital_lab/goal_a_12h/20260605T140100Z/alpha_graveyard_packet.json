@@ -1,0 +1,51 @@
+{
+  "authority": "evidence_only",
+  "blockers": [],
+  "broker_write_authority": false,
+  "capital_permission": "none",
+  "clean": true,
+  "entries": [
+    {
+      "bucket": "killed_routes",
+      "candidate_count": 94,
+      "decision": "graveyard_only",
+      "promotion_credit": false,
+      "reason": "route lifecycle says rejected or retired; lineage must be attached before alpha credit"
+    },
+    {
+      "bucket": "burn_in_routes",
+      "candidate_count": 54,
+      "decision": "quarantine_until_oos",
+      "promotion_credit": false,
+      "reason": "burn-in status is not out-of-sample evidence"
+    },
+    {
+      "bucket": "paper_operational_routes",
+      "candidate_count": 5,
+      "decision": "prior_evidence_only",
+      "promotion_credit": false,
+      "reason": "paper route operation cannot certify market edge"
+    }
+  ],
+  "generated_at": "2026-06-05T14:01:00Z",
+  "graveyard_recorded": true,
+  "harness_run_id": "dharma-capital-lab-goal-a-alpha-evidence-12h-20260605T140100Z",
+  "live_authority": false,
+  "live_order_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "packet_hash": "83d711f922049e555f93db78b332508f169d7089570315d226cd50193fbd714f",
+  "paper_only": true,
+  "policy": {
+    "promotion_credit_allowed": false,
+    "route_counts_are_edge_evidence": false,
+    "survivor_only_clean_packets_forbidden": true
+  },
+  "run_id": "20260605T140100Z",
+  "schema_version": "dharma.capital_lab.alpha_evidence.v2.alpha_graveyard_packet",
+  "secret_value_recorded": false,
+  "secret_values_read": false,
+  "status": "alpha_evidence_partial_clean_false",
+  "total_candidate_count": 153,
+  "withdrawals_or_transfers": false
+}

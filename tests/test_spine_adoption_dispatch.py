@@ -268,3 +268,88 @@ def test_spine_bypass_report_classifies_known_sites():
         f"Bypass report found {len(unknowns)} unclassified .submit() site(s): "
         + ", ".join(f"{e.file}:{e.line}" for e in unknowns)
     )
+
+
+# ---------------------------------------------------------------------------
+# 8. Track completion criteria (ACTIVE_TRACK: runtime-truth-spine-adoption)
+# ---------------------------------------------------------------------------
+
+
+async def test_every_dispatch_emits_exactly_one_evidence_receipt(
+    registry: CardRegistry, monkeypatch,
+):
+    """Criterion `dispatch_emits_evidence_receipt`: for every dispatch through a
+    spine-adopted production surface, exactly ONE EvidenceReceipt is produced —
+    not zero, not two. Counts actual invoke_agent traversals instead of trusting
+    the return type. (The orchestrator surface has its own equivalent suite:
+    tests/test_orchestrator_spine_dispatch.py.)
+    """
+    from dharma_swarm.a2a import a2a_bridge as bridge_mod
+
+    traversals: list[EvidenceReceipt] = []
+    real_invoke = bridge_mod.invoke_agent
+
+    async def counting_invoke(*args, **kwargs):
+        receipt = await real_invoke(*args, **kwargs)
+        traversals.append(receipt)
+        return receipt
+
+    monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
+
+    bridge, _ = _make_bridge(registry)
+    n_dispatches = 3
+    returned: list[EvidenceReceipt] = []
+    for _ in range(n_dispatches):
+        result, receipt = await bridge.submit_via_spine(_sample_task())
+        assert isinstance(receipt, EvidenceReceipt)
+        assert result.status == A2ATaskStatus.COMPLETED
+        returned.append(receipt)
+
+    # Exactly one spine traversal per dispatch...
+    assert len(traversals) == n_dispatches
+    # ...each producing the receipt the caller got back...
+    assert [r.receipt_id for r in traversals] == [r.receipt_id for r in returned]
+    # ...and every receipt distinct (no reuse across dispatches).
+    assert len({r.receipt_id for r in returned}) == n_dispatches
+
+
+def test_no_dropoff_sources_remain():
+    """Criterion `zero_dropoff_sources`: no production dispatch source drops off
+    the spine UNACCOUNTED. Every A2AServer.submit() call site must be either
+    spine-adopted or an explicitly declared intentional bypass — and the
+    declared allowlist must not have rotted (each entry still matches a real,
+    currently-scanned site; stale entries hide drift).
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "spine_bypass_report",
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "governance"
+        / "spine_bypass_report.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    entries = mod._scan_production_submits()
+
+    # 1. No unaccounted drop-off sources.
+    unknowns = [e for e in entries if e.classification == "unknown"]
+    assert unknowns == [], (
+        f"{len(unknowns)} unaccounted dispatch drop-off(s): "
+        + ", ".join(f"{e.file}:{e.line}" for e in unknowns)
+    )
+
+    # 2. Allowlist freshness: every declared intentional bypass corresponds to a
+    #    site the scan still finds at that exact (file, line). A mismatch means
+    #    code moved and the allowlist silently rotted.
+    scanned_allowlisted = {
+        (e.file, e.line) for e in entries if e.classification == "intentional"
+    }
+    declared = set(mod._INTENTIONAL_BYPASS.keys())
+    stale = declared - scanned_allowlisted
+    assert stale == set(), (
+        "Stale allowlist entries (declared but no matching site found): "
+        + ", ".join(f"{f}:{ln}" for f, ln in sorted(stale))
+    )

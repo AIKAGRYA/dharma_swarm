@@ -1,0 +1,123 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-32-dense-code-fq1-provenance",
+  "cycle": 32,
+  "created_at_utc": "2026-06-01T12:38:18Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Harden and re-audit the dense SWE-bench-Live-style code repair adapter so its verifier artifact explicitly preserves FQ1 sealed-reserve provenance, secrecy, and dense-only authority boundaries.",
+  "status": "completed_repo_local_receipt",
+  "impact": {
+    "gitnexus_target": "Function:scripts/runtime/forge_dense_code_gym.py:build_artifact",
+    "risk": "LOW",
+    "direct_callers": 1,
+    "affected_processes": 0,
+    "affected_modules": 1,
+    "detect_changes_scope_all": {
+      "risk": "CRITICAL",
+      "changed_files": 78,
+      "changed_symbols": 1312,
+      "affected_processes": 20,
+      "note": "Repository-wide dirty worktree predates this cycle; scoped cycle edits are limited to dense-code packet files and local Forge report artifacts."
+    }
+  },
+  "outputs": [
+    "scripts/runtime/forge_dense_code_gym.py",
+    "tests/test_dense_code_gym.py",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-32/verifier_artifact.json",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-32/completion_audit.md",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-32/sealed_manifests/trial-00/swe-live-local-router-2026-06.base.manifest.json",
+    "reports/forge/dense-code-gym-repair-adapter/cycle-32/sealed_manifests/trial-00/swe-live-local-router-2026-06-ec088bca00.variant.manifest.json",
+    "reports/forge/fq1-sealed-reserve-perturbation-generator/verifier_artifact.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-32-dense-code-fq1-provenance.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "uses_generated_sealed_base_and_variant": true,
+    "sealed_transform_deterministic": true,
+    "sealed_seed_not_leaked_to_candidate": true,
+    "sealed_variant_not_visible_to_candidate": true,
+    "sealed_transform_not_candidate_authored": true,
+    "raw_seed_absent_from_dense_code_cases": true,
+    "variant_manifest_hash_propagated_to_variant_cases": true,
+    "base_and_variant_candidate_views_are_distinct": true,
+    "memorized_base_candidate_denied_by_variant": true,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_dense_code_gym.py tests/test_dense_code_gym.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_code_gym.py -q --tb=short",
+      "outcome": "4 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_code_gym.py --output-dir reports/forge/dense-code-gym-repair-adapter/cycle-32 --freshness-month 2026-06",
+      "outcome": "cycle verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py",
+      "outcome": "operator status artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_code_gym.py tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "22 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_fq1_sealed_reserve_generator.py tests/test_reward_forge_v0.py tests/test_dharma_eval.py tests/test_dense_gym_adapter.py tests/test_dense_code_gym.py -q --tb=short",
+      "outcome": "40 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fq1_sealed_reserve.py",
+      "outcome": "FQ1 verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/dense-code-gym-repair-adapter/cycle-32/verifier_artifact.json",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json",
+      "outcome": "pass"
+    }
+  ],
+  "artifact_hashes": {
+    "dense_code_adapter_script_sha256": "838a8ab39d3bb1b450321e66a87baa25e4cf3969c0cdc4a2200f7c74ee5d0633",
+    "dense_code_adapter_test_sha256": "a29b2d6eb1c309e42bcea9a3a1e06520cb3679bce38c5da845154a4c8d6668cf",
+    "cycle_verifier_artifact_sha256": "e0614b132daf97655668a698a35eea552d0d8490593ddfb33a57bf1da27f80c0",
+    "status_artifact_sha256": "d00c1d298bfe6169a151461f37b12d74f371e5b46f8cda145ad72f062446b95f",
+    "fq1_verifier_artifact_sha256": "7808d90cc9343a87261b29ca48d0208ac773019b424833b43cff3fd84eddcdec"
+  },
+  "status_snapshot": {
+    "dense_eval_artifacts": 7,
+    "dense_eval_unique_packets": 3,
+    "packet_chain_verified_internal": 3,
+    "packet_chain_internal_remaining": 0,
+    "external_acted_receipts": 0,
+    "blocked_external_authority_items": 6,
+    "receipt_policy_status": "repo_local_required_no_canonical_context"
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed.",
+    "Repository-wide GitNexus detect-changes remains critical because of pre-existing unrelated dirty worktree state."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

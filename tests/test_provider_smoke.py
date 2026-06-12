@@ -2,14 +2,26 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from api.routers import chat as chat_router
 from dharma_swarm.models import ProviderType
 from dharma_swarm.provider_smoke import (
+    _classify_error,
     _probe_qwen_dashboard,
+    list_ollama_manifest_models,
     run_provider_smoke,
     strongest_ollama_model,
 )
 from dharma_swarm.telemetry_plane import TelemetryPlaneStore
+
+
+@pytest.fixture(autouse=True)
+def _disable_live_ollama_discovery(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "dharma_swarm.provider_smoke.list_ollama_runtime_models",
+        lambda base_url=None: [],
+    )
 
 
 def test_strongest_ollama_model_prefers_largest_model_size() -> None:
@@ -17,9 +29,95 @@ def test_strongest_ollama_model_prefers_largest_model_size() -> None:
     assert strongest_ollama_model(models) == "gpt-oss:120b"
 
 
+def test_list_ollama_manifest_models_preserves_required_tags(tmp_path) -> None:
+    manifests = tmp_path / "models" / "manifests" / "registry.ollama.ai" / "library"
+    for rel in (
+        "deepseek-v3.1/671b-cloud",
+        "gpt-oss/20b-cloud",
+        "mistral/latest",
+    ):
+        path = manifests / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+
+    assert list_ollama_manifest_models(tmp_path) == [
+        "deepseek-v3.1:671b-cloud",
+        "gpt-oss:20b-cloud",
+        "mistral:latest",
+    ]
+
+
+def test_classify_error_distinguishes_insufficient_credits() -> None:
+    assert _classify_error("Error code: 402 - Insufficient credits") == "insufficient_credits"
+    assert _classify_error("HTTP error 402 Payment Required") == "insufficient_credits"
+
+
+def test_strongest_ollama_model_prefers_chat_models_over_embeddings() -> None:
+    models = [
+        "nomic-embed-text:latest",
+        "mistral:latest",
+        "gpt-oss:20b-cloud",
+        "deepseek-v3.1:671b-cloud",
+    ]
+    assert strongest_ollama_model(models) == "deepseek-v3.1:671b-cloud"
+    assert strongest_ollama_model(["nomic-embed-text"]) is None
+
+
+def test_run_provider_smoke_local_prefers_installed_chat_model_before_missing_default(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
+    monkeypatch.delenv("OLLAMA_MODEL", raising=False)
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.delenv("OLLAMA_USE_CLOUD", raising=False)
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.setattr(
+        "dharma_swarm.provider_smoke.list_ollama_runtime_models",
+        lambda base_dir=None: [
+            "deepseek-v3.1:671b-cloud",
+            "gpt-oss:20b-cloud",
+            "mistral:latest",
+            "nomic-embed-text:latest",
+        ],
+    )
+
+    ollama_calls: list[str] = []
+
+    async def _fake_ollama(model: str):
+        ollama_calls.append(model)
+        if model == "llama3.2":
+            return {
+                "status": "unknown_model",
+                "model": model,
+                "response_preview": "",
+                "usage": {},
+            }
+        return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
+
+    async def _fake_nim(model: str):
+        return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
+
+    async def _fake_openrouter(model: str):
+        return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
+
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_ollama", _fake_ollama)
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_nim", _fake_nim)
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_openrouter", _fake_openrouter)
+
+    payload = run_provider_smoke()
+
+    assert ollama_calls == ["deepseek-v3.1:671b-cloud"]
+    assert payload["ollama"]["transport_mode"] == "local_api"
+    assert payload["ollama"]["strongest_installed"] == "deepseek-v3.1:671b-cloud"
+    assert payload["ollama"]["configured_model"] == "deepseek-v3.1:671b-cloud"
+    assert payload["ollama"]["strongest_verified"] == "deepseek-v3.1:671b-cloud"
+    assert payload["ollama"]["status"] == "ok"
+
+
 def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "test-ollama-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
     monkeypatch.setattr(
         "dharma_swarm.provider_smoke.list_ollama_manifest_models",
         lambda base_dir=None: ["llama3.2:3b", "gpt-oss:120b"],
@@ -37,7 +135,10 @@ def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatc
             "base_url": "https://nim.local/v1",
         }
 
+    openrouter_calls: list[str] = []
+
     async def _fake_openrouter(model: str):
+        openrouter_calls.append(model)
         return {
             "status": "ok",
             "model": model,
@@ -63,6 +164,43 @@ def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatc
     assert payload["nvidia_nim"]["strongest_verified"]
     assert payload["openrouter"]["status"] == "ok"
     assert payload["openrouter"]["strongest_verified"]
+    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
+
+
+def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) -> None:
+    monkeypatch.delenv("NVIDIA_NIM_MODEL", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+
+    async def _fake_ollama(model: str):
+        return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
+
+    nim_calls: list[str] = []
+
+    async def _fake_nim(model: str):
+        nim_calls.append(model)
+        return {"status": "missing_config", "model": model, "response_preview": "", "usage": {}}
+
+    openrouter_calls: list[str] = []
+
+    async def _fake_openrouter(model: str):
+        openrouter_calls.append(model)
+        return {
+            "status": "insufficient_credits",
+            "model": model,
+            "response_preview": "",
+            "usage": {},
+        }
+
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_ollama", _fake_ollama)
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_nim", _fake_nim)
+    monkeypatch.setattr("dharma_swarm.provider_smoke._probe_openrouter", _fake_openrouter)
+
+    payload = run_provider_smoke()
+
+    assert payload["nvidia_nim"]["status"] == "missing_config"
+    assert payload["openrouter"]["status"] == "insufficient_credits"
+    assert nim_calls == ["nvidia/llama-3.1-nemotron-ultra-253b-v1"]
+    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
 
 
 def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:

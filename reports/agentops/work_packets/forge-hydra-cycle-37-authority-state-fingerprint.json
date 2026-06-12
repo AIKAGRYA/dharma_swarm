@@ -1,0 +1,138 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-37-authority-state-fingerprint",
+  "cycle": 37,
+  "created_at_utc": "2026-06-01T13:20:19Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Add a stable authority-state fingerprint to the Forge Hydra status artifact so the long-run supervisor can detect unchanged countersign/operator-boundary state without relaunch churn.",
+  "status": "completed_repo_local_receipt",
+  "mcp_notes": {
+    "mcp_synergy": "Used MCP-first routing for filesystem reads and GitNexus impact analysis.",
+    "gitnexus_repo": "/Users/dhyana/dharma_swarm",
+    "filesystem": "Read Forge Hydra goal specs, council protocol, cycle-36 work packet, status generator, focused tests, and status artifacts before editing."
+  },
+  "impact": {
+    "gitnexus_targets": [
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:summarize_forge_hydra_status",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      },
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:render_markdown_status",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      }
+    ],
+    "detect_changes_scope_all": {
+      "risk": "CRITICAL",
+      "changed_files": 78,
+      "changed_symbols": 1312,
+      "affected_processes": 20,
+      "note": "Repository-wide dirty worktree predates this cycle; scoped cycle edits are limited to Forge Hydra status authority-state fingerprinting, focused tests, and repo-local report artifacts."
+    },
+    "note": "The active checkout index was current at HEAD c8efcff28e67ab6b9a55bcd9faca83562d26e269; sibling indexes were stale and were not used."
+  },
+  "outputs": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-37/status_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-37/status.md",
+    "reports/forge/forge-hydra-status/cycle-37/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-37-authority-state-fingerprint.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "status_artifact_has_authority_state": true,
+    "status_artifact_has_authority_state_hash": true,
+    "authority_state_hash_stable_across_generation_time": true,
+    "authority_state_hash_changes_on_countersign_state_change": true,
+    "markdown_has_authority_state_section": true,
+    "external_acted_receipts_remain_zero": true,
+    "archive_fitness_changed": false,
+    "external_contact_performed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "20 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py",
+      "outcome": "live status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --output-dir reports/forge/forge-hydra-status/cycle-37",
+      "outcome": "cycle-37 status artifacts regenerated"
+    },
+    {
+      "command": "python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null && python3 -m json.tool reports/forge/forge-hydra-status/cycle-37/status_artifact.json >/dev/null && python3 -m json.tool reports/agentops/work_packets/forge-hydra-cycle-37-authority-state-fingerprint.json >/dev/null",
+      "outcome": "pass"
+    },
+    {
+      "command": "mcp__gitnexus.detect_changes(scope=\"all\")",
+      "outcome": "CRITICAL from pre-existing dirty worktree: 78 changed files, 1312 changed symbols, 20 affected processes"
+    }
+  ],
+  "artifact_hashes": {
+    "status_script_sha256": "136077892243fa2db24e5f236840e0ccf2e122c5c791cf7380e2d2908ce51911",
+    "status_test_sha256": "06bff2b3c5282747848fab632c1c506d1e61b4c38f76c70c09465eeebd1a4183",
+    "live_status_artifact_sha256": "e46a6e53165686cab78f9dce9d42157de102ae5b7a368518df0159802a6929c9",
+    "live_status_markdown_sha256": "1afa526ac3312573c835e676215a8ad4e6f90ce0fcf2e8c8cd45920e88421bbe",
+    "cycle_status_artifact_sha256": "e46a6e53165686cab78f9dce9d42157de102ae5b7a368518df0159802a6929c9",
+    "cycle_status_markdown_sha256": "1afa526ac3312573c835e676215a8ad4e6f90ce0fcf2e8c8cd45920e88421bbe"
+  },
+  "status_snapshot": {
+    "status_hash": "sha256:411d47fbf57adcc78b9018441c55b4f2442bd794ff66e8574f00087009094bf1",
+    "authority_state_hash": "sha256:b8acec02a8a8e760807bd7921ef2c4675edf6bc83cb70552c8ae57bc6836ef09",
+    "next_cycle_status": "internal_evidence_waiting_on_countersign",
+    "next_cycle_recommended_action": "await_or_request_required_countersign",
+    "next_cycle_packet": "v0.1.0-live-telos-gate",
+    "next_cycle_internal_build_items": 0,
+    "next_cycle_internal_repair_items": 0,
+    "next_cycle_pending_countersign_items": 9,
+    "next_cycle_external_authority_blocked_items": 2,
+    "autonomous_cycle_useful": false,
+    "supervisor_relaunch_recommended": false,
+    "supervisor_recommended_action": "pause_relaunch_until_authority_state_changes",
+    "supervisor_boundary": "countersign_or_external_authority",
+    "external_acted_receipts": 0,
+    "blocked_external_authority_items": 6,
+    "archive_fitness_authority": "none_from_this_status_artifact"
+  },
+  "canonical_receipt": {
+    "attempted": false,
+    "reason": "No mission/task/goal/AgentOps/DSE receipt identifier is present in this runtime; repo-local receipt artifacts are required.",
+    "detected_context_variables": []
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed.",
+    "Repository-wide dirty worktree predates this cycle; detect-changes may remain critical outside this scoped packet."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

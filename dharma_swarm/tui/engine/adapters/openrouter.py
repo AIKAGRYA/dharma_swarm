@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
 from typing import Any, AsyncIterator
 
 import httpx
 
+from dharma_swarm.api_keys import OPENROUTER_API_KEY_ENV, env_value
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 
@@ -83,7 +83,7 @@ class OpenRouterAdapter(ProviderAdapter):
         api_key = (
             self._config.api_key
             or request.provider_options.get("openrouter_api_key")
-            or os.environ.get("OPENROUTER_API_KEY")
+            or env_value(OPENROUTER_API_KEY_ENV)
         )
         if not api_key:
             yield ErrorEvent(

@@ -37,12 +37,15 @@ GRANDFATHERED: dict[str, int] = {
     "dharma_swarm/evolution.py": 3401,
     "dharma_swarm/swarm.py": 3252,
     "dharma_swarm/providers.py": 3096,
-    # 2026-06-12: re-grandfathered from 2525 — multi-lane rescue (PR #585) folded
-    # spine-dispatch + lane work; decomposition issue #587.
-    "dharma_swarm/orchestrator.py": 2896,
+    # 2026-06-12: re-grandfathered from 2525 — #557 spine-dispatch (main) +
+    # lane EvidenceReceipt persistence took it to 2923; decomposition issue #582.
+    "dharma_swarm/orchestrator.py": 2923,
     "dharma_swarm/tui/app.py": 2520,
     "dharma_swarm/terminal_bridge.py": 2539,
     "dharma_swarm/operator_core/control_surface.py": 1001,
+    # 2026-06-12: landed at 1251 (evidence-only alpha membrane);
+    # decomposition issue #581 (split planned with Phase-2 capital wiring).
+    "dharma_swarm/capital_lab/alpha_evidence.py": 1251,
     # 2026-06-12: PR #585 rescue batch — decomposition issue #587.
     "dharma_swarm/context_compiler.py": 1017,
     "dharma_swarm/operator_core/control_surface_memory.py": 1240,

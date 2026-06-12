@@ -52,6 +52,16 @@ from dharma_swarm.runtime_fields import (
 )
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
+# Runtime Truth Spine participation (substrate-nativeness).
+# The core execution (run_task) is the leaf invoked by spine-wrapped callers
+# (Orchestrator._run_task_via_spine, A2ABridge.submit_via_spine) which wrap
+# the actual call inside an invoke_agent() invoker closure to emit exactly one
+# EvidenceReceipt per dispatch. This import declares the surface's place in
+# the single blessed path; no god-object bypass of the spine for orchestrated work.
+from dharma_swarm.spine.invoke import invoke_agent
+from dharma_swarm.spine.receipt import EvidenceReceipt
+from dharma_swarm.spine.routing import RoutingDecision
+
 logger = logging.getLogger(__name__)
 
 from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG

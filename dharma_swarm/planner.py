@@ -15,7 +15,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import Task, _new_id, _utc_now
+from dharma_swarm.models import ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +170,7 @@ class Planner:
         )
 
         request = LLMRequest(
-            model="claude-sonnet-4-20250514",
+            model=canonical_default_model(ProviderType.ANTHROPIC),
             messages=[{"role": "user", "content": prompt}],
             system="You are a planning agent. Generate structured plans. Never write code.",
             max_tokens=2000,

@@ -20,6 +20,22 @@ import subprocess
 import sys
 import uuid
 from typing import Any
+from dharma_swarm.terminal_bridge_text import (
+    render_working_memory,
+    render_git_summary_lines,
+    render_system_prompt,
+    render_command_graph_text,
+    render_command_registry_text,
+    render_operator_snapshot_text,
+    render_model_policy_text,
+    render_agent_routes_text,
+    render_evolution_surface_text,
+    render_session_catalog_text,
+    render_session_detail_text,
+    render_identity_response,
+    render_memory_response,
+)
+
 
 from dharma_swarm.context import build_orientation_packet
 from dharma_swarm.cascade import get_registered_domains
@@ -40,8 +56,8 @@ from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, Runti
 from dharma_swarm.models import ProviderType
 from dharma_swarm.tui import model_routing
 try:
-    from dharma_swarm.terminal_commands import system_commands as system_commands_module
-    from dharma_swarm.terminal_commands.system_commands import SystemCommandHandler
+    from dharma_swarm.tui.commands import system_commands as system_commands_module
+    from dharma_swarm.tui.commands.system_commands import SystemCommandHandler
 except ImportError:
     system_commands_module = None  # type: ignore[assignment]
     SystemCommandHandler = None  # type: ignore[assignment,misc]
@@ -50,8 +66,12 @@ from dharma_swarm.workspace_topology import build_workspace_topology
 from dharma_swarm.operator_core import build_session_catalog, build_session_detail
 from dharma_swarm.operator_core.session_store import SessionStore
 from dharma_swarm.terminal_control import load_terminal_control_state
-from dharma_swarm.terminal_engine.events import ToolCallComplete
-from dharma_swarm.terminal_engine.events import PermissionDecisionEvent, PermissionOutcomeEvent, PermissionResolutionEvent
+from dharma_swarm.tui.engine.events import (
+    PermissionDecisionEvent,
+    PermissionOutcomeEvent,
+    PermissionResolutionEvent,
+    ToolCallComplete,
+)
 
 def _json_default(value: object) -> object:
     if is_dataclass(value):
@@ -199,37 +219,13 @@ class TerminalBridge:
         self._save_working_memory(memory)
 
     def _render_working_memory(self, memory: dict[str, Any]) -> str:
-        turns = memory.get("recent_turns", [])
-        actions = memory.get("recent_actions", [])
-        active_mission = str(memory.get("active_mission", "") or "").strip() or "none"
-        preferred_route = str(memory.get("preferred_route", "") or "").strip() or "none"
-        lines = [
-            f"Active mission: {active_mission}",
-            f"Preferred route: {preferred_route}",
-        ]
-        if isinstance(turns, list) and turns:
-            lines.append("Recent turns:")
-            for item in turns[-4:]:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {intent} | {route} | {prompt}".format(
-                        intent=str(item.get("intent", "chat")),
-                        route=str(item.get("route", "unknown")),
-                        prompt=str(item.get("prompt", ""))[:100],
-                    )
-                )
-        if isinstance(actions, list) and actions:
-            lines.append("Recent actions:")
-            for action in actions[-4:]:
-                lines.append(f"- {str(action)[:120]}")
-        return "\n".join(lines)
+        return render_working_memory(memory)
 
     def _ensure_adapters(self) -> None:
         if self._adapters or self._adapter_boot_error is not None:
             return
         try:
-            from dharma_swarm.terminal_adapters import (
+            from dharma_swarm.tui.engine.adapters import (
                 ClaudeAdapter,
                 CodexAdapter,
                 CompletionRequest,
@@ -1192,35 +1188,7 @@ class TerminalBridge:
         }
 
     def _render_git_summary_lines(self, git_summary: dict[str, Any]) -> list[str]:
-        staged = git_summary.get("staged")
-        unstaged = git_summary.get("unstaged")
-        untracked = git_summary.get("untracked")
-        if staged is None or unstaged is None or untracked is None:
-            lines = [f"Git: {git_summary.get('branch', 'unavailable')} ({git_summary.get('sync_summary', 'unavailable')})"]
-        else:
-            lines = [
-                "Git: {branch}@{head} | staged {staged} | unstaged {unstaged} | untracked {untracked}".format(
-                    branch=git_summary.get("branch", "unavailable"),
-                    head=git_summary.get("head", "unknown"),
-                    staged=staged,
-                    unstaged=unstaged,
-                    untracked=untracked,
-                )
-            ]
-        hotspots = list(git_summary.get("changed_hotspots", []) or [])
-        hotspot_summary = (
-            "; ".join(
-                f"{str(item.get('name', '') or '')} ({int(item.get('count', 0) or 0)})"
-                for item in hotspots
-                if isinstance(item, dict) and str(item.get("name", "") or "")
-            )
-            or "none"
-        )
-        lines.append(f"Git hotspots: {hotspot_summary}")
-        path_summary = "; ".join(str(path) for path in list(git_summary.get("changed_paths", []) or []) if str(path)) or "none"
-        lines.append(f"Git changed paths: {path_summary}")
-        lines.append(f"Git sync: {git_summary.get('sync_summary', 'unavailable')}")
-        return lines
+        return render_git_summary_lines(git_summary)
 
     def _build_ontology_snapshot(self) -> str:
         concepts_path = self._package_root / "dharma_concepts.json"
@@ -1738,236 +1706,28 @@ class TerminalBridge:
         return "\n".join(lines)
 
     def _render_command_graph_text(self, graph: dict[str, Any]) -> str:
-        lines = [
-            "# Command Graph",
-            f"Command count: {graph.get('count', 0)}",
-            f"Async commands: {graph.get('async_count', 0)}",
-            "",
-            "## Categories",
-        ]
-        categories = graph.get("categories", {})
-        if isinstance(categories, dict):
-            for name, commands in categories.items():
-                values = commands if isinstance(commands, list) else []
-                lines.append(f"- {name}: {', '.join(str(item) for item in values) if values else 'none'}")
-        async_commands = graph.get("async_commands", [])
-        if isinstance(async_commands, list):
-            lines.extend(["", "## Async lanes", ", ".join(str(item) for item in async_commands) if async_commands else "none"])
-        return "\n".join(lines)
+        return render_command_graph_text(graph)
 
     def _render_command_registry_text(self, registry: dict[str, Any]) -> str:
-        lines = ["# Command Registry", f"Commands: {registry.get('count', 0)}", "", "## Commands"]
-        commands = registry.get("commands", [])
-        if isinstance(commands, list):
-            for item in commands[:24]:
-                if not isinstance(item, dict):
-                    continue
-                sync_state = "async" if item.get("async") else "sync"
-                lines.append(
-                    "- /{name} [{sync_state}] -> {target_pane} | {description}".format(
-                        name=str(item.get("name", "?")),
-                        sync_state=sync_state,
-                        target_pane=str(item.get("target_pane", "control")),
-                        description=str(item.get("description", "command")),
-                    )
-                )
-        return "\n".join(lines)
+        return render_command_registry_text(registry)
 
     def _render_operator_snapshot_text(self, snapshot: dict[str, Any]) -> str:
-        overview = snapshot.get("overview", {})
-        runs = snapshot.get("runs", [])
-        actions = snapshot.get("actions", [])
-        lines = [
-            "# Operator Snapshot",
-            f"Runtime DB: {snapshot.get('runtime_db', str(DEFAULT_RUNTIME_DB))}",
-        ]
-        error = str(snapshot.get("error", "") or "").strip()
-        if error:
-            lines.append(f"Error: {error}")
-            return "\n".join(lines)
-        if isinstance(overview, dict):
-            lines.extend(
-                [
-                    f"Sessions: {overview.get('sessions', 0)}",
-                    f"Claims: {overview.get('claims', 0)} | active {overview.get('active_claims', 0)} | acked {overview.get('acknowledged_claims', 0)}",
-                    f"Runs: {overview.get('runs', 0)} | active {overview.get('active_runs', 0)}",
-                    f"Artifacts: {overview.get('artifacts', 0)} | promoted facts {overview.get('promoted_facts', 0)}",
-                    f"Context bundles: {overview.get('context_bundles', 0)} | operator actions {overview.get('operator_actions', 0)}",
-                ]
-            )
-        lines.extend(["", "## Active runs"])
-        if isinstance(runs, list) and runs:
-            for run in runs[:8]:
-                if not isinstance(run, dict):
-                    continue
-                lines.append(
-                    "- {assigned_to} | {status} | task {task_id} | run {run_id}".format(
-                        assigned_to=str(run.get("assigned_to", "?")),
-                        status=str(run.get("status", "?")),
-                        task_id=str(run.get("task_id", ""))[:18],
-                        run_id=str(run.get("run_id", ""))[:12],
-                    )
-                )
-        else:
-            lines.append("none")
-        lines.extend(["", "## Recent operator actions"])
-        if isinstance(actions, list) and actions:
-            for action in actions[:8]:
-                if not isinstance(action, dict):
-                    continue
-                lines.append(
-                    "- {action_name} by {actor} | task {task_id} | {reason}".format(
-                        action_name=str(action.get("action_name", "?")),
-                        actor=str(action.get("actor", "?")),
-                        task_id=str(action.get("task_id", ""))[:18] or "-",
-                        reason=str(action.get("reason", "") or "").strip() or "no reason",
-                    )
-                )
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return render_operator_snapshot_text(snapshot)
 
     def _render_model_policy_text(self, policy: dict[str, Any]) -> str:
-        lines = [
-            "# Model Policy",
-            f"Active: {policy.get('active_label', policy.get('selected_model', 'unknown'))}",
-            f"Route: {policy.get('selected_route', 'unknown')}",
-            f"Strategy: {policy.get('strategy', 'responsive')}",
-            f"Default route: {policy.get('default_route', 'unknown')}",
-            "",
-            "## Fallback chain",
-        ]
-        chain = policy.get("fallback_chain", [])
-        if isinstance(chain, list) and chain:
-            for item in chain[:6]:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(f"- {item.get('label', item.get('alias', '?'))} [{item.get('provider', '?')}]")
-        else:
-            lines.append("none")
-        lines.extend(["", "## Targets"])
-        targets = policy.get("targets", [])
-        if isinstance(targets, list):
-            for item in targets:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(f"- {item.get('alias', '?')} -> {item.get('label', '?')}")
-        return "\n".join(lines)
+        return render_model_policy_text(policy)
 
     def _render_agent_routes_text(self, routes: dict[str, Any]) -> str:
-        lines = ["# Agent Routes", "", "## Route profiles"]
-        route_items = routes.get("routes", [])
-        if isinstance(route_items, list):
-            for item in route_items:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {intent} -> {provider}:{model_alias} | effort {reasoning} | role {role}".format(
-                        intent=str(item.get("intent", "?")),
-                        provider=str(item.get("provider", "?")),
-                        model_alias=str(item.get("model_alias", "?")),
-                        reasoning=str(item.get("reasoning", "?")),
-                        role=str(item.get("role", "?")),
-                    )
-                )
-        openclaw = routes.get("openclaw", {})
-        if isinstance(openclaw, dict):
-            lines.extend(
-                [
-                    "",
-                    "## OpenClaw",
-                    f"Present: {openclaw.get('present', False)}",
-                    f"Readable: {openclaw.get('readable', False)}",
-                    f"Agents: {openclaw.get('agents_count', 0)}",
-                    f"Providers: {', '.join(str(item) for item in openclaw.get('providers', [])) if openclaw.get('providers') else 'none'}",
-                ]
-            )
-        return "\n".join(lines)
+        return render_agent_routes_text(routes)
 
     def _render_evolution_surface_text(self, surface: dict[str, Any]) -> str:
-        lines = ["# Evolution Surface", "", "## Cascade domains"]
-        domains = surface.get("domains", [])
-        if isinstance(domains, list):
-            for item in domains:
-                if not isinstance(item, dict):
-                    continue
-                lines.append(
-                    "- {name} | threshold {fitness_threshold} | max_iter {max_iterations} | max_duration {max_duration_seconds}s".format(
-                        name=str(item.get("name", "?")),
-                        fitness_threshold=str(item.get("fitness_threshold", "?")),
-                        max_iterations=str(item.get("max_iterations", "?")),
-                        max_duration_seconds=str(item.get("max_duration_seconds", "?")),
-                    )
-                )
-        lines.extend(["", "## Entry commands"])
-        entries = surface.get("entry_commands", [])
-        if isinstance(entries, list):
-            for entry in entries:
-                lines.append(f"- {entry}")
-        lines.extend(["", "## Principles"])
-        principles = surface.get("principles", [])
-        if isinstance(principles, list):
-            for principle in principles:
-                lines.append(f"- {principle}")
-        return "\n".join(lines)
+        return render_evolution_surface_text(surface)
 
     def _render_session_catalog_text(self, catalog: dict[str, Any]) -> str:
-        lines = ["# Session Catalog", f"Sessions: {catalog.get('count', 0)}", "", "## Recent sessions"]
-        sessions = catalog.get("sessions", [])
-        if isinstance(sessions, list) and sessions:
-            for item in sessions[:12]:
-                if not isinstance(item, dict):
-                    continue
-                session = item.get("session")
-                if session is None:
-                    continue
-                metadata = session.get("metadata", {}) if isinstance(session, dict) else {}
-                lines.append(
-                    "- {session_id} | {provider_id}:{model_id} | {status} | turns {turns} | replay {replay}".format(
-                        session_id=session.get("session_id", "?") if isinstance(session, dict) else getattr(session, "session_id", "?"),
-                        provider_id=session.get("provider_id", "?") if isinstance(session, dict) else getattr(session, "provider_id", "?"),
-                        model_id=session.get("model_id", "?") if isinstance(session, dict) else getattr(session, "model_id", "?"),
-                        status=session.get("status", "?") if isinstance(session, dict) else getattr(session, "status", "?"),
-                        turns=str(metadata.get("total_turns", item.get("total_turns", 0))),
-                        replay="ok" if bool(item.get("replay_ok")) else "issues",
-                    )
-                )
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return render_session_catalog_text(catalog)
 
     def _render_session_detail_text(self, detail: dict[str, Any]) -> str:
-        session = detail.get("session")
-        compact = detail.get("compaction_preview", {})
-        session_id = session.get("session_id", "?") if isinstance(session, dict) else getattr(session, "session_id", "?")
-        provider_id = session.get("provider_id", "?") if isinstance(session, dict) else getattr(session, "provider_id", "?")
-        model_id = session.get("model_id", "?") if isinstance(session, dict) else getattr(session, "model_id", "?")
-        status = session.get("status", "?") if isinstance(session, dict) else getattr(session, "status", "?")
-        cwd = session.get("cwd", "?") if isinstance(session, dict) else getattr(session, "cwd", "?")
-        lines = [
-            "# Session Detail",
-            f"Session: {session_id}",
-            f"Route: {provider_id}:{model_id}",
-            f"Status: {status}",
-            f"CWD: {cwd}",
-            f"Replay: {'ok' if detail.get('replay_ok') else 'issues'}",
-            "",
-            "## Compaction preview",
-            f"Events: {compact.get('event_count', 0)}",
-            f"Compactable ratio: {compact.get('compactable_ratio', 0.0)}",
-            f"Protected: {', '.join(str(item) for item in compact.get('protected_event_types', [])) or 'none'}",
-            "",
-            "## Recent event types",
-            ", ".join(str(item) for item in compact.get("recent_event_types", [])) or "none",
-        ]
-        issues = detail.get("replay_issues", [])
-        lines.extend(["", "## Replay issues"])
-        if isinstance(issues, list) and issues:
-            for issue in issues[:8]:
-                lines.append(f"- {issue}")
-        else:
-            lines.append("none")
-        return "\n".join(lines)
+        return render_session_detail_text(detail)
 
     def _build_workspace_preview(self, content: str) -> dict[str, str]:
         return {
@@ -2117,41 +1877,10 @@ class TerminalBridge:
         }
 
     def _render_identity_response(self, bootstrap: dict[str, Any]) -> str:
-        workspace_preview = bootstrap.get("workspace_preview", {})
-        runtime_preview = bootstrap.get("runtime_preview", {})
-        if not isinstance(workspace_preview, dict):
-            workspace_preview = {}
-        if not isinstance(runtime_preview, dict):
-            runtime_preview = {}
-        route = f"{bootstrap.get('selected_provider', 'codex')}:{bootstrap.get('selected_model', 'gpt-5.4')}"
-        active_tab = str(bootstrap.get("active_tab", "chat"))
-        commands = bootstrap.get("command_graph", {})
-        categories = commands.get("categories", {}) if isinstance(commands, dict) else {}
-        repo_root = str(workspace_preview.get("Repo root", self._repo_root))
-        branch = str(workspace_preview.get("Branch", "unknown"))
-        repo_risk = str(workspace_preview.get("Repo risk", "unknown"))
-        runtime_activity = str(runtime_preview.get("Runtime activity", "none"))
-        available = ", ".join(str(name) for name in categories.keys()) if isinstance(categories, dict) else "chat, repo, control"
-        return "\n".join(
-            [
-                "I am Dharma Swarm's operator intelligence for this workspace.",
-                f"Route: {route}",
-                f"Repo: {repo_root}",
-                f"Branch: {branch}",
-                f"Active tab: {active_tab}",
-                f"Repo risk: {repo_risk}",
-                f"Runtime: {runtime_activity}",
-                f"Native surfaces: {available}",
-                "I can answer in plain language, switch models, invoke Dharma-native commands, and work against repo/runtime/ontology state directly.",
-            ]
-        )
+        return render_identity_response(bootstrap, repo_root=self._repo_root)
 
     def _render_memory_response(self, bootstrap: dict[str, Any] | None = None) -> str:
-        if isinstance(bootstrap, dict):
-            rendered = str(bootstrap.get("working_memory", "") or "").strip()
-            if rendered:
-                return rendered
-        return self._render_working_memory(self._load_working_memory())
+        return render_memory_response(bootstrap)
 
     def _read_openclaw_summary(self) -> dict[str, Any]:
         oc_path = Path.home() / ".openclaw" / "openclaw.json"

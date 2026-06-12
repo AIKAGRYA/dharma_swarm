@@ -18,6 +18,7 @@ from typing import Any, Mapping
 
 import httpx
 
+from dharma_swarm.api_keys import bootstrap_runtime_env
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import LLMRequest, ProviderType
 from dharma_swarm.runtime_provider import create_runtime_provider, resolve_runtime_provider_config
@@ -427,7 +428,13 @@ async def run_api_key_audit(
     include_agentic: bool = True,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    env_map = env or os.environ
+    if env is None:
+        bootstrap_runtime_env()
+        env_map: Mapping[str, str] = os.environ
+    else:
+        copied_env = dict(env)
+        bootstrap_runtime_env(env=copied_env, include_files=False)
+        env_map = copied_env
     records: list[dict[str, Any]] = []
     for spec in API_KEY_AUDIT_SPECS:
         configured = bool(str(env_map.get(spec.key_name, "")).strip())

@@ -318,6 +318,8 @@ class Orchestrator:
                             task.id, agent.id,
                             c.constraint_name, c.verdict.value, c.reason,
                         )
+                    # Return agent to available pool before skipping
+                    available.append(agent)
                     continue  # skip this task, try next
 
             td = TaskDispatch(
@@ -1997,12 +1999,37 @@ class Orchestrator:
             )
             return
 
+        # Handle REVIEW decisions (Tier C gate advisories)
+        if gate.result.decision.value == "review":
+            td.metadata["review_flagged"] = True
+            td.metadata["review_reason"] = gate.result.reason
+            logger.info(
+                "Dispatch flagged for review: task %s -> %s: %s",
+                td.task_id,
+                td.agent_id,
+                gate.result.reason,
+            )
+            # Proceed anyway (soft-allow) — REVIEW is advisory, not blocking
+
         if gate.attempts:
             td.metadata["witness_reroutes"] = gate.attempts
 
         claim_meta = self._prepare_claim(task_for_gate, td)
         self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)
-        claim_meta = await self._attach_context_bundle(task_for_gate, td, claim_meta)
+
+        # Add timeout to context bundle compilation to prevent tick timeout
+        try:
+            claim_meta = await asyncio.wait_for(
+                self._attach_context_bundle(task_for_gate, td, claim_meta),
+                timeout=30.0,  # Must be < 45s orchestrator tick timeout
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Context bundle compilation timed out for task %s, proceeding without full bundle",
+                td.task_id,
+            )
+            claim_meta["context_bundle_status"] = "timeout"
+            td.metadata["context_bundle_status"] = "timeout"
         claim_meta = self._attach_latent_gold(task_for_gate, claim_meta)
         if task_for_gate is not None:
             task_for_gate.metadata = dict(claim_meta)

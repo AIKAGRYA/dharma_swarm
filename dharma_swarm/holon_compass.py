@@ -44,15 +44,17 @@ def log_signal(name: str, user_message: str, holon_reply: str, agents_root: Path
     Returns the signal dict (so callers can surface it), but a holon is never *stopped* by it —
     that is the difference between a compass (this) and a gate (Step 3b).
     """
+    # Log/path hygiene: name may originate from an API path param upstream.
+    safe_name = str(name).replace("\n", " ").replace("\r", " ")[:64]
     sig = score_exchange(user_message, holon_reply)
-    sig["holon"] = name
-    path = _signal_path(name, agents_root)
+    sig["holon"] = safe_name
+    path = _signal_path(safe_name, agents_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(sig, ensure_ascii=False) + "\n")
     if sig["telos_alignment"] < LOW_ALIGNMENT:
         logger.warning(
             "[holon %s] low telos-alignment signal: %.2f (non-binding — compass, not gate)",
-            name, sig["telos_alignment"],
+            safe_name, sig["telos_alignment"],
         )
     return sig
