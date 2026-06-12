@@ -28,7 +28,6 @@ import asyncio
 import hashlib
 import json
 import os
-import re
 import ssl
 import sys
 import uuid
@@ -257,11 +256,11 @@ def main(argv: list[str] | None = None) -> int:
             # The receipt is printed and persisted, and NATS exception text can echo
             # the endpoint URL as user:password@host. Keep the receipt taint-free:
             # only the exception TYPE enters it; the scrubbed detail goes to stderr.
+            # Exception TYPE only: NATS error text can embed user:password@host and
+            # no scrubbing convinces taint tracking once config.credential is in the
+            # flow. Reproduce with the NATS CLI for full detail.
             receipt["error"] = type(exc).__name__
-            detail = re.sub(r"://[^/@\s]+@", "://***@", str(exc))
-            if config.credential:
-                detail = detail.replace(config.credential, "***")
-            print(f"publish failed ({type(exc).__name__}): {detail[:300]}", file=sys.stderr)
+            print(f"publish failed: {type(exc).__name__}", file=sys.stderr)
 
     receipt_path = write_receipt(Path(args.receipt_dir), receipt)
     receipt["receipt_path"] = str(receipt_path)
