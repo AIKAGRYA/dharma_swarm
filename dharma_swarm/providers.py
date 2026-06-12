@@ -51,6 +51,7 @@ from dharma_swarm.ollama_config import (
     OLLAMA_LOCAL_BASE_URL,
     build_ollama_headers,
     get_ollama_cloud_frontier_chain,
+    is_ollama_cloud_model,
     ollama_transport_mode,
     resolve_ollama_base_url,
     resolve_ollama_model,
@@ -987,7 +988,7 @@ class OllamaProvider(LLMProvider):
         # Keyless local transport cannot serve :cloud models (the local daemon
         # proxies them to ollama.com and gets 401). Degrade to the local
         # default so frontier-pinned agents stay functional without a key.
-        if model.endswith(":cloud") and not (self._api_key or "").strip():
+        if is_ollama_cloud_model(model) and not (self._api_key or "").strip():
             model = OLLAMA_DEFAULT_LOCAL_MODEL
 
         return await self._complete_native(model, messages, request)

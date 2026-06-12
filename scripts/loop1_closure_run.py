@@ -74,7 +74,7 @@ async def run(args: argparse.Namespace) -> dict:
         task = await swarm.create_task(
             title=title,
             description=prompt,
-            priority=TaskPriority.NORMAL,
+            priority=TaskPriority.URGENT,
             metadata={"provider_allowlist": [provider_type.value]},
         )
         task_ids.append(task.id)

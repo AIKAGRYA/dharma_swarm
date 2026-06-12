@@ -309,3 +309,12 @@ class TestBuildOllamaHeaders:
             api_key="sk-explicit",
         )
         assert headers["Authorization"] == "Bearer sk-explicit"
+
+
+def test_is_ollama_cloud_model_variants():
+    from dharma_swarm.ollama_config import is_ollama_cloud_model
+
+    assert is_ollama_cloud_model("glm-5:cloud")
+    assert is_ollama_cloud_model("qwen3-coder:480b-cloud")
+    assert not is_ollama_cloud_model("llama3.2")
+    assert not is_ollama_cloud_model(None)
