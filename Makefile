@@ -248,6 +248,15 @@ hygiene-audit:
 hygiene-check:
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
+# One-way quality ratchet (QL-R1): counters may only improve vs the
+# git-tracked baselines; green improvements auto-tighten (commit the
+# baselines file with the improving change). CI/agents use plain check.
+quality-ratchet:
+	$(PYTHON) scripts/governance/hygiene/ratchet.py --tighten
+
+quality-ratchet-check:
+	$(PYTHON) scripts/governance/hygiene/ratchet.py
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
