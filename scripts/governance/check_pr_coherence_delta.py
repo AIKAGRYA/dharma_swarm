@@ -10,6 +10,7 @@ substantive answer.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -22,6 +23,36 @@ REQUIRED_FIELDS = (
     "Declared-vs-actual gap closed",
     "Proof that re-reads the map",
     "New drift introduced",
+)
+
+# Accepted label variants per canonical field. The gate cares that each
+# question is answered, not that the label is typed verbatim.
+FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "Organ touched": (
+        "Organ touched",
+        "Organs touched",
+        "Organ(s) touched",
+    ),
+    "Declared-vs-actual gap closed": (
+        "Declared-vs-actual gap closed",
+        "Declared vs actual gap closed",
+        "Declared-vs-actual gap",
+        "Gap closed",
+    ),
+    "Proof that re-reads the map": (
+        "Proof that re-reads the map",
+        "Proof that rereads the map",
+        "Proof",
+    ),
+    "New drift introduced": (
+        "New drift introduced",
+        "Drift introduced",
+        "New drift",
+    ),
+}
+
+_ALL_LABELS = tuple(
+    label for aliases in FIELD_ALIASES.values() for label in aliases
 )
 
 PLACEHOLDER_VALUES = {
@@ -58,30 +89,39 @@ def _read_body(args: argparse.Namespace) -> str:
     return ""
 
 
-def _field_pattern(field: str) -> re.Pattern[str]:
+def _label_pattern(label: str) -> re.Pattern[str]:
     return re.compile(
-        rf"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?{re.escape(field)}(?:\*\*)?\s*:\s*(.*)$"
+        rf"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?{re.escape(label)}(?:\*\*)?\s*:\s*(.*)$"
     )
 
 
-def extract_field(body: str, field: str) -> str | None:
-    """Extract a single Coherence Delta field from a Markdown PR body."""
+_STOP_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?(?:"
+    + "|".join(re.escape(label) for label in _ALL_LABELS)
+    + r")(?:\*\*)?\s*:"
+)
 
-    match = _field_pattern(field).search(body)
+
+def extract_field(body: str, field: str) -> str | None:
+    """Extract a single Coherence Delta field from a Markdown PR body.
+
+    Accepts any registered label alias for the field.
+    """
+
+    match = None
+    for label in FIELD_ALIASES.get(field, (field,)):
+        match = _label_pattern(label).search(body)
+        if match:
+            break
     if not match:
         return None
 
     first_line = match.group(1).strip()
     tail: list[str] = []
     lines = body[match.end() :].splitlines()
-    stop_re = re.compile(
-        r"^\s*(?:[-*]\s*)?(?:\*\*)?(?:"
-        + "|".join(re.escape(name) for name in REQUIRED_FIELDS)
-        + r")(?:\*\*)?\s*:"
-    )
     for line in lines:
         stripped = line.strip()
-        if stop_re.match(line):
+        if _STOP_RE.match(line):
             break
         if stripped.startswith("#"):
             break
@@ -110,27 +150,81 @@ def validate_body(body: str) -> list[FieldResult]:
     return [validate_field(body, field) for field in REQUIRED_FIELDS]
 
 
+def _load_comments(comments_file: str | None) -> list[str]:
+    if not comments_file:
+        return []
+    path = Path(comments_file)
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    bodies: list[str] = []
+    if isinstance(payload, list):
+        for item in payload:
+            if isinstance(item, dict):
+                text = item.get("body")
+            else:
+                text = item
+            if isinstance(text, str) and text.strip():
+                bodies.append(text)
+    return bodies
+
+
+def validate_sources(body: str, comments: list[str]) -> tuple[list[FieldResult], str]:
+    """Validate the PR body first; fall back to PR comments (latest first).
+
+    A comment containing all four substantive fields satisfies the gate, so
+    agents that cannot edit the PR description can still answer the merge
+    boundary questions in-thread.
+    """
+
+    body_results = validate_body(body)
+    if all(result.ok for result in body_results):
+        return body_results, "PR body"
+    for index, comment in enumerate(reversed(comments)):
+        comment_results = validate_body(comment)
+        if all(result.ok for result in comment_results):
+            return comment_results, f"PR comment #{len(comments) - index}"
+    return body_results, "PR body"
+
+
+_FAIL_TEMPLATE = """
+To pass, add this block to the PR body — or, if you cannot edit the body,
+post it as a PR comment (the gate accepts either):
+
+## Coherence Delta
+- Organ touched: <module(s)/file(s) + architectural layer>
+- Declared-vs-actual gap closed: <BR-NNN / MM-NN id + evidence, or 'none — why'>
+- Proof that re-reads the map: <what map/check you re-read or ran>
+- New drift introduced: <named drift, or 'none'>
+"""
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--body-file", help="Path to a file containing the PR body")
     parser.add_argument("--body", help="PR body text")
+    parser.add_argument(
+        "--comments-file",
+        help="Path to a JSON file of PR comments (list of objects with 'body')",
+    )
     args = parser.parse_args(argv)
 
     body = _read_body(args)
-    results = validate_body(body)
+    comments = _load_comments(args.comments_file)
+    results, source = validate_sources(body, comments)
     failed = [result for result in results if not result.ok]
 
     if failed:
-        print("Coherence Delta check failed:")
+        print("Coherence Delta check failed (no valid block in body or comments):")
         for result in failed:
             print(f"- {result.name}: {result.reason}")
-        print()
-        print("Every PR body must answer:")
-        for field in REQUIRED_FIELDS:
-            print(f"- {field}:")
+        print(_FAIL_TEMPLATE)
         return 1
 
-    print("Coherence Delta check passed:")
+    print(f"Coherence Delta check passed (source: {source}):")
     for result in results:
         preview = result.value.replace("\n", " ")
         if len(preview) > 100:
