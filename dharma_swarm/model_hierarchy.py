@@ -60,20 +60,29 @@ class LaneRole(str, Enum):
 # Within each tier, ordering is the Day 1 seed.  EWMA scores override this
 # after sufficient routing events (~100 calls).
 
+# MODEL PREFERENCE DOCTRINE — FREE/CHEAP POWERFUL FRONTIER FIRST.
+# Within every lane, the default model is the MOST POWERFUL model that lane
+# offers at $0 (or near-$0) — never the small convenience model. Small models
+# (llama3.2, mistral-small, 8B-class) are permitted ONLY as explicit keyless
+# local fallbacks (see ollama_config.OLLAMA_DEFAULT_LOCAL_MODEL) or fast-path
+# T0 classifiers — never as a lane's default. Every other file seeds its
+# models from DEFAULT_MODELS / default_model() below; do not hardcode model
+# ids elsewhere.
+
 TIER_FREE: tuple[ProviderType, ...] = (
-    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5
-    ProviderType.NVIDIA_NIM,     # Llama 3.3 70B  (50 req/day)
-    ProviderType.GROQ,           # Qwen3-32B      (3000 tok/s)
+    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5 (cloud)
     ProviderType.CEREBRAS,       # Qwen3 235B / GPT-OSS 120B (3000 tok/s)
+    ProviderType.GROQ,           # Kimi K2 1T (fast inference)
     ProviderType.SILICONFLOW,    # Qwen3-Coder 480B
-    ProviderType.SAMBANOVA,      # Llama 3.3 70B
     ProviderType.TOGETHER,       # Qwen3-Coder 480B
     ProviderType.FIREWORKS,      # Qwen3-Coder 480B
+    ProviderType.NVIDIA_NIM,     # Nemotron Ultra 253B (50 req/day — quota-poor, so late)
+    ProviderType.SAMBANOVA,      # DeepSeek V3
 )
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
-    ProviderType.MISTRAL,        # mistral-small (1B tok/mo free tier)
-    ProviderType.GOOGLE_AI,      # gemini-2.5-flash (1M ctx free)
+    ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
+    ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
     ProviderType.OPENROUTER_FREE,  # Nemotron 120B, GLM-4.5-Air, etc.
 )
@@ -244,21 +253,23 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 # Default model per provider (used when request.model is empty).
 # Moved here from runtime_provider.py as the single source.
 
+# Doctrine: the default per lane is the most powerful model the lane offers
+# at $0/near-$0 — see MODEL PREFERENCE DOCTRINE above the tier definitions.
 DEFAULT_MODELS: dict[ProviderType, str] = {
     # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
-    ProviderType.GROQ: "qwen/qwen3-32b",
-    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
+    ProviderType.OLLAMA: "glm-5:cloud",                                   # GLM-5 744B
+    ProviderType.NVIDIA_NIM: "nvidia/llama-3.1-nemotron-ultra-253b-v1",   # Nemotron Ultra 253B
+    ProviderType.GROQ: "moonshotai/kimi-k2-instruct",                     # Kimi K2 1T MoE
+    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",              # Qwen3 235B
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
+    ProviderType.SAMBANOVA: "DeepSeek-V3-0324",                           # DeepSeek V3 671B
     ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
     # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
+    ProviderType.MISTRAL: "mistral-large-latest",
+    ProviderType.GOOGLE_AI: "gemini-2.5-pro",
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
+    ProviderType.OPENROUTER_FREE: "nvidia/nemotron-3-super-120b-a12b:free",  # Nemotron 120B
     # Paid tier
     ProviderType.OPENROUTER: "xiaomi/mimo-v2-pro",
     ProviderType.OPENAI: "gpt-5",

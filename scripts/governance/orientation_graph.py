@@ -15,6 +15,7 @@ This command does NOT own any fact. It projects from the existing owners:
     custody    -> docs/docops/assertions.yaml (canonical_guard.registered) + git
     liveness   -> live ops census receipt (scripts/runtime/live_ops_census.py)
     broken     -> docs/state/BROKEN_REGISTER.md
+    loops      -> committed loop-closure run reports (reports/loop_closure/**)
 
 Doctrine line that must hold (same as the reconciliation track's):
     Read models project truth from owners; they do not become authority.
@@ -46,6 +47,7 @@ PORTFOLIO = REPO_ROOT / "docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 ASSERTIONS = REPO_ROOT / "docs/docops/assertions.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
+LOOP_CLOSURE_DIR = REPO_ROOT / "reports/loop_closure"
 
 
 def _census_receipt_path() -> Path | None:
@@ -114,6 +116,17 @@ class BrokenItem:
 
 
 @dataclass
+class LoopClosure:
+    report: str
+    provider: str = ""
+    tasks_completed: int = 0
+    tasks_requested: int = 0
+    dispatch_dropoffs: int = 0
+    evidence_receipts: int = 0
+    closed: bool = False
+
+
+@dataclass
 class OrientationPacket:
     identity: Identity
     organs: list[Organ]
@@ -121,6 +134,7 @@ class OrientationPacket:
     custody: CustodyReport
     liveness: Liveness
     broken: list[BrokenItem]
+    loop_closure: LoopClosure | None = None
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -254,6 +268,37 @@ def build_broken() -> list[BrokenItem]:
     return [i for i in items if i.status not in {"FIXED", "CLOSED"}]
 
 
+def build_loop_closure() -> LoopClosure | None:
+    """Latest committed Loop 1 closure run report (scripts/loop1_closure_run.py)."""
+    if not LOOP_CLOSURE_DIR.exists():
+        return None
+    reports = sorted(LOOP_CLOSURE_DIR.glob("*/loop1_closure_run*.json"))
+    if not reports:
+        return None
+    path = reports[-1]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return LoopClosure(report=f"unreadable report at {path}")
+    completed = int(payload.get("tasks_completed", 0))
+    requested = int(payload.get("tasks_requested", 0))
+    dropoffs = int(payload.get("dispatch_dropoffs", 0))
+    receipts = len(payload.get("evidence_receipts") or {})
+    try:
+        report_ref = str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        report_ref = str(path)
+    return LoopClosure(
+        report=report_ref,
+        provider=str(payload.get("provider", "")),
+        tasks_completed=completed,
+        tasks_requested=requested,
+        dispatch_dropoffs=dropoffs,
+        evidence_receipts=receipts,
+        closed=bool(requested and completed == requested and dropoffs == 0 and receipts),
+    )
+
+
 def build_packet() -> OrientationPacket:
     return OrientationPacket(
         identity=build_identity(),
@@ -262,6 +307,7 @@ def build_packet() -> OrientationPacket:
         custody=build_custody(),
         liveness=build_liveness(),
         broken=build_broken(),
+        loop_closure=build_loop_closure(),
     )
 
 
@@ -307,6 +353,17 @@ def render(packet: OrientationPacket) -> None:
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:
         print(f"  [{item.status}] {item.id} — {item.title}")
+
+    _section("LOOP 1 CLOSURE — owner: committed closure run report (read-only)")
+    closure = packet.loop_closure
+    if closure is None:
+        print("  no committed closure run — run scripts/loop1_closure_run.py")
+    else:
+        verdict = "CLOSED" if closure.closed else "NOT CLOSED"
+        print(f"  [{verdict}] {closure.tasks_completed}/{closure.tasks_requested} tasks "
+              f"completed via {closure.provider or '?'} "
+              f"(dropoffs={closure.dispatch_dropoffs}, receipts={closure.evidence_receipts})")
+        print(f"  Report: {closure.report}")
 
     print()
     print("  Depth: make onboard (state) · docs/MEGAFILE_INDEX.md (maps)")

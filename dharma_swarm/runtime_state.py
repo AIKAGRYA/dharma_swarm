@@ -385,12 +385,14 @@ def _apply_connection_pragmas_sync(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA synchronous=NORMAL")
+    db.execute("PRAGMA busy_timeout=5000")
 
 
 async def _apply_connection_pragmas_async(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute("PRAGMA busy_timeout=5000")
 
 
 def ensure_runtime_state_schema_sync(
