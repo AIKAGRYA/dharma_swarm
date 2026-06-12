@@ -66,6 +66,17 @@ def cmd_status(*, as_json: bool = False) -> None:
     if "control_plane_snapshot" in data:
         print(f"Control plane snapshot: {data['control_plane_snapshot']}")
 
+    if "loop_liveness" in data:
+        ll = data["loop_liveness"]
+        line = f"Daemon loops: {ll['running']} running"
+        if ll["abandoned"]:
+            line += f" | ABANDONED: {', '.join(ll['abandoned'])}"
+        if ll["hot_restarts"]:
+            hot = ", ".join(f"{k}x{v}" for k, v in ll["hot_restarts"].items())
+            line += f" | hot restarts: {hot}"
+        line += f" (as of {ll['age_min']}m ago, pid {ll['pid']})"
+        print(line)
+
     agni = data.get("agni", {})
     if agni.get("synced"):
         if agni.get("working_md_age_min") is not None:

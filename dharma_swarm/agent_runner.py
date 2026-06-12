@@ -52,6 +52,16 @@ from dharma_swarm.runtime_fields import (
 )
 from dharma_swarm.telos_gates import check_with_reflective_reroute
 
+# Runtime Truth Spine participation (substrate-nativeness).
+# The core execution (run_task) is the leaf invoked by spine-wrapped callers
+# (Orchestrator._run_task_via_spine, A2ABridge.submit_via_spine) which wrap
+# the actual call inside an invoke_agent() invoker closure to emit exactly one
+# EvidenceReceipt per dispatch. This import declares the surface's place in
+# the single blessed path; no god-object bypass of the spine for orchestrated work.
+from dharma_swarm.spine.invoke import invoke_agent
+from dharma_swarm.spine.receipt import EvidenceReceipt
+from dharma_swarm.spine.routing import RoutingDecision
+
 logger = logging.getLogger(__name__)
 
 from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
@@ -883,6 +893,8 @@ def _build_self_state_block(agent_name: str) -> str:
     Reads identity snapshot, organism state (samvara), and recognition seed.
     Returns a compact text block (~500 chars) or empty string if unavailable.
     """
+    from dharma_swarm.daemon_config import dharma_state_dir
+
     state_dir = dharma_state_dir()
     lines: list[str] = ["## Self-State"]
 
@@ -939,7 +951,7 @@ def _build_system_prompt(config: AgentConfig) -> str:
     if config.system_prompt and config.provider != ProviderType.CLAUDE_CODE:
         return config.system_prompt
 
-    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES, dharma_state_dir
+    from dharma_swarm.daemon_config import ROLE_BRIEFINGS, V7_BASE_RULES
 
     if config.system_prompt:
         # CLAUDE_CODE with explicit prompt: use it as base, append context

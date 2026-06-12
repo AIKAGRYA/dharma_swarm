@@ -1,0 +1,110 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-7",
+  "created_at_utc": "2026-06-02T05:09:04Z",
+  "agent": "codex",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "cycle": 7,
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "bounded_packet": "Rung 4 - Failure capsule learning-fuel status",
+  "result": "Extended the read-only Forge Reality Arena status path so canonical failure capsules are summarized as learning fuel: class counts, recent repair candidates, and should-feed-fitness violations now appear in the status artifact, markdown, and AgentOps status packet. The live lane still has zero fitness-eligible receipts and zero archive fitness mutation.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-7.json"
+  ],
+  "generated_artifacts": [
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "metrics": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "transfer_passed_reps": 3,
+    "base_memorized_candidates_denied": 4,
+    "coordination_scenarios_run": 55,
+    "coordination_unique_scenarios": 11,
+    "coordination_min_repetitions_per_scenario": 5,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 0,
+    "failure_capsule_failure_classes": 0,
+    "failure_capsules_should_feed_fitness": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 3,
+    "fitness_boundary_blocked_candidates": 6,
+    "fitness_eligible_receipts": 0,
+    "target_missing": [],
+    "external_anchors_observed_not_owned": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "failure_capsule_summary": {
+    "class_counts": {},
+    "recent_capsules": [],
+    "should_feed_fitness_count": 0
+  },
+  "hashes": {
+    "content_hash_bundle": "sha256:b26770264dcece81d7a4541cec8bdd02baab18289924545e596d1eaf8a51f938",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:a05e3ec48be64cf222fdf236101d2f09997a65cb4d8fffad0081446629664934",
+    "tests/test_forge_reality_arena_status.py": "sha256:c41ab033533ad8406f831a69744d8bd905af3ec5733fef4fb766a61627db6ab2",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:17765abe67d6de42a8ec32ea31d597c4371353f8ab4a05a48fd50e3f4696ddde",
+    "reports/forge/forge-reality-arena/status.md": "sha256:ccfd68455a39da663a4dbc82e99102db333764d9643288f142cbff6fd6881d79",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:93227a6b266a22e9e9a1fb929b790f6340e294112a0b7ec3d76fa55dd5dabaf0"
+  },
+  "verification": [
+    {
+      "command": "make onboard",
+      "exit_code": 0
+    },
+    {
+      "command": "GitNexus MCP impact for summarize_reality_arena_status, load_failure_capsules, render_markdown",
+      "exit_code": 1,
+      "blocker": "GitNexus could not resolve the untracked Forge Reality Arena symbols in the indexed graph; graph blast radius is unknown for these new lane files."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "13 passed, 1 pytest config warning for unknown timeout option."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "27 passed, 1 pytest config warning for unknown timeout option."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "Regenerated status_artifact.json, status.md, and forge-reality-arena-status.json."
+    }
+  ],
+  "acceptance": {
+    "canonical_ds_goal_context_available": false,
+    "repo_local_receipt_required": true,
+    "external_actions_performed": false,
+    "external_contact": false,
+    "external_repo_contact": false,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "merged": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "actual_fitness_eligible_receipts_zero": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true,
+    "failure_capsule_learning_queue_visible": true,
+    "failure_capsules_should_feed_fitness_zero": true
+  },
+  "blockers": [
+    "GitNexus MCP impact cannot currently resolve the untracked Forge Reality Arena symbols."
+  ],
+  "next_bounded_packet": "Rung 4 continuation: add an isolated multi-scenario failure capsule drill that can produce the 10-capsule target without polluting live coordination pass/fail counts or fitness authority."
+}

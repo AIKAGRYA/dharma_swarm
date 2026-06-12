@@ -260,11 +260,11 @@ DEFAULT_MODELS: dict[ProviderType, str] = {
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid tier
-    ProviderType.OPENROUTER: "xiaomi/mimo-v2-pro",
+    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-code",
-    ProviderType.CODEX: "codex",
+    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
+    ProviderType.CODEX: "gpt-5.4",
 }
 
 

@@ -1,0 +1,238 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-45",
+  "cycle": 45,
+  "recorded_at": "2026-06-02T05:33:13+08:00",
+  "observed_at_utc": "2026-06-01T21:33:13Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "active_external_pr_ledger_rechecked_agentkanban_target_prepared_no_public_action_no_external_confirmation",
+  "public_action_taken": false,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": false,
+  "fork_created": false,
+  "automated_external_services_observed": true,
+  "non_maintainer_human_review_observed": true,
+  "human_maintainer_action_observed": false,
+  "new_pr_accepted_or_merged": false,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-045.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-045-active-pr-ledger.md",
+      "kind": "active_external_pr_ledger"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/jokiatgithub-agentkanban-4/cycle-045-target-readiness.md",
+      "kind": "target_feasibility_packet"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-45.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-045-status/status_artifact.json",
+      "kind": "read_only_status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-045-status/status.md",
+      "kind": "read_only_status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "mcp_registry_note": "GitNexus MCP list_repos returned stale sibling worktrees; local CLI status was authoritative for this workspace.",
+    "dharma_impact_analysis_required": false
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "issue_number": 219,
+      "pr_number": 222,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks_summary": "CodeRabbit success; GitGuardian success",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "issue_number": 3,
+      "pr_number": 5,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "issue_number": 4,
+      "pr_number": 6,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 11,
+      "pr_number": 22,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "issue_number": 7,
+      "pr_number": 23,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "external_human_comment_observed": true,
+      "treated_as_maintainer_acceptance": false,
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "issue_number": 42,
+      "pr_number": 43,
+      "state": "OPEN",
+      "mergeable": "MERGEABLE",
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "known_blockers": {
+    "labmain_ai_agent_pay_demo_35": {
+      "state": "open",
+      "locked": false,
+      "assignees": [],
+      "labels": [
+        "bounty:$50"
+      ],
+      "open_prs_referencing_issue": 17,
+      "disqualified": true,
+      "disqualification_reason": "high competition"
+    },
+    "evaleval_every_eval_ever_152": {
+      "state": "open",
+      "locked": false,
+      "assignees": [],
+      "labels": [
+        "documentation",
+        "good first issue"
+      ],
+      "direct_competing_pr": 154,
+      "withheld": true,
+      "withheld_reason": "direct competing PR remains open"
+    }
+  },
+  "fresh_target_scout": {
+    "selected_local_prep_target": {
+      "repo": "jokiatgithub/AgentKanban",
+      "issue_number": 4,
+      "issue_ref": "jokiatgithub/AgentKanban#4",
+      "clone_path": "/Users/dhyana/.dharma/forge_external_beast/worktrees/jokiatgithub-AgentKanban-upstream-main",
+      "open_human_competing_prs": 0,
+      "implementation_complete": false,
+      "public_action_withheld": true,
+      "withheld_reason": "implementation and local D1 reset proof incomplete"
+    },
+    "discarded_candidate": {
+      "repo": "floatpane/matcha",
+      "issue_number": 1404,
+      "reason": "bug likely requires authenticated email/TUI behavior to reproduce and verify"
+    }
+  },
+  "target_local_checks": [
+    {
+      "target": "jokiatgithub/AgentKanban",
+      "command": "npm install",
+      "exit_code": 0
+    },
+    {
+      "target": "jokiatgithub/AgentKanban",
+      "command": "npm run build:agents",
+      "exit_code": 0
+    },
+    {
+      "target": "jokiatgithub/AgentKanban",
+      "command": "npm run typecheck",
+      "exit_code": 0
+    },
+    {
+      "target": "jokiatgithub/AgentKanban",
+      "command": "git status --short --branch",
+      "exit_code": 0,
+      "result": "clean"
+    }
+  ],
+  "status_projection": {
+    "hashes_captured_by_shasum": true,
+    "acted_receipts": 3,
+    "external_humans_or_orgs_acted": 3,
+    "internal_build_items": 0,
+    "internal_repair_items": 0,
+    "pending_countersign_items": 9,
+    "external_authority_blocked_items": 1,
+    "autonomous_cycle_useful": false,
+    "archive_fitness_authority": "none_from_this_cycle"
+  },
+  "guardrails": {
+    "money_spent_or_requested": false,
+    "bounty_claimed": false,
+    "private_credentials_submitted": false,
+    "protected_branch_pushed_or_merged": false,
+    "broad_performance_claim_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "external_confirmed_true_written": false,
+    "first_external_receipt_witness_created": false,
+    "nonzero_archive_fitness_set": false,
+    "v2_autonomy_escalation": false
+  },
+  "blockers": [
+    "Active external PRs still need maintainer acceptance, merge, approval, or material review.",
+    "labmain/ai-agent-pay-demo#35 remains overcrowded with 17 competing open PRs.",
+    "evaleval/every_eval_ever#152 remains blocked by competing PR #154.",
+    "jokiatgithub/AgentKanban#4 needs implementation and local D1 reset proof before public action."
+  ]
+}

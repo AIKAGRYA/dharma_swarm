@@ -1,0 +1,71 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-measurement-guardian-cycle-003",
+  "created_at": "2026-06-01T22:45:00+08:00",
+  "actor": "forge_measurement_guardian",
+  "cycle": 3,
+  "mission": "Revalidate the first external acted receipts and seal the archive-fitness quorum boundary.",
+  "scope": [
+    "reports/forge/measurement-guardian/cycle-003-fitness-quorum-guard.json",
+    "reports/forge/measurement-guardian/cycle-003-fitness-quorum-guard.md",
+    "reports/forge/measurement-guardian/cycle-003-status-smoke/status_artifact.json",
+    "reports/forge/measurement-guardian/cycle-003-status-smoke/status.md"
+  ],
+  "actions": [
+    "Inspected dirty worktree without reverting or cleaning unrelated changes.",
+    "Fetched live GitHub PR, repo, issue, commit, search, and comment state with gh.",
+    "Fetched live GitHub repo, PR, and PR-comment state with the GitHub MCP connector.",
+    "Rehashed manifest, readiness packets, prior guardian artifacts, witness, and cycle-3 status smoke outputs.",
+    "Ran local guardrail scans for builder-lane authority leakage and swarm-agent account collisions.",
+    "Generated read-only Forge Hydra status smoke artifacts under the guardian report path and writable guardian state dir."
+  ],
+  "result": {
+    "summary_verdict": "confirmed_external_acted_receipt_revalidated_fitness_blocked",
+    "external_acted_receipts_revalidated": true,
+    "confirmed_receipt_count": 3,
+    "quality_stratified_receipt_count": 3,
+    "domain_count": 1,
+    "v1_external_threshold_ready": false,
+    "archive_fitness_changed": false,
+    "fitness_authority_granted": false
+  },
+  "evidence": {
+    "guardian_report": "reports/forge/measurement-guardian/cycle-003-fitness-quorum-guard.json",
+    "guardian_report_md": "reports/forge/measurement-guardian/cycle-003-fitness-quorum-guard.md",
+    "status_smoke_artifact": "reports/forge/measurement-guardian/cycle-003-status-smoke/status_artifact.json",
+    "state_mirror_dir": "/Users/dhyana/.dharma/forge_measurement_guardian",
+    "source_manifest_sha256": "9bcb3bd635a59a5960bf1a7f24e70c8d4b73820a860bf3762397f001d41175d7",
+    "status_smoke_sha256": "64658f3051d89c98e65bc99c9fe92655b625d3cc56d5a58026ebb50568777dd4"
+  },
+  "commands": [
+    "gh auth status",
+    "gh repo view <candidate repos> --json nameWithOwner,owner,isFork,isArchived,isPrivate,defaultBranchRef,url",
+    "gh pr view <direct candidates> --json number,title,state,isDraft,author,mergedAt,mergedBy,mergeCommit,headRefName,headRefOid,headRepository,headRepositoryOwner,isCrossRepository,baseRefName,baseRefOid,body,closingIssuesReferences,url",
+    "gh issue view <linked issues> --json number,title,state,stateReason,closedAt,author,url",
+    "gh api repos/<repo>/commits/<merge_commit_sha>",
+    "gh api repos/<repo>/issues/<pr>/comments",
+    "gh search prs --author AmitabhainArunachala --merged --merged-at 2026-06-01..2026-06-01 --json repository,number,title,url,closedAt,state --limit 30",
+    "mcp__codex_apps__github._get_repo for all three candidate repos",
+    "mcp__codex_apps__github._get_pr_info for PRs 98, 7, and 6",
+    "mcp__codex_apps__github._fetch_pr_comments for PRs 98, 7, and 6",
+    "python3 scripts/runtime/forge_hydra_status.py --active-track-evidence /dev/null --output-dir reports/forge/measurement-guardian/cycle-003-status-smoke",
+    "python3 scripts/runtime/forge_hydra_status.py --active-track-evidence /dev/null --output-dir /Users/dhyana/.dharma/forge_measurement_guardian/cycle-003-status-smoke",
+    "shasum -a 256 <manifest, readiness packets, prior guardian artifacts, witness, status smoke outputs>",
+    "rg -n '\\b(abduznik|Yasuno-5555|leticiv)\\b' examples/agents docs/agents reports/agent_registry_atlas dharma_swarm -S",
+    "rg -n '\"external_confirmed\"\\s*:\\s*true|first_external_receipt_witness_created\"\\s*:\\s*true|archive_fitness_changed\"\\s*:\\s*true|nonzero_archive_fitness_set\"\\s*:\\s*true|\"fitness_authority_granted\"\\s*:\\s*true|\"eligible_to_set_archive_fitness\"\\s*:\\s*true' reports/forge/external-beast reports/agentops/work_packets/forge-external-beast-cycle-*.json -S",
+    "jq threshold projection over reports/forge/measurement-guardian/cycle-003-status-smoke/status_artifact.json"
+  ],
+  "guardrails": {
+    "public_github_actions_taken": false,
+    "money_spent": false,
+    "payment_requested": false,
+    "bounty_claimed": false,
+    "protected_dharma_swarm_branch_pushed_or_merged": false,
+    "commit_push_merge_or_pr_action_in_dharma_swarm": false,
+    "archive_fitness_changed": false,
+    "v2_or_higher_autonomy_escalated": false
+  },
+  "blockers": [
+    "Archive fitness remains intentionally blocked pending N>=5 confirmed receipts, M>=3 domains, and transfer-aware gate execution."
+  ]
+}

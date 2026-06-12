@@ -1,0 +1,72 @@
+{
+  "schema": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-13-dense-gym-locality-guard",
+  "cycle": 13,
+  "created_at": "2026-06-01T09:03:29Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "scope": "Harden the dense Terminal-Bench-style local adapter so verifier commands cannot silently use external services.",
+  "outputs": [
+    "dharma_swarm/eval/dense_gym.py",
+    "scripts/runtime/forge_dense_gym_adapter.py",
+    "tests/test_dense_gym_adapter.py",
+    "reports/forge/dense-gym-terminal-adapter/cycle-13/verifier_artifact.json",
+    "reports/forge/dense-gym-terminal-adapter/cycle-13/completion_audit.md",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md"
+  ],
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile dharma_swarm/eval/dense_gym.py scripts/runtime/forge_dense_gym_adapter.py tests/test_dense_gym_adapter.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_gym_adapter.py tests/test_dense_code_gym.py -q --tb=short",
+      "outcome": "7 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_gym_adapter.py --output-dir reports/forge/dense-gym-terminal-adapter/cycle-13",
+      "outcome": "verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "5 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+      "outcome": "status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_gym_adapter.py tests/test_dense_code_gym.py tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "12 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/dense-gym-terminal-adapter/cycle-13/verifier_artifact.json >/dev/null",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null",
+      "outcome": "pass"
+    }
+  ],
+  "artifacts": {
+    "verifier_artifact_sha256": "f1f06fb501fede86fe1fa1bb0022129abc52deda0af1e5ec5e7695a8a336a0fd",
+    "status_artifact_sha256": "8aa9b15f51f080941fe7fc6999462fbcf820d32e13ea19ea6db5c382e805f027"
+  },
+  "blockers": [
+    "Canonical ds-goal receipt not attempted because no mission/task/goal id environment variable was present.",
+    "GitNexus for /Users/dhyana/dharma_swarm remains unavailable for current-worktree impact; dense-gym symbols were not found in the stale sibling index and bounded analyze exited 124."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "spending": false,
+    "commit_push_pr": false,
+    "fitness_changed": false
+  },
+  "status": "completed_repo_local_receipt"
+}

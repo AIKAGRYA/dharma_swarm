@@ -21,6 +21,9 @@ from dharma_swarm.api_keys import (
     GOOGLE_AI_API_KEY_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     PPLX_API_KEY_ENV,
+    apply_env_assignment,
+    bootstrap_runtime_env,
+    env_value,
     normalize_env_aliases,
 )
 
@@ -125,11 +128,54 @@ class TestNormalizeEnvAliases:
         nvidia_applied = [a for a in applied if a[1] == "NVIDIA_NIM_API_KEY"]
         assert len(nvidia_applied) == 1
 
+    def test_unresolved_shell_reference_is_treated_as_absent(self) -> None:
+        env: dict[str, str] = {
+            "GEMINI_API_KEY": "real-gemini",
+            "GOOGLE_AI_API_KEY": "$GEMINI_API_KEY",
+        }
+        applied = normalize_env_aliases(env)
+        assert env["GOOGLE_AI_API_KEY"] == "real-gemini"
+        assert applied == [("GEMINI_API_KEY", "GOOGLE_AI_API_KEY")]
+        assert env_value("GOOGLE_AI_API_KEY", env) == "real-gemini"
+
+
+class TestRuntimeEnvBootstrap:
+    def test_apply_env_assignment_skips_unresolved_shell_reference(self) -> None:
+        env: dict[str, str] = {}
+        assert apply_env_assignment("export GOOGLE_AI_API_KEY=$GEMINI_API_KEY", env) is False
+        assert "GOOGLE_AI_API_KEY" not in env
+
+    def test_apply_env_assignment_expands_existing_simple_reference(self) -> None:
+        env: dict[str, str] = {"GEMINI_API_KEY": "real-gemini"}
+        assert apply_env_assignment("export GOOGLE_AI_API_KEY=$GEMINI_API_KEY", env) is True
+        assert env["GOOGLE_AI_API_KEY"] == "real-gemini"
+
+    def test_bootstrap_runtime_env_loads_files_then_normalizes(self, tmp_path: Path) -> None:
+        env_file = tmp_path / "agent_keys.env"
+        env_file.write_text(
+            "export GOOGLE_AI_API_KEY=$GEMINI_API_KEY\n"
+            "export GEMINI_API_KEY='real-gemini'\n"
+            "export OPENROUTER_API_KEY='or-test'\n",
+            encoding="utf-8",
+        )
+        env: dict[str, str] = {}
+
+        bootstrap_runtime_env(env=env, env_paths=(env_file,))
+
+        assert env["GEMINI_API_KEY"] == "real-gemini"
+        assert env["GOOGLE_AI_API_KEY"] == "real-gemini"
+        assert env["OPENROUTER_API_KEY"] == "or-test"
+
 
 class TestNormalizeDkeysScript:
     """Smoke-test the CLI wrapper."""
 
     _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "normalize_dkeys_env.py"
+    _LOAD_RUNTIME_ENV = Path(__file__).resolve().parent.parent / "scripts" / "load_runtime_env.sh"
+
+    def test_load_runtime_env_sources_agent_keys_file(self) -> None:
+        text = self._LOAD_RUNTIME_ENV.read_text(encoding="utf-8")
+        assert "$HOME/.dharma/agent_keys.env" in text
 
     def test_dry_run_no_crash(self) -> None:
         result = subprocess.run(

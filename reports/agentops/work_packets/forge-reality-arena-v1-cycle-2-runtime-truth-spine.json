@@ -1,0 +1,121 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-2-runtime-truth-spine",
+  "created_at_utc": "2026-06-02T13:52:46Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "mission": "Forge Reality Arena v1",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "operator_goal_id": "",
+  "operator_goal_id_unavailable_reason": "not_recorded_in_autonomy_mission",
+  "run_id": "20260602T133721Z",
+  "correlation_id": "20260602-forge-reality-arena-v1-10h:forge-reality-arena-master-v1:20260602T133721Z",
+  "authority": "evidence-only",
+  "status": "repo_local_receipt",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "cycle": {
+    "v1_cycle": 2,
+    "packet": "runtime_truth_spine",
+    "rungs": [
+      "rung_2_live_ops_and_onboard_visibility",
+      "rung_3_transport_truth"
+    ]
+  },
+  "result": "Forge Reality Arena status and AgentOps packet now expose read-only live_ops and transport truth refs: no-probe live_ops census, NATS substrate status, A2A autonomy score with evidence tiers, tmux substrate status, and persistent-fleet snapshot.",
+  "outputs": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/live-ops-census/no-probes.json",
+    "reports/forge/forge-reality-arena/transport-truth/nats_substrate_status.json",
+    "reports/forge/forge-reality-arena/transport-truth/a2a_autonomy_score.json",
+    "reports/forge/forge-reality-arena/transport-truth/tmux_ecosystem_status.json"
+  ],
+  "artifact_hashes": {
+    "status_artifact": "sha256:003ab796456e4aef64e2d963da264e2b40c7b39b20b2aa7f108a4ecd7d3289cd",
+    "agentops_status": "sha256:daa9945bf202a51180cc0e509ffd4b7f1561c15213ffe8dd09b584c8740dfd46",
+    "live_ops_census_no_probes": "sha256:e3996cc143b56c357704b6fb847a63278a136df3749a72e496f9ea460de01b99",
+    "nats_substrate_status": "sha256:5a0bdcd047da9a30f10f4c5c1a3410ea5c0f57b491d220640173516d5c6265ce",
+    "a2a_autonomy_score": "sha256:8ddeb84e5139af5cc8cde30f54ba71e145970ea9a5121cddd13f3ae9aabf3847",
+    "tmux_ecosystem_status": "sha256:73dfdba7cba5b916e24c6f44afd72138610ebecd17ae9e223edb5c9300cc6ded"
+  },
+  "transport_truth": {
+    "live_ops_probe_mode": "no_probes",
+    "nats_ack_verified": true,
+    "nats_ack_tier": "jetstream_ack_verified",
+    "a2a_score": 79,
+    "a2a_verdict": "near_80",
+    "a2a_transport_authority": "nats_jetstream",
+    "tmux_local_verdict": "ready",
+    "persistent_fleet_status": "loaded",
+    "no_port_open_as_live_claim": true,
+    "filesystem_mirrors_not_live_contact": true
+  },
+  "acceptance": {
+    "status_artifact_has_live_ops_census_ref": true,
+    "status_artifact_has_nats_status_ref": true,
+    "status_artifact_has_a2a_status_ref": true,
+    "status_artifact_has_tmux_status_ref": true,
+    "status_artifact_has_persistent_fleet_status_ref": true,
+    "a2a_evidence_tiers_separated": true,
+    "tmux_not_task_authority": true,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "fitness_mutation_performed": false
+  },
+  "test_commands": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py dharma_swarm/operator_core/nats_substrate_status.py dharma_swarm/operator_core/a2a_autonomy_score.py scripts/runtime/tmux_ecosystem_status.py scripts/runtime/live_ops_census.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "outcome": "passed: 22 passed, 1 warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --state-dir /Users/dhyana/.dharma/forge_reality_arena_master --refresh-runtime-truth",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "outcome": "passed: dharma-reward-forge-v0 and goodworks-dgm-core-2026-05 are shippable"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "outcome": "passed"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "passed"
+    }
+  ],
+  "blockers": [
+    "operator_goal_id is not separately recorded in the autonomy-spine mission",
+    "A2A remains below ready_80: missing fresh non-projected wake proof for opus_composer, codex_composer wake receipt degraded as skipped_budget_cap, and one A2A task remains open"
+  ],
+  "remaining_internal_packets": [
+    "knowledge_ops_failure_capsule_handoff",
+    "control_watch_tower_scorecard_visibility",
+    "adversary_verifier_false_completion_fixtures",
+    "v1_final_scorecard"
+  ],
+  "remaining_external_gates": [
+    "external acted receipt",
+    "Measurement Guardian countersign",
+    "operator lease for any public or economic action",
+    "archive fitness mutation authority"
+  ],
+  "dry_run_only": true
+}

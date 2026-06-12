@@ -1,0 +1,319 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-61",
+  "cycle": 61,
+  "recorded_at": "2026-06-02T08:45:50+08:00",
+  "observed_at_utc": "2026-06-02T00:45:50Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "post_receipt_custody_waggle_mcp_222_merge_reverified",
+  "public_action_taken": false,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": false,
+  "public_branch_pushed": false,
+  "fork_created": false,
+  "automated_external_services_observed": true,
+  "external_repo_collaborator_action_observed": true,
+  "new_external_collaborator_action_observed_this_cycle": false,
+  "new_pr_accepted_or_merged": false,
+  "external_receipt_reverified_this_cycle": true,
+  "new_external_confirmation_flag_set_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "first_external_receipt_witness_file_modified_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-061.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-061-active-pr-ledger.md",
+      "kind": "active_pr_ledger"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-61.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-061-status/status_artifact.json",
+      "kind": "status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-061-status/status.md",
+      "kind": "status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-061-receipt-reverification.json",
+      "kind": "receipt_guard_reverification"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-061-guard-probes.json",
+      "kind": "receipt_guard_negative_probe"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dirty_entries_before_artifact_writes": 429,
+    "dharma_symbol_edits_this_cycle": false,
+    "witness_files_touched_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date_for_current_repo_root",
+    "dharma_impact_analysis_required": false,
+    "impact_analysis_note": "No function, class, or method symbol was edited; this cycle wrote reports and state artifacts only."
+  },
+  "external_receipt": {
+    "repo": "Abhigyan-Shekhar/Waggle-mcp",
+    "issue_number": 219,
+    "issue_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/issues/219",
+    "issue_state": "CLOSED",
+    "issue_state_reason": "COMPLETED",
+    "issue_closed_at": "2026-06-01T23:50:36Z",
+    "issue_author": "ard12",
+    "pr_number": 222,
+    "pr_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/pull/222",
+    "branch": "codex/issue-219-normalize-relationship-tests",
+    "head_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+    "base_sha": "83c509153ad06f1e7c21ba2702a71856b17bc521",
+    "pr_state": "MERGED",
+    "merged_at": "2026-06-01T23:50:35Z",
+    "merge_commit_sha": "ec5a4e06fb83f064155344eebc87ab44346ea84b",
+    "merged_by": "ard12",
+    "merged_by_type": "User",
+    "merged_by_is_bot": false,
+    "review_decision": "APPROVED",
+    "latest_reviews": [
+      {
+        "author": "ded-furby",
+        "author_association": "NONE",
+        "state": "COMMENTED",
+        "submitted_at": "2026-06-01T19:08:58Z"
+      },
+      {
+        "author": "ard12",
+        "author_association": "COLLABORATOR",
+        "state": "APPROVED",
+        "submitted_at": "2026-06-01T22:38:17Z"
+      }
+    ],
+    "visible_checks": [
+      "CodeRabbit: pass",
+      "GitGuardian Security Checks: pass",
+      "Lint (ruff): pass",
+      "Package smoke-test: pass",
+      "Test (Python 3.11, ubuntu-latest): pass",
+      "Test (Python 3.11, windows-latest): pass",
+      "Test (Python 3.12, ubuntu-latest): pass",
+      "Test (Python 3.13, ubuntu-latest): pass",
+      "VS Code extension validation: pass"
+    ],
+    "maintainer_action_observed": true,
+    "new_maintainer_action_observed_this_cycle": false,
+    "external_confirmed": true,
+    "external_confirmed_source": "/Users/dhyana/.dharma/forge_external_beast/cycle-061-receipt-reverification.json"
+  },
+  "receipt_guard": {
+    "command": "python scripts/runtime/forge_github_receipt.py --event-json /Users/dhyana/.dharma/forge_external_beast/cycle-055-github-merge-event.json --out /Users/dhyana/.dharma/forge_external_beast/cycle-061-receipt-reverification.json",
+    "exit_code": 0,
+    "external_confirmed": true,
+    "repository_external": true,
+    "merger_external_human": true,
+    "guard_reasons": [
+      "external_merge_confirmed"
+    ],
+    "receipt_verified": true,
+    "receipt_verify_reason": "ok",
+    "review_status": "candidate_for_human_review"
+  },
+  "guard_probes": {
+    "command": "python scripts/runtime/forge_github_receipt.py --dry-run-probes --out /Users/dhyana/.dharma/forge_external_beast/cycle-061-guard-probes.json",
+    "exit_code": 0,
+    "synthetic_external_merge": {
+      "external_confirmed": false,
+      "guard_reasons": [
+        "dry_run_not_acted_authority"
+      ],
+      "review_status": "blocked"
+    },
+    "synthetic_self_merge": {
+      "external_confirmed": false,
+      "guard_reasons": [
+        "repository_not_external",
+        "merger_not_external_human",
+        "dry_run_not_acted_authority"
+      ],
+      "review_status": "blocked"
+    }
+  },
+  "active_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "pr_number": 222,
+      "state": "MERGED",
+      "merged_at": "2026-06-01T23:50:35Z",
+      "review_decision": "APPROVED",
+      "maintainer_action_observed": true,
+      "external_confirmed": true
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "pr_number": 5,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "head_sha": "14a36ce3513a9f5e25ba990945cc7e4822ee0237",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "pr_number": 6,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "head_sha": "5bed1aeb9c4db910328f1f70d7bc21b2671c8333",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_number": 22,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "head_sha": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_number": 23,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "head_sha": "12b87ab1f96cb02da0217aff7af2aead22967f66",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "pr_number": 43,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "head_sha": "3e2c9611112134f987fbd319860128dc321997e9",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "jokiatgithub/AgentKanban",
+      "pr_number": 9,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "head_sha": "b6b012ccc579b45ae7e3acc54b1c925e841393c6",
+      "latest_reviews": [],
+      "external_confirmed": false
+    },
+    {
+      "repo": "siddhant-rajhans/cortexlab",
+      "pr_number": 76,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "head_sha": "3099d29c89e28eae3725c892fc1b43c4c13c7b0b",
+      "latest_reviews": [],
+      "external_confirmed": false
+    }
+  ],
+  "verification": [
+    {
+      "target": "Dharma worktree",
+      "command": "git status --short; git branch --show-current; git rev-parse HEAD",
+      "exit_code": 0,
+      "result": "worktree remains pre-existing dirty on trust-build-compass"
+    },
+    {
+      "target": "Dharma GitNexus current root",
+      "command": "npx gitnexus status",
+      "exit_code": 0,
+      "result": "index up to date at c8efcff"
+    },
+    {
+      "target": "Waggle PR connector metadata",
+      "command": "GitHub connector _get_pr_info",
+      "exit_code": 0,
+      "result": "PR #222 remains closed and merged"
+    },
+    {
+      "target": "GitHub auth context",
+      "command": "gh auth status",
+      "exit_code": 0,
+      "result": "operator-controlled GitHub auth available"
+    },
+    {
+      "target": "Waggle PR CLI metadata",
+      "command": "gh pr view 222 --repo Abhigyan-Shekhar/Waggle-mcp --json ...",
+      "exit_code": 0,
+      "result": "PR #222 remains merged by ard12"
+    },
+    {
+      "target": "Waggle issue CLI metadata",
+      "command": "gh issue view 219 --repo Abhigyan-Shekhar/Waggle-mcp --json ...",
+      "exit_code": 0,
+      "result": "issue #219 remains closed as completed"
+    },
+    {
+      "target": "Waggle PR checks",
+      "command": "gh pr checks 222 --repo Abhigyan-Shekhar/Waggle-mcp",
+      "exit_code": 0,
+      "result": "visible checks pass"
+    },
+    {
+      "target": "Active external PR ledger",
+      "command": "gh pr view on seven secondary PRs",
+      "exit_code": 0,
+      "result": "all secondary PRs remain open and unmerged"
+    },
+    {
+      "target": "Receipt guard re-verification",
+      "command": "python scripts/runtime/forge_github_receipt.py --event-json /Users/dhyana/.dharma/forge_external_beast/cycle-055-github-merge-event.json --out /Users/dhyana/.dharma/forge_external_beast/cycle-061-receipt-reverification.json",
+      "exit_code": 0,
+      "result": "external_confirmed=true"
+    },
+    {
+      "target": "Receipt guard negative probes",
+      "command": "python scripts/runtime/forge_github_receipt.py --dry-run-probes --out /Users/dhyana/.dharma/forge_external_beast/cycle-061-guard-probes.json",
+      "exit_code": 0,
+      "result": "synthetic dry-run and self-merge cases blocked"
+    }
+  ],
+  "guardrails": {
+    "money_spent": false,
+    "payment_or_bounty_claimed": false,
+    "private_credentials_submitted": false,
+    "broad_claim_published": false,
+    "dharma_main_pushed_or_merged": false,
+    "witness_file_created_or_modified_by_cycle": false,
+    "archive_fitness_changed": false,
+    "v2_autonomy_escalated": false
+  },
+  "blockers": "none for Cycle 61 custody; witness materialization, archive fitness application, and bounty/payment handling remain separate governance steps"
+}

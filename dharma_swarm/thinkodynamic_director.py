@@ -1716,14 +1716,18 @@ async def _vision_via_provider(
 
     # Free tier (zero cost, rate-limited)
     try:
+        free_config = resolve_runtime_provider_config(ProviderType.OPENROUTER_FREE)
+        free_model = (
+            free_config.default_model
+            or canonical_default_model(ProviderType.OPENROUTER_FREE)
+        )
         result = await _attempt(
             "OpenRouter/free",
-            create_runtime_provider(
-                resolve_runtime_provider_config(ProviderType.OPENROUTER_FREE)
-            ),
+            create_runtime_provider(free_config),
             LLMRequest(
                 messages=[{"role": "user", "content": prompt}],
                 system=sys_msg,
+                model=free_model,
                 max_tokens=4096,
             ),
             per_attempt_max=30.0,
@@ -1735,18 +1739,19 @@ async def _vision_via_provider(
 
     # Anthropic (most capable, expensive — last resort)
     try:
+        anthropic_model = canonical_default_model(ProviderType.ANTHROPIC)
         result = await _attempt(
             "Anthropic/sonnet",
             create_runtime_provider(
                 resolve_runtime_provider_config(
                     ProviderType.ANTHROPIC,
-                    model="claude-sonnet-4-20250514",
+                    model=anthropic_model,
                 )
             ),
             LLMRequest(
                 messages=[{"role": "user", "content": prompt}],
                 system=sys_msg,
-                model="claude-sonnet-4-20250514",
+                model=anthropic_model,
                 max_tokens=4096,
             ),
             per_attempt_max=45.0,
@@ -1966,8 +1971,14 @@ class ThinkodynamicDirector:
         return out
 
     def _resolve_primary_minds(self) -> list[DirectorMindSpec]:
-        codex_model = os.getenv("DGC_DIRECTOR_CODEX_MODEL", "").strip() or "gpt-5.4"
-        opus_model = os.getenv("DGC_DIRECTOR_OPUS_MODEL", "").strip() or "claude-opus-4-6"
+        codex_model = (
+            os.getenv("DGC_DIRECTOR_CODEX_MODEL", "").strip()
+            or canonical_default_model(ProviderType.CODEX)
+        )
+        opus_model = (
+            os.getenv("DGC_DIRECTOR_OPUS_MODEL", "").strip()
+            or canonical_default_model(ProviderType.CLAUDE_CODE)
+        )
         return [
             DirectorMindSpec(
                 name="codex-primus",
@@ -1995,7 +2006,8 @@ class ThinkodynamicDirector:
                 name="kimi-cartographer",
                 role="researcher",
                 provider=ProviderType.OPENROUTER.value,
-                model=os.getenv("DGC_DIRECTOR_KIMI_MODEL", "").strip() or "moonshotai/kimi-k2.5",
+                model=os.getenv("DGC_DIRECTOR_KIMI_MODEL", "").strip()
+                or canonical_default_model(ProviderType.OPENROUTER),
                 backend="provider-fallback",
                 purpose="Cheap high-context mapping, corpus digestion, and buyer-pain scanning.",
                 focus=("cartographer", "researcher", "architect"),
@@ -2035,7 +2047,8 @@ class ThinkodynamicDirector:
                 name="nim-validator",
                 role="validator",
                 provider=ProviderType.NVIDIA_NIM.value,
-                model=os.getenv("DGC_DIRECTOR_NIM_VALIDATOR_MODEL", "").strip() or "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+                model=os.getenv("DGC_DIRECTOR_NIM_VALIDATOR_MODEL", "").strip()
+                or canonical_default_model(ProviderType.NVIDIA_NIM),
                 backend="provider-fallback",
                 purpose="Fast validation pressure and wide-context review without burning frontier budget.",
                 focus=("validator", "architect", "researcher"),

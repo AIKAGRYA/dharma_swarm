@@ -1,0 +1,113 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-31-dense-gym-fq1-provenance",
+  "cycle": 31,
+  "created_at_utc": "2026-06-01T12:29:24Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Harden and re-audit the dense Terminal-Bench-style adapter so its verifier artifact explicitly preserves FQ1 sealed-reserve provenance, secrecy, and dense-only authority boundaries.",
+  "status": "completed_repo_local_receipt",
+  "impact": {
+    "gitnexus_target": "scripts/runtime/forge_dense_gym_adapter.py:build_artifact",
+    "risk": "LOW",
+    "direct_callers": 1,
+    "affected_processes": 0,
+    "affected_modules": 1
+  },
+  "outputs": [
+    "scripts/runtime/forge_dense_gym_adapter.py",
+    "tests/test_dense_gym_adapter.py",
+    "reports/forge/dense-gym-terminal-adapter/verifier_artifact.json",
+    "reports/forge/dense-gym-terminal-adapter/cycle-31/verifier_artifact.json",
+    "reports/forge/dense-gym-terminal-adapter/cycle-31/completion_audit.md",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-31-dense-gym-fq1-provenance.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "generated_manifest_hashes_preserved": true,
+    "sealed_transform_deterministic": true,
+    "sealed_seed_not_leaked_to_candidate": true,
+    "sealed_variant_not_visible_to_candidate": true,
+    "raw_seed_absent_from_dense_cases": true,
+    "variant_manifest_hash_propagated_to_variant_case": true,
+    "base_and_variant_candidate_views_are_distinct": true,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_dense_gym_adapter.py -q --tb=short",
+      "outcome": "5 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_fq1_sealed_reserve_generator.py tests/test_reward_forge_v0.py tests/test_dharma_eval.py -q --tb=short",
+      "outcome": "31 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_gym_adapter.py",
+      "outcome": "canonical dense verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_gym_adapter.py --output-dir reports/forge/dense-gym-terminal-adapter/cycle-31",
+      "outcome": "cycle verifier artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+      "outcome": "operator status artifact regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "18 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_dense_gym_adapter.py tests/test_dense_gym_adapter.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/dense-gym-terminal-adapter/verifier_artifact.json",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/dense-gym-terminal-adapter/cycle-31/verifier_artifact.json",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json",
+      "outcome": "pass"
+    }
+  ],
+  "artifact_hashes": {
+    "dense_adapter_script_sha256": "37ccd3e82d9de26780b545be58f3a8a1a1aaeef9d223f54c7aaebb340981d27b",
+    "dense_adapter_test_sha256": "f65ea260cd05bf54b036badd163200e25109b5eb53e3b74cc33262220e297b7d",
+    "canonical_verifier_artifact_sha256": "8b78d72a97d5da3c1dfa45342c01e2bb3a7dce8e007c9783a5cb1ad84fd89c0f",
+    "cycle_verifier_artifact_sha256": "a15f2edbf6120142f807080a396543085c215c5537a249ee1be63e1d2578559f",
+    "status_artifact_sha256": "8664d8750dd84c246577601cad4bb2d616b4f9899f3b43b034a4bbd610ea1ff3"
+  },
+  "status_snapshot": {
+    "dense_eval_artifacts": 6,
+    "packet_chain_verified_internal": 3,
+    "packet_chain_internal_remaining": 0,
+    "external_acted_receipts": 0,
+    "receipt_policy_status": "repo_local_required_no_canonical_context"
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

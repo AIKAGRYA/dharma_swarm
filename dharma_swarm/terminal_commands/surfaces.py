@@ -17,48 +17,51 @@ from dharma_swarm.terminal_commands._helpers import (
 
 def cmd_tui() -> None:
     """Launch the interactive TUI dashboard."""
-    use_legacy = os.getenv("DGC_USE_LEGACY_TUI", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
-    if not use_legacy:
-        terminal_dir = DHARMA_SWARM / "terminal"
-        if terminal_dir.exists() and (terminal_dir / "package.json").exists():
-            bun_path = shutil.which("bun")
-            if bun_path:
-                try:
-                    env = dict(os.environ)
-                    native_auth = subprocess.run(
-                        ["/bin/zsh", "-lc", "env -u ANTHROPIC_API_KEY claude auth status"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    if native_auth.returncode == 0:
-                        try:
-                            payload = json.loads(native_auth.stdout or "{}")
-                        except json.JSONDecodeError:
-                            payload = {}
-                        if isinstance(payload, dict) and str(payload.get("subscriptionType", "")).strip().lower() == "max":
-                            env["DHARMA_CLAUDE_AUTH_MODE"] = "subscription"
-                    subprocess.run(
-                        [bun_path, "run", "start"],
-                        cwd=str(terminal_dir),
-                        env=env,
-                        check=True,
-                    )
-                    return
-                except subprocess.CalledProcessError:
-                    pass
     try:
-        from dharma_swarm.tui import run
-        run()
-    except Exception:
-        # Fallback to legacy TUI
-        from dharma_swarm.tui_legacy import run_tui
-        run_tui()
+        use_legacy = os.getenv("DGC_USE_LEGACY_TUI", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not use_legacy:
+            terminal_dir = DHARMA_SWARM / "terminal"
+            if terminal_dir.exists() and (terminal_dir / "package.json").exists():
+                bun_path = shutil.which("bun")
+                if bun_path:
+                    try:
+                        env = dict(os.environ)
+                        native_auth = subprocess.run(
+                            ["/bin/zsh", "-lc", "env -u ANTHROPIC_API_KEY claude auth status"],
+                            capture_output=True,
+                            text=True,
+                            check=False,
+                        )
+                        if native_auth.returncode == 0:
+                            try:
+                                payload = json.loads(native_auth.stdout or "{}")
+                            except json.JSONDecodeError:
+                                payload = {}
+                            if isinstance(payload, dict) and str(payload.get("subscriptionType", "")).strip().lower() == "max":
+                                env["DHARMA_CLAUDE_AUTH_MODE"] = "subscription"
+                        subprocess.run(
+                            [bun_path, "run", "start"],
+                            cwd=str(terminal_dir),
+                            env=env,
+                            check=True,
+                        )
+                        return
+                    except subprocess.CalledProcessError:
+                        pass
+        try:
+            from dharma_swarm.tui import run
+            run()
+        except Exception:
+            # Fallback to legacy TUI
+            from dharma_swarm.tui_legacy import run_tui
+            run_tui()
+    except KeyboardInterrupt:
+        print("\nDGC dashboard stopped.")
 
 
 def _build_chat_context_snapshot() -> str:
