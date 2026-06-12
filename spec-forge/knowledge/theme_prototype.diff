@@ -1,0 +1,45 @@
+diff --git a/terminal/src/theme.ts b/terminal/src/theme.ts
+index a7bdd8b43..30b37823c 100644
+--- a/terminal/src/theme.ts
++++ b/terminal/src/theme.ts
+@@ -1,14 +1,28 @@
++// Hokusai-futurist truecolor migration (prototype).
++// Spec: spec-forge/knowledge/DESIGN_FEEDBACK_OPERATOR_20260612.md + handoff §7.
++// PROTOTYPE SUBSTITUTIONS (call-site census 2026-06-12):
++//   indigo: spec #1A2233 (raised surface) — but all 3 call sites use it as
++//     borderColor (Composer, ActivityPane, ShellHeader); #1A2233 borders are
++//     invisible on a dark canvas. Substituted ridge #658594 (spec §7 focused
++//     border, 4.69:1) so the operator can see the chrome. Real S4 lands
++//     #1A2233 only alongside the border->surface migration.
++//   river: spec #2D4F67 (decorative-border-only, 2.13:1 "never carries
++//     meaning") — but 2 call sites use it as Text color
++//     (OperatorSummaryBand.tsx:51, ActivityPane.tsx:214); #2D4F67 text is
++//     illegible. Substituted crest #7FB4CA (spec §7, 8.15:1, same Great-Wave
++//     ink-gradient family). Real S4 lands #2D4F67 only after migrating those
++//     two Text call sites off river (migration rule criterion #8).
+ export const THEME = {
+-  ink: "gray",
+-  indigo: "blue",
+-  river: "blue",
+-  wave: "cyan",
+-  foam: "white",
+-  parchment: "yellow",
+-  persimmon: "yellow",
+-  vermilion: "red",
+-  moss: "green",
+-  pine: "green",
+-  mist: "white",
+-  stone: "gray",
++  ink: "#727169",
++  indigo: "#658594",
++  river: "#7FB4CA",
++  wave: "#7E9CD8",
++  foam: "#DCD7BA",
++  parchment: "#DCA561",
++  persimmon: "#FF9E3B",
++  vermilion: "#FF5D62",
++  moss: "#98BB6C",
++  pine: "#7AA89F",
++  mist: "#C8C093",
++  stone: "#8992A7",
+ } as const;

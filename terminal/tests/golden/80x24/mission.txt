@@ -1,0 +1,24 @@
+Chat [Mission] Repo Commands Models Ontology ▸
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Mission                                                                      │
+│ Bootstrap framing, intent routing, and session launch context.               │
+│                                                                              │
+│ ◆ Operator Shell                                                             │
+│ ◇ Goal                                                                       │
+│ Provide one clean operator shell with continuity, visible execution, and     │
+│ repo-aware state.                                                            │
+│ ◇ Principles                                                                 │
+│ One state model. One bridge. Visible tools. Minimal chrome. No duplicate     │
+│ output.                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ status  backend offline, retrying                                            │
+│ route  ready | codex:gpt-5.4                                                 │
+│ keys  Tab tabs | Enter send | ^B side | ↑/↓ scroll                           │
+╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,0 +1,24 @@
+│ DHARMA  OFF | codex:gpt-5.4 | REA | Commands                                 │
+│ tab navigation | responsive                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+◂ Mission Repo [Commands] Models Ontology Runtime ▸
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Commands                                                                     │
+│ Registered command graph and operational affordances.                        │
+│                                                                              │
+│ Command graph loading...                                                     │
+│ Plain language should resolve into Dharma-native commands when confidence is │
+│  high.                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ status  backend offline, retrying                                            │
+│ route  ready | codex:gpt-5.4                                                 │
+│ keys  Tab tabs | Enter send | ^B side | ↑/↓ scroll                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
