@@ -77,17 +77,24 @@ AGENT_UID_ALIASES = {
 }
 
 
-def resolve_agent_uid(to: str, *, agent_uid: str = "") -> str:
-    resolved = (agent_uid or AGENT_UID_ALIASES.get(to, to)).strip()
+def _validate_subject_token(token: str, *, label: str) -> str:
+    cleaned = (token or "").strip()
     forbidden = {".", "*", ">", "/", "\\"}
-    if not resolved or any(char.isspace() or char in forbidden for char in resolved):
-        raise ValueError(f"invalid agent uid for NATS subject: {resolved!r}")
-    return resolved
+    if not cleaned or any(char.isspace() or char in forbidden for char in cleaned):
+        raise ValueError(f"invalid {label} for NATS subject: {cleaned!r}")
+    return cleaned
+
+
+def resolve_agent_uid(to: str, *, agent_uid: str = "") -> str:
+    return _validate_subject_token(
+        agent_uid or AGENT_UID_ALIASES.get(to, to), label="agent uid"
+    )
 
 
 def subject_for_route(to: str, *, route: str, agent_uid: str = "") -> tuple[str, str]:
     if route == ROUTE_A2A:
-        subject = f"dharma.a2a.{to}"
+        recipient = _validate_subject_token(to, label="a2a recipient")
+        subject = f"dharma.a2a.{recipient}"
         return subject, _a2a_target_for_subject(subject)
     if route == ROUTE_AGENT_INBOX:
         resolved_uid = resolve_agent_uid(to, agent_uid=agent_uid)
@@ -162,7 +169,7 @@ async def _publish_and_wait(
         insecure_ctx.verify_mode = ssl.CERT_NONE
         tls_kwargs["tls"] = insecure_ctx
     async def _quiet_error_cb(exc: Exception) -> None:
-        result["last_connection_error"] = f"{type(exc).__name__}: {exc}"
+        result["last_connection_error"] = type(exc).__name__
 
     nc = await nats.connect(
         servers=[str(config.endpoint)],
@@ -204,7 +211,7 @@ async def _publish_and_wait(
             result["status"] = STATUS_PUBLISH_FAILED
             result["ack_tier"] = None
             result["transport_ack"] = "JETSTREAM_PUB_ACK_AMBIGUOUS"
-            result["error"] = f"{type(exc).__name__}: {exc}"
+            result["error"] = type(exc).__name__
             await ack_sub.unsubscribe()
             await reply_sub.unsubscribe()
             return result
@@ -700,7 +707,7 @@ def main(argv: list[str] | None = None) -> int:
             agent_uid=args.agent_uid,
         )
     except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        print(f"ERROR: {type(exc).__name__}", file=sys.stderr)
         return 2
     receipt: dict[str, Any] = {
         "schema_version": "dharma.a2a.send_receipt.v1",
@@ -775,12 +782,12 @@ def main(argv: list[str] | None = None) -> int:
                             else:
                                 receipt["status"] = STATUS_PUBLISH_FAILED
                                 receipt["ack_tier"] = None
-                            receipt["error"] = f"{type(fallback_exc).__name__}: {fallback_exc}"
-                            receipt["python_client_error"] = f"{type(exc).__name__}: {exc}"
+                            receipt["error"] = type(fallback_exc).__name__
+                            receipt["python_client_error"] = type(exc).__name__
                     else:
                         receipt["status"] = STATUS_PUBLISH_FAILED
                         receipt["ack_tier"] = None
-                        receipt["error"] = f"{type(exc).__name__}: {exc}"
+                        receipt["error"] = type(exc).__name__
 
     receipt.update(classify_contact_evidence(receipt))
     receipt_path = write_receipt(Path(args.receipt_dir), receipt)
@@ -790,7 +797,7 @@ def main(argv: list[str] | None = None) -> int:
             receipt["runtime_truth_ref"] = _complete_runtime_publish(runtime_dispatch, receipt)
             receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         except Exception as exc:
-            receipt["runtime_truth_error"] = f"{type(exc).__name__}: {exc}"
+            receipt["runtime_truth_error"] = type(exc).__name__
             receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if args.json:
         print(json.dumps(receipt, indent=2, sort_keys=True))

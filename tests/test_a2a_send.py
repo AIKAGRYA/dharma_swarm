@@ -562,3 +562,77 @@ def test_main_duplicate_packet_id_skips_second_publish(tmp_path, monkeypatch):
     deduped = next(body for body in bodies if body["status"] == "PUBLISH_DEDUPED")
     assert deduped["runtime_truth_ref"]["idempotency_inserted"] is False
     assert deduped["collaboration_claim"] == "duplicate_publish_skipped"
+
+
+def test_route_a2a_rejects_unsafe_recipient(tmp_path):
+    packet = _write_packet(tmp_path)
+    for bad in ("bad.agent", "bad agent", "bad*agent", "bad>agent", "bad/agent", "bad\\agent", ""):
+        try:
+            a2a_send.build_envelope(
+                to=bad,
+                file_path=packet,
+                sender="operator",
+                kind="fleet.packet",
+                packet_id="abc123",
+                route=a2a_send.ROUTE_A2A,
+            )
+        except ValueError as exc:
+            assert "invalid a2a recipient" in str(exc)
+        else:
+            raise AssertionError(f"expected unsafe a2a recipient {bad!r} to be rejected")
+
+
+def test_publish_failure_receipt_omits_exception_text(monkeypatch):
+    class FakeSubscription:
+        async def unsubscribe(self):
+            return None
+
+    class FakeJetStream:
+        async def publish(self, *_args, **_kwargs):
+            raise RuntimeError("connect to nats://user:super-secret@127.0.0.1 refused")
+
+    class FakeConnection:
+        async def subscribe(self, *_args, **_kwargs):
+            return FakeSubscription()
+
+        def jetstream(self):
+            return FakeJetStream()
+
+        async def publish(self, *_args, **_kwargs):
+            return None
+
+        async def flush(self, **_kwargs):
+            return None
+
+        async def close(self):
+            return None
+
+    async def fake_connect(**_kwargs):
+        return FakeConnection()
+
+    monkeypatch.setitem(sys.modules, "nats", types.SimpleNamespace(connect=fake_connect))
+    envelope = {
+        "subject": "dharma.a2a.devin",
+        "ack_subject": "dharma.a2a.devin.ack.abc123",
+        "reply_subject": "dharma.a2a.devin.reply.abc123",
+        "packet_id": "abc123",
+    }
+    config = a2a_send.NATSConfig(
+        endpoint="nats://127.0.0.1:4222",
+        user="",
+        credential="",
+        missing=(),
+    )
+
+    result = asyncio.run(
+        a2a_send._publish_and_wait(  # noqa: SLF001
+            config,
+            envelope,
+            wait_s=0.0,
+            timeout_s=0.1,
+        )
+    )
+
+    assert result["status"] == a2a_send.STATUS_PUBLISH_FAILED
+    assert result["error"] == "RuntimeError"
+    assert "super-secret" not in json.dumps(result)
