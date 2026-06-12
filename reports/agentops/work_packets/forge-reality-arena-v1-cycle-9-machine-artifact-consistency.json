@@ -1,0 +1,121 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-9-machine-artifact-consistency",
+  "created_at_utc": "2026-06-02T15:11:32Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "cycle": {
+    "v1_cycle": 9,
+    "operator_cycle": 9,
+    "label": "machine-artifact-consistency"
+  },
+  "result": "Added a machine-readable consistency contract that compares run identity, final scorecard state, Control Watch Tower readout fields, and key artifact refs so stale or mismatched operator-facing Forge Arena artifacts fail visibly.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-9-machine-artifact-consistency.json",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.md",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/forge/forge-reality-arena/live-ops-census/no-probes.json",
+    "reports/forge/forge-reality-arena/transport-truth/a2a_autonomy_score.json",
+    "reports/forge/forge-reality-arena/transport-truth/nats_substrate_status.json",
+    "reports/forge/forge-reality-arena/transport-truth/tmux_ecosystem_status.json"
+  ],
+  "artifact_consistency": {
+    "schema_version": "forge_reality_arena_machine_artifact_consistency.v1",
+    "status": "passed",
+    "mismatch_count": 0,
+    "scorecard_status": "passed",
+    "agentops_acceptance_passed": true,
+    "control_watch_tower_status": "passed"
+  },
+  "score": {
+    "before": 100,
+    "after": 100,
+    "delta": 0,
+    "completion_state": "internal_exhausted_external_gated",
+    "receipt_count_after": 12
+  },
+  "verification": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass: 25 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --refresh-runtime-truth --repo-root /Users/dhyana/dharma_swarm --reports-root /Users/dhyana/dharma_swarm/reports/forge --output-dir /Users/dhyana/dharma_swarm/reports/forge/forge-reality-arena --state-dir /Users/dhyana/.dharma/forge_reality_arena_master --agentops-status-path /Users/dhyana/dharma_swarm/reports/agentops/work_packets/forge-reality-arena-status.json",
+      "exit_code": 0,
+      "result": "pass: regenerated status, scorecard, AgentOps status, CWT readout, live_ops, and transport-truth snapshots"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "exit_code": 0,
+      "result": "pass: dharma-reward-forge-v0 and goodworks-dgm-core-2026-05 remain shippable"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "result": "pass: authority scan artifact regenerated with 0 violations"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "result": "pass: dry-run artifact regenerated with 0 fitness-eligible receipts"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "exit_code": 0,
+      "result": "pass: no-probe census generated without probe failures"
+    },
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "result": "pass: onboarding reports Forge mission as projection-only and internally complete/external-gated"
+    },
+    {
+      "command": "jq scorecard/status/agentops/control consistency assertions",
+      "exit_code": 0,
+      "result": "pass: scorecard, status artifact, AgentOps status, and CWT readout all report consistency passed with 0 mismatches"
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:6e534fb5e5ea0d80cae09d47fb98f90f3af177d7a8f6563733f10363e95868cb",
+    "tests/test_forge_reality_arena_status.py": "sha256:fd93d365603a24ccf5ed6a6bb0f0bd9d9ca5c389486f8a0430e9562b7377f20a",
+    "reports/forge/forge-reality-arena/v1_scorecard.json": "sha256:9c8ff1c6ae76abb319c04b257b4ac68bad567cfdd48561d5e81aaa6c8683e931",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:c760b3d905c89e5d7b36f751c1d8d6026e62ac5481252915239f7b5994709fc0",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:5d8fdd6d463244373c1c8301d152ab58a58ef5a28470553e5b6f14ab758eb43d",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json": "sha256:0dce6babe35ba8801eb411ba0735792ad0da55861b8bc10d36e2d2ce6965868b",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json": "sha256:9443ad27f10592b65f15b1f06675bd87e995afdb2ebf3607dc51a3f1ef52d909",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:e0a668d982711a5296d04d15983bfd0e68979501079d1d89d1ca1046db6e42d7"
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "dry_run_only": true
+  },
+  "blockers": [
+    "gitnexus_target_summarize_reality_arena_status_not_found",
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next_packet": "External Beast or Measurement Guardian lease packet; request explicit operator approval before any external action or archive fitness mutation."
+}

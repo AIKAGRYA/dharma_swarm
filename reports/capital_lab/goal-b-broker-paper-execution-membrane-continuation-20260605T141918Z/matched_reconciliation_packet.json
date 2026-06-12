@@ -1,0 +1,16 @@
+{
+  "broker_snapshot_hash": "80e1c9fb7f0af0e918423a4b2862978a633dc8899527b5ba58444aa3069013ae",
+  "broker_write_authority": false,
+  "clean": false,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "kill_switch_engaged": false,
+  "ledger_snapshot_hash": "80e1c9fb7f0af0e918423a4b2862978a633dc8899527b5ba58444aa3069013ae",
+  "live_authority": false,
+  "live_readiness": 0,
+  "matched_order_count": 4,
+  "mismatches": [],
+  "packet_type": "ReconciliationPacket",
+  "readiness_blocked": false,
+  "schema_version": "goal_b.reconciliation.v1",
+  "self_hash": "4665eff579bc1eccef343f8b718f7ee1e91ef9d1f16efb42d91b6ce9dbab1d64"
+}

@@ -1,0 +1,181 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-6",
+  "created_at_utc": "2026-06-02T05:02:24Z",
+  "agent": "codex",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "cycle": 6,
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "bounded_packet": "Rung 2 - Coordination integrity scenario expansion",
+  "result": "Added the first Rung 2 adversarial coordination-integrity fixture for overlapping execution leases, updated the coordination gym/status invariants from the fixed 10-scenario baseline to an 11-scenario expansion target, and regenerated the live 5x replay ledger with 55 deterministic episodes and zero failures.",
+  "changed_files": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "scripts/runtime/forge_failure_capsule.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-pressure-test/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-6.json"
+  ],
+  "generated_artifacts": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/failure-pressure-test/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/sealed_task_manifest.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "metrics": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "transfer_passed_reps": 3,
+    "coordination_scenarios_run": 55,
+    "coordination_unique_scenarios": 11,
+    "coordination_min_repetitions_per_scenario": 5,
+    "coordination_scenario_expansion_target_met": true,
+    "coordination_20_run_target_met": true,
+    "coordination_50_run_target_met": true,
+    "coordination_5x_replay_target_met": true,
+    "coordination_scenarios_failed": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 3,
+    "fitness_boundary_blocked_candidates": 6,
+    "fitness_eligible_receipts": 0,
+    "target_missing": [],
+    "external_anchors_observed_not_owned": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "hashes": {
+    "scripts/runtime/forge_swarm_coordination_gym.py": "sha256:f9f3a3abaf47d660fb1ba7eb6cff560a0ae7312aaed48d687272b3dc49be12f0",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:e946c1bde2976e259d192db8b924bcdee3a3bc6b0b56cc359b1e399f8063a892",
+    "scripts/runtime/forge_failure_capsule.py": "sha256:9848201a46b8407097054eaedc92e63efda475e4bca73830ca8df14fcbfab312",
+    "tests/test_forge_swarm_coordination_gym.py": "sha256:2c166bfffad8a46aff1a3b82b61d5fc05b0ae828eaef58766bc01981ea624972",
+    "tests/test_forge_reality_arena_status.py": "sha256:a0b9ed465d9f972a39326bd1cf8b73a10bc2b24d745e6cd826345587963f4207",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md": "sha256:46fe275611974a030856ed001ae4d075533e598357742db805a989f46c8dc2d2",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:0c001c3e464c9a7a9c883e5c90703b7c8c5b1d1f1b378e338ba87b658fb1d4e0",
+    "reports/forge/forge-reality-arena/failure-pressure-test/verifier_artifact.json": "sha256:eefa6bd4bda5ac450a4a8af68443ae64461d527a795811f69d6c122e14dd85f5",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:d08935bbd1f44873de8576db0aa1c91326777158db094ead21273d8f6b86ff7a",
+    "reports/forge/forge-reality-arena/status.md": "sha256:62e5617125d73161dab2d6a3e1d51ff16cf7ae4d039396646427678a7ac4f267",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:2e3f0708c2be504a702ad229dd88fa8407f4a3ef19b05639809f91a8b12e29f5",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:be98958d3c77a1e2f3730854fb09b3f5e53e25c7f3f9a7865d003a791e15af29",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json": "sha256:d8794b187753bd21a65802c091dc74a5553dbfe077e777989119db6199e143a5",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json": "sha256:b6ba8e0d4c36a54af9df3020b2cd3df0495f7c065f1fdaa6eecee19c0fb9eb1e",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json": "sha256:ba6348a8ede025756956fbe1fb2e5f8182f097defe45d51bb0dbe6d4e26ca86e",
+    "reports/forge/forge-reality-arena/benchmark-adapter/sealed_task_manifest.json": "sha256:f7c3a9571a2aa3fd5e2da78ccf256d729746f890202daff26ac37c8d731b934b"
+  },
+  "verification": [
+    {
+      "command": "make onboard",
+      "exit_code": 0
+    },
+    {
+      "command": "npx gitnexus analyze",
+      "exit_code": 130,
+      "blocker": "Analyzer produced only the banner and remained silent for about 60 seconds; bounded attempt was stopped."
+    },
+    {
+      "command": "GitNexus MCP impact for run_coordination_gym",
+      "exit_code": 1,
+      "blocker": "Current repo path /Users/dhyana/dharma_swarm is not registered; closest sibling index did not contain the new Forge arena symbol."
+    },
+    {
+      "command": "Context+ get_blast_radius for run_coordination_gym",
+      "exit_code": 0,
+      "outcome": "18 usages in 5 files, limited to Forge runtime/tests and prior receipts."
+    },
+    {
+      "command": "Context+ get_blast_radius for summarize_reality_arena_status",
+      "exit_code": 0,
+      "outcome": "18 usages in 4 files, limited to Forge runtime/tests and prior receipts."
+    },
+    {
+      "command": "Context+ get_blast_radius for VALID_FAILURE_CLASSES",
+      "exit_code": 0,
+      "outcome": "3 usages in 1 file."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py scripts/runtime/forge_reality_arena_status.py scripts/runtime/forge_failure_capsule.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py tests/test_forge_failure_capsule.py",
+      "exit_code": 0
+    },
+    {
+      "command": "Context+ run_static_analysis target_path=scripts/runtime/forge_swarm_coordination_gym.py",
+      "exit_code": 0,
+      "outcome": "No issues found."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_benchmark_adapter.py tests/test_forge_docker_sandbox.py tests/test_forge_fitness_boundary_dry_run.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "31 passed, 1 pytest config warning for unknown timeout option."
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 5",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-pressure-test",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0
+    },
+    {
+      "command": "JSON validation for 9 Forge Reality Arena artifacts",
+      "exit_code": 0
+    }
+  ],
+  "acceptance": {
+    "canonical_ds_goal_context_available": false,
+    "repo_local_receipt_required": true,
+    "external_actions_performed": false,
+    "external_contact": false,
+    "external_repo_contact": false,
+    "payment_action": false,
+    "public_claims_published": false,
+    "pushed": false,
+    "merged": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "actual_fitness_eligible_receipts_zero": true,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true,
+    "coordination_scenario_expansion_target_met": true,
+    "coordination_50_run_target_met": true,
+    "coordination_5x_replay_target_met": true
+  },
+  "blockers": [
+    "GitNexus MCP registry path mismatch persists for /Users/dhyana/dharma_swarm.",
+    "npx gitnexus analyze did not complete within the bounded retry window."
+  ],
+  "next_bounded_packet": "Continue Rung 2 with a second adversarial fixture, preferably stale claim resurrection or stale status mixed with current owner evidence, while preserving zero external authority."
+}

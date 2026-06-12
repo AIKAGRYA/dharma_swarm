@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_present": {
+      "type": "boolean"
+    },
+    "blocking_errors": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "candidate_kind": {
+      "enum": [
+        "registered_worker",
+        "persistent_agent_candidate",
+        "daemon",
+        "script",
+        "framework"
+      ],
+      "type": "string"
+    },
+    "context_bundle_present": {
+      "type": "boolean"
+    },
+    "count_as_l4": {
+      "type": "boolean"
+    },
+    "current_process_present": {
+      "type": "boolean"
+    },
+    "current_tier": {
+      "enum": [
+        "L0",
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5",
+        "L6"
+      ],
+      "type": "string"
+    },
+    "delegation_run_present": {
+      "type": "boolean"
+    },
+    "evidence_paths": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "execution_lease_present": {
+      "type": "boolean"
+    },
+    "execution_lease_required": {
+      "type": "boolean"
+    },
+    "identity_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_success_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "memory_receipts_present": {
+      "type": "boolean"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "next_required_action": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "outcome_present": {
+      "type": "boolean"
+    },
+    "passport_present": {
+      "type": "boolean"
+    },
+    "recent_success_present": {
+      "type": "boolean"
+    },
+    "registered_identity": {
+      "type": "boolean"
+    },
+    "routing_decision_present": {
+      "type": "boolean"
+    },
+    "runtime_session_present": {
+      "type": "boolean"
+    },
+    "target_tier": {
+      "const": "L4",
+      "type": "string"
+    },
+    "wake_claim_present": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "candidate_kind",
+    "name",
+    "current_tier",
+    "target_tier",
+    "registered_identity",
+    "identity_path",
+    "passport_present",
+    "wake_claim_present",
+    "runtime_session_present",
+    "delegation_run_present",
+    "context_bundle_present",
+    "routing_decision_present",
+    "execution_lease_required",
+    "execution_lease_present",
+    "memory_receipts_present",
+    "artifact_present",
+    "outcome_present",
+    "recent_success_present",
+    "current_process_present",
+    "last_success_at",
+    "blocking_errors",
+    "next_required_action",
+    "count_as_l4",
+    "evidence_paths"
+  ],
+  "title": "dharma_swarm L4 persistent-agent readiness row",
+  "type": "object"
+}

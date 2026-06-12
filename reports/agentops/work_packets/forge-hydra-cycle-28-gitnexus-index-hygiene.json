@@ -1,0 +1,35 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-28-gitnexus-index-hygiene",
+  "cycle": 28,
+  "created_at_utc": "2026-06-01T12:04:36Z",
+  "agent": "codex_forgewright",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "objective": "Restore bounded active-worktree GitNexus impact analysis for Forge Hydra source edits by excluding generated report artifacts from the code graph.",
+  "status": "completed",
+  "files": [
+    ".gitnexusignore",
+    "reports/forge/gitnexus-active-index-hygiene/cycle-28/verifier_artifact.json",
+    "reports/forge/gitnexus-active-index-hygiene/cycle-28/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-28-gitnexus-index-hygiene.json"
+  ],
+  "tests": [
+    "tests/test_curriculum_engine.py: 7 passed, 1 warning",
+    "tests/test_dense_code_gym.py tests/test_dense_gym_adapter.py: 7 passed, 1 warning",
+    "npx gitnexus status: active repo index up-to-date at c8efcff",
+    "GitNexus impact propose_curriculum_tasks: LOW risk, 1 direct test caller, 0 affected processes"
+  ],
+  "blockers": [
+    "overall worktree remains critically dirty due to pre-existing unrelated changes",
+    "canonical ds-goal receipt unavailable because no mission/task identifiers were present"
+  ],
+  "external_authority": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}

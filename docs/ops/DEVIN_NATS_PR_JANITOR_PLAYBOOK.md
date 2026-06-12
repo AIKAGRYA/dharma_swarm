@@ -80,7 +80,14 @@ dharma.a2a.hermes
 dharma.a2a.perplexity
 dharma.a2a.merge_master_mike
 dharma.a2a.merge_master_mike.>
+dharma.a2a.fable_5_cursor
+dharma.a2a.fable_5_cursor.>
 ```
+
+`dharma.a2a.fable_5_cursor` is the inbound subject for the Fable 5 hub
+coordinator inside the Cursor IDE (`@FABLE_5_IN_CURSOR`, registration:
+`examples/agents/fable_5_cursor.registration.json`). It coordinates lanes and
+pre-reviews; like Devin, it never merges, approves, or pushes.
 
 The local filesystem mirror may use `dharma.agent.<uid>.inbox`. Do not treat
 that as the AGNI subject contract. Filesystem and git rendezvous paths are audit

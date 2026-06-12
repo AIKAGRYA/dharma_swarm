@@ -1,0 +1,175 @@
+{
+  "artifact_hashes": {
+    "control_watch_tower": "sha256:53ba119d79a0a0b5d7f1cc1eceae4baac472f57bc99f8614cc7603be999be41a",
+    "scorecard_json": "sha256:7c279cea97b7b63e371e26ba304d7014216c3204418ba4692b4d212606ab27b2",
+    "soak_heartbeat": "sha256:15af8733213a42707ea20ccb1130d4550bb67ab053bf9f3a9df3362796625282",
+    "soak_samples": "sha256:f17362c1bd766753bccb18e833d6f11b35f54762bcf858e204b6acc7b53a72d8",
+    "status_artifact": "sha256:613f129c1bc0674104e142cf84ec952ca320d16d85558ee887139ba68ec34a25"
+  },
+  "authority_boundary": {
+    "archive_after_hash": "sha256:2d9bc2108186caa844485d9eee98b940fcb607219575601e3b750723f923c23d",
+    "archive_before_hash": "sha256:2d9bc2108186caa844485d9eee98b940fcb607219575601e3b750723f923c23d",
+    "archive_fitness_mutation_allowed": false,
+    "archive_fitness_mutation_performed": false,
+    "authority_scan_violation_count": 0,
+    "external_confirmed_count": 0,
+    "external_confirmed_refs": [],
+    "external_contact_or_submission": false,
+    "money_spent": false,
+    "push_merge_publish": false
+  },
+  "autonomy_cycle_policy": {
+    "authority_boundary": {
+      "archive_fitness_changed": false,
+      "external_actions_performed": false,
+      "external_confirmed_set": false,
+      "fitness_mutation_performed": false
+    },
+    "continue_internal_cycles": false,
+    "decision": "stop_internal_autonomy_cycles",
+    "decision_inputs": {
+      "completion_state": "internal_exhausted_external_gated",
+      "external_action_lease_needed": true,
+      "guardian_countersign_observed": false,
+      "remaining_external_gate_count": 3,
+      "remaining_internal_packet_count": 0,
+      "score": 100,
+      "score_threshold": 85,
+      "score_threshold_met": true
+    },
+    "next_packet": "operator-approved External Beast or Measurement Guardian lease packet",
+    "packet_stop_not_mission_stop": true,
+    "reason": "v1 internal proof chain is complete; remaining gates require Guardian, external acted receipt, or operator lease authority.",
+    "resume_conditions": [
+      "remaining_internal_packets_non_empty",
+      "operator_or_architect_opens_v1_1_internal_scope",
+      "operator_external_action_lease_observed_for_sparse_lane",
+      "guardian_countersign_ref_observed"
+    ],
+    "schema_version": "forge_reality_arena_autonomy_cycle_policy.v1"
+  },
+  "closeout_verdict": "internal_v1_complete_external_gated",
+  "completion_state": "internal_exhausted_external_gated",
+  "correlation_id": "20260602-forge-reality-arena-v1-10h:forge-reality-arena-master-v1:20260602T133721Z",
+  "created_at": "2026-06-03T14:49:32Z",
+  "failure_learning": {
+    "failure_capsule_count": 24,
+    "failure_capsule_refs": [
+      "reports/forge/forge-reality-arena/failure-capsules/a2a_mirror_without_live_handler-5a11e266bc9d.json",
+      "reports/forge/forge-reality-arena/failure-capsules/artifact_status_prose_without_verifier-0beaca36399f.json",
+      "reports/forge/forge-reality-arena/failure-capsules/artifact_status_prose_without_verifier-11d4ae8cc67e.json",
+      "reports/forge/forge-reality-arena/failure-capsules/authority_receipt_mirror_without_actor-5878fbebd7fa.json",
+      "reports/forge/forge-reality-arena/failure-capsules/canonical_ds_goal_receipt_overclaim-252c2134a873.json",
+      "reports/forge/forge-reality-arena/failure-capsules/cross_agent_summary_wrong_claim-8cfc2626abde.json",
+      "reports/forge/forge-reality-arena/failure-capsules/cross_agent_summary_wrong_claim-c1db919faf0a.json",
+      "reports/forge/forge-reality-arena/failure-capsules/dirty_worktree_unrelated_changes-b0c616318784.json",
+      "reports/forge/forge-reality-arena/failure-capsules/duplicate_dense_eval_artifacts-8cf9612b18d9.json",
+      "reports/forge/forge-reality-arena/failure-capsules/evidence_status_correction_latency-036463c81428.json",
+      "reports/forge/forge-reality-arena/failure-capsules/evidence_status_correction_latency-0c5acb932140.json",
+      "reports/forge/forge-reality-arena/failure-capsules/external_pr_without_transfer-eda4d70c6a38.json",
+      "reports/forge/forge-reality-arena/failure-capsules/missing_guardian_countersign-c8a776015074.json",
+      "reports/forge/forge-reality-arena/failure-capsules/nats_false_liveness-06d2220259ee.json",
+      "reports/forge/forge-reality-arena/failure-capsules/non_material_human_comment-0d32d9c3143a.json",
+      "reports/forge/forge-reality-arena/failure-capsules/orphan_codex_child_process-c4bbe538a8c5.json",
+      "reports/forge/forge-reality-arena/failure-capsules/overlapping_execution_lease_collision-1ef4cd3d1997.json",
+      "reports/forge/forge-reality-arena/failure-capsules/refuted_repair_waiting_recountersign-6b25e5e17b93.json",
+      "reports/forge/forge-reality-arena/failure-capsules/review_defends_false_success_after_counterevidence-bff130308687.json",
+      "reports/forge/forge-reality-arena/failure-capsules/reward_hacking_busywork_progress_claim-54a26848370b.json",
+      "reports/forge/forge-reality-arena/failure-capsules/sibling_transfer_bespoke_prompt_rescue-13c56f4f268e.json",
+      "reports/forge/forge-reality-arena/failure-capsules/sibling_transfer_bespoke_prompt_rescue-86895a27b250.json",
+      "reports/forge/forge-reality-arena/failure-capsules/status_courier_missing_blocker_detail-baada4b50b25.json",
+      "reports/forge/forge-reality-arena/failure-capsules/work_packet_hidden_canary_contradiction-9317e1fd9f30.json"
+    ],
+    "failure_capsules_quarantined": 0,
+    "failure_capsules_should_feed_fitness": 0,
+    "memory_ingestion_status": "candidate_handoff_ready",
+    "memory_trust_tier": "quarantined_candidate"
+  },
+  "machine_artifact_consistency_mismatch_count": 0,
+  "machine_artifact_consistency_status": "passed",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "next_packet": "operator-approved External Beast or Measurement Guardian lease packet",
+  "remaining_external_gates": [
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "run_id": "20260602T133721Z",
+  "schema_version": "forge_reality_arena_v1_10h_closeout_receipt.v1",
+  "score": 100,
+  "score_minimum_required": 85,
+  "source_spec_ref": "docs/specs/forge_packets/FORGE_REALITY_ARENA_V1_10H_MASTER_GOAL.md",
+  "ten_hour_requirement": {
+    "observed_at": "2026-06-03T01:00:04Z",
+    "observed_elapsed_hours": 11.0129,
+    "passed": true,
+    "sample_index": 45,
+    "status": "target_reached",
+    "target_hours": 10
+  },
+  "tmux_session": "forge-reality-arena-master",
+  "verification_commands": [
+    {
+      "cmd": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "status": "passed"
+    },
+    {
+      "cmd": "pytest -q tests/test_forge_reality_arena_status.py tests/test_forge_reality_arena_soak.py",
+      "status": "passed",
+      "summary": "27 passed, 1 warning"
+    },
+    {
+      "artifact": "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+      "cmd": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "status": "passed"
+    },
+    {
+      "artifact": "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+      "cmd": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "status": "passed"
+    },
+    {
+      "cmd": "python3 scripts/governance/check_track_status.py",
+      "status": "passed"
+    },
+    {
+      "artifact": "reports/forge/forge-reality-arena/live-ops-census/no-probes.json",
+      "cmd": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "note": "no-probes mode; projection-only rows are explicitly not live claims",
+      "status": "passed"
+    },
+    {
+      "cmd": "make onboard",
+      "status": "passed"
+    },
+    {
+      "artifact": "reports/forge/forge-reality-arena/status_artifact.json",
+      "cmd": "python3 scripts/runtime/forge_reality_arena_status.py --refresh-runtime-truth",
+      "status": "passed"
+    }
+  ],
+  "visibility_refs": {
+    "a2a_truth": "reports/forge/forge-reality-arena/transport-truth/a2a_autonomy_score.json",
+    "agentops_status": "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "authority_scan": "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "control_watch_tower": "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "fitness_dry_run": "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "handoff_json": "/Users/dhyana/.dharma/forge_reality_arena_master/handoff/forge_reality_arena_v1_handoff_20260602T2258Z.json",
+    "handoff_tgz": "/Users/dhyana/.dharma/forge_reality_arena_master/handoff/forge_reality_arena_v1_handoff_20260602T2258Z.tgz",
+    "knowledge_ops_handoff": "reports/forge/forge-reality-arena/knowledge-ops/failure_capsule_handoff.json",
+    "live_ops_census": "reports/forge/forge-reality-arena/live-ops-census/no-probes.json",
+    "memory_kernel_handoff": "reports/forge/forge-reality-arena/knowledge-ops/failure_capsule_handoff.json",
+    "nats_truth": "reports/forge/forge-reality-arena/transport-truth/nats_substrate_status.json",
+    "onboard_end": "reports/forge/forge-reality-arena/onboarding/onboard_end.txt",
+    "onboard_start": "reports/forge/forge-reality-arena/onboarding/onboard_start.txt",
+    "persistent_fleet_truth": "/Users/dhyana/.dharma/a2a_bus/persistent_fleet_status.json",
+    "scorecard_json": "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "scorecard_md": "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "soak_heartbeat": "/Users/dhyana/.dharma/forge_reality_arena_master/forge_reality_arena_soak_heartbeat.json",
+    "soak_log": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/forge-reality-arena-soak.log",
+    "soak_samples": "/Users/dhyana/.dharma/forge_reality_arena_master/logs/soak/20260602T133721Z/samples.jsonl",
+    "status_artifact": "reports/forge/forge-reality-arena/status_artifact.json",
+    "tmux_truth": "reports/forge/forge-reality-arena/transport-truth/tmux_ecosystem_status.json",
+    "vps_handoff_dir": "agni:/root/dharma_forge_reality_arena_handoff/"
+  }
+}

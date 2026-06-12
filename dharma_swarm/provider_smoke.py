@@ -9,8 +9,11 @@ import os
 import re
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 from uuid import uuid4
 
+from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_has_value
 from dharma_swarm.models import LLMRequest, ProviderType
 from dharma_swarm.ollama_config import (
     OLLAMA_CLOUD_FRONTIER_MODELS,
@@ -32,6 +35,11 @@ _OLLAMA_ROOT_ERROR_MARKERS = (
     "ensure path elements are traversable",
     ".ollama: file exists",
 )
+_PROVIDER_WIDE_TERMINAL_STATUSES = {
+    "auth_failed",
+    "insufficient_credits",
+    "missing_config",
+}
 _NIM_HOSTED_FRONTIER_MODELS = (
     "nvidia/llama-3.1-nemotron-ultra-253b-v1",
     "meta/llama-3.3-70b-instruct",
@@ -49,6 +57,29 @@ _OPENROUTER_FRONTIER_MODELS = (
     "openai/gpt-5-codex",
     "deepseek/deepseek-r1",
     "qwen/qwen3-235b-a22b",
+)
+_OLLAMA_NON_CHAT_MARKERS = (
+    "embed",
+    "embedding",
+    "nomic-embed",
+    "bge-",
+    "e5-",
+    "all-minilm",
+    "snowflake-arctic-embed",
+)
+_OLLAMA_CHAT_FAMILY_WEIGHTS = (
+    ("deepseek-v3.2", 940.0),
+    ("deepseek-v3.1", 930.0),
+    ("deepseek", 890.0),
+    ("gpt-oss", 850.0),
+    ("qwen3", 830.0),
+    ("qwen2.5", 790.0),
+    ("llama4", 760.0),
+    ("llama3.3", 750.0),
+    ("llama3.2", 730.0),
+    ("mistral", 690.0),
+    ("gemma", 650.0),
+    ("phi", 620.0),
 )
 _PROVIDER_SMOKE_OUTCOME_KIND = "provider_smoke_probe"
 _QWEN_DASHBOARD_SMOKE_PROVIDERS = {
@@ -76,6 +107,13 @@ def _classify_error(exc: Exception | str) -> str:
         return "blocked"
     if "unauthorized" in text or "http error 401" in text:
         return "auth_failed"
+    if (
+        "http error 402" in text
+        or "error code: 402" in text
+        or "payment required" in text
+        or "insufficient credits" in text
+    ):
+        return "insufficient_credits"
     if "not set" in text:
         return "missing_config"
     if "http error 429" in text or "too many requests" in text or "rate limit" in text:
@@ -114,6 +152,24 @@ def _strength_score(model_name: str) -> tuple[float, int]:
         scored.append(number * scale)
     best = max(scored) if scored else 0.0
     return (best, len(text))
+
+
+def _is_ollama_chat_model_candidate(model_name: str) -> bool:
+    text = str(model_name or "").strip().lower()
+    if not text:
+        return False
+    return not any(marker in text for marker in _OLLAMA_NON_CHAT_MARKERS)
+
+
+def _ollama_chat_score(model_name: str) -> tuple[float, float, int]:
+    text = model_name.lower()
+    size_score, name_length = _strength_score(text)
+    family_score = 0.0
+    for marker, score in _OLLAMA_CHAT_FAMILY_WEIGHTS:
+        if marker in text:
+            family_score = score
+            break
+    return (family_score + size_score, size_score, name_length)
 
 
 def _configured_ollama_root(base_dir: str | Path | None = None) -> Path:
@@ -181,17 +237,93 @@ def list_ollama_manifest_models(base_dir: str | Path | None = None) -> list[str]
         if len(parts) < 3:
             continue
         if parts[0] == "registry.ollama.ai" and parts[1] == "library":
-            found.add(parts[2])
+            model = parts[2]
+            tag = parts[3] if len(parts) >= 4 else ""
+            found.add(f"{model}:{tag}" if tag else model)
             continue
-        found.add(parts[-2] if len(parts) >= 2 else parts[-1])
+        if len(parts) >= 2:
+            found.add(f"{parts[-2]}:{parts[-1]}")
+            continue
+        found.add(parts[-1])
+    return sorted(found)
+
+
+def list_ollama_runtime_models(base_url: str | None = None) -> list[str]:
+    """Return models reported by the running Ollama daemon, if reachable."""
+    base = str(base_url or "http://localhost:11434").strip().rstrip("/")
+    if not base or not base.startswith(("http://", "https://")):
+        return []  # scheme allowlist — no file:// / ftp:// via configured base
+    try:
+        with urlopen(f"{base}/api/tags", timeout=2.0) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, OSError, TimeoutError, json.JSONDecodeError):
+        return []
+
+    models = payload.get("models", [])
+    if not isinstance(models, list):
+        return []
+    found: set[str] = set()
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("model") or item.get("name") or "").strip()
+        if name:
+            found.add(name)
     return sorted(found)
 
 
 def strongest_ollama_model(installed_models: list[str]) -> str | None:
-    if not installed_models:
+    chat_models = [
+        model
+        for model in installed_models
+        if _is_ollama_chat_model_candidate(model)
+    ]
+    if not chat_models:
         return None
-    ranked = sorted(installed_models, key=_strength_score, reverse=True)
+    ranked = sorted(chat_models, key=_ollama_chat_score, reverse=True)
     return ranked[0]
+
+
+def _resolve_ollama_smoke_models(
+    *,
+    requested_model: str | None,
+    configured_model: str | None,
+    transport_mode: str,
+    installed_models: list[str],
+    strongest_local_model: str | None,
+) -> list[str]:
+    requested = str(requested_model or "").strip()
+    configured = str(configured_model or "").strip()
+    if transport_mode == "cloud_api":
+        return _dedupe_models(
+            [
+                requested,
+                configured,
+                *OLLAMA_CLOUD_FRONTIER_MODELS,
+            ]
+        )
+
+    if requested:
+        return _dedupe_models(
+            [
+                requested,
+                strongest_local_model or "",
+                configured,
+            ]
+        )
+
+    configured_is_installed_chat = (
+        bool(configured)
+        and configured in installed_models
+        and _is_ollama_chat_model_candidate(configured)
+    )
+    return _dedupe_models(
+        [
+            strongest_local_model or "",
+            configured if configured_is_installed_chat else "",
+            configured,
+        ]
+    )
 
 
 async def _probe_ollama(model: str) -> dict[str, Any]:
@@ -562,6 +694,9 @@ async def _probe_qwen_dashboard(provider_name: str, task: str) -> dict[str, Any]
 async def _probe_model_pack(
     probe_fn,
     models: list[str],
+    *,
+    stop_on_success: bool = True,
+    stop_on_provider_terminal_status: bool = True,
 ) -> dict[str, Any]:
     verified: list[dict[str, Any]] = []
     first_success: dict[str, Any] | None = None
@@ -569,8 +704,16 @@ async def _probe_model_pack(
     for model in _dedupe_models(models):
         result = await probe_fn(model)
         verified.append(result)
-        if first_success is None and result.get("status") == "ok":
+        status = str(result.get("status") or "").strip()
+        if first_success is None and status == "ok":
             first_success = result
+            if stop_on_success:
+                break
+        if (
+            stop_on_provider_terminal_status
+            and status in _PROVIDER_WIDE_TERMINAL_STATUSES
+        ):
+            break
 
     if first_success is not None:
         return {
@@ -622,15 +765,31 @@ def run_provider_smoke(
             "symlink_target": "",
         }
     )
-    installed = list_ollama_manifest_models() if ollama_mode == "local_api" else []
+    runtime_installed = (
+        list_ollama_runtime_models(ollama_base_url)
+        if ollama_mode == "local_api"
+        else []
+    )
+    manifest_installed = (
+        list_ollama_manifest_models()
+        if ollama_mode == "local_api" and not runtime_installed
+        else []
+    )
+    installed = runtime_installed or manifest_installed
+    installed_source = (
+        "runtime_api"
+        if runtime_installed
+        else "manifest"
+        if manifest_installed
+        else ""
+    )
     strongest_local = strongest_ollama_model(installed)
-    resolved_ollama = _dedupe_models(
-        [
-            ollama_model or "",
-            ollama_config.default_model or "",
-            *(OLLAMA_CLOUD_FRONTIER_MODELS if ollama_mode == "cloud_api" else ()),
-            strongest_local or "",
-        ]
+    resolved_ollama = _resolve_ollama_smoke_models(
+        requested_model=ollama_model,
+        configured_model=ollama_config.default_model,
+        transport_mode=ollama_mode,
+        installed_models=installed,
+        strongest_local_model=strongest_local,
     )
     resolved_nim = _dedupe_models(
         [
@@ -658,8 +817,9 @@ def run_provider_smoke(
         "ollama": {
             "configured_base_url": ollama_base_url,
             "transport_mode": ollama_mode,
-            "api_key_configured": bool(os.environ.get("OLLAMA_API_KEY", "").strip()),
+            "api_key_configured": env_has_value(OLLAMA_API_KEY_ENV),
             "installed_models": installed,
+            "installed_model_source": installed_source,
             "strongest_installed": strongest_local,
             "catalog_models": list(OLLAMA_CLOUD_FRONTIER_MODELS),
             "configured_model": resolved_ollama[0] if resolved_ollama else "",
@@ -703,6 +863,7 @@ def run_provider_smoke(
 __all__ = [
     "inspect_ollama_root",
     "list_ollama_manifest_models",
+    "list_ollama_runtime_models",
     "run_provider_smoke",
     "strongest_ollama_model",
 ]

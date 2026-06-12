@@ -1,0 +1,40 @@
+{
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "receipts": [
+    {
+      "broker_write_authority": false,
+      "clean": false,
+      "denied_calls": [],
+      "denied_imports": [],
+      "generated_at": "2026-06-05T15:10:20Z",
+      "live_authority": false,
+      "live_readiness": 0,
+      "packet_type": "AuthorityFenceReceipt",
+      "passed": true,
+      "scanned_paths": [
+        "/Users/dhyana/dharma_swarm/dharma_swarm/capital_lab/broker_paper_membrane.py"
+      ],
+      "schema_version": "goal_b.authority_fence.v1",
+      "self_hash": "6c57b8d72039c0ac14d61849a057edef595eac126239badb23ac36366a6cc7f8",
+      "violations": []
+    },
+    {
+      "broker_write_authority": false,
+      "clean": false,
+      "denied_calls": [],
+      "denied_imports": [],
+      "generated_at": "2026-06-05T15:10:20Z",
+      "live_authority": false,
+      "live_readiness": 0,
+      "packet_type": "AuthorityFenceReceipt",
+      "passed": true,
+      "scanned_paths": [
+        "runtime_bindings"
+      ],
+      "schema_version": "goal_b.authority_fence.v1",
+      "self_hash": "76b0fae3872ed0d22030fb120854a0027cace3eaf90cf60a3df8b75c48cb5992",
+      "violations": []
+    }
+  ],
+  "schema_version": "goal_b.authority_fence_bundle.v1"
+}

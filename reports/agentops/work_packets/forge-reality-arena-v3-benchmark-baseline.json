@@ -1,0 +1,27 @@
+{
+  "adapter_readiness_score": 50,
+  "authority": {
+    "archive_fitness_mutated": false,
+    "benchmark_platform_contacted": false,
+    "external_confirmed": false,
+    "fitness_mutation_allowed": false,
+    "local_style_fixtures_are_official_scores": false,
+    "public_submission_performed": false
+  },
+  "generated_at": "2026-06-04T14:53:41Z",
+  "lane": "forge-reality-arena-v3-benchmark-baseline",
+  "official_baseline_score": 0,
+  "official_benchmark_results_count": 0,
+  "outputs": [
+    "reports/forge/forge-reality-arena-v3-benchmark-baseline/v3_benchmark_baseline.json",
+    "reports/forge/forge-reality-arena-v3-benchmark-baseline/v3_benchmark_baseline.md",
+    "reports/forge/forge-reality-arena-v3-benchmark-baseline/benchmark_readiness_ledger.jsonl",
+    "reports/forge/forge-reality-arena-v3-benchmark-baseline/negative_result_receipts.jsonl",
+    "reports/forge/forge-reality-arena-v3-benchmark-baseline/local-adapter-smoke/verifier_artifact.json"
+  ],
+  "packet_id": "forge-reality-arena-v3-benchmark-baseline",
+  "schema_version": "agentops_work_packet.v1",
+  "scorecard_ref": "reports/forge/forge-reality-arena-v3-benchmark-baseline/v3_benchmark_baseline.json",
+  "status": "official_baseline_not_established_blocker_receipts_written",
+  "track": "dharma-reward-forge-v0"
+}

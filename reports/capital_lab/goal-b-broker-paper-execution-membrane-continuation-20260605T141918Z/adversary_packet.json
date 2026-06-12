@@ -1,0 +1,157 @@
+{
+  "schema_version": "goal_b.adversary_packet.v1",
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "task_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation-t03-adversary",
+  "agent_uid": "hermes-m5",
+  "role": "adversary",
+  "generated_at": "2026-06-05T14:28:40Z",
+  "amendment_reason": "Planner lane restored MASTER_GOAL.md and PACKET_SCHEMAS.md after the initial adversary scan; this packet now distinguishes restored continuation contract evidence from the still-broken predecessor artifact chain.",
+  "verdict": "block_clean_status",
+  "status": "adversary_blocks_clean_and_live_readiness",
+  "live_readiness": 0,
+  "live_authority": false,
+  "broker_write_authority": false,
+  "clean": false,
+  "nats_a2a_live_collaboration_claimed": false,
+  "live_ack_evidence_seen": false,
+  "external_broker_paper_receipts_seen": false,
+  "source_refs": [
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/MASTER_GOAL.md",
+      "exists": true,
+      "hash": "bb3f39bb5e1e393d40686dfbbc49ce94eaf56ac947021d16a6491cccc01e527c",
+      "finding": "Contract was absent at continuation start but has since been restored and hashed by the planner lane."
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/PACKET_SCHEMAS.md",
+      "exists": true,
+      "hash": "0efec7be996b6828661ae8130428dde86d2182875b8568dfedc8b608b820a34e",
+      "finding": "Packet schema was absent at continuation start but has since been restored and hashed by the planner lane."
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/planner_acceptance_contract.md",
+      "exists": true,
+      "hash": "97dee1e3770b0af1c725f04720c8ff7e14e5c6f7d3cbb59536402c590f073298",
+      "finding": "Continuation planner acceptance contract exists and preserves false/zero authority status."
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/planner_acceptance_contract.json",
+      "exists": true,
+      "hash": "48cd564b417c1b4c41a119e9e040fefb35575ab074e44e6781e6035d61c41c96",
+      "finding": "Continuation planner acceptance gates exist and keep default_next_status blocked_live_authority_detected."
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-20260605T135732Z/planner_acceptance_contract.md",
+      "exists": false,
+      "finding": "Planner manifest references a report artifact whose parent directory is absent."
+    },
+    {
+      "path": "reports/capital_lab/goal-b-broker-paper-execution-membrane-20260605T135732Z/planner_acceptance_contract.json",
+      "exists": false,
+      "finding": "Planner manifest references a JSON acceptance artifact whose parent directory is absent."
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T134546Z-goal-b-agni-broker-paper-execution/execution_feasibility_packet.json",
+      "exists": true,
+      "hash": "4836be354b95847febe1ce95ea8c4ac8807049ee75d5582115191f696086eea3",
+      "finding": "Prior Agni packet blocks on live-capable Hyperliquid surface, missing external paper receipts, missing lifecycle parity, missing reconciliation, missing duplicate-client-order-id drill."
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-broker-paper-execution-membrane/runs/20260605T134546Z-goal-b-agni-broker-paper-execution/adapter_readiness_packet.json",
+      "exists": true,
+      "hash": "d4965b2e5b01cd6fbc8fd4a49c8c5a849b84797203c32198b92372b14e1c97e0",
+      "finding": "Adapter readiness remains live-capable-blocked with no idempotent client order IDs and no broker snapshot reconciliation."
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-execution-readiness-90/runs/20260605T082051Z-execution-readiness-90/execution_reconciliation_receipt.json",
+      "exists": true,
+      "finding": "Older readiness artifact reconciles a fixture broker-shaped snapshot only; it explicitly blocks on external_sandbox_broker_snapshot_missing."
+    },
+    {
+      "path": "spec-forge/dharma-capital-lab-execution-readiness-90/runs/20260605T082051Z-execution-readiness-90/external_parity_matrix.json",
+      "exists": true,
+      "finding": "Older external parity matrix has ready_count 0 and blocks on external_paper_broker_api_not_run."
+    },
+    {
+      "path": "hooks/codex_dharma_bridge.py",
+      "exists": true,
+      "finding": "Bridge is fail-open sanitized hook receipt logging only; it is not a live authority fence, broker adapter, or A2A/NATS acknowledgement proof."
+    }
+  ],
+  "critical_findings": [
+    {
+      "id": "GB-ADV-001",
+      "severity": "medium",
+      "claim_attacked": "The predecessor evidence chain was clean and complete at continuation start.",
+      "finding": "The 20260605T135732Z planner manifest referenced contract/report artifacts that were absent at continuation start. The current planner lane has restored MASTER_GOAL.md, PACKET_SCHEMAS.md, and continuation acceptance artifacts with hashes, so G0 is locally repaired, but the predecessor continuity gap must not be hidden.",
+      "required_receipt": "Downstream packets must cite the restored 20260605T141918Z contract hashes and keep the 20260605T135732Z missing-report gap visible in the handoff."
+    },
+    {
+      "id": "GB-ADV-002",
+      "severity": "critical",
+      "claim_attacked": "Agni live-capable Hyperliquid authority is fenced.",
+      "finding": "The only available Agni evidence says /root/hyperliquid-trading-agent is present with live-capable order/cancel methods and a HYPERLIQUID_PRIVATE_KEY alias. No quarantine, process fence, import-deny, permission-deny, or operator lease receipt is present in this continuation.",
+      "required_receipt": "Produce an authority membrane receipt that proves the Hyperliquid repo cannot be imported, invoked, started, or selected by Goal B adapter code, without reading or recording secret values."
+    },
+    {
+      "id": "GB-ADV-003",
+      "severity": "high",
+      "claim_attacked": "Paper-mode local routes equal broker-paper lifecycle parity.",
+      "finding": "Prior evidence says trading_lab mutates local RoutePortfolio state and lacks submit, ack, partial fill, full fill, cancel, reject, and expire broker-shaped receipts.",
+      "required_receipt": "Record one idempotent paper order lifecycle packet covering submit, ack, partial fill, full fill, cancel, reject, and expire from the same adapter contract."
+    },
+    {
+      "id": "GB-ADV-004",
+      "severity": "high",
+      "claim_attacked": "Older execution-readiness-90 artifacts can satisfy Goal B external broker parity.",
+      "finding": "The older readiness artifacts are fixture-only, below-90, and explicitly say no external paper broker API call, no external sandbox broker snapshot, and no live capital readiness.",
+      "required_receipt": "Produce fresh Goal B-scoped external paper broker/sandbox receipts or explicitly keep the route as fixture-only with clean=false."
+    },
+    {
+      "id": "GB-ADV-005",
+      "severity": "high",
+      "claim_attacked": "The repaired codex_dharma_bridge.py proves live collaboration or execution safety.",
+      "finding": "The hook writes fail-open sanitized Codex hook metadata to ~/.dharma/codex_hooks. It does not prove NATS/A2A live acknowledgements, does not fence live broker code, and does not validate broker lifecycle receipts.",
+      "required_receipt": "Keep bridge repair as logging support only; require separate live-ack evidence and separate authority/lifecycle receipts."
+    }
+  ],
+  "missing_receipts": [
+    "predecessor_20260605T135732Z_report_gap_handoff",
+    "hyperliquid_authority_fence_receipt",
+    "isolated_broker_paper_adapter_import_deny_receipt",
+    "idempotent_client_order_id_receipt",
+    "submit_ack_partial_full_cancel_reject_expire_lifecycle_receipt",
+    "duplicate_client_order_id_replay_receipt",
+    "local_ledger_to_external_paper_broker_snapshot_reconciliation_receipt",
+    "reconciliation_mismatch_blocks_receipt",
+    "rejection_drill_receipt",
+    "cancel_expire_drill_receipt",
+    "stale_data_heartbeat_max_loss_exposure_order_rate_kill_switch_drill_receipts",
+    "operator_handoff_receipt"
+  ],
+  "false_liveness_claims_to_refuse": [
+    "paper_mode_true_implies_broker_execution_readiness",
+    "trading_halted_false_implies_live_readiness",
+    "dashboard_route_counts_or_live_labels_imply_trade_authority",
+    "absence_of_named_hyperliquid_process_implies_hyperliquid_fenced",
+    "Alpaca_TradingClient_paper_true_without_order_receipts_implies_lifecycle_parity",
+    "fixture_order_lifecycle_ledger_implies_external_broker_paper_parity",
+    "codex_hook_receipts_imply_NATS_or_A2A_live_collaboration"
+  ],
+  "minimum_pass_conditions": [
+    "Use the restored 20260605T141918Z contract and schema hashes in downstream manifests while preserving the 20260605T135732Z missing-artifact gap.",
+    "Prove Hyperliquid live-capable authority is isolated from Goal B before any adapter submit path exists.",
+    "Prove idempotent client_order_id generation and duplicate replay blocking.",
+    "Prove broker-paper submit/ack/partial/full/cancel/reject/expire lifecycle parity.",
+    "Prove local ledger versus external paper broker snapshot reconciliation and mismatch blocking.",
+    "Prove rejection, cancel, expire, stale-data, heartbeat, max-loss, exposure, and order-rate drills.",
+    "Keep live_readiness=0, live_authority=false, broker_write_authority=false, and clean=false until every gate above is present."
+  ],
+  "non_actions": [
+    "No live orders placed.",
+    "No live broker keys read.",
+    "No secret values recorded.",
+    "No NATS or A2A live collaboration claimed.",
+    "No profit, alpha, or live-readiness claim made."
+  ]
+}

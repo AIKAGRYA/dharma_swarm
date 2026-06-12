@@ -1,0 +1,49 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-17-status-packet-chain-exhaustion",
+  "cycle": 17,
+  "agent": "codex_forgewright",
+  "created_at_utc": "2026-06-01T09:48:24Z",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "summary": "Add packet-chain and internal-exhaustion visibility to the Forge Hydra status artifact.",
+  "receipt": {
+    "type": "repo_local",
+    "canonical_ds_goal_receipt": false,
+    "canonical_blocker": "No mission/task/goal/AgentOps/DSE/DS receipt environment variable exists.",
+    "verifier_artifact": "reports/forge/forge-hydra-status/cycle-17/verifier_artifact.json",
+    "completion_audit": "reports/forge/forge-hydra-status/cycle-17/completion_audit.md",
+    "status_artifact": "reports/forge/forge-hydra-status/status_artifact.json",
+    "status_hash": "sha256:369fc5bee80892560872c9abeac8d2cbcc07a9deb4dece6dd37cccaa31dacfb7"
+  },
+  "outcome": {
+    "packet_chain_total": 5,
+    "packet_chain_verified_internal": 3,
+    "packet_chain_internal_remaining": 0,
+    "packet_chain_external_authority_blocked": 2,
+    "packet_chain_all_internal_packets_exhausted": true,
+    "external_acted_receipts": 0,
+    "archive_fitness_authority": "none_from_this_status_artifact"
+  },
+  "test_commands": [
+    "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+    "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+    "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+    "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py tests/test_forge_github_receipt.py -q --tb=short",
+    "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/forge-hydra-status/status_artifact.json >/dev/null",
+    "make onboard"
+  ],
+  "exit_codes": [0, 0, 0, 0, 0, 0],
+  "authority_boundaries": {
+    "external_contact": false,
+    "spending": false,
+    "commit_push_pr": false,
+    "fitness_changed": false,
+    "external_confirmed_claimed": false
+  },
+  "blockers": [
+    "The first external receipt witness remains missing and operator/external-authority gated.",
+    "GitNexus current-worktree impact remains unavailable."
+  ]
+}

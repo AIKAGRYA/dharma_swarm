@@ -36,6 +36,7 @@ from dharma_swarm.models import (
     _new_id,
     _utc_now,
 )
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.model_catalog import apply_model_pack_metadata
 
 logger = logging.getLogger(__name__)
@@ -326,7 +327,10 @@ class WorkerSpawner:
         model = spec.model
         if not model:
             # Use provider rotation for diversity
-            model = str(metadata.get("preferred_model") or "claude-sonnet-4-20250514")
+            model = str(
+                metadata.get("preferred_model")
+                or canonical_default_model(ProviderType.ANTHROPIC)
+            )
 
         request = LLMRequest(
             model=model,

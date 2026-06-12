@@ -1,0 +1,42 @@
+{
+  "agent_id": "codex_5_5_cli",
+  "authority": "evidence-only",
+  "created_at_utc": "2026-06-01T07:29:34Z",
+  "cycle": 8,
+  "mission": "forge_hydra_long_run",
+  "packet_id": "forge-hydra-status-stratified-quality",
+  "scope": "Harden Forge Hydra dashboard reporting for Council-required stratified receipt quality without granting receipt authority.",
+  "changed_files": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status-stratified-quality/cycle-8/verifier_artifact.json",
+    "reports/forge/forge-hydra-status-stratified-quality/cycle-8/completion_audit.md"
+  ],
+  "verification": {
+    "commands": [
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py tests/test_forge_github_receipt.py tests/test_evolution_receipt.py -q --tb=short",
+      "Context+ static analysis on scripts/runtime/forge_hydra_status.py",
+      "Context+ static analysis on tests/test_forge_hydra_status.py",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py"
+    ],
+    "exit_codes": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "summary": "py_compile clean; 4 focused status tests passed; 15 adjacent Forge receipt/status tests passed; static analysis clean; status artifacts refreshed."
+  },
+  "boundaries": {
+    "canonical_ds_goal_receipt_attempted": false,
+    "external_contact": false,
+    "fitness_set": false,
+    "reason": "No mission id environment variable was present; external acted receipts and nonzero fitness remain operator-gated."
+  }
+}
