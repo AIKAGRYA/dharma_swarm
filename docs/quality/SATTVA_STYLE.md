@@ -1,10 +1,10 @@
 ---
-title: Sattva Style — the positive quality canon
+title: Sattva Style — proposed positive quality invariants
 status: seed
 schema_version: sattva_style.v1
 last_updated: 2026-06-12
-doc_role: doctrine-seed
-authority: descriptive
+doc_role: reference
+authority: none — proposes; the hygiene lifecycle and existing gates dispose
 enforced_by: scripts/governance/hygiene/ratchet.py (subset; see "What is live")
 companion_artifacts:
   - docs/governance/hygiene/LIFECYCLE.md
@@ -14,12 +14,15 @@ companion_artifacts:
 
 # Sattva Style
 
-The anti-slop layer says what code must not be. This document says what
-code here IS when it is good — distilled from the five most battle-tested
-quality doctrines in the world (NASA/JPL's Power of Ten, TigerBeetle's
-TIGER_STYLE, SQLite's testing regime, the Linux kernel's process canon,
-and Erlang/OTP's supervision doctrine), adapted to this repo's substrate:
-async-first Python, multi-agent authorship, receipt-and-witness culture.
+This is a reference document, not doctrine: it PROPOSES a positive
+quality standard; nothing in it binds anyone until promoted through the
+hygiene lifecycle by its own rules. The anti-slop layer says what code
+must not be. This document says what code here IS when it is good —
+distilled from the five most battle-tested quality doctrines in the
+world (NASA/JPL's Power of Ten, TigerBeetle's TIGER_STYLE, SQLite's
+testing regime, the Linux kernel's process rules, and Erlang/OTP's
+supervision discipline), adapted to this repo's substrate: async-first
+Python, multi-agent authorship, receipt-and-witness culture.
 
 Two laws govern this document itself:
 
@@ -120,7 +123,7 @@ tightens (Power of Ten R10, tempered by SQLite §12: analyzers are
 seatbelts, not search parties — marginal spend goes to dynamic testing).
 Counter: `ruff_undefined_or_redefined` (down, target 0) — **LIVE in
 ratchet v1** (F821/F811 first: names that do not bind are code that has
-never run — the canonical LLM-authorship defect); full-ruleset counter is
+never run — the classic LLM-authorship defect); full-ruleset counter is
 the v2 widening. *Diversity bill: real for opinionated style rules — keep
 the enforced selection on correctness classes (F, E9, B), never on taste.*
 
