@@ -5,6 +5,7 @@ on:
     branches: [main, v2-gap-closure]
   pull_request:
     branches: [main]
+  merge_group:
 
 jobs:
   go-adapter-contracts:
