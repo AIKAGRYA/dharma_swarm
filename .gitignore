@@ -41,6 +41,16 @@ external/
 .dharma_witness_link
 .memory_fallback/
 
+# Hyperfile branch runtime state (heartbeats, pids, ephemeral vision dumps).
+# These were committed by mistake; they are machine-local agent state, not source.
+.dharma_psmv_hyperfile_branch/
+.dharma_psmv_hyperfile_branch_v2/
+
+# Raw model output dumps from the telos engine (NDJSON traces).
+# These are runtime artifacts, not authored documentation. If a packet needs
+# to cite a specific output, promote a curated excerpt into a tracked .md.
+docs/telos-engine/.raw-outputs/
+
 # Build artifacts
 .next/
 node_modules/
