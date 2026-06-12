@@ -3,24 +3,23 @@
 This directory holds draft track blocks that are **not yet active**.
 
 A file here is a proposal — a complete track block that an operator (or another
-agent at the operator's direction) may move into `ACTIVE_TRACK.yaml` under
-`active_tracks:` once two conditions hold:
+agent at the operator's direction) may move into `ACTIVE_TRACK.yaml` as the
+next strategic `active_track:` once two conditions hold:
 
-1. **Doctrine permits the concurrent track.** The `track_policy` floor and
-   ceiling in `ACTIVE_TRACK.yaml` (default `min_active: 1`, `max_active: 10`)
-   must permit one more active track, and the proposed block must have
-   non-overlapping surfaces and non-goals with the currently ACTIVE tracks.
-2. **Schema machinery is in place.** The multi-track v2 schema readers
-   (`check_track_status.py`, `render_active_track_includes.py`, and the
-   `api/routers/` + `dharma_swarm/operator_core/dashboard_ssot.py`
-   projections) must be live on `main`. Proposals authored against the v2
-   `active_tracks:` list (not the v1 scalar) require those readers.
+1. **Doctrine permits the strategic transition.** The proposal must have
+   non-overlapping surfaces and non-goals with the current active track, or the
+   operator must explicitly close/supersede the current track first.
+2. **Parallel work is declared as a lane first.** Work may proceed before
+   promotion only as an explicit lane under `parallel_lane_policy`: owner,
+   branch/worktree or work packet, allowed surfaces, verification command, and
+   receipt path.
 
 ## Rules
 
 - A proposal here is **draft only**. It does not constitute a declared track;
-  CI does not gate against it, `make onboard` does not surface it, and no agent
-  should treat it as load-bearing until promoted into `ACTIVE_TRACK.yaml`.
+  CI does not gate against it, `make onboard` does not surface it as strategic
+  intent, and no agent should treat it as load-bearing until promoted into
+  `ACTIVE_TRACK.yaml` or declared in the parallel lane map.
 - A proposal must declare an `owner` and a non-empty `completion_criteria`
   list using the same `{id, kind, file, pattern}` shape the live checker
   accepts (`file_exists`, `file_contains`, `pr_merged`).

@@ -1,0 +1,84 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-8-control-watch-tower-visibility",
+  "created_at_utc": "2026-06-02T15:01:13Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena v1",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "cycle": {
+    "v1_cycle": 8,
+    "name": "control_watch_tower_visibility"
+  },
+  "result": {
+    "status": "completed",
+    "summary": "Added an explicit Forge Reality Arena Control Watch Tower equivalent readout under the existing Forge report tree and exposed its refs/hash through the v1 scorecard and AgentOps status packet.",
+    "score_delta": "0; score remains 100/100, but Rung 7 control visibility is now machine-addressable from the final scorecard."
+  },
+  "outputs": [
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-8-control-watch-tower-visibility.json",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.md",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md"
+  ],
+  "verification": {
+    "commands": [
+      {
+        "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+        "outcome": "passed"
+      },
+      {
+        "command": "pytest -q tests/test_forge_reality_arena_status.py",
+        "outcome": "passed",
+        "details": "24 passed; 1 existing pytest config warning for unknown timeout option"
+      },
+      {
+        "command": "python3 scripts/runtime/forge_reality_arena_status.py --state-dir /Users/dhyana/.dharma/forge_reality_arena_master",
+        "outcome": "passed"
+      }
+    ]
+  },
+  "acceptance": {
+    "control_watch_tower_readout_written": true,
+    "scorecard_exposes_control_watch_tower_ref": true,
+    "agentops_embeds_control_watch_tower_visibility": true,
+    "read_only_status": true,
+    "external_actions_performed": false,
+    "archive_fitness_changed": false,
+    "fitness_mutation_performed": false,
+    "external_confirmed_set": false
+  },
+  "authority_boundary": {
+    "internal_only": true,
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "blockers": [
+    "guardian_countersign_not_observed",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next": "External Beast or Measurement Guardian lease packet; no further internal Forge Reality Arena v1 packet is required unless v1.1 scope is opened."
+}

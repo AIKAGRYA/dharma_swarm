@@ -1,0 +1,150 @@
+{
+  "schema_version": "codex_agent_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-6",
+  "created_at": "2026-06-01T18:55:46+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "scope": "Perform a quiet post-PR receipt watch for the active Guild target, document the CI action-required state, recheck the named labmain fallback target, run a narrow cleaner-target scan, rerun focused verification, and avoid public noise unless an actionable maintainer signal exists.",
+  "target": {
+    "repository": "Yasuno-5555/Guild",
+    "issue": 1,
+    "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+    "pr": 7,
+    "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+    "fork": "AmitabhainArunachala/Guild",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+    "local_branch": "codex/issue-1-invalid-bounty-fixtures",
+    "commit": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348"
+  },
+  "actions": [
+    "inspected dharma_swarm worktree without cleaning or reverting user changes",
+    "read the previous external-beast readiness and cycle reports",
+    "used the GitHub app to recheck PR #7 metadata, comments, reviews, review threads, and workflow runs",
+    "used gh CLI to cross-check the PR workflow run, branch checks, commit statuses, issue state, issue events, and PR issue events",
+    "classified the CI action_required workflow run as fork workflow platform gating, not an external acted receipt",
+    "rechecked labmain/ai-agent-pay-demo issue #35 and rejected it again as a current target because competition and bounty-claim noise remain high",
+    "ran a narrow GitHub search for newer unassigned zero-comment good-first/test issues and found no better target candidate",
+    "fetched the external clone remotes and confirmed origin/main and the fork branch remained unchanged",
+    "reran focused local verification for the submitted Guild patch",
+    "updated the target readiness packet with cycle 6 watch evidence",
+    "recorded the cycle 6 report"
+  ],
+  "public_actions": [],
+  "candidate_rechecks": [
+    {
+      "repository": "labmain/ai-agent-pay-demo",
+      "issue": 35,
+      "issue_url": "https://github.com/labmain/ai-agent-pay-demo/issues/35",
+      "state": "open",
+      "locked": false,
+      "comments": 11,
+      "acceptance_criteria_clear": true,
+      "selected": false,
+      "rejection_reason": "High visible competition and payment-claim noise; many open PRs already target the same empty-response fix path."
+    }
+  ],
+  "target_search": {
+    "query": "is:issue is:open no:assignee comments:0 updated:>=2026-05-28 \"good first issue\" \"test\"",
+    "result": "no better candidate returned for this cycle"
+  },
+  "verification": [
+    {
+      "command": "git status --short && git branch --show-current && git rev-parse HEAD",
+      "workdir": "/Users/dhyana/dharma_swarm",
+      "outcome": "passed; dirty worktree confirmed and left untouched"
+    },
+    {
+      "command": "GitHub app _get_pr_info(repository_full_name=Yasuno-5555/Guild, pr_number=7)",
+      "outcome": "passed; PR open, non-draft, mergeable, unchanged at 1444b1538c2fd6cf640734a3f3faa7a9f2b1a348"
+    },
+    {
+      "command": "GitHub app _fetch_pr_comments/_list_pull_request_reviews/_list_pull_request_review_threads for PR #7",
+      "outcome": "passed; all returned empty results"
+    },
+    {
+      "command": "GitHub app _fetch_commit_workflow_runs(repo_full_name=Yasuno-5555/Guild, commit_sha=1444b1538c2fd6cf640734a3f3faa7a9f2b1a348)",
+      "outcome": "passed; CI workflow run 26749510285 returned with conclusion action_required"
+    },
+    {
+      "command": "gh run view 26749510285 --repo Yasuno-5555/Guild --json status,conclusion,event,createdAt,updatedAt,headBranch,headSha,displayTitle,url,workflowName,jobs",
+      "outcome": "passed; run status completed, conclusion action_required, event pull_request, jobs empty"
+    },
+    {
+      "command": "gh pr checks 7 --repo Yasuno-5555/Guild",
+      "outcome": "reported no checks on the branch"
+    },
+    {
+      "command": "gh api repos/Yasuno-5555/Guild/commits/1444b1538c2fd6cf640734a3f3faa7a9f2b1a348/status",
+      "outcome": "passed; total_count 0"
+    },
+    {
+      "command": "gh api repos/Yasuno-5555/Guild/issues/1",
+      "outcome": "passed; issue #1 open, unlocked, unassigned, 0 comments"
+    },
+    {
+      "command": "gh api repos/Yasuno-5555/Guild/issues/1/events --paginate",
+      "outcome": "passed; only original good first issue label event observed"
+    },
+    {
+      "command": "gh api repos/Yasuno-5555/Guild/issues/7/events --paginate",
+      "outcome": "passed; no PR issue events"
+    },
+    {
+      "command": "gh api repos/labmain/ai-agent-pay-demo/issues/35",
+      "outcome": "passed; issue #35 open, unlocked, unassigned, 11 comments"
+    },
+    {
+      "command": "gh pr list --repo labmain/ai-agent-pay-demo --state open --json number,title,url,headRefName,createdAt,updatedAt --limit 100",
+      "outcome": "passed; many open competing PRs observed"
+    },
+    {
+      "command": "gh search issues 'is:issue is:open no:assignee comments:0 updated:>=2026-05-28 \"good first issue\" \"test\"' --limit 20 --json repository,number,title,url,labels,updatedAt",
+      "outcome": "passed; returned []"
+    },
+    {
+      "command": "git fetch --all --prune && git rev-parse origin/main && git rev-parse fork/codex/issue-1-invalid-bounty-fixtures",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed; origin/main e359a26802cab7160b682e3765da4472c98eba5f, fork branch 1444b1538c2fd6cf640734a3f3faa7a9f2b1a348"
+    },
+    {
+      "command": "cargo test -p guild-spec",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed; 12 tests"
+    },
+    {
+      "command": "initial invalid-fixture CLI validation loop",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "failed due to local harness expecting errors array while CLI emitted singular error string"
+    },
+    {
+      "command": "corrected invalid-fixture CLI validation loop over examples/invalid-fixtures/*.yml",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed expected exits"
+    },
+    {
+      "command": "git diff --check HEAD",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed"
+    }
+  ],
+  "readiness_gate": {
+    "passed": true,
+    "basis": "The public PR is already open from cycle 2 and focused verification remains green; no further public action was warranted in cycle 6.",
+    "external_confirmed": false
+  },
+  "maintainer_action": {
+    "observed": false,
+    "details": "PR #7 has no reviews, comments, status contexts, merge, close, acceptance, workflow approval event, or maintainer event yet. CI action_required is treated as platform gating only."
+  },
+  "forbidden_state_changes": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_public_branch_this_cycle": false,
+    "opened_pr_this_cycle": false,
+    "posted_comment_this_cycle": false,
+    "set_external_confirmed": false,
+    "created_first_external_receipt_witness": false,
+    "set_nonzero_archive_fitness": false
+  }
+}

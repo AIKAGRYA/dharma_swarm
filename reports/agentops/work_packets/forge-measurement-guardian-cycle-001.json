@@ -1,0 +1,131 @@
+{
+  "packet_id": "forge-measurement-guardian-cycle-001",
+  "cycle": 1,
+  "recorded_at": "2026-06-01T22:02:00+08:00",
+  "observed_at_utc": "2026-06-01T14:02:00Z",
+  "actor": "forge_measurement_guardian",
+  "mission": "Verify cycle-020 external acted receipt candidates independently from builder lane",
+  "status": "external_acted_receipts_confirmed_fitness_blocked",
+  "source_manifest": {
+    "path": "reports/forge/external-beast/cycle-020-receipt-candidate-manifest.json",
+    "sha256": "9bcb3bd635a59a5960bf1a7f24e70c8d4b73820a860bf3762397f001d41175d7"
+  },
+  "artifacts": [
+    {
+      "path": "reports/forge/measurement-guardian/cycle-001-external-receipt-verification.json",
+      "kind": "guardian_verification_json"
+    },
+    {
+      "path": "reports/forge/measurement-guardian/cycle-001-external-receipt-verification.md",
+      "kind": "guardian_verification_report"
+    },
+    {
+      "path": "reports/witness/2026-06-01-dharma-reward-forge-first-external-receipt.md",
+      "kind": "first_external_acted_receipt_witness"
+    },
+    {
+      "path": "reports/forge/measurement-guardian/cycle-001/abduznik-instrumation-98/verifier_artifact.json",
+      "kind": "status_ingest_verifier_artifact"
+    },
+    {
+      "path": "reports/forge/measurement-guardian/cycle-001/yasuno-5555-guild-7/verifier_artifact.json",
+      "kind": "status_ingest_verifier_artifact"
+    },
+    {
+      "path": "reports/forge/measurement-guardian/cycle-001/leticiv-intigriti-asset-copier-6/verifier_artifact.json",
+      "kind": "status_ingest_verifier_artifact"
+    },
+    {
+      "path": "reports/forge/forge-hydra-status/status_artifact.json",
+      "kind": "regenerated_status_artifact"
+    },
+    {
+      "path": "reports/forge/forge-hydra-status/status.md",
+      "kind": "regenerated_status_report"
+    }
+  ],
+  "confirmed_external_acted_receipts": [
+    "abduznik/instrumation#98",
+    "Yasuno-5555/Guild#7",
+    "leticiv/intigriti-asset-copier#6"
+  ],
+  "secondary_context_not_direct_receipt": [
+    "Yasuno-5555/Guild#9 closed unmerged in favor of replacement PR #10"
+  ],
+  "authority": {
+    "external_confirmed": true,
+    "eligible_to_set_archive_fitness": false,
+    "archive_fitness_changed": false,
+    "fitness_authority_granted": false,
+    "reason": "External acted receipts are confirmed, but transfer, domain breadth, N>=5 receipt threshold, and archive-fitness mutation were not executed."
+  },
+  "guardrails": {
+    "public_github_actions_taken_by_guardian": false,
+    "money_spent": false,
+    "payment_requested": false,
+    "bounty_claimed": false,
+    "protected_dharma_swarm_branch_pushed_or_merged": false,
+    "broad_dharma_swarm_performance_claim_published": false,
+    "commit_push_merge_or_pr_action_in_dharma_swarm": false,
+    "nonzero_archive_fitness_set": false,
+    "v2_or_higher_autonomy_escalated": false
+  },
+  "verification_commands": [
+    {
+      "command": "git status --short && git rev-parse --show-toplevel && git rev-parse --abbrev-ref HEAD && git rev-parse HEAD",
+      "exit_code": 0,
+      "outcome": "passed; repo was dirty before guardian writes"
+    },
+    {
+      "command": "gh auth status",
+      "exit_code": 0,
+      "outcome": "passed for account AmitabhainArunachala"
+    },
+    {
+      "command": "shasum -a 256 <manifest and readiness packets>",
+      "exit_code": 0,
+      "outcome": "passed; all readiness hashes matched the manifest"
+    },
+    {
+      "command": "gh repo view <candidate repos>",
+      "exit_code": 0,
+      "outcome": "passed; base repos are public, non-archived, non-forks, and not owned by Dharma Swarm/operator"
+    },
+    {
+      "command": "gh pr view <direct candidates>",
+      "exit_code": 0,
+      "outcome": "passed; all three direct PRs are merged by external accounts with transparent disclosure"
+    },
+    {
+      "command": "gh issue view <linked issues>",
+      "exit_code": 0,
+      "outcome": "passed; all linked direct issues are CLOSED/COMPLETED"
+    },
+    {
+      "command": "gh api repos/<repo>/commits/<merge_commit_sha>",
+      "exit_code": 0,
+      "outcome": "passed; all direct merge commit SHAs exist"
+    },
+    {
+      "command": "mcp__fetch.fetch and mcp__codex_apps__github._fetch_pr_comments",
+      "exit_code": 0,
+      "outcome": "passed; independent MCP live evidence matched the GitHub CLI findings"
+    },
+    {
+      "command": "rg guardrail scans",
+      "exit_code": 0,
+      "outcome": "passed; no builder-lane forbidden true state found in external-beast artifacts and no preexisting first external receipt witness existed"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_hydra_status.py --active-track-evidence /dev/null",
+      "exit_code": 0,
+      "outcome": "passed after writing guardian status-ingest artifacts"
+    },
+    {
+      "command": "gh api comment aggregation with gh-level --argjson flags",
+      "exit_code": 1,
+      "outcome": "failed due command construction error; corrected by piping gh api JSON into jq with --argjson"
+    }
+  ],
+  "blocker": "Archive fitness remains blocked pending transfer-aware gate, threshold/domain requirements, and explicit no-fake-done fitness bridge."
+}

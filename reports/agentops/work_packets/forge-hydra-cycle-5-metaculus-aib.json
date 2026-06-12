@@ -1,0 +1,60 @@
+{
+  "id": "forge-hydra-cycle-5-metaculus-aib",
+  "base_ref": "trust-build-compass@c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "branch": "trust-build-compass",
+  "worktree": "/Users/dhyana/dharma_swarm",
+  "intent": "Build a dry-run-only Metaculus AIB sparse reality anchor that projects resolved binary forecast evidence into the existing forecast_brier Forge receipt path without external contact or archive fitness authority.",
+  "allowed_files": [
+    "dharma_swarm/eval/metaculus_aib.py",
+    "scripts/runtime/forge_metaculus_aib_anchor.py",
+    "tests/test_metaculus_aib_anchor.py",
+    "reports/forge/metaculus-aib-reality-anchor/**",
+    "reports/forge/forge-hydra-status/**",
+    "reports/agentops/work_packets/forge-hydra-cycle-5-metaculus-aib.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/archive.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/evolution_promotion.py",
+    "dharma_swarm/ginko_brier.py",
+    "api/**",
+    ".github/**"
+  ],
+  "gates": [
+    {
+      "name": "metaculus-aib-anchor-tests",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_metaculus_aib_anchor.py -q --tb=short"
+    },
+    {
+      "name": "forecast-receipt-and-status-regression",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_metaculus_aib_anchor.py tests/test_ginko_brier.py tests/test_evolution_receipt.py tests/test_forge_hydra_status.py -q --tb=short"
+    },
+    {
+      "name": "cycle-artifact-generator",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_metaculus_aib_anchor.py --output-dir reports/forge/metaculus-aib-reality-anchor/cycle-5"
+    },
+    {
+      "name": "forge-hydra-status-refresh",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "feat(forge): add metaculus aib dry-run reality anchor"
+  },
+  "approval": {
+    "before_external_contact": true,
+    "before_commit": true,
+    "before_merge": true,
+    "before_nonzero_fitness": true
+  },
+  "agent_uid": "codex_5_5_cli",
+  "metadata": {
+    "cycle": 5,
+    "packet_id": "metaculus-aib-reality-anchor",
+    "authority_class": "reality_resolved_forecast",
+    "external_confirmed": false,
+    "fitness_authority": "none",
+    "operator_boundary": "Metaculus AIB live participation, credentials, external contact, and nonzero fitness require operator approval."
+  }
+}

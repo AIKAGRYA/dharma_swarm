@@ -1,0 +1,117 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-80",
+  "cycle": 80,
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "created_at_utc": "2026-06-02T04:45:00Z",
+  "objective": "Run a bounded Cycle 80 external-beast custody sweep: recheck active external PRs for material maintainer action, reverify known external merges, check active PR CI state, preserve authority boundaries, and record evidence.",
+  "scope": {
+    "repo_root": "/Users/dhyana/dharma_swarm",
+    "state_dir": "/Users/dhyana/.dharma/forge_external_beast",
+    "public_actions_allowed_by_lease": [
+      "fork/create branch if readiness gate passes",
+      "push target branch if readiness gate passes",
+      "open or update one concise PR if readiness gate passes",
+      "post one concise issue/PR comment tied to PR if normal for target"
+    ],
+    "public_actions_taken": [],
+    "forbidden_actions_not_taken": [
+      "spend money",
+      "request payment",
+      "claim bounty",
+      "submit private credentials",
+      "publish broad Dharma Swarm performance claims",
+      "merge or push to dharma_swarm main",
+      "set external_confirmed true",
+      "create first_external_receipt_witness",
+      "set nonzero archive fitness",
+      "escalate to v2 autonomy"
+    ]
+  },
+  "source_checks": {
+    "git_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "branch": "trust-build-compass",
+    "gitnexus_status": "up-to-date",
+    "github_connector_checked": true,
+    "github_review_threads_checked": true,
+    "github_authored_search_checked": true,
+    "github_pr_checks_checked": true,
+    "labmain_issue_35_rechecked": true
+  },
+  "results": {
+    "active_external_open_prs": 7,
+    "known_external_merges_reverified": 4,
+    "closed_unmerged_external_prs_rechecked": 1,
+    "new_material_external_actions": 0,
+    "new_public_action": false,
+    "active_prs_with_fixable_failed_checks": 0,
+    "archive_fitness_changed": false,
+    "witness_modified": false,
+    "labmain_issue_35_status": "open_unlocked_but_still_disqualified_for_saturation",
+    "blockers": "none"
+  },
+  "artifacts": [
+    "reports/forge/external-beast/cycle-080.md",
+    "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-080-active-pr-ledger.md",
+    "reports/forge/external-beast/targets/active-external-pr-ledger/cycle-080-material-action-sweep.md",
+    "reports/forge/external-beast/targets/labmain-ai-agent-pay-demo-issue-35/cycle-080-disqualification-recheck.md",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-080-live-sweep/summary.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-080-receipt-guard/dry-run-probes.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-080-status/status_artifact.json",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-080-status/status.md",
+    "/Users/dhyana/.dharma/forge_external_beast/cycle-080-fitness-boundary/verifier_artifact.json",
+    "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+    "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md"
+  ],
+  "verification": [
+    {
+      "command": "git status --short --branch",
+      "outcome": "passed"
+    },
+    {
+      "command": "npx gitnexus status",
+      "outcome": "passed"
+    },
+    {
+      "command": "GitHub connector _fetch_pr for seven active external PRs",
+      "outcome": "passed"
+    },
+    {
+      "command": "GitHub connector _list_pull_request_review_threads for seven active external PRs",
+      "outcome": "passed; zero review threads"
+    },
+    {
+      "command": "gh auth status",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh search prs --author AmitabhainArunachala --state open/--merged/--state closed",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh api repos/.../issues/... for linked active issues and labmain issue 35",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh pr checks for seven active external PRs",
+      "outcome": "passed as evidence collection; five PRs had no checks, two ferro-labs PRs had passing Python checks"
+    },
+    {
+      "command": "gh pr view for four known merged external PRs and Yasuno-5555/Guild#9",
+      "outcome": "passed"
+    },
+    {
+      "command": "python scripts/runtime/forge_github_receipt.py --dry-run-probes --out /Users/dhyana/.dharma/forge_external_beast/cycle-080-receipt-guard/dry-run-probes.json",
+      "outcome": "passed; synthetic authority remained blocked"
+    },
+    {
+      "command": "python scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir /Users/dhyana/.dharma/forge_external_beast/cycle-080-status --active-track-evidence /dev/null",
+      "outcome": "passed"
+    },
+    {
+      "command": "python scripts/runtime/forge_fitness_boundary_dry_run.py --reports-root reports/forge --arena-root reports/forge/reality-arena --output-dir /Users/dhyana/.dharma/forge_external_beast/cycle-080-fitness-boundary",
+      "outcome": "exited 1 as refusal; blockers were coordination_integrity_gate_not_passed, benchmark_adapter_not_verified, docker_sandbox_not_ready"
+    }
+  ]
+}

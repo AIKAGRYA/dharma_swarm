@@ -1,0 +1,122 @@
+{
+  "acceptance": {
+    "agentops_status_embeds_scorecard": true,
+    "archive_fitness_changed": false,
+    "dry_run_only": true,
+    "external_actions_performed": false,
+    "external_confirmed_set": false,
+    "fitness_mutation_performed": false,
+    "onboard_start_end_refs_present": true,
+    "v1_scorecard_json_written": true,
+    "v1_scorecard_md_written": true
+  },
+  "agent": "codex",
+  "artifact_hashes": {
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:7f155095f19eb3afa24807a39503e9c6ca696c2ec0ebc421d2893ab509f68c02",
+    "reports/forge/forge-reality-arena/onboarding/onboard_end.txt": "sha256:d62b5a5c990b0f9ddb6e97642025fbd542a900c5678a59da02337dbe50f9ed66",
+    "reports/forge/forge-reality-arena/onboarding/onboard_start.txt": "sha256:8fd92a154638c3d7e53f5d3a34638287d0a0829c3c4969327922eb01a4359839",
+    "reports/forge/forge-reality-arena/status.md": "sha256:b0216dd0ebe18bd14b05e0cdf36584e49905400b2f5476c14e4ab20dad8f6690",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:46f5c082db20428a1545ee5250eb7d3da38952bcc06ca2ee8e341f86dfb93920",
+    "reports/forge/forge-reality-arena/v1_scorecard.json": "sha256:a95676c151fa00939ee9fe91bf90e9680a82eb7288c8fc55f158f9d6d3fede49",
+    "reports/forge/forge-reality-arena/v1_scorecard.md": "sha256:2f14591a85ba733822a12d4f3d22bfa05ab4708e6ff3716e51e58b179cf755a1",
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:59752e242156642e420270659a0f0f8a480f6f187610b7650efd8ac95f6e5b10",
+    "tests/test_forge_reality_arena_status.py": "sha256:f945077317f775ef0cb88e7ff1ffebc5eeaef82a318612da33e83f83a4ccd5db"
+  },
+  "authority": "evidence-only",
+  "blockers": [
+    "not_recorded_in_autonomy_mission",
+    "guardian_countersign_not_observed"
+  ],
+  "correlation_id": "20260602-forge-reality-arena-v1-10h:forge-reality-arena-master-v1:20260602T133721Z",
+  "created_at_utc": "2026-06-02T14:15:55Z",
+  "cycle": {
+    "packet": "reporter_scorecard",
+    "v1_cycle": 4
+  },
+  "dry_run_only": true,
+  "lane": "forge-reality-arena-master",
+  "mission": "Forge Reality Arena v1",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "operator_goal_id": "",
+  "operator_goal_id_unavailable_reason": "not_recorded_in_autonomy_mission",
+  "outputs": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/forge/forge-reality-arena/onboarding/onboard_start.txt",
+    "reports/forge/forge-reality-arena/onboarding/onboard_end.txt",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-4-v1-scorecard.json"
+  ],
+  "packet_id": "forge-reality-arena-v1-cycle-4-v1-scorecard",
+  "remaining_external_gates": [
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "remaining_internal_packets": [],
+  "result": "Forge Reality Arena status now emits a final v1 machine scorecard JSON and Markdown, embeds the scorecard into the AgentOps status packet, captures start/end onboard artifacts, and keeps external, archive, and fitness mutation authority false.",
+  "role": "codex_forgewright",
+  "run_id": "20260602T133721Z",
+  "schema_version": "agentops_work_packet.v1",
+  "score_delta": {
+    "area": "verification/reporting",
+    "points": 10
+  },
+  "status": "complete_internal_external_gated",
+  "test_commands": [
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "outcome": "pass",
+      "summary": "24 passed, 1 pytest config warning"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "outcome": "pass"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --state-dir /Users/dhyana/.dharma/forge_reality_arena_master --refresh-runtime-truth",
+      "outcome": "pass"
+    },
+    {
+      "command": "make onboard > reports/forge/forge-reality-arena/onboarding/onboard_start.txt",
+      "outcome": "pass"
+    },
+    {
+      "command": "make onboard > reports/forge/forge-reality-arena/onboarding/onboard_end.txt",
+      "outcome": "pass"
+    }
+  ],
+  "track": "dharma-reward-forge-v0",
+  "v1_scorecard": {
+    "completion_state": "internal_exhausted_external_gated",
+    "remaining_external_gates": [
+      "guardian_or_external_acted_receipt_required",
+      "guardian_countersign_required_before_archive_fitness_mutation",
+      "operator_external_action_lease_required_before_sparse_lane_action"
+    ],
+    "remaining_internal_packets": [],
+    "score": 100,
+    "scorecard_json": "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "scorecard_md": "reports/forge/forge-reality-arena/v1_scorecard.md"
+  }
+}

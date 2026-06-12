@@ -43,6 +43,42 @@ def test_unknown_without_reason_fails() -> None:
     assert failed["Organ touched"] == "UNKNOWN requires a reason"
 
 
+def test_label_aliases_are_accepted() -> None:
+    body = """
+- Organs touched: dharma_swarm/providers.py (provider chain)
+- Gap closed: BR-021 evidence at providers.py:2808
+- Proof: re-ran make orient and docops
+- Drift introduced: none
+"""
+
+    results = checker.validate_body(body)
+
+    assert all(result.ok for result in results)
+
+
+def test_comment_fallback_satisfies_gate() -> None:
+    body = "Just a summary, no coherence delta."
+    comment = """
+## Coherence Delta
+- Organ touched: docs/governance
+- Declared-vs-actual gap closed: none — docs-only change
+- Proof that re-reads the map: read COHERENCE_DELTA.md
+- New drift introduced: none
+"""
+
+    results, source = checker.validate_sources(body, ["unrelated", comment])
+
+    assert all(result.ok for result in results)
+    assert source == "PR comment #2"
+
+
+def test_comment_fallback_fails_when_no_source_valid() -> None:
+    results, source = checker.validate_sources("nothing", ["also nothing"])
+
+    assert not all(result.ok for result in results)
+    assert source == "PR body"
+
+
 def test_multiline_answer_is_accepted_until_next_field() -> None:
     body = """
 - Organ touched:

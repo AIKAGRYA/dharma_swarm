@@ -1,0 +1,65 @@
+{
+  "id": "collaboration-scorecard-v1",
+  "base_ref": "HEAD",
+  "branch": "feat/collaboration-scorecard-v1",
+  "worktree": "/Users/dhyana/promotion_worktrees/dharma_swarm_collaboration_scorecard_v1",
+  "intent": "Build a small collaboration scorecard that can distinguish real multi-agent collaboration from queue theater by reading A2A queue rows, inbox receipts, wake logs, and conjunction state.",
+  "allowed_files": [
+    "dharma_swarm/operator_core/collaboration_scorecard.py",
+    "scripts/runtime/collaboration_scorecard.py",
+    "tests/test_collaboration_scorecard.py",
+    "reports/agentops/**",
+    "reports/collaboration_packets/**"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/telos_gates.py",
+    "dharma_swarm/dharma_kernel.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/swarm.py",
+    "api/**",
+    "dashboard/**"
+  ],
+  "gates": [
+    {
+      "name": "scorecard-tests",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_collaboration_scorecard.py"
+    },
+    {
+      "name": "a2a-lifecycle-regression",
+      "command": "/Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_a2a_task_lifecycle.py"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "feat(a2a): add collaboration scorecard"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  },
+  "agent_uid": "codex_composer",
+  "return_address": {
+    "resume_surface": "collaboration_packet",
+    "resume_ref": "collaboration_packet:novel-artifact-scorecard-v1-20260525",
+    "obligation": "produce or explicitly block the collaboration scorecard artifact",
+    "base_case": "focused tests pass and all participating A2A tasks close with terminal receipts",
+    "depth": 0,
+    "trace_id": "trace:novel-artifact-scorecard-v1-20260525"
+  },
+  "metadata": {
+    "drill_kind": "four_agent_novel_artifact",
+    "novel_artifact_target": "collaboration_scorecard.v1",
+    "expected_inputs": [
+      "~/.dharma/a2a_bus/tasks/queue.jsonl",
+      "~/.dharma/a2a_bus/conjunction/latest.json",
+      "~/.dharma/a2a_bus/inboxes/**/receipt_*.json",
+      "~/.dharma/external_agents/**/logs/wake_receipts.jsonl"
+    ],
+    "minimum_output_behavior": [
+      "score completed verified task receipts higher than stale open task rows",
+      "detect missing participant receipts",
+      "detect no-artifact collaboration theater",
+      "separate autonomous_local participation from mirrored_or_manual participation"
+    ]
+  }
+}

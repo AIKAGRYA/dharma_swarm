@@ -1,0 +1,44 @@
+{
+  "agent_id": "codex_5_5_cli",
+  "authority": "evidence-only",
+  "boundaries": {
+    "canonical_ds_goal_receipt_attempted": false,
+    "external_contact": false,
+    "fitness_set": false,
+    "reason": "No mission id environment variable was present; external acted receipts and nonzero fitness remain operator-gated."
+  },
+  "branch": "trust-build-compass",
+  "changed_files": [
+    "scripts/runtime/forge_pre_v1_audit.py",
+    "tests/test_forge_pre_v1_audit.py",
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/v0.9-pre-v1-audit/cycle-9/verifier_artifact.json",
+    "reports/forge/v0.9-pre-v1-audit/cycle-9/completion_audit.md"
+  ],
+  "created_at_utc": "2026-06-01T07:49:09Z",
+  "cycle": 9,
+  "id": "forge-hydra-cycle-9-pre-v1-evidence-gate",
+  "mission": "forge_hydra_long_run",
+  "packet_id": "forge-pre-v1-audit-evidence-gate",
+  "scope": "Harden the Forge pre-v1 audit so internal evidence completeness requires machine-readable passing verifier evidence, and record the current unproven v0.1.0 gate.",
+  "verification": {
+    "commands": [
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_pre_v1_audit.py tests/test_forge_pre_v1_audit.py",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_pre_v1_audit.py -q --tb=short",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_pre_v1_audit.py --reports-root reports/forge --out reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+      "jq assertion over reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_pre_v1_audit.py tests/test_forge_hydra_status.py -q --tb=short",
+      "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m json.tool reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json"
+    ],
+    "exit_codes": [
+      0,
+      0,
+      2,
+      0,
+      0,
+      0
+    ],
+    "summary": "py_compile clean; 5 focused pre-v1 audit tests passed; live audit exits 2 by design because v0.1.0 lacks machine-readable pass evidence; JSON assertion passed; 9 adjacent audit/status tests passed; JSON validation passed."
+  },
+  "worktree": "/Users/dhyana/dharma_swarm"
+}

@@ -1,0 +1,65 @@
+{
+  "id": "forge-hydra-cycle-6-github-receipt-hardening",
+  "base_ref": "trust-build-compass@c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "branch": "trust-build-compass",
+  "worktree": "/Users/dhyana/dharma_swarm",
+  "intent": "Harden sparse acted-code receipt scaffolding so GitHub PR-merge dry-run probes cannot be mistaken for external acted authority or nonzero fitness.",
+  "allowed_files": [
+    "scripts/runtime/forge_github_receipt.py",
+    "tests/test_forge_github_receipt.py",
+    "reports/forge/v0.1.3-first-external-receipt/plumbing_dry_run.json",
+    "reports/forge/v0.1.3-first-external-receipt/verifier_artifact.json",
+    "reports/forge/forge-hydra-status/**",
+    "reports/forge/github-acted-code-receipt-hardening/cycle-6/**",
+    "reports/agentops/work_packets/forge-hydra-cycle-6-github-receipt-hardening.json"
+  ],
+  "forbidden_files": [
+    "dharma_swarm/archive.py",
+    "dharma_swarm/evolution.py",
+    "dharma_swarm/evolution_promotion.py",
+    "dharma_swarm/evolution_receipt.py",
+    "api/**",
+    ".github/**"
+  ],
+  "gates": [
+    {
+      "name": "github-receipt-tests",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_github_receipt.py -q --tb=short"
+    },
+    {
+      "name": "receipt-status-regression",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_github_receipt.py tests/test_forge_hydra_status.py tests/test_evolution_receipt.py -q --tb=short"
+    },
+    {
+      "name": "forge-chain-regression",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_archive.py tests/test_dharma_eval.py tests/test_evolution_promotion.py tests/test_evolution_receipt.py tests/test_reward_forge_v0.py tests/test_forge_github_receipt.py -q --tb=short"
+    },
+    {
+      "name": "dry-run-probe-regeneration",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_github_receipt.py --dry-run-probes --out reports/forge/v0.1.3-first-external-receipt/plumbing_dry_run.json"
+    },
+    {
+      "name": "forge-hydra-status-refresh",
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(forge): block dry-run github receipts from acted authority"
+  },
+  "approval": {
+    "before_external_contact": true,
+    "before_commit": true,
+    "before_merge": true,
+    "before_nonzero_fitness": true
+  },
+  "agent_uid": "codex_5_5_cli",
+  "metadata": {
+    "cycle": 6,
+    "packet_id": "github-acted-code-receipt-dry-run-authority-hardening",
+    "authority_class": "external_acted_code_scaffold",
+    "external_confirmed": false,
+    "fitness_authority": "none",
+    "operator_boundary": "A real GitHub acted-code receipt requires operator approval, external human maintainer action, non-dry-run evidence, and transfer/telos gates before archive fitness can move."
+  }
+}

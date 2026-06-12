@@ -11,6 +11,12 @@ make onboard
 
 `make onboard` is read-only. It prints the live Codex/MCP toolbelt status, branch/dirty-tree state, and links to the highest-value docs.
 
+For Fable 5 / `fable_5_cursor`, read
+[`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md) only after this
+command and the first-read surfaces it names. That map is an operational
+route for a specific hub-coordinator identity; it is not a new authority
+surface.
+
 For a build session, use the explicit preflight and closeout targets around
 the actual implementation work:
 
@@ -31,11 +37,14 @@ GitHub-only agents cannot see local credentials, `dkeys`, or live process enviro
 
 Read in this order:
 
-1. [`CLAUDE.md`](../../CLAUDE.md): repo behavior, engineering rules, architecture summary, build/test commands.
-2. [`CODEX_TOOLBELT_ONBOARDING.md`](CODEX_TOOLBELT_ONBOARDING.md): large-codebase context tools, MCP health, Sourcegraph/GDrive/Postgres gates, Sourcebot lane.
-3. [`BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md): mandatory build-session read order and current active track.
-4. [`MEGAFILE_INDEX.md`](../MEGAFILE_INDEX.md): the ten durable onboarding surfaces.
-5. The task-specific row below that matches the work you are doing.
+1. `make onboard` output: live branch, active tracks, dirty tree, stale docs, and next command.
+2. [`CLAUDE.md`](../../CLAUDE.md): repo behavior, engineering rules, architecture summary, build/test commands.
+3. [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md): architecture, axioms, and invariants.
+4. [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml): current build portfolio and owned surfaces.
+5. [`ANTI_SLOP_RULES.md`](../governance/ANTI_SLOP_RULES.md): hard and advisory anti-slop gates.
+
+Everything else is depth-on-demand. [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md)
+owns this first-read rule; if this section drifts, that file wins.
 
 Do not read the whole repo. Pick the smallest route that gives you evidence.
 
@@ -65,8 +74,9 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 | Architecture/navigation | [`NAVIGATION.md`](../architecture/NAVIGATION.md), [`MEGAFILE_INDEX.md`](../MEGAFILE_INDEX.md), GitNexus/Context+ |
 | Runtime wiring or bugfix | [`INTERFACE_MISMATCH_MAP.md`](../../INTERFACE_MISMATCH_MAP.md), [`CYBERNETIC_LOOP_MAP.md`](../../CYBERNETIC_LOOP_MAP.md), relevant tests |
 | Current live state | [`LIVE_OPS_DASHBOARD.md`](../state/LIVE_OPS_DASHBOARD.md), [`BROKEN_REGISTER.md`](../state/BROKEN_REGISTER.md), `~/.dharma` evidence |
-| Active build track | [`ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md`](../plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md), [`NEXT_10_SUBSTRATE_TODO.md`](../plans/NEXT_10_SUBSTRATE_TODO.md), [`HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](../plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md) |
+| Active build track | [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml), [`active_track_evidence.md`](../../reports/governance/active_track_evidence.md), current `make onboard` output |
 | Persistent agents | Check the current branch for `docs/agents/` and `docs/research/persistent_agents*/`; if absent, ask the operator for the latest packet rather than inventing L4 readiness claims. |
+| Fable 5 hub coordination | [`FABLE5_ONBOARDING_MAP.md`](FABLE5_ONBOARDING_MAP.md), `examples/agents/fable_5_cursor.registration.json`, current `make onboard` output |
 | Docs or governance edits | [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md), [`REPO_GOVERNANCE_AUDIT.md`](../governance/REPO_GOVERNANCE_AUDIT.md) |
 | Doctrine/telos | [`OPERATIONAL_DOCTRINE.md`](../doctrine/OPERATIONAL_DOCTRINE.md), [`LIVE_ROADMAP.md`](../doctrine/LIVE_ROADMAP.md), [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md) |
 | Foundations/glossary | [`foundations/INDEX.md`](../../foundations/INDEX.md), [`foundations/GLOSSARY.md`](../../foundations/GLOSSARY.md) |

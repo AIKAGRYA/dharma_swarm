@@ -1,0 +1,44 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-15-status-active-track-evidence",
+  "cycle": 15,
+  "builder": "codex_forgewright",
+  "created_at_utc": "2026-06-01T09:26:14Z",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "scope": "Expose active-track governance evidence in the Forge Hydra status artifact without changing external receipt or fitness authority.",
+  "files": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/governance/active_track_evidence.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-15/verifier_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-15/completion_audit.md"
+  ],
+  "result": {
+    "active_track_completion": "7/8",
+    "active_track_failed_criteria": 1,
+    "active_track_external_receipt_witness_gaps": 1,
+    "external_acted_receipts": 0,
+    "archive_fitness_authority": "none_from_this_status_artifact"
+  },
+  "verification": [
+    "make onboard -> pass",
+    "py_compile forge_hydra_status/test_forge_hydra_status -> pass",
+    "pytest tests/test_forge_hydra_status.py -q --tb=short -> 7 passed, 1 warning",
+    "pytest tests/test_forge_hydra_status.py tests/test_dense_code_gym.py -q --tb=short -> 10 passed, 1 warning",
+    "forge_hydra_status.py generator -> pass",
+    "json.tool status_artifact.json -> pass"
+  ],
+  "authority": {
+    "external_confirmed": false,
+    "external_contact": false,
+    "fitness_changed": false,
+    "canonical_receipt": "not_attempted_no_mission_environment"
+  },
+  "blockers": [
+    "Real first external receipt witness remains missing and operator/external-authority gated.",
+    "GitNexus current-worktree impact unavailable: /Users/dhyana/dharma_swarm is not registered in the MCP index."
+  ]
+}

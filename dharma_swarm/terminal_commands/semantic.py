@@ -14,6 +14,11 @@ from dharma_swarm.terminal_commands._helpers import (
     _run,
 )
 
+# Restored after being lost in the dgc_cli → terminal_commands extraction
+# (8a5a8cd52); original definition recovered from d7af817ac.
+_DEFAULT_GRAPH_PATH = DHARMA_STATE / "semantic" / "concept_graph.json"
+
+
 def _resolve_graph_path(graph_path: str | None) -> Path:
     return Path(graph_path) if graph_path else _DEFAULT_GRAPH_PATH
 

@@ -86,3 +86,81 @@ def test_spine_dispatch_timeout_reraises_and_records_timeout_receipt():
         raised = True
     assert raised, "timeout must propagate"
     assert me._last_evidence_receipt.status == "timeout"
+
+
+def _stub_self_with_store(db_path):
+    """Stub self whose runtime lifecycle resolves to a store at db_path —
+    the persistence wire must write to THIS db, never a hardcoded default."""
+    store = types.SimpleNamespace(db_path=db_path)
+    lifecycle = types.SimpleNamespace(_runtime_state_store=lambda: store)
+    me = types.SimpleNamespace(_runtime_lifecycle=lifecycle)
+    return me
+
+
+def test_spine_dispatch_persists_receipt_json_to_the_stores_db(tmp_path):
+    """GATE-1 falsifiability: a flagged dispatch must land its EvidenceReceipt
+    in delegation_runs.receipt_json of the SAME db the run row was written to.
+    (The witness kit counts this column; without this write the gate is
+    unfalsifiable — divergence rounds 1+2 findings.)"""
+    import json
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
+    conn.execute(
+        "INSERT INTO delegation_runs (task_id, status) VALUES ('t-persist', 'running')"
+    )
+    conn.commit()
+    conn.close()
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-persist")
+    result = asyncio.run(
+        Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0)
+    )
+    assert result == "RUN_RESULT"
+
+    conn = sqlite3.connect(db_path)
+    row = conn.execute(
+        "SELECT receipt_json FROM delegation_runs WHERE task_id='t-persist'"
+    ).fetchone()
+    conn.close()
+    assert row is not None and row[0], "receipt_json must be populated"
+    blob = json.loads(row[0])
+    assert blob["task_id"] == "t-persist"
+    assert blob["operation"] == "invoke_agent"
+    assert blob["receipt_id"] == str(me._last_evidence_receipt.receipt_id)
+
+
+def test_spine_dispatch_zero_row_persist_is_loud_not_silent(tmp_path, caplog):
+    """A receipt whose task_id matches NO delegation_runs row must surface as a
+    warning (persist_receipt raises; the wire's fail-open logs it) — never as a
+    silent 0-row success that leaves the witness flat with no diagnostic."""
+    import logging
+    import sqlite3
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT)")
+    conn.commit()
+    conn.close()  # table exists, but NO row for this task
+
+    class Runner:
+        async def run_task(self, task):
+            return "RUN_RESULT"
+
+    me = _stub_self_with_store(db_path)
+    td = _stub_td(task_id="t-orphan")
+    with caplog.at_level(logging.WARNING):
+        result = asyncio.run(
+            Orchestrator._run_task_via_spine(me, Runner(), object(), td, 5.0)
+        )
+    assert result == "RUN_RESULT", "dispatch must not break on persistence failure"
+    assert any(
+        "NOT persisted" in rec.message for rec in caplog.records
+    ), "0-row persist must produce a visible warning"
