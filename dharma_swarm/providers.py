@@ -556,7 +556,7 @@ class NVIDIANIMProvider(LLMProvider):
 
         finish_reason = choices[0].get("finish_reason") if choices else None
         return LLMResponse(
-            content=message.get("content") or "",
+            content=_extract_openai_compatible_message_text(message),
             model=str(data.get("model") or payload["model"]),
             usage=usage,
             tool_calls=tool_calls,
@@ -1363,7 +1363,7 @@ class SiliconFlowProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1437,7 +1437,7 @@ class TogetherProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1511,7 +1511,7 @@ class FireworksProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1585,7 +1585,7 @@ class GoogleAIProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1659,7 +1659,7 @@ class SambaNovaProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1733,7 +1733,7 @@ class MistralProvider(LLMProvider):
             for tc in (msg.tool_calls or [])
         ]
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},
@@ -1800,7 +1800,7 @@ class ChutesProvider(LLMProvider):
         choice = resp.choices[0]
         msg = choice.message
         return LLMResponse(
-            content=msg.content or "", model=resp.model,
+            content=_extract_openai_compatible_message_text(msg), model=resp.model,
             usage={"prompt_tokens": resp.usage.prompt_tokens,
                    "completion_tokens": resp.usage.completion_tokens,
                    "total_tokens": resp.usage.total_tokens} if resp.usage else {},

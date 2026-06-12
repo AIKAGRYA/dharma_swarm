@@ -1,0 +1,3 @@
+2026-06-12T00:52:15Z START attempt3
+2026-06-12T00:52:48Z STEP1 daemon tree identified: /Users/dhyana/dharma_swarm_main (pid 16574, python3.11 editable install)
+2026-06-12T00:53:37Z STEP2a seat fix read (af7991aab in dharma_swarm_live); daemon tree already has bounded scan STAGED, uncommitted
