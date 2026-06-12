@@ -145,7 +145,14 @@
       "seams/**",
       "dharma_swarm/inter_agent/**",
       "inter_agent/**",
-      "docs/ops/**"
+      "docs/ops/**",
+      ".swarm_collab/**",
+      "docs/agent_tasks/**",
+      "docs/inside_swarm/**",
+      "docs/plans/**",
+      "docs/specs/**",
+      "docs/sovereign_holons/**",
+      "dharma_swarm/chetana/claude_code_plugin/**"
     ],
       "registered": [
         "AGENTS.md",
@@ -179,6 +186,9 @@
       "docs/vision_maps/NORTH_STAR.md",
       "docs/vision_maps/2026-05-30_binocular_witness_seer_northstar.md",
       "docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md",
+      "docs/vision_maps/MASTER_2026-06-10_anatomy_altitude_integration.md",
+      "docs/vision_maps/MASTER_2026-06-10_leverage_synthesis.md",
+      "INTERFACE_MISMATCH_MAP.md",
       "docs/state/LIVE_OPS_DASHBOARD.md",
       "docs/state/BROKEN_REGISTER.md",
       "docs/governance/CANONICAL_DOC_STACK.md",

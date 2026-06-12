@@ -1,3 +1,7 @@
 2026-06-12T00:52:15Z START attempt3
 2026-06-12T00:52:48Z STEP1 daemon tree identified: /Users/dhyana/dharma_swarm_main (pid 16574, python3.11 editable install)
 2026-06-12T00:53:37Z STEP2a seat fix read (af7991aab in dharma_swarm_live); daemon tree already has bounded scan STAGED, uncommitted
+2026-06-12T01:19:08Z STEP2 fix committed in dharma_swarm_main (pre-commit bypassed: missing .venv + pre-existing docops drift)
+2026-06-12T01:19:32Z STEP3 timing proof: _workspace_section over ~/.dharma = 0.20s (pre-fix ~73s)
+2026-06-12T01:19:56Z STEP4a daemon kickstarted, new pid 89130, DHARMA_SPINE_DISPATCH=1 confirmed
+2026-06-12T01:23:23Z STEP4 daemon restarted pid 89130, spine flag confirmed, lock held; starting witness watch

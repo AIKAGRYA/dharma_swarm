@@ -131,12 +131,22 @@ Build organs 5 + 6 of `STATE_OF_TRUTH.md` and that seat is ours.
 
 ---
 
+## Addendum 2026-06-12 — Hermes Agent re-verified (the frontier moved in 3 days' worth of releases)
+
+Fresh primary-source check (github.com/NousResearch/hermes-agent README + RELEASE_v0.15.0 + v2026.5.29/v2026.6.5 release notes, hermes-agent.nousresearch.com/docs):
+
+- **Velocity:** ~190k stars, 390 contributors, 17 releases since 2025-07; v0.15.0 alone = 1,302 commits / 747 PRs. Conclusion unchanged but sharpened: **we cannot and should not out-velocity commodity harness plumbing.** Include it; don't rebuild it.
+- **What Hermes now ships** (beyond the Feb-2026 row in the table): 20+ messaging platforms from one gateway; built-in cron + webhooks; profiles (isolated config/sessions/skills/memory per instance) + global `SOUL.md` personas; skills hub (19,932 catalog entries, agentskills.io standard); MCP client + `hermes mcp serve`; six terminal backends incl. serverless persistence (Daytona/Modal); git-worktree isolation; filesystem checkpoints/rollback; **kanban multi-agent platform** — orchestrator auto-decomposition, swarm topology (root → parallel workers → **gated verifier** → **gated synthesizer**, shared blackboard), per-task model overrides, worktree-per-task; promptware/Brainworm defense at three chokepoints; Atropos RL trajectory export.
+- **Strategic read — convergent evolution toward the empty seat:** Hermes' kanban now has *gated verifiers* and *prompt-injection chokepoints* — action-safety and task-verification are commoditizing fast. What remains unshipped anywhere: **identity/value governance** (telos gates bound to who the agent *is*), **receipts as a truth spine** (EvidenceReceipt-grade, externally re-readable), and **bounded self-evolution through a policy door**. The seat is still empty, but the wall clock is running.
+- **Include-directive (operator-ratifiable):** Hermes Agent is MIT and provider-agnostic — it can serve as a commodity **body** for a holon: one Hermes *profile* per holon, `SOUL.md` projected from `~/.dharma/agents/<name>/prompt_variants/active.txt`, free-model routing, cron pulse, Telegram reachability — while dharma_swarm stays the **governing organism** (identity seed, kill/budget, talk receipts, witness, evolution archive). Same pattern extends to OpenHands (coding hands) and Claude Code/Codex (dev seats): **one soul, many bodies** — the `agent.seed.yaml` contract from `04_FRONTIER_DOSSIER.md` is the projection surface.
+- Peer-table delta: Hermes row Self-evolve stays 🟢, Self-govern stays 🔴 (sandboxing + command approval + promptware defense = action safety, not value governance). OpenClaw lineage note: Hermes ships `hermes claw migrate` — it is positioning as the claw-family successor.
+
 ## Sources
 - Anthropic, *Scaling Managed Agents: Decoupling the brain from the hands* (engineering blog, 2026); anthropics/skills `managed-agents-overview.md`.
 - Cognition, *Don't Build Multi-Agents* (Jun 2025) + *Multi-Agents: What's Actually Working* (2026).
 - *Live-SWE-agent: Self-Evolving Software Agents* (arXiv 2511.13646); *A Self-Improving Coding Agent / SICA* (arXiv 2504.15228); *Darwin Gödel Machine* (arXiv 2505.22954); *Huxley-Gödel Machine*; *SWE-RL* (Meta, Dec 2025); *SWE-EVO* (arXiv 2512.18470).
-- Nous Research Hermes Agent docs + NVIDIA NemoClaw blog.
+- Nous Research Hermes Agent docs + NVIDIA NemoClaw blog; hermes-agent README + RELEASE_v0.15.0/v0.15.1 notes (re-verified 2026-06-12).
 - `awesome-harness-engineering` (2026 taxonomy); A2A Protocol; Open Agent Passport / SPIFFE auth drafts.
 - This folder's `00_RESEARCH_DOSSIER.md`, `04_FRONTIER_DOSSIER.md` (52-source landscape).
 
-*Living doc — re-verify quarterly; the frontier moves monthly.*
+*Living doc — re-verify quarterly; the frontier moves monthly. Last re-verification: 2026-06-12 (Hermes Agent).*
