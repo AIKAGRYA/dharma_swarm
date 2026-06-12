@@ -1,0 +1,25 @@
+{
+  "artifact_hashes": {
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/adapter_readiness_packet.json": "f7711471dbbb63c429b3b7d0e3a32070fc88f039f59ed829f9b6a412cd64a1f0",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/authority_fence_receipts.json": "f21014cf6fd636dae25fefce88489435205e22c6556c690d3c3d3a38fc7e8fbe",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/broker_paper_ledger.json": "c2d8363a1fc5a7d3ac215da9bf867d3bde8f9796b4770284592aa516d708fe89",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/builder_report.md": "e816624a449d306505a53be4d715855b1eae238c37f289356932214a5ff44a6f",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/duplicate_order_drill.json": "ac928819bf5094dded948126d7af6c387840a853cc779b1b3733860e32d31664",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/execution_feasibility_packet.json": "7ab04aa2c26314444037914fce4e2936a369b4d01a68247502ffbc9eb1f7abc4",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/kill_switch_drills.json": "4103859161b27299a5ce78ea77074db959a72d90572b7521f836f8aea4aba258",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/lifecycle_receipts.json": "6562d044b2284e4c68aece664517303c19bf2a5afa1c74f142a103ad9331383e",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/matched_reconciliation_packet.json": "368068d2c313371d4afb36fec506acd17c21267962c29756b7bb2adb936b2b3c",
+    "reports/capital_lab/goal-b-broker-paper-execution-membrane-continuation-20260605T141918Z/mismatch_reconciliation_packet.json": "4102861f781156ba41d59760659e9f85c0a2ede1e52c810f5080b259bc0e135d"
+  },
+  "broker_write_authority": false,
+  "clean": false,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "live_authority": false,
+  "live_readiness": 0,
+  "local_loop_passed": true,
+  "manifest_hash_note": "builder_manifest.json is excluded from artifact_hashes to avoid a self-referential hash",
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "schema_version": "goal_b.builder_manifest.v1",
+  "status": "fixture_membrane_complete_blocked_live_authority_detected",
+  "task_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation-t02-builder"
+}

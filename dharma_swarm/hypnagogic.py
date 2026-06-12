@@ -21,6 +21,8 @@ from typing import Any
 
 import aiofiles
 
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
+from dharma_swarm.models import ProviderType
 from dharma_swarm.runtime_provider import (
     PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
     complete_via_preferred_runtime_providers,
@@ -28,6 +30,8 @@ from dharma_swarm.runtime_provider import (
 
 _DREAM_FILE = Path.home() / ".dharma" / "subconscious" / "dream_associations.jsonl"
 _JOURNAL_DIR = Path.home() / ".dharma" / "subconscious" / "journal"
+_HYPNAGOGIC_OPENROUTER_MODEL = canonical_default_model(ProviderType.OPENROUTER)
+_HYPNAGOGIC_ANTHROPIC_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
 
 _HYPNAGOGIC_SYSTEM = """You are in the hypnagogic state. Waking up. The dream is still present.
 The rational mind is just coming online — not fully lit, not dark.
@@ -88,8 +92,8 @@ Keep the hypnagogic voice — half-awake, generative, not yet engineering."""
         response, _provider_config = await complete_via_preferred_runtime_providers(
             system=_HYPNAGOGIC_SYSTEM,
             messages=[{"role": "user", "content": user_prompt}],
-            openrouter_model="anthropic/claude-3.5-sonnet",
-            anthropic_model="claude-sonnet-4-20250514",
+            openrouter_model=_HYPNAGOGIC_OPENROUTER_MODEL,
+            anthropic_model=_HYPNAGOGIC_ANTHROPIC_MODEL,
             max_tokens=3000,
             temperature=0.75,
             provider_order=PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,

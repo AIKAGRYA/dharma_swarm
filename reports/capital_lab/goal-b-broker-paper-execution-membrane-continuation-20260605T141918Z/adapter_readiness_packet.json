@@ -1,0 +1,39 @@
+{
+  "adapter_id": "goal_b_fixture_broker_paper_membrane",
+  "adapter_scope": "fixture_only_live_authority_fenced",
+  "authority_risks": [
+    "agni_hyperliquid_live_capable_repo_present",
+    "agni_hyperliquid_private_key_alias_present",
+    "fixture_proof_does_not_certify_external_broker_paper_readiness"
+  ],
+  "blockers": [
+    "blocked_live_authority_detected:hyperliquid_live_capable_repo_present",
+    "blocked_live_authority_detected:HYPERLIQUID_PRIVATE_KEY_alias_present",
+    "blocked_clean_status:external_broker_paper_receipts_missing",
+    "blocked_clean_status:fixture_only_evidence"
+  ],
+  "broker_snapshot_read_available": true,
+  "broker_write_authority": false,
+  "clean": false,
+  "duplicate_prevention_available": true,
+  "external_broker_paper_evidence": false,
+  "fixture_or_internal_only": true,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "idempotent_client_order_ids": true,
+  "lifecycle_events_supported": {
+    "ack": true,
+    "cancel": true,
+    "expire": true,
+    "full_fill": true,
+    "partial_fill": true,
+    "reject": true,
+    "submit": true
+  },
+  "live_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T141918Z-goal-b-broker-paper-execution-membrane-continuation",
+  "packet_type": "AdapterReadinessPacket",
+  "reconciliation_available": true,
+  "schema_version": "goal_b.adapter_readiness.v1",
+  "status": "fixture_membrane_complete_blocked_live_authority_detected"
+}

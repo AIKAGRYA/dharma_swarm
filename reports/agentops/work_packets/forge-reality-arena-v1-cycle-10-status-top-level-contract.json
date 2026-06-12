@@ -1,0 +1,133 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-v1-cycle-10-status-top-level-contract",
+  "created_at_utc": "2026-06-02T15:24:45Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-master",
+  "mission_id": "20260602-forge-reality-arena-v1-10h",
+  "cycle": {
+    "v1_cycle": 10,
+    "operator_cycle": 10,
+    "label": "status-top-level-contract"
+  },
+  "result": "Promoted the v1 scorecard machine contract into status_artifact.json top-level fields so future agents can identify mission_id, run_id, completion_state, score, receipts, authority boundary, and remaining gates without parsing nested scorecard prose.",
+  "changed_files": [
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/agentops/work_packets/forge-reality-arena-v1-cycle-10-status-top-level-contract.json",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/forge/forge-reality-arena/v1_scorecard.json",
+    "reports/forge/forge-reality-arena/v1_scorecard.md",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.md",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/live-ops-census/no-probes.json"
+  ],
+  "status_top_level_contract": {
+    "schema_version": "forge_reality_arena_status_top_level_contract.v1",
+    "source": "v1_scorecard",
+    "field_count": 52,
+    "json_assertion_status": "passed",
+    "status_fields_match_scorecard": true
+  },
+  "score": {
+    "before": 100,
+    "after": 100,
+    "delta": 0,
+    "completion_state": "internal_exhausted_external_gated",
+    "receipt_count_after": 13,
+    "latest_master_cycle": 50,
+    "latest_operator_cycle": 36,
+    "remaining_internal_packets": [],
+    "remaining_external_gates": [
+      "guardian_or_external_acted_receipt_required",
+      "guardian_countersign_required_before_archive_fitness_mutation",
+      "operator_external_action_lease_required_before_sparse_lane_action"
+    ]
+  },
+  "verification": [
+    {
+      "command": "mcp__gitnexus.impact(repo='dharma_swarm', target='summarize_reality_arena_status', file_path='scripts/runtime/forge_reality_arena_status.py', kind='Function', direction='upstream')",
+      "exit_code": 0,
+      "result": "blocked: target not found in stale/sibling GitNexus index; used manual file-level impact for status generator, CLI writer, AgentOps packet, CWT readout, and tests"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_reality_arena_status.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass"
+    },
+    {
+      "command": "pytest -q tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "result": "pass: 25 passed, 1 existing pytest config warning"
+    },
+    {
+      "command": "python3 scripts/governance/check_track_status.py",
+      "exit_code": 0,
+      "result": "pass: dharma-reward-forge-v0 and goodworks-dgm-core-2026-05 remain shippable"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "result": "pass: authority scan artifact regenerated with 0 violations"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "result": "pass: fitness dry-run artifact regenerated with no fitness mutation"
+    },
+    {
+      "command": "python3 scripts/runtime/live_ops_census.py --no-probes",
+      "exit_code": 0,
+      "result": "pass: no-probe census generated with 0 probe failures and 0 source-cache mismatches"
+    },
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "result": "pass: onboard reports Forge mission projection-only, internally complete, external-gated, with NATS live ack verified"
+    },
+    {
+      "command": "python3 scripts/runtime/forge_reality_arena_status.py --state-dir /Users/dhyana/.dharma/forge_reality_arena_master",
+      "exit_code": 0,
+      "result": "pass: regenerated status, scorecard, AgentOps status, and CWT readout"
+    },
+    {
+      "command": "python3 JSON status/scorecard/agentops/cwt top-level contract assertions",
+      "exit_code": 0,
+      "result": "pass: all 52 promoted status fields match v1_scorecard; score=100; receipt_count=13; remaining external gates=3"
+    }
+  ],
+  "artifact_hashes": {
+    "scripts/runtime/forge_reality_arena_status.py": "sha256:d6caa8d7a6b2c1336578e47b60efe1692229c98dfc85db6c7d071806b41adf0c",
+    "tests/test_forge_reality_arena_status.py": "sha256:afc74bdfa7656485a64c986b349f9be2d16d68ac23d9a5d53661b10e4a5ad700",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:f3ec51486ebcad60d43c291c2f928a9852a3bbc89b22e1f198c3d4c1594a0d56",
+    "reports/forge/forge-reality-arena/v1_scorecard.json": "sha256:f501575bc883d1bad97f7e876814c0aa33674f7615f6497f8614b3acf64ff244",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:04ab46f19b9232204541d400acb8b4dbe1b9cac35097bec102432f50055542bb",
+    "reports/forge/forge-reality-arena/control-watch-tower/forge_reality_arena_readout.json": "sha256:5e4f8bd03246999c70dd6bd142ca595b36e1b13092330c6a21cb5463ead7101f",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json": "sha256:38e4f579a78cdd3d34318454944f46f9b2106a5852126ee744b83b99bdbd76c3",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:64f691b619ef1a87461fb451c29a424f79c2d455892f4bf4eeee91644dcb1f5e",
+    "reports/forge/forge-reality-arena/live-ops-census/no-probes.json": "sha256:b4ad603d246f8aa93c39112902b206d45c9a1cd423d49f3985e982f1f1c6320c"
+  },
+  "authority_boundary": {
+    "repo_local_only": true,
+    "external_actions_performed": false,
+    "external_state_mutated": false,
+    "archive_mutated": false,
+    "fitness_mutated": false,
+    "external_confirmed_set": false,
+    "dry_run_only": true
+  },
+  "blockers": [
+    "gitnexus_target_summarize_reality_arena_status_not_found",
+    "guardian_or_external_acted_receipt_required",
+    "guardian_countersign_required_before_archive_fitness_mutation",
+    "operator_external_action_lease_required_before_sparse_lane_action"
+  ],
+  "next_packet": "External Beast or Measurement Guardian lease packet; request explicit operator approval before any external action or archive fitness mutation."
+}

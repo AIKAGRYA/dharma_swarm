@@ -1,0 +1,26 @@
+{
+  "accepted": false,
+  "authority": "evidence_only",
+  "blockers": [
+    "independent_acceptance_requires_clean_strategy_and_score_at_or_above_80"
+  ],
+  "broker_write_authority": false,
+  "capital_permission": "none",
+  "clean": false,
+  "evaluator": "deterministic_membrane_self_check_not_external_certifier",
+  "generated_at": "2026-06-05T14:01:00Z",
+  "harness_run_id": "dharma-capital-lab-goal-a-alpha-evidence-12h-20260605T140100Z",
+  "live_authority": false,
+  "live_order_authority": false,
+  "live_readiness": 0,
+  "mission_id": "20260605T140100Z-dharma-capital-lab-goal-a-alpha-evidence-12h",
+  "packet_hash": "d09dc53405ee547dde7bec1416e759677873f8630d49f5f9b861767c96c4bda5",
+  "paper_only": true,
+  "run_id": "20260605T140100Z",
+  "schema_version": "dharma.capital_lab.alpha_evidence.v2.independent_evaluator_receipt",
+  "score_observed": 41.73,
+  "secret_value_recorded": false,
+  "secret_values_read": false,
+  "status": "alpha_evidence_partial_clean_false",
+  "withdrawals_or_transfers": false
+}

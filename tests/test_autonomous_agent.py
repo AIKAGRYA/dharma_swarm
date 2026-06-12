@@ -18,7 +18,17 @@ from dharma_swarm.autonomous_agent import (
     AgentResult,
     AutonomousAgent,
     _DANGEROUS_PATTERNS,
+    cli_wake,
 )
+from dharma_swarm.models import ProviderType
+
+# Cross-lane drift guard: the TUI-alias model resolver ships on the
+# holon/spine-v1 lane and is absent here. Skip its tests instead of breaking
+# collection for the whole module.
+try:
+    from dharma_swarm.autonomous_agent import _resolve_agent_model_override
+except ImportError:
+    _resolve_agent_model_override = None
 
 
 # ---------------------------------------------------------------------------
@@ -562,6 +572,61 @@ class TestPresetAgents:
         witness = PRESET_AGENTS["witness"]
         assert "write_file" not in witness.allowed_tools
 
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="claude_code preset lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    def test_preset_agents_use_subscription_claude_code_lane(self):
+        for ident in PRESET_AGENTS.values():
+            assert ident.provider == "claude_code"
+            assert ident.model == "claude-sonnet-4-6"
+
+
+@pytest.mark.skipif(
+    _resolve_agent_model_override is None,
+    reason="_resolve_agent_model_override not on this branch (holon/spine-v1 lane drift)",
+)
+class TestCliWakeModelRouting:
+    def test_resolves_tui_model_aliases(self):
+        assert _resolve_agent_model_override("gemini") == (
+            "openrouter_direct",
+            "google/gemini-2.5-pro",
+        )
+        assert _resolve_agent_model_override("glm-5") == ("ollama", "glm-5:cloud")
+        assert _resolve_agent_model_override("codex") == ("codex", "gpt-5.4")
+
+    def test_resolves_explicit_provider_model_route(self):
+        assert _resolve_agent_model_override("openrouter:anthropic/claude-opus-4-6") == (
+            "openrouter_direct",
+            "anthropic/claude-opus-4-6",
+        )
+        assert _resolve_agent_model_override("google_ai:gemini-2.5-flash") == (
+            "google_ai",
+            "gemini-2.5-flash",
+        )
+
+    @pytest.mark.asyncio
+    async def test_cli_wake_model_override_does_not_mutate_preset(self, monkeypatch, capsys):
+        original = PRESET_AGENTS["reviewer"]
+        captured: list[AgentIdentity] = []
+
+        async def fake_wake(self, task):
+            captured.append(self.identity)
+            assert task == "check routing"
+            return AgentResult(summary="done")
+
+        monkeypatch.setattr(AutonomousAgent, "wake", fake_wake)
+
+        await cli_wake("reviewer", "check routing", model="gemini")
+
+        assert captured
+        assert captured[0].provider == "openrouter_direct"
+        assert captured[0].model == "google/gemini-2.5-pro"
+        assert PRESET_AGENTS["reviewer"] is original
+        assert PRESET_AGENTS["reviewer"].provider == "claude_code"
+        assert PRESET_AGENTS["reviewer"].model == "claude-sonnet-4-6"
+        assert "Waking reviewer on openrouter:google/gemini-2.5-pro" in capsys.readouterr().out
+
 
 # ---------------------------------------------------------------------------
 # LLM provider dispatch
@@ -607,6 +672,36 @@ class TestCallLLM:
         agent._call_codex = AsyncMock(return_value={"text": [], "tool_uses": []})
         await agent._call_llm("sys", [], [])
         agent._call_codex.assert_awaited_once()
+
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="claude_code dispatch lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    @pytest.mark.asyncio
+    async def test_claude_code_dispatch(self):
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s", provider="claude_code",
+        )
+        agent = AutonomousAgent(ident)
+        agent._call_claude_code = AsyncMock(return_value={"text": [], "tool_uses": []})
+        await agent._call_llm("sys", [], [])
+        agent._call_claude_code.assert_awaited_once()
+
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="openrouter_direct dispatch lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    @pytest.mark.asyncio
+    async def test_openrouter_direct_dispatch(self):
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s", provider="openrouter_direct",
+        )
+        agent = AutonomousAgent(ident)
+        agent._call_direct_runtime_provider = AsyncMock(return_value={"text": [], "tool_uses": []})
+        await agent._call_llm("sys", [], [])
+        agent._call_direct_runtime_provider.assert_awaited_once_with(
+            ProviderType.OPENROUTER, "sys", [], []
+        )
 
 
 # ---------------------------------------------------------------------------

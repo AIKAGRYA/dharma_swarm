@@ -1,0 +1,140 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-2",
+  "created_at_utc": "2026-06-02T03:55:09Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena Hydra master spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": 2,
+  "canonical_ds_goal_context_available": false,
+  "repo_local_receipt_required": true,
+  "result": "Added a local Docker sandbox probe and surfaced its outcome in Forge Reality Arena status without external contact or archive fitness mutation.",
+  "outputs": [
+    "scripts/runtime/forge_docker_sandbox.py",
+    "tests/test_forge_docker_sandbox.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "artifact_hashes": {
+    "scripts/runtime/forge_docker_sandbox.py": "sha256:280d2795b817b75f5a804e4147b4db8ce0f6bf32a416822820384c4f30008c45",
+    "tests/test_forge_docker_sandbox.py": "sha256:950199e98398944d87633f75a070f5bdd9279d501c6ebd74b4179aeda54e7e28",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json": "sha256:5fe0d1b4899e8afbb7fe49b77f0b3bf74bb9e6921723ee25d960e6163125d0d7",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:d0c2117c8367dd44458b6b5c0890636c520294ad69f6abc75adff8f9aca29cb3",
+    "reports/forge/forge-reality-arena/status.md": "sha256:e21d4abf289945697f69ff34edfd80c2a8480df7c08e41bfbc8852494c41da5f",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:181e2def2c14e6bdc9fb89c8d272aabcfd38d316b08962269a02c5cb47a7d623"
+  },
+  "status_snapshot": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 6,
+    "transfer_passed_reps": 3,
+    "base_memorized_candidates_denied": 4,
+    "coordination_scenarios_run": 20,
+    "coordination_unique_scenarios": 10,
+    "coordination_min_repetitions_per_scenario": 2,
+    "coordination_20_run_target_met": true,
+    "coordination_scenarios_passed": 20,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "docker_sandbox_smoke_passed": true,
+    "docker_sandbox_blockers": 0,
+    "external_anchors_observed_not_owned": 2,
+    "fitness_eligible_receipts": 0,
+    "blocked_authority_items": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "docker_sandbox": {
+    "probe_status": "smoke_passed",
+    "server_version": "29.2.1",
+    "selected_image": "python:3.11-slim",
+    "network_disabled": true,
+    "pull_policy_never": true,
+    "external_repo_contact": false,
+    "blockers": []
+  },
+  "acceptance": {
+    "docker_probe_completed": true,
+    "docker_smoke_passed": true,
+    "focused_arena_tests_passed": true,
+    "status_artifacts_regenerated": true,
+    "external_actions_performed": false,
+    "archive_fitness_changed": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "summary": "passed; DRF remains primary active track and no external action was performed"
+    },
+    {
+      "command": "npx gitnexus analyze",
+      "exit_code": 0,
+      "summary": "indexed /Users/dhyana/dharma_swarm at c8efcff with 110790 nodes and 191252 edges"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_docker_sandbox.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "11 passed, 1 existing PytestConfigWarning for unknown timeout option"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_docker_sandbox.py scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "summary": "passed"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 2 && PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py && PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py && PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "summary": "regenerated coordination, dense, Docker sandbox, status, and AgentOps status artifacts"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "21 passed, 1 existing PytestConfigWarning for unknown timeout option"
+    },
+    {
+      "command": "python3 -m json.tool reports/agentops/work_packets/forge-reality-arena-master-cycle-2.json >/dev/null && python3 -m json.tool reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json >/dev/null && python3 -m json.tool reports/forge/forge-reality-arena/status_artifact.json >/dev/null && python3 -m json.tool reports/agentops/work_packets/forge-reality-arena-status.json >/dev/null",
+      "exit_code": 0,
+      "summary": "repo-local receipt, Docker verifier, status artifact, and AgentOps status JSON parsed successfully"
+    },
+    {
+      "command": "npx gitnexus detect-changes --scope all",
+      "exit_code": 1,
+      "summary": "blocked by duplicate GitNexus repository registry entries; current checkout not selectable through detect-changes"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m ruff check scripts/runtime/forge_docker_sandbox.py scripts/runtime/forge_reality_arena_status.py tests/test_forge_docker_sandbox.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 1,
+      "summary": "not run as static check because ruff is not installed in the active venv"
+    }
+  ],
+  "tooling_notes": [
+    "GitNexus CLI status reports /Users/dhyana/dharma_swarm up to date after analyze.",
+    "GitNexus MCP and CLI impact commands still route to duplicate named registry entries and did not expose this checkout for symbol impact; edits were kept scoped and verified with focused tests.",
+    "Ruff is unavailable in the active venv, so no lint installation or broad tooling mutation was attempted."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "blockers": [
+    "GitNexus MCP registry still does not expose /Users/dhyana/dharma_swarm for symbol impact even after successful CLI analyze."
+  ]
+}

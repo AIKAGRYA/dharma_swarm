@@ -1,0 +1,63 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-18-github-receipt-guard-hardening",
+  "cycle": 18,
+  "status": "complete",
+  "agent": "codex_forgewright",
+  "created_at_utc": "2026-06-01T09:57:02Z",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "scope": "Internal hardening for the v0.1.3 GitHub external receipt guard.",
+  "outputs": [
+    "reports/forge/v0.1.3-first-external-receipt/cycle-18/verifier_artifact.json",
+    "reports/forge/v0.1.3-first-external-receipt/cycle-18/completion_audit.md",
+    "reports/forge/v0.1.3-first-external-receipt/cycle-18/plumbing_guard_probe.json",
+    "reports/forge/v0.1.3-first-external-receipt/cycle-18/swarm_fork_guard_event.json",
+    "reports/forge/v0.1.3-first-external-receipt/cycle-18/swarm_fork_guard_result.json",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md"
+  ],
+  "code_changes": [
+    "scripts/runtime/forge_github_receipt.py",
+    "tests/test_forge_github_receipt.py"
+  ],
+  "acceptance": {
+    "repo_guard_blocks_swarm_owner_or_fork_like_repo": true,
+    "denied_receipts_have_zero_score": true,
+    "external_acted_receipts_created": 0,
+    "archive_fitness_authority": "none",
+    "all_passed": true
+  },
+  "tests": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_github_receipt.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "6 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_github_receipt.py tests/test_evolution_receipt.py tests/test_evolution_promotion.py tests/test_forge_hydra_status.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "30 passed, 1 warning"
+    },
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "summary": "active track remains 7/8; first_external_receipt_witness missing"
+    }
+  ],
+  "blockers": [
+    "first_external_receipt_witness remains operator/external-authority gated",
+    "canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE/DS receipt environment variable exists",
+    "GitNexus current-worktree impact remains unavailable for untracked Forge receipt symbols"
+  ],
+  "authority_boundary": {
+    "external_contact_performed": false,
+    "pull_request_submitted": false,
+    "issue_comment_posted": false,
+    "bounty_claimed": false,
+    "payment_requested": false,
+    "external_confirmed": false,
+    "archive_fitness_updated": false
+  }
+}

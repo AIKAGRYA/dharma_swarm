@@ -1,0 +1,72 @@
+{
+  "schema_version": "agentops.work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-81",
+  "cycle": 81,
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "recorded_at_utc": "2026-06-02T05:06:02Z",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "state_dir": "/Users/dhyana/.dharma/forge_external_beast",
+  "objective": "Move Dharma Reward Forge toward a real external acted receipt via a bounded public GitHub contribution.",
+  "public_action_taken": true,
+  "public_actions": [
+    {
+      "type": "pull_request_opened",
+      "repository": "stellarkit-lab-devtools/stellarkit-api",
+      "issue": 220,
+      "pull_request": 223,
+      "pr_url": "https://github.com/stellarkit-lab-devtools/stellarkit-api/pull/223",
+      "branch": "codex/issue-220-xlm-stroop-convert",
+      "commit_sha": "7e58f72168b4d4d76b14ad98391b18cdf05a8078",
+      "external_maintainer_acted": false
+    }
+  ],
+  "target_readiness_packet": "reports/forge/external-beast/targets/stellarkit-lab-devtools-stellarkit-api-issue-220/cycle-081-target-readiness.md",
+  "tests": [
+    {
+      "command": "npx gitnexus status",
+      "outcome": "passed"
+    },
+    {
+      "command": "node --check tests/api.test.js",
+      "cwd": "/Users/dhyana/.dharma/forge_external_beast/target-clones/stellarkit-api",
+      "outcome": "passed"
+    },
+    {
+      "command": "npx jest tests/api.test.js --runInBand --coverage=false",
+      "cwd": "/Users/dhyana/.dharma/forge_external_beast/target-clones/stellarkit-api",
+      "outcome": "passed: 78 passed, 2 skipped"
+    },
+    {
+      "command": "npm run lint",
+      "cwd": "/Users/dhyana/.dharma/forge_external_beast/target-clones/stellarkit-api",
+      "outcome": "passed with pre-existing warnings"
+    },
+    {
+      "command": "npm test -- --runInBand",
+      "cwd": "/Users/dhyana/.dharma/forge_external_beast/target-clones/stellarkit-api",
+      "outcome": "failed with unrelated baseline failures: 40 suites passed, 10 failed"
+    },
+    {
+      "command": "python scripts/runtime/forge_github_receipt.py --dry-run-probes --out /Users/dhyana/.dharma/forge_external_beast/cycle-081-receipt-guard/dry-run-probes.json",
+      "outcome": "passed"
+    },
+    {
+      "command": "python scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir /Users/dhyana/.dharma/forge_external_beast/cycle-081-status --active-track-evidence /dev/null",
+      "outcome": "passed"
+    },
+    {
+      "command": "python scripts/runtime/forge_fitness_boundary_dry_run.py --reports-root reports/forge --arena-root reports/forge/reality-arena --output-dir /Users/dhyana/.dharma/forge_external_beast/cycle-081-fitness-boundary",
+      "outcome": "expected refusal: exit 1"
+    }
+  ],
+  "authority": {
+    "external_confirmed_set": false,
+    "archive_fitness_changed": false,
+    "witness_modified": false,
+    "payment_action_taken": false,
+    "bounty_or_reward_claimed": false,
+    "v2_escalation": false
+  },
+  "next_action": "watch external PRs for material maintainer action"
+}

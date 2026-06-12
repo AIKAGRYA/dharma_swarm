@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 4 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -90,6 +90,43 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+
+### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
+
+**Track id:** `runtime-truth-spine-adoption-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-10 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06
+**Owns surfaces:** dharma_swarm/spine/**, dharma_swarm/a2a/a2a_bridge.py, dharma_swarm/orchestrator.py, dharma_swarm/agent_runner.py, scripts/uplift_guards/check_spine_ownership.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+spine-adoption ships end-to-end: every production dispatch flows through
+invoke_agent() and emits exactly one EvidenceReceipt. This track migrates
+the god objects (agent_runner.py, orchestrator.py, a2a_bridge.py) onto
+the shipped spine substrate. Target: 3 production callers outside the
+spine package, zero bypass paths. Substrate-nativeness moves toward 30%+.
+
+Ported 2026-06-10 from the v1 declaration (opened 2026-06-06 on the
+qwen/spine-adoption lane, commit c28951d5b, which closed reconciliation
+in v1) into the v2 portfolio while merging origin/main. In the v2
+multi-track model it runs as a co-equal peer of the reconciliation and
+NATS lanes rather than requiring their closure; reconciliation's open
+status is main's standing declaration and is left to the operator.
+
+**Next items:**
+
+- [code] (blocker) Wire a2a_bridge.submit_via_spine into production dispatch (ingest_trishula_inbox bypass at a2a_bridge.py:307 — Slice 2 per scripts/governance/spine_bypass_report.py).
+- [code] (blocker) orchestrator.py dispatch through invoke_agent behind DHARMA_SPINE_DISPATCH (landed via #557; operator confirms one live EvidenceReceipt on a real dispatch = GATE 1).
+- [code] (blocker) Migrate agent_runner.py run_task through invoke_agent(). Largest surface, last.
+- [code] (blocker) Drain the intentional-bypass allowlist (node_gateway submit endpoints, a2a_client._dispatch_local) and enable allow-list-at-zero in uplift_guards CI.
+- [docs] Author docs/architecture/SPINE_ADOPTION_NARRATIVE.md
+
+**Non-goals:**
+
+- Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
+- Do not decompose agent_runner.run_task beyond invoke_agent() routing.
+- Do not change EvidenceReceipt schema; adopt shipped types unchanged.
+- Do not introduce NATS, Redis, or gRPC in this track (transport belongs to the NATS lane).
+- Do not broadly refactor swarm.py, providers.py, or SwarmManager.
 
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
@@ -169,6 +206,39 @@ runtime-truth rendering or non-goals.
 - Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
 - Do not touch operator_core/** or runtime_state.py.
 
+### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
+
+**Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
+**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
+
+Build A from the composer convergence: merge Verified Composer Command
+Spine v1 with the Sovereign Holon Orchestrator target, bringing
+fable_composer and codex_composer up as the first read-only composer
+holon pair. The track is active as a scoped longrun lane, not as a new
+receipt owner. Command receipts are projections of spine.EvidenceReceipt.
+
+The clean GitHub-main mirror remains the merge target; the active build
+lane currently lives on qwen/spine-adoption because that lane contains
+the holon docs, modules, and verifier tests. The lane must reconcile back
+to main through the normal review path before it is called shipped.
+
+**Next items:**
+
+- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
+- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
+- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
+- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+
+**Non-goals:**
+
+- Do not create a new durable receipt store; project over spine.EvidenceReceipt.
+- Do not send outreach, deploy, push, or open PRs in this track without a later explicit lease.
+- Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
+- Do not merge holon substrate to main without the frozen verifier runbook passing.
+
 **Recently closed tracks:**
 
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
@@ -189,7 +259,7 @@ These are immutable engineering laws for this repository. Violation = architectu
 The `dharma_swarm/` package currently has **389 files at its top level (58.7% of 663 total Python modules)** (V). No new .py file may be added to the top level. New modules must go into an appropriate subdirectory. Existing top-level files will be organized over time.
 
 ### A2: NO DUPLICATE IMPLEMENTATIONS
-Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **24 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
+Before creating a new file for routing, bridging, adapting, or orchestrating, check if one already exists. The repo currently has **26 bridge files** (V), **3 model_routing copies** (2 are identical, 1 is different) (V), **4 orchestrators** (V), **21 adapter files across 8 locations** (V), and **14 router files** (V). Do not add more without deprecating an existing one.
 
 ### A3: NO UNDOCUMENTED SEAMS
 If your code creates a new interface between domains (a bridge, adapter, or protocol), you must update `NAVIGATION.md` with its purpose, entry point, and boundary constraints. Undocumented seams become invisible coupling.
@@ -231,16 +301,16 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **674** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **391 (58.7%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **285,944** | wc -l across dharma_swarm Python modules |
-| Test files | **649** | find tests -name "*.py" -type f |
-| Test functions | **11,119 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **720** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **399 (55.4%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **296,187** | wc -l across dharma_swarm Python modules |
+| Test files | **673** | find tests -name "*.py" -type f |
+| Test functions | **11,299 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **895** | find . -name "*.md" -type f |
-| Markdown total lines | **221,411** | wc -l across all .md |
-| Bridge files | **24** | find dharma_swarm -name "*bridge*.py" |
+| Markdown files | **987** | find . -name "*.md" -type f |
+| Markdown total lines | **234,671** | wc -l across all .md |
+| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
@@ -341,7 +411,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 ### Domain 6: Bridges (Integration Layer)
 
-**24 bridge files** (V), **11,910 total LOC**:
+**26 bridge files** (V), **11,910 total LOC**:
 
 | Bridge | Lines | Importers | Status |
 |--------|-------|-----------|--------|
@@ -526,13 +596,13 @@ This re-audit found errors in the earlier 5-model audit:
 | Error in prior audit | Corrected value |
 |---------------------|----------------|
 | "codex_overnight.py is 10K lines" | **1,008 lines** (V) |
-| "17 bridge files" / "19 bridge files" (self-contradicting) | **24 bridge files** (V) |
+| "17 bridge files" / "19 bridge files" (self-contradicting) | **26 bridge files** (V) |
 | "16 TUI test errors" | **16 total errors: 10 numpy, 2 textual, 1 typer, 1 pytest_asyncio, 1 yaml, 1 tui.app** -- only 3 are TUI-specific (V) |
 | "10 pillars" with "PILLAR_04 missing, PILLAR_11 present" | **10 pillar files exist** (PILLAR_01-03, 05-11; PILLAR_04 never created). Sparse numbering, not 11. (V) |
 | "router_v1.py is LEGACY" | **router_v1.py is ALIVE** -- actively used by providers.py for signal generation (V) |
 | "18 provider classes" (VIVEKA) | **19 classes** (including abstract LLMProvider base); **18 ProviderType enum values** (V) |
 | "engine/ is legacy duplicate of tui/engine/" | **Both are ALIVE** -- engine/ has 41 importers, tui/engine/ has 31 importers. Different purposes. (V) |
-| Bridge count of "30" (Phase 3A) | **24 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
+| Bridge count of "30" (Phase 3A) | **26 actual bridge files** -- the "30" counted test files and non-bridge files with "bridge" in name (V) |
 
 ---
 

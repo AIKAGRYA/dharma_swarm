@@ -2467,7 +2467,11 @@ export function commandTargetTab(command: string): string {
     return "approvals";
   }
 
-  if (["status", "help", "dashboard"].includes(normalized)) {
+  if (normalized === "help") {
+    return "chat";
+  }
+
+  if (["status", "dashboard"].includes(normalized)) {
     return "control";
   }
 
@@ -3851,7 +3855,7 @@ export function eventToTabPatch(event: Record<string, unknown>): {tabId: string;
     if (!output) {
       return [];
     }
-    if (targetPane === "chat" && command) {
+    if (targetPane === "chat" && command && normalizeCommandName(command) !== "help") {
       return [];
     }
     if (targetPane === "repo" && (workspacePayload || isWorkspaceSnapshotContent(output))) {

@@ -300,6 +300,36 @@ def test_provider_scan_accepts_groq_llama_models(tmp_path: Path) -> None:
     assert not any(f.category == "provider_model_mismatch" for f in report.findings)
 
 
+def test_provider_scan_accepts_bare_claude_models_on_claude_code(tmp_path: Path) -> None:
+    repo_root = tmp_path
+    _write(
+        repo_root / "dharma_swarm" / "models.py",
+        "\n".join(
+            [
+                "from enum import Enum",
+                "class ProviderType(str, Enum):",
+                "    CLAUDE_CODE = 'claude_code'",
+            ]
+        ),
+    )
+    _write(
+        repo_root / "dharma_swarm" / "autonomous_agent.py",
+        "\n".join(
+            [
+                "from dharma_swarm.models import ProviderType",
+                "AGENT = {",
+                "    'provider': ProviderType.CLAUDE_CODE,",
+                "    'model': 'claude-sonnet-4-6',",
+                "}",
+            ]
+        ),
+    )
+
+    report = scanner_providers.scan(repo_root=repo_root)
+
+    assert not any(f.category == "provider_model_mismatch" for f in report.findings)
+
+
 def test_lifecycle_scanner_accepts_gate_decision_alias_and_optional_steps(tmp_path: Path) -> None:
     repo_root = tmp_path
     _write(

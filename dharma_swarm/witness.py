@@ -29,7 +29,9 @@ import random
 from datetime import datetime, timezone
 from typing import Any
 
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import _new_id
+from dharma_swarm.models import ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +305,7 @@ class WitnessAuditor:
         )
 
         request = LLMRequest(
-            model="claude-sonnet-4-20250514",
+            model=canonical_default_model(ProviderType.ANTHROPIC),
             messages=[{"role": "user", "content": prompt}],
             system="You are a telos alignment auditor. Respond only with valid JSON.",
             max_tokens=256,

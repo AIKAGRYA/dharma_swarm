@@ -1,0 +1,124 @@
+{
+  "packet_id": "forge-measurement-guardian-cycle-002",
+  "cycle": 2,
+  "recorded_at": "2026-06-01T22:35:55+08:00",
+  "observed_at_utc": "2026-06-01T14:35:55Z",
+  "actor": "forge_measurement_guardian",
+  "mission": "Cycle-2 drift check and evidence seal for first external acted receipt witness",
+  "status": "external_acted_receipts_revalidated_fitness_blocked",
+  "source_manifest": {
+    "path": "reports/forge/external-beast/cycle-020-receipt-candidate-manifest.json",
+    "sha256": "9bcb3bd635a59a5960bf1a7f24e70c8d4b73820a860bf3762397f001d41175d7"
+  },
+  "artifacts": [
+    {
+      "path": "reports/forge/measurement-guardian/cycle-002-receipt-drift-seal.json",
+      "kind": "guardian_drift_seal_json",
+      "sha256": "c3f845cf344be811797bde5993296f5cae528cae8dd63da71a6d1c57789289f7"
+    },
+    {
+      "path": "reports/forge/measurement-guardian/cycle-002-receipt-drift-seal.md",
+      "kind": "guardian_drift_seal_report",
+      "sha256": "a5a3a6ae726695e72f430eedc2084eb4f62a77bac247eb71e529740b523b56ef"
+    },
+    {
+      "path": "reports/witness/2026-06-01-dharma-reward-forge-first-external-receipt.md",
+      "kind": "prior_cycle_first_external_acted_receipt_witness",
+      "sha256": "acf39d2effec5bb7f882a066de9d57915b955af85cc9484af95914b6a7fcffbf"
+    }
+  ],
+  "revalidated_external_acted_receipts": [
+    "abduznik/instrumation#98",
+    "Yasuno-5555/Guild#7",
+    "leticiv/intigriti-asset-copier#6"
+  ],
+  "secondary_context_not_direct_receipt": [
+    "Yasuno-5555/Guild#9 closed unmerged in favor of replacement PR #10"
+  ],
+  "authority": {
+    "external_confirmed": true,
+    "new_external_confirmed_state_created_this_cycle": false,
+    "eligible_to_set_archive_fitness": false,
+    "archive_fitness_changed": false,
+    "fitness_authority_granted": false,
+    "reason": "Cycle 2 only revalidated and sealed the cycle-1 evidence. The transfer-aware archive-fitness bridge and N>=5/M>=3 domain threshold were not executed."
+  },
+  "status_snapshot": {
+    "acted_receipt_count": 3,
+    "domains": [
+      "external_code_contribution"
+    ],
+    "quality_complete_for_all_acted_receipts": true,
+    "countersign_pending_count": 6,
+    "fitness_authority": null
+  },
+  "guardrails": {
+    "public_github_actions_taken_by_guardian": false,
+    "money_spent": false,
+    "payment_requested": false,
+    "bounty_claimed": false,
+    "protected_dharma_swarm_branch_pushed_or_merged": false,
+    "broad_dharma_swarm_performance_claim_published": false,
+    "commit_push_merge_or_pr_action_in_dharma_swarm": false,
+    "nonzero_archive_fitness_set": false,
+    "v2_or_higher_autonomy_escalated": false
+  },
+  "verification_commands": [
+    {
+      "command": "gh auth status",
+      "exit_code": 0,
+      "outcome": "passed for account AmitabhainArunachala"
+    },
+    {
+      "command": "mcp__codex_apps__github._get_pr_info for PRs 98, 7, and 6",
+      "exit_code": 0,
+      "outcome": "passed; all direct PRs remain merged with the same head and merge commit SHAs"
+    },
+    {
+      "command": "mcp__codex_apps__github._fetch_pr_comments for PRs 98, 7, and 6",
+      "exit_code": 0,
+      "outcome": "passed; comment state still matches cycle-1 evidence"
+    },
+    {
+      "command": "gh repo view <candidate repos>",
+      "exit_code": 0,
+      "outcome": "passed; candidate repositories remain public, non-archived, non-forks, and non-Dharma-controlled"
+    },
+    {
+      "command": "gh pr view <direct candidates>",
+      "exit_code": 0,
+      "outcome": "passed; all direct PRs remain merged by external accounts distinct from the author"
+    },
+    {
+      "command": "gh issue view <linked issues>",
+      "exit_code": 0,
+      "outcome": "passed; linked issues remain CLOSED/COMPLETED"
+    },
+    {
+      "command": "gh api repos/<repo>/commits/<merge_commit_sha>",
+      "exit_code": 0,
+      "outcome": "passed; all direct merge commit SHAs still exist"
+    },
+    {
+      "command": "gh search prs --author AmitabhainArunachala --merged --merged-at 2026-06-01..2026-06-01 --json repository,number,title,url,closedAt,state --limit 30",
+      "exit_code": 0,
+      "outcome": "passed; same-day external direct matches remain the three confirmed candidates, with Dharma Swarm PRs excluded"
+    },
+    {
+      "command": "shasum -a 256 <manifest, readiness, cycle-1 guardian, witness, verifier, and status artifacts>",
+      "exit_code": 0,
+      "outcome": "passed; hashes sealed in cycle-002 drift artifact"
+    },
+    {
+      "command": "jq empty <manifest, cycle-1 guardian artifacts, AgentOps packet, verifier artifacts, status artifact, cycle-2 drift artifact>",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "rg and jq authority guardrail scans",
+      "exit_code": "mixed",
+      "outcome": "passed; jq checks exited 0, rg no-match registry scan exited 1 as expected, and no forbidden true fitness-authority state was found"
+    }
+  ],
+  "blocker": "Archive fitness remains blocked pending transfer-aware gate, receipt/domain thresholds, and explicit archive-fitness bridge."
+}

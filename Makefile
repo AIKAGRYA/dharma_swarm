@@ -1,12 +1,14 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
 PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
+# Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
+VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 GO ?= go
 GOFMT ?= gofmt
 SEMGREP ?= scripts/governance/run_semgrep_with_ca.sh
@@ -58,6 +60,12 @@ help:
 	@echo "  make pr-run-claude PR=123 Run Claude Code against the latest review packet"
 	@echo "  make pr-gate PR=123 Verify merge gate against live GitHub state"
 	@echo "  make pr-merge PR=123 ARGS='--confirm merge-pr-123' Dry-run gated merge"
+	@echo "  make pr-mike ARGS='--dry-run --max-prs 5' Merge Master Mike packet -> reviewer -> gate fanout"
+	@echo "  make mike-wake    Record a fresh Mike wake receipt"
+	@echo "  make mike-status  Render Mike nest status"
+	@echo "  make mike-cycle ARGS='--cycle-mode dry-run --max-prs 5' Run one supervised Mike cycle"
+	@echo "  make mike-tmux-start Start Mike's dry-run daemon lane in tmux"
+	@echo "  make mike-tmux-stop  Stop Mike's tmux daemon lane"
 	@echo "  make memory-kernel-readiness Run read-only MemoryKernel readiness gates"
 	@echo "  make memory-kernel-readiness-strict Require 100% strict MemoryKernel readiness"
 	@echo "  make memory-kernel-burn-in Append M3 context preview burn-in receipts"
@@ -115,33 +123,36 @@ live:
 	TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live
 
 test:
-	python -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
 
 test-fast:
-	python -m pytest tests/ -q --tb=line -x --timeout=10
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
 
 lint:
 	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
 
 syntax-check:
-	@python3 -c "\
-import ast; from pathlib import Path; \
-errors = [f'{f.name}:{e.lineno}: {e.msg}' for f in Path('dharma_swarm').glob('*.py') \
-          for e in [None] if (lambda: (lambda e: e)(None))() or True \
-          if (setattr(__builtins__, '_', None) or True)]; \
-[print(f'Checking {len(list(Path(\"dharma_swarm\").glob(\"*.py\")))} files...')] and \
-[print('OK: all clean') if not [print('FAIL:', f) for f in \
-    [f'{p.name}:{e.lineno}: {e.msg}' for p in Path('dharma_swarm').glob('*.py') \
-     for e in [None] if True]] else None]"
-	@python3 -c "\
-import ast; from pathlib import Path; errs=[] ; \
-[errs.append(f'{f.name}:{e.lineno}') for f in Path('dharma_swarm').glob('*.py') \
- for _ in [None] if (lambda f=f: \
-   [errs.append(f'{f.name}') for e in [None] \
-    if not (__import__('builtins').__dict__.update({'_e': None}) or True)])()]; \
-print('syntax check done')"
-	python3 -c "import ast; from pathlib import Path; errs=[]; [errs.append(f.name) or print(f'FAIL: {f.name}') for f in Path('dharma_swarm').glob('*.py') if not __import__('ast').parse(f.read_text()) is not None or False]; print(f'Checked {len(list(Path(\"dharma_swarm\").glob(\"*.py\")))} files, {len(errs)} errors')" || \
-	python3 -c "import ast; from pathlib import Path; [ast.parse(f.read_text()) for f in Path('dharma_swarm').glob('*.py')]; print('All syntax OK')"
+	@$(VENV_PYTHON) -m compileall -q dharma_swarm api scripts && echo "syntax-check: OK (compileall clean)"
+
+# Undefined names are guaranteed NameErrors at runtime — always blocking.
+lint-blockers:
+	@ruff check dharma_swarm/ api/ scripts/ --select=F821 --quiet && echo "lint-blockers: OK (no undefined names)"
+
+# The watchmen-watcher: verifies the verification gates themselves work.
+# Born 2026-06-12 after syntax-check, test-fast, and suite collection were
+# all found broken simultaneously with nothing noticing.
+verifier-selfcheck:
+	@echo "[1/4] syntax-check"
+	@$(MAKE) -s syntax-check
+	@echo "[2/4] lint-blockers (F821)"
+	@$(MAKE) -s lint-blockers
+	@echo "[3/4] test collection"
+	@$(VENV_PYTHON) -m pytest tests/ --collect-only -q >/tmp/dharma-collect-check.log 2>&1 \
+		|| (echo "COLLECTION BROKEN:"; tail -20 /tmp/dharma-collect-check.log; exit 1)
+	@tail -1 /tmp/dharma-collect-check.log
+	@echo "[4/4] onboard door"
+	@$(MAKE) -s onboard >/dev/null 2>&1 && echo "onboard: OK"
+	@echo "verifier-selfcheck: ALL GATES FUNCTIONAL"
 
 gh-auth:
 	gh auth login
@@ -259,6 +270,24 @@ pr-run-claude:
 pr-merge:
 	$(PYTHON) scripts/runtime/pr_merge_control.py merge --pr "$${PR:?set PR=number}" $${ARGS:-}
 
+pr-mike:
+	$(PYTHON) scripts/runtime/pr_merge_control.py fanout $${ARGS:-}
+
+mike-wake:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py wake $${ARGS:-}
+
+mike-status:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py status $${ARGS:-}
+
+mike-cycle:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py cycle $${ARGS:-}
+
+mike-tmux-start:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py tmux-start $${ARGS:-}
+
+mike-tmux-stop:
+	$(PYTHON) scripts/runtime/merge_master_mike_daemon.py tmux-stop $${ARGS:-}
+
 memory-kernel-readiness:
 	$(REPO_PYTHON) scripts/memory_kernel_readiness.py --repo-root . --dry-run
 	$(REPO_PYTHON) scripts/memory_writer_sentinel.py --repo-root . --ci
@@ -301,7 +330,7 @@ operator-prod-smoke:
 # `make spine-check` target stays as an operator-convenience alias only.
 governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
 
-agent-build-preflight: onboard hygiene-check
+agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
 
 agent-build-closeout:

@@ -24,7 +24,7 @@ if [[ -f "$HOME/.zshrc" ]]; then
     )"
 fi
 
-for envfile in "$HOME/.env" "$HOME/.dharma/.env" "$HOME/.dharma/daemon.env"; do
+for envfile in "$HOME/.env" "$HOME/.dharma/.env" "$HOME/.dharma/daemon.env" "$HOME/.dharma/agent_keys.env"; do
     _load_env_file "$envfile"
 done
 

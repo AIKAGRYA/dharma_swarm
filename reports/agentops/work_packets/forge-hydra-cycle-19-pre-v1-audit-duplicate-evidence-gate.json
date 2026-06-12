@@ -1,0 +1,68 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-19-pre-v1-audit-duplicate-evidence-gate",
+  "cycle": 19,
+  "status": "complete",
+  "agent": "codex_forgewright",
+  "created_at_utc": "2026-06-01T10:04:59Z",
+  "repo": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "scope": "Internal pre-v1 audit hardening so duplicate required-packet verifier artifacts cannot mask failed or unproven evidence.",
+  "outputs": [
+    "reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+    "reports/forge/v0.9-pre-v1-audit/cycle-19/verifier_artifact.json",
+    "reports/forge/v0.9-pre-v1-audit/cycle-19/completion_audit.md",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md"
+  ],
+  "code_changes": [
+    "scripts/runtime/forge_pre_v1_audit.py",
+    "tests/test_forge_pre_v1_audit.py"
+  ],
+  "acceptance": {
+    "failed_duplicate_required_packet_artifact_rejected": true,
+    "unproven_duplicate_required_packet_artifact_rejected": true,
+    "real_reports_internal_v0x_evidence_complete": true,
+    "real_reports_conflicting_required_packet_artifacts": 0,
+    "external_acted_receipts_created": 0,
+    "archive_fitness_authority": "none",
+    "all_passed": true
+  },
+  "tests": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_pre_v1_audit.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "7 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_pre_v1_audit.py --reports-root reports/forge --out reports/forge/v0.9-pre-v1-audit/pre_v1_trace_audit.json",
+      "exit_code": 0,
+      "summary": "internal_v0x_evidence_complete=true; conflicting_required_packet_artifacts=[]"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_pre_v1_audit.py tests/test_forge_hydra_status.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "17 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --reports-root reports/forge --output-dir reports/forge/forge-hydra-status",
+      "exit_code": 0,
+      "summary": "status refreshed; external acted receipts 0; active track remains 7/8"
+    }
+  ],
+  "blockers": [
+    "first_external_receipt_witness remains operator/external-authority gated",
+    "canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE/DS receipt environment variable exists",
+    "GitNexus current-worktree impact remains unavailable for these untracked Forge audit symbols"
+  ],
+  "authority_boundary": {
+    "external_contact_performed": false,
+    "pull_request_submitted": false,
+    "issue_comment_posted": false,
+    "bounty_claimed": false,
+    "payment_requested": false,
+    "external_confirmed": false,
+    "archive_fitness_updated": false
+  }
+}

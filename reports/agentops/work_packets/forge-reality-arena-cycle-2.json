@@ -1,0 +1,106 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-cycle-2",
+  "created_at_utc": "2026-06-02T03:29:26Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena v0",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": 2,
+  "canonical_ds_goal_context_available": false,
+  "repo_local_receipt_required": true,
+  "result": "Added deterministic coordination replay support and regenerated the arena status with 20 local coordination episodes over 10 unique scenarios.",
+  "outputs": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "scripts/runtime/forge_reality_arena_status.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "docs/specs/forge_packets/FORGE_REALITY_ARENA_V0_STATUS.md",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "artifact_hashes": {
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:507f80b615e8b3ae6494bd5b5d119c5644c0b2753c362db3e6a6fc6cc3db93d0",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:c81ca41785ed4fd345a0c237dc93fa44aea6c10f844c9bda3a4d7c8c493b6557",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:349c8ed488d73c180e15b7d5b85a24df351b6248cfd6acce31069e61c347a0e7"
+  },
+  "status_snapshot": {
+    "dense_reps": 9,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 6,
+    "transfer_passed_reps": 3,
+    "base_memorized_candidates_denied": 4,
+    "coordination_scenarios_run": 20,
+    "coordination_unique_scenarios": 10,
+    "coordination_min_repetitions_per_scenario": 2,
+    "coordination_20_run_target_met": true,
+    "coordination_scenarios_passed": 20,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 0,
+    "external_anchors_observed_not_owned": 2,
+    "fitness_eligible_receipts": 0,
+    "blocked_authority_items": 2,
+    "autonomous_relaunch_useful": false
+  },
+  "acceptance": {
+    "focused_arena_tests_passed": true,
+    "existing_forge_guardrails_passed": true,
+    "governance_checks_passed": true,
+    "external_actions_performed": false,
+    "archive_fitness_changed": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "external_beast_ledger_preserved": true
+  },
+  "test_commands": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "16 passed, 1 PytestConfigWarning for unknown timeout option"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "20 passed, 1 PytestConfigWarning for unknown timeout option"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_reward_forge_v0.py tests/test_dharma_eval.py -q --tb=short",
+      "exit_code": 0,
+      "summary": "27 passed, 1 PytestConfigWarning for unknown timeout option"
+    },
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "summary": "passed; DRF remains the primary active track"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/governance/check_track_status.py",
+      "exit_code": 0,
+      "summary": "passed; DRF and Goodworks tracks report shippable"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/governance/render_active_track_includes.py --check",
+      "exit_code": 0,
+      "summary": "passed"
+    },
+    {
+      "command": "make docops-integrity",
+      "exit_code": 0,
+      "summary": "passed"
+    }
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  },
+  "blockers": []
+}

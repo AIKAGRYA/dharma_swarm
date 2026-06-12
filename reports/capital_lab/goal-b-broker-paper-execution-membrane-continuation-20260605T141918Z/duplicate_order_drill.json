@@ -1,0 +1,16 @@
+{
+  "broker_write_authority": false,
+  "clean": false,
+  "client_order_id": "gbp-ddbc222ad2fc05c3b0178c7c",
+  "duplicate_seen": true,
+  "generated_at": "2026-06-05T15:10:20Z",
+  "live_authority": false,
+  "live_readiness": 0,
+  "order_count": 1,
+  "passed": true,
+  "receipt_count_after": 4,
+  "receipt_count_before": 4,
+  "schema_version": "goal_b.duplicate_order_drill.v1",
+  "second_receipt_created": false,
+  "self_hash": "7f30a57ac97742bd98c7121b0d421bf412d108b0cc332bde31a0481b6d13def9"
+}

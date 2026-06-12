@@ -94,6 +94,9 @@ curation:
 
 The scientific and philosophical grounding for dharma_swarm. Every engineering decision traces to at least one pillar.
 
+> **▶ Read first: [THE_ORGANISM.md](THE_ORGANISM.md)** — what dharma_swarm *is* (the Krishna→Arjuna hierarchy), the one-line canon, and the live 2026 genome (foundations · mechanisms · self-organs · outward organs) seeded on it. The 11 pillars below are its base layer.
+> **▶ Keys & model routing (ops): [Model & Key Routing — The One Way](../docs/ops/MODEL_KEY_ROUTING.md)** — one key home + dkeys, one resolver door, power-first, Anthropic→Max. Read before any key or model call.
+
 ## Layer Role
 
 `foundations/` is the conceptual canon layer.

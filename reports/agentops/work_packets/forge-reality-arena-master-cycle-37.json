@@ -1,0 +1,218 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-37",
+  "created_at_utc": "2026-06-02T11:42:50Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": {
+    "master_cycle": 37,
+    "operator_cycle": 23
+  },
+  "result": "Verified Cycle 23 as a fresh repo-local negative-result checkpoint. GitNexus still cannot resolve the active checkout, but onboarding, focused Forge tests, deterministic replay generators, Docker sandbox smoke, benchmark adapter, fitness-boundary dry run, master audit, authority scan, and status refresh remain green. The master audit still reports 14 complete requirements, 1 external-gated Guardian/sparse-acted-receipt boundary, 0 buildable internal packets, and 0 fitness-eligible receipts.",
+  "files_changed": [],
+  "artifacts_refreshed": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/master-spec-audit/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "new_learning_artifacts": [
+    "reports/agentops/work_packets/forge-reality-arena-master-cycle-37.json"
+  ],
+  "content_hash_phase": "pre_cycle_receipt_write_refresh",
+  "content_hashes": {
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json": "sha256:66507c41c9b59a219295fc5b9bd3e4fe48019b18ca985ae005d847c3f591ac22",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json": "sha256:3c22331f9279eb03eb3e05fafb95550936017dd015bd79e39b292ac2555378b8",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json": "sha256:ea5f635553d314664f1150221a12f1b895a448baab79fe62da5a101127ff5fec",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json": "sha256:34dc8a1eb97a4652394c34a241afec886d4db86de9fe2b9c424f77c22bfa6dbe",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json": "sha256:03824bd4b13d1539269dd9544117494ad8c5d59a4787bfababc6a137fe27a9b7",
+    "reports/forge/forge-reality-arena/master-spec-audit/verifier_artifact.json": "sha256:c215cea748a9268ed79a52c69c38ff4d5d266ebe725ede89e004832a567d29eb",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json": "sha256:786d0f1735d79d98675443577aa12ee55796b1eda4b6cdd50e78617464576520",
+    "reports/forge/forge-reality-arena/status_artifact.json": "sha256:dc86a1c19b1a3301bf1ddb0b6ac93fc7aa54ccce4a997e939eb8db3e571017a2",
+    "reports/agentops/work_packets/forge-reality-arena-status.json": "sha256:91d3896e95d9b3e774472908ba46428dde295a32c9e4a198e049b1141f3b45c3"
+  },
+  "patch_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "eval_manifest_hash": "sha256:3c22331f9279eb03eb3e05fafb95550936017dd015bd79e39b292ac2555378b8",
+  "score": {
+    "dense_reps": 500,
+    "unique_dense_packets": 3,
+    "transfer_passed_reps": 470,
+    "base_memorized_candidates_denied": 475,
+    "coordination_scenarios_run": 500,
+    "coordination_unique_scenarios": 25,
+    "coordination_min_repetitions_per_scenario": 20,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 24,
+    "failure_capsule_failure_classes": 14,
+    "fitness_boundary_candidates_for_human_review": 470,
+    "fitness_eligible_receipts": 0,
+    "master_spec_audit_buildable_packets": 0
+  },
+  "dense_replay": {
+    "artifact_ref": "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "event_count": 500,
+    "unique_packet_count": 3,
+    "transfer_passed_reps": 470,
+    "base_memorized_candidates_denied": 475,
+    "external_confirmed": false,
+    "fitness_authority": "none_dense_training_signal_only"
+  },
+  "coordination_replay": {
+    "artifact_ref": "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "episode_count": 500,
+    "unique_scenario_count": 25,
+    "min_repetitions_per_scenario": 20,
+    "failed_episode_count": 0
+  },
+  "fitness_boundary_dry_run": {
+    "artifact_ref": "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "candidate_for_human_review_count": 470,
+    "blocked_candidate_count": 30,
+    "actual_fitness_eligible_receipts": 0,
+    "guardian_countersign_required": true
+  },
+  "master_spec_audit": {
+    "artifact_ref": "reports/forge/forge-reality-arena/master-spec-audit/verifier_artifact.json",
+    "status_counts": {
+      "complete": 14,
+      "external_gated": 1
+    },
+    "buildable_internal_packets_remaining": [],
+    "autonomous_relaunch_useful_under_master_spec": false,
+    "external_gated_requirements": [
+      "guardian_external_authority_boundary"
+    ]
+  },
+  "acceptance": {
+    "agentops_status_refreshed": true,
+    "archive_fitness_mutated": false,
+    "canonical_ds_goal_context_available": false,
+    "concrete_negative_result": "no local master-spec buildable packets remain after fresh onboarding and deterministic verifier refresh",
+    "dense_training_signal_not_fitness_authority": true,
+    "external_actions_performed": false,
+    "fitness_eligible_receipts_zero": true,
+    "master_spec_audit_refreshed": true,
+    "repo_local_receipt_required": true,
+    "status_refreshed": true
+  },
+  "external_boundary": {
+    "archive_fitness_changed": false,
+    "archive_fitness_mutated": false,
+    "external_actions_performed": false,
+    "external_confirmed": false,
+    "external_repo_contact": false,
+    "fitness_eligible_receipts": 0,
+    "merged": false,
+    "payment_action": false,
+    "published": false,
+    "pushed": false
+  },
+  "tool_blockers": [
+    {
+      "tool": "GitNexus",
+      "status": "blocked_for_active_checkout",
+      "details": "list_repos returned sibling/stale dharma_swarm checkouts, not the active /Users/dhyana/dharma_swarm checkout; detect_changes(repo=/Users/dhyana/dharma_swarm, scope=all) returned Repository not found."
+    },
+    {
+      "tool": "codebase-retrieval",
+      "status": "blocked_for_active_checkout",
+      "details": "codebase-retrieval failed to index /Users/dhyana/dharma_swarm during the MCP-first scan; manual file-level checks and focused tests were used instead."
+    }
+  ],
+  "stratified_fields": {
+    "counterparty": "none; repo-local internal lane only",
+    "domain": "code/agent dense training and DRF internal fitness-boundary dry run",
+    "independence": "make onboard, pytest, generated verifier artifacts, master audit, authority scan, and status artifacts",
+    "transfer": "checkpoint preserves transfer-gated human-review candidates while blocking promotion without Guardian or external acted receipt authority",
+    "value_risk": "prevents dense-eval authority creep or fake local progress after master-spec backlog exhaustion"
+  },
+  "cost": {
+    "external_actions": 0,
+    "money_spent_usd": 0,
+    "network_required_for_lane_work": false,
+    "public_actions": 0
+  },
+  "test_commands": [
+    {
+      "command": "mcp__gitnexus.list_repos()",
+      "exit_code": 0,
+      "outcome": "returned indexed sibling/stale dharma_swarm checkouts, not the active /Users/dhyana/dharma_swarm checkout"
+    },
+    {
+      "command": "mcp__gitnexus.detect_changes(repo=/Users/dhyana/dharma_swarm, scope=all)",
+      "exit_code": 1,
+      "outcome": "Repository not found; treated as a tool blocker"
+    },
+    {
+      "command": "mcp__codebase_retrieval.codebase_retrieval(directory_path=/Users/dhyana/dharma_swarm, information_request=Forge Reality Arena Hydra status generation...)",
+      "exit_code": 1,
+      "outcome": "Failed to index the directory; treated as a tool blocker"
+    },
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "outcome": "passed; active track remains 8/8 complete and shippable, with next action outside this internal lane"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_authority_scan.py tests/test_forge_reality_arena_master_audit.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "66 passed, 1 existing pytest config warning for unknown timeout option"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_swarm_coordination_gym.py",
+      "exit_code": 0,
+      "outcome": "wrote 500-episode coordination verifier artifact"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0,
+      "outcome": "wrote 500-rep sealed dense replay ledger"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0,
+      "outcome": "smoke_passed"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0,
+      "outcome": "verified"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "outcome": "verified; 470 dry-run human-review candidates and 0 actual fitness-eligible receipts"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_reality_arena_master_audit.py",
+      "exit_code": 0,
+      "outcome": "verified 14 complete requirements, 1 external-gated requirement, and 0 buildable internal packets"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "outcome": "authority scan passed with 0 violations before cycle receipt write"
+    },
+    {
+      "command": "PATH=/Users/dhyana/dharma_swarm/.venv/bin:$PATH python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "status artifact, markdown status, and AgentOps status packet refreshed"
+    }
+  ],
+  "blockers": [
+    "guardian_or_external_acted_receipt_required",
+    "gitnexus_active_checkout_unresolved",
+    "codebase_retrieval_active_checkout_index_failed"
+  ],
+  "next": "authority wait: Guardian or sparse external acted-receipt lane must review candidates before any fitness-eligible receipt or archive fitness mutation"
+}

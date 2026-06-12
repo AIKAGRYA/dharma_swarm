@@ -1,0 +1,137 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-hydra-cycle-38-idle-checkpoint",
+  "cycle": 38,
+  "created_at_utc": "2026-06-01T13:27:44Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "branch": "trust-build-compass",
+  "head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+  "mission": "Forge Hydra long-run internal packet cycle",
+  "objective": "Add a stable idle checkpoint to the Forge Hydra status artifact so the long-run supervisor can suppress relaunch churn while all internal packets are exhausted and only countersign/operator authority can change state.",
+  "status": "completed_repo_local_receipt",
+  "mcp_notes": {
+    "mcp_synergy": "Used MCP-first routing for filesystem reads, GitNexus context/impact analysis, and sequential task decomposition.",
+    "gitnexus_repo": "/Users/dhyana/dharma_swarm",
+    "filesystem": "Read Forge Hydra goal specs, council protocol, cycle-37 audit, status generator, focused tests, and regenerated status artifacts before and after editing."
+  },
+  "impact": {
+    "gitnexus_targets": [
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:summarize_forge_hydra_status",
+        "risk": "HIGH",
+        "direct_callers": 18,
+        "affected_processes": 0,
+        "affected_modules": 1,
+        "note": "High because this central status aggregator is called by the full focused status test file and main; edit was additive and covered by tests/test_forge_hydra_status.py."
+      },
+      {
+        "target": "Function:scripts/runtime/forge_hydra_status.py:render_markdown_status",
+        "risk": "LOW",
+        "direct_callers": 1,
+        "affected_processes": 0,
+        "affected_modules": 1
+      }
+    ],
+    "detect_changes_scope_all": {
+      "risk": "CRITICAL",
+      "changed_files": 78,
+      "changed_symbols": 1312,
+      "affected_processes": 20,
+      "note": "Repository-wide dirty worktree predates this cycle; scoped cycle edits are limited to Forge Hydra idle-checkpoint status accounting, focused tests, and repo-local report artifacts."
+    },
+    "note": "The active checkout index for /Users/dhyana/dharma_swarm was current at HEAD c8efcff28e67ab6b9a55bcd9faca83562d26e269; stale sibling indexes were not used."
+  },
+  "outputs": [
+    "scripts/runtime/forge_hydra_status.py",
+    "tests/test_forge_hydra_status.py",
+    "reports/forge/forge-hydra-status/status_artifact.json",
+    "reports/forge/forge-hydra-status/status.md",
+    "reports/forge/forge-hydra-status/cycle-38/status_artifact.json",
+    "reports/forge/forge-hydra-status/cycle-38/status.md",
+    "reports/forge/forge-hydra-status/cycle-38/completion_audit.md",
+    "reports/agentops/work_packets/forge-hydra-cycle-38-idle-checkpoint.json"
+  ],
+  "acceptance": {
+    "all_passed": true,
+    "status_artifact_has_idle_checkpoint": true,
+    "status_artifact_has_idle_checkpoint_hash": true,
+    "idle_checkpoint_hash_stable_across_generation_time": true,
+    "idle_checkpoint_hash_changes_on_countersign_state_change": true,
+    "markdown_has_idle_checkpoint_section": true,
+    "external_acted_receipts_remain_zero": true,
+    "archive_fitness_changed": false,
+    "external_contact_performed": false
+  },
+  "verification": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m py_compile scripts/runtime/forge_hydra_status.py tests/test_forge_hydra_status.py",
+      "outcome": "pass"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_hydra_status.py -q --tb=short",
+      "outcome": "20 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py",
+      "outcome": "live status artifacts regenerated"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_hydra_status.py --output-dir reports/forge/forge-hydra-status/cycle-38",
+      "outcome": "cycle-38 status artifacts regenerated"
+    },
+    {
+      "command": "mcp__gitnexus.detect_changes(scope=\"all\")",
+      "outcome": "CRITICAL from pre-existing dirty worktree: 78 changed files, 1312 changed symbols, 20 affected processes"
+    }
+  ],
+  "artifact_hashes": {
+    "status_script_sha256": "75f222c0f3b70c053846bbff274a9a5fe189f6dc907c1d3d791101e5f5c7c878",
+    "status_test_sha256": "c1dd06897edd6d26c3699e05d58538fff4663ee814812683af0ebc7871089957",
+    "live_status_artifact_sha256": "6698351b46c3ab5ef2b2da1d228560471f7bcb789b9a87de3dca17e92fed8ea9",
+    "live_status_markdown_sha256": "ff8ab1179b5d8da10a8c2b91853a3fa765c5b890da6dd6f1959f35a037af7550",
+    "cycle_status_artifact_sha256": "6698351b46c3ab5ef2b2da1d228560471f7bcb789b9a87de3dca17e92fed8ea9",
+    "cycle_status_markdown_sha256": "ff8ab1179b5d8da10a8c2b91853a3fa765c5b890da6dd6f1959f35a037af7550"
+  },
+  "status_snapshot": {
+    "status_hash": "sha256:c6c0e0002d8d06eef4b0a185a7f2fe4eaff6d7a35dddd05528c16226255e588f",
+    "authority_state_hash": "sha256:b8acec02a8a8e760807bd7921ef2c4675edf6bc83cb70552c8ae57bc6836ef09",
+    "idle_checkpoint_hash": "sha256:20f84f215070fc2c5c230d8a6402258b9f8d5f5bc9379abf91de74473799bdf1",
+    "idle_checkpoint_paused": true,
+    "next_cycle_status": "internal_evidence_waiting_on_countersign",
+    "next_cycle_recommended_action": "await_or_request_required_countersign",
+    "next_cycle_packet": "v0.1.0-live-telos-gate",
+    "next_cycle_internal_build_items": 0,
+    "next_cycle_internal_repair_items": 0,
+    "next_cycle_pending_countersign_items": 9,
+    "next_cycle_external_authority_blocked_items": 2,
+    "autonomous_cycle_useful": false,
+    "supervisor_relaunch_recommended": false,
+    "supervisor_recommended_action": "pause_relaunch_until_authority_state_changes",
+    "supervisor_boundary": "countersign_or_external_authority",
+    "external_acted_receipts": 0,
+    "blocked_external_authority_items": 6,
+    "archive_fitness_authority": "none_from_this_status_artifact"
+  },
+  "canonical_receipt": {
+    "attempted": false,
+    "reason": "No mission/task/goal/AgentOps/DSE receipt identifier is present in this runtime; repo-local receipt artifacts are required.",
+    "detected_context_variables": []
+  },
+  "blockers": [
+    "Canonical ds-goal receipt unavailable because no mission/task/goal/AgentOps/DSE receipt identifier was present.",
+    "External acted receipts remain operator-gated; no external contact, PR action, spending, or archive fitness update was performed.",
+    "Repository-wide dirty worktree predates this cycle; detect-changes remains critical outside this scoped packet."
+  ],
+  "external_boundary": {
+    "external_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false
+  }
+}
