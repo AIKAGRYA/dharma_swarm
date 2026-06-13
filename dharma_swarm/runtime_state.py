@@ -316,6 +316,7 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "message_consumed",
         "identity_mapping",
         "idempotency_consumed",
+        "runtime_warrant",
         "ontology_action_requested",
         "ontology_action_applied",
         "child_spawned",

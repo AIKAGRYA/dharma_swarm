@@ -3,6 +3,7 @@ name: module-budget
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+  merge_group:
 
 concurrency:
   group: module-budget-${{ github.ref }}
@@ -28,8 +29,20 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Select comparison refs
+        id: refs
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "base=${{ github.event.merge_group.base_sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.merge_group.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run module-budget gate
         run: |
           python3 scripts/governance/check_module_budget.py \
-            --base-ref "${{ github.event.pull_request.base.sha }}" \
-            --head-ref "${{ github.event.pull_request.head.sha }}"
+            --base-ref "${{ steps.refs.outputs.base }}" \
+            --head-ref "${{ steps.refs.outputs.head }}"

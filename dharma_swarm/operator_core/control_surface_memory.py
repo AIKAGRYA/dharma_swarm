@@ -11,7 +11,7 @@ import inspect
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from dharma_swarm.operator_core.control_surface_memory_readiness import (
     READINESS_ROW_RAW_FIELDS,
@@ -36,6 +36,12 @@ ROLLOUT_STATES = ("off", "shadow", "preview", "canary", "live")
 ROLLOUT_ENV_VAR = "DHARMA_MEMORY_KERNEL_ROLLOUT"
 ROLLBACK_ENV_VAR = "DHARMA_MEMORY_KERNEL_ROLLBACK"
 MEMORY_HOME_ENV_VAR = "DHARMA_MEMORY_KERNEL_HOME"
+MEMORY_SNAPSHOT_SCHEMA_VERSION = "memory_kernel_control_snapshot.v1"
+MEMORY_DEEP_VERIFIER_COMMAND = (
+    "GET /api/control-surface/rows?memory_depth=deep or "
+    "python3 scripts/memory_kernel_readiness.py"
+)
+MemoryProjectionDepth = Literal["snapshot", "deep"]
 
 
 @dataclass(frozen=True)
@@ -50,8 +56,17 @@ class KernelProjection:
     home_source: str
 
 
-def memory_kernel_control_rows(repo_root: Path) -> list[ControlSurfaceRow]:
+def memory_kernel_control_rows(
+    repo_root: Path,
+    *,
+    depth: MemoryProjectionDepth = "deep",
+) -> list[ControlSurfaceRow]:
     """Build MemoryKernel rows for operator visibility and control."""
+
+    if depth == "snapshot":
+        return _memory_kernel_snapshot_rows(repo_root)
+    if depth != "deep":
+        raise ValueError(f"unsupported MemoryKernel projection depth: {depth}")
 
     projection = _kernel_projection(repo_root)
     context_canary = _memory_context_canary_row(repo_root)
@@ -91,6 +106,239 @@ def memory_kernel_closure_rows(repo_root: Path) -> list[ControlSurfaceRow]:
     """Backward-compatible alias for the parked operator-lane name."""
 
     return memory_kernel_control_rows(repo_root)
+
+
+def _memory_kernel_snapshot_rows(repo_root: Path) -> list[ControlSurfaceRow]:
+    write_receipts = memory_write_receipts_row(repo_root)
+    promotion_candidate = memory_promotion_candidate_row(repo_root)
+    knowledgeops_bridge = memory_knowledgeops_bridge_row(repo_root)
+    return [
+        _memory_surface_snapshot_row(repo_root),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.adapter_coverage",
+            kind="memory_adapter",
+            label="MemoryKernel Adapter Coverage",
+            owner_module="dharma_swarm/memory_kernel/facade.py",
+            desired_state="existing_surfaces_have_read_adapters",
+        ),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.writer_sentinel",
+            kind="memory_writer",
+            label="Memory Writer Sentinel",
+            owner_module="dharma_swarm/memory_kernel/writer_sentinel.py",
+            desired_state="no_action_required_bypasses",
+        ),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.context_shadow",
+            kind="memory_context",
+            label="MemoryKernel Context Shadow",
+            owner_module="dharma_swarm/context.py",
+            desired_state="observe_without_prompt_injection",
+        ),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.context_canary",
+            kind="memory_context",
+            label="MemoryKernel Context Canary Failure Projection",
+            owner_module="dharma_swarm/memory_kernel/context_parity.py",
+            desired_state="unsafe_context_failures_are_visible",
+        ),
+        write_receipts,
+        promotion_candidate,
+        knowledgeops_bridge,
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.knowledgeops_intake",
+            kind="memory_knowledgeops",
+            label="KnowledgeOps Memory Intake",
+            owner_module="dharma_swarm/knowledge_ops/memory_intake.py",
+            desired_state="accepted_decisions_enter_memory_kernel_intake",
+        ),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.promotion_queue",
+            kind="memory_promotion",
+            label="Memory Promotion Queue",
+            owner_module="dharma_swarm/knowledge_ops/memory_promotion_queue.py",
+            desired_state="reviewable_candidates_before_canonical_memory",
+        ),
+        _memory_deep_deferred_row(
+            repo_root=repo_root,
+            row_id="memory.readiness",
+            kind="memory_adapter",
+            label="MemoryKernel Strict Readiness",
+            owner_module="dharma_swarm/memory_kernel/readiness.py",
+            desired_state="strict_ready_all_accounted_warning_free",
+        ),
+        _memory_rollout_snapshot_row(),
+        _memory_rollback_switch_row(),
+        _operator_prod_smoke_row(repo_root),
+    ]
+
+
+def _memory_surface_snapshot_row(repo_root: Path) -> ControlSurfaceRow:
+    home, home_source = _memory_home(repo_root)
+    try:
+        from dharma_swarm.memory_kernel.surfaces import default_surface_specs
+
+        specs = default_surface_specs()
+        existing = 0
+        for spec in specs:
+            path = Path(
+                spec.path_template.format(
+                    home=home,
+                    repo_root=repo_root,
+                )
+            ).expanduser()
+            if path.exists():
+                existing += 1
+        row = ControlSurfaceRow(
+            id="memory.census",
+            kind="memory_census",
+            label="MemoryKernel Surface Census",
+            authority_role="projection",
+            declared_state="registered_surface_snapshot",
+            desired_state="deep_census_when_needed",
+            observed_state=f"registered={len(specs)} existing_path_templates={existing}",
+            coherence_state="partial",
+            priority="p1",
+            owner_module="dharma_swarm/memory_kernel/census.py",
+            truth_owner="MemoryKernel",
+            gap_codes=["memory_deep_probe_deferred"],
+            next_action=MEMORY_DEEP_VERIFIER_COMMAND,
+            raw={
+                "schema_version": MEMORY_SNAPSHOT_SCHEMA_VERSION,
+                "projection_mode": "snapshot",
+                "deep_probe_deferred": True,
+                "deep_probe_command": MEMORY_DEEP_VERIFIER_COMMAND,
+                "surface_count": len(specs),
+                "existing_path_template_count": existing,
+                "home": str(home),
+                "home_source": home_source,
+            },
+        )
+        row.add_evidence(
+            "process",
+            f"surface_specs={len(specs)} existing_path_templates={existing}",
+            status="stale",
+            provenance_chain=[
+                "MemoryKernel",
+                "surface_specs",
+                "snapshot_projection",
+            ],
+        )
+    except Exception as exc:
+        row = _memory_error_row(
+            row_id="memory.census",
+            kind="memory_census",
+            label="MemoryKernel Surface Census",
+            owner_module="dharma_swarm/memory_kernel/census.py",
+            error=str(exc),
+            next_action="Repair MemoryKernel surface registry import before snapshot projection",
+        )
+    row.add_source_ref("file", "dharma_swarm/memory_kernel/surfaces.py", exists=True)
+    row.add_source_ref("file", "dharma_swarm/memory_kernel/census.py", exists=True)
+    return row
+
+
+def _memory_deep_deferred_row(
+    *,
+    repo_root: Path,
+    row_id: str,
+    kind: str,
+    label: str,
+    owner_module: str,
+    desired_state: str,
+) -> ControlSurfaceRow:
+    row = ControlSurfaceRow(
+        id=row_id,
+        kind=kind,
+        label=label,
+        authority_role="projection",
+        declared_state="deep_probe_required",
+        desired_state=desired_state,
+        observed_state="deep_probe_deferred",
+        coherence_state="partial",
+        priority="p1",
+        owner_module=owner_module,
+        truth_owner="MemoryKernel",
+        gap_codes=["memory_deep_probe_deferred"],
+        next_action=MEMORY_DEEP_VERIFIER_COMMAND,
+        raw={
+            "schema_version": MEMORY_SNAPSHOT_SCHEMA_VERSION,
+            "projection_mode": "snapshot_deep_probe_deferred",
+            "deep_probe_deferred": True,
+            "deep_probe_command": MEMORY_DEEP_VERIFIER_COMMAND,
+        },
+    )
+    row.add_evidence(
+        "process",
+        "deep MemoryKernel probe deferred in default operator projection",
+        status="stale",
+        provenance_chain=[
+            "MemoryKernel",
+            row_id,
+            "snapshot_projection",
+        ],
+    )
+    row.add_source_ref("file", owner_module, exists=(repo_root / owner_module).exists())
+    return row
+
+
+def _memory_rollout_snapshot_row() -> ControlSurfaceRow:
+    state, configured, invalid = _rollout_state()
+    unsafe_advance = state in {"preview", "canary", "live"} or invalid
+    gap_codes = ["memory_deep_probe_deferred"]
+    if invalid:
+        gap_codes.append("memory_kernel_rollout_invalid_state")
+    if unsafe_advance:
+        gap_codes.append("memory_rollout_requires_deep_readiness_probe")
+    row = ControlSurfaceRow(
+        id="memory.rollout_gate",
+        kind="memory_rollout",
+        label="MemoryKernel Rollout Gate",
+        authority_role="adapter",
+        declared_state="operator_controlled_rollout",
+        desired_state="off_shadow_preview_canary_before_live",
+        observed_state=state,
+        coherence_state="partial" if unsafe_advance else "bound",
+        priority="p0" if unsafe_advance else "p1",
+        owner_module="dharma_swarm/operator_core/control_surface_memory.py",
+        truth_owner="operator_control",
+        gap_codes=gap_codes,
+        next_action=MEMORY_DEEP_VERIFIER_COMMAND,
+        raw={
+            "schema_version": MEMORY_SNAPSHOT_SCHEMA_VERSION,
+            "projection_mode": "snapshot",
+            "deep_probe_deferred": True,
+            "deep_probe_command": MEMORY_DEEP_VERIFIER_COMMAND,
+            "state": state,
+            "configured_value": configured,
+            "invalid": invalid,
+            "allowed_states": ROLLOUT_STATES,
+            "default_state": "off",
+            "state_source": f"env:{ROLLOUT_ENV_VAR}" if configured else "safe_default",
+            "rollback_switch": f"env:{ROLLBACK_ENV_VAR}",
+            "burn_in_safety_state": "deep_probe_required" if unsafe_advance else "safe_default_off",
+            "burn_in_safe": not unsafe_advance,
+        },
+    )
+    row.add_evidence(
+        "process",
+        f"{ROLLOUT_ENV_VAR}={configured or '<unset>'} resolved={state}; deep readiness deferred",
+        status="stale" if unsafe_advance else "present",
+        provenance_chain=[
+            "operator_control",
+            "rollout_gate",
+            "snapshot_projection",
+        ],
+    )
+    row.add_source_ref("config", f"env:{ROLLOUT_ENV_VAR}", exists=bool(configured))
+    row.add_source_ref("file", "dharma_swarm/memory_kernel/readiness.py", exists=True)
+    return row
 
 
 def _kernel_projection(repo_root: Path) -> KernelProjection:

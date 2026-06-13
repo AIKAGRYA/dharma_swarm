@@ -349,3 +349,30 @@ class TestWorkspaceSection:
             workspace_root=None, active_paths=[],
         )
         assert content == ""
+
+    def test_huge_workspace_is_time_boxed(self, tmp_path, monkeypatch):
+        """Regression: workspace_root with ~1M files (the state dir) must not
+        block the event loop for minutes — the scan is capped and time-boxed.
+
+        H02 Phase 1: the unbounded rglob+stat blocked the loop 60-120s, the
+        orchestrator tick 45s timeout cancelled dispatch mid-flight every
+        tick (dispatched=0 since 2026-05-27).
+        """
+        import itertools
+        import time
+
+        compiler = self._make_compiler()
+        real = tmp_path / "real.py"
+        real.write_text("present")
+
+        def endless_rglob(self_path, pattern):
+            return itertools.chain([real], itertools.cycle([real]))
+
+        monkeypatch.setattr(Path, "rglob", endless_rglob)
+        t0 = time.monotonic()
+        content, refs = compiler._workspace_section(
+            workspace_root=tmp_path, active_paths=[],
+        )
+        elapsed = time.monotonic() - t0
+        assert elapsed < 5.0, f"scan not bounded: {elapsed:.1f}s"
+        assert str(real) in refs

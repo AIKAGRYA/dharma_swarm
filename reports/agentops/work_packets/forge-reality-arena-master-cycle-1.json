@@ -1,0 +1,59 @@
+{
+  "acceptance": {
+    "archive_fitness_changed": false,
+    "canonical_ds_goal_context_available": false,
+    "external_actions_performed": false,
+    "failure_pressure_test_capsule_written": true,
+    "live_status_polluted_by_pressure_test": false,
+    "repo_local_receipt_required": true
+  },
+  "agent": "codex_5_5_cli",
+  "authority": "evidence-only",
+  "blockers": [],
+  "created_at_utc": "2026-06-02T03:43:52Z",
+  "cycle": 1,
+  "lane": "forge-reality-arena-v0",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "packet_id": "forge-reality-arena-master-cycle-1",
+  "result": "Added an isolated failure-capsule pressure-test path for the coordination gym and verified it writes a capsule without affecting live status counts.",
+  "role": "codex_forgewright",
+  "schema_version": "agentops_work_packet.v1",
+  "status_snapshot": {
+    "coordination_scenarios_failed": 0,
+    "coordination_scenarios_run": 20,
+    "coordination_unique_scenarios": 10,
+    "failure_capsules_written": 0,
+    "fitness_eligible_receipts": 0
+  },
+  "tests": [
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py -q --tb=short",
+      "outcome": "passed: 18 tests, 1 pytest config warning for unknown timeout option"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --failure-pressure-test",
+      "outcome": "passed: wrote reports/forge/forge-reality-arena/failure-pressure-test/verifier_artifact.json"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 2",
+      "outcome": "passed: regenerated 20 live coordination episodes"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "outcome": "passed: regenerated dense event ledger"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "outcome": "passed: regenerated status artifacts and AgentOps status packet"
+    },
+    {
+      "command": "make onboard",
+      "outcome": "passed"
+    }
+  ],
+  "tooling_notes": [
+    "npx gitnexus analyze completed successfully for /Users/dhyana/dharma_swarm; npx gitnexus status reports the current worktree index is up to date.",
+    "The active GitNexus MCP server still exposed older sibling repo entries and could not resolve the current worktree path for impact/detect-change queries."
+  ],
+  "track": "dharma-reward-forge-v0"
+}

@@ -23,7 +23,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -293,6 +293,37 @@ class AgentIdentity:
     working_directory: str = field(default_factory=lambda: str(Path.home()))
 
 
+def _identity_from_registered_holon(
+    agent_name: str,
+    *,
+    agents_root: Path | None = None,
+) -> AgentIdentity | None:
+    """Build an AgentIdentity from a registered holon's own prompt and model."""
+    from dharma_swarm.holon_bridge import load_holon
+
+    try:
+        holon = load_holon(agent_name, agents_root=agents_root)
+    except FileNotFoundError:
+        return None
+
+    provider = holon.provider_type
+    role = str(holon.identity.get("role") or "registered_holon")
+    working_directory = str(
+        holon.identity.get("storage_root")
+        or holon.identity.get("working_directory")
+        or Path.home()
+    )
+    return AgentIdentity(
+        name=holon.name,
+        role=role,
+        system_prompt=holon.system_prompt,
+        model=holon.model,
+        provider=provider,
+        allowed_tools=[],
+        working_directory=working_directory,
+    )
+
+
 def _providers_registered_on_router(
     router: Any,
     candidate_order: list[ProviderType],
@@ -520,6 +551,13 @@ class AutonomousAgent:
             return await self._call_anthropic(system, messages, tools)
         if self.identity.provider in ("openrouter", "OPENROUTER"):
             return await self._call_openrouter(system, messages, tools)
+        if self.identity.provider in (
+            "claude_code",
+            "CLAUDE_CODE",
+            "anthropic_max",
+            "ANTHROPIC_MAX",
+        ):
+            return await self._call_claude_code(system, messages, tools)
         if self.identity.provider in ("codex", "CODEX"):
             return await self._call_codex(system, messages, tools)
         raise ValueError(f"Unsupported provider: {self.identity.provider}")
@@ -775,6 +813,51 @@ class AutonomousAgent:
         if last_exc is not None:
             raise last_exc
         raise RuntimeError("Codex provider chain exhausted without an explicit error")
+
+    async def _call_claude_code(
+        self, system: str, messages: list[dict], tools: list[dict],
+    ) -> dict[str, Any]:
+        from dharma_swarm.models import LLMRequest
+
+        configs = preferred_runtime_provider_configs(
+            provider_order=(ProviderType.CLAUDE_CODE,),
+            model_overrides={ProviderType.CLAUDE_CODE: self.identity.model},
+            working_dir=self.identity.working_directory,
+        )
+        if not configs:
+            raise RuntimeError("Claude Code provider unavailable; install the claude CLI")
+
+        last_exc: Exception | None = None
+        for config in configs:
+            provider = create_runtime_provider(config)
+            try:
+                response = await provider.complete(
+                    LLMRequest(
+                        model=config.default_model or self.identity.model,
+                        system=system,
+                        messages=messages,
+                        max_tokens=4096,
+                        temperature=0.0,
+                        tools=tools,
+                    )
+                )
+                return _llm_response_to_react_shape(response)
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "[%s] provider %s failed for claude-code lane: %s",
+                    self.identity.name,
+                    config.provider.value,
+                    exc,
+                )
+            finally:
+                close = getattr(provider, "close", None)
+                if callable(close):
+                    await close()
+
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError("Claude Code provider chain exhausted without an explicit error")
 
     @staticmethod
     def _to_openai_message(msg: dict) -> dict:
@@ -1343,13 +1426,17 @@ async def cli_wake(agent_name: str, task: str, model: str | None = None) -> None
     if agent_name in PRESET_AGENTS:
         identity = PRESET_AGENTS[agent_name]
     else:
-        identity = AgentIdentity(
-            name=agent_name, role="general",
-            system_prompt=f"You are {agent_name}, an autonomous agent in dharma_swarm.",
-        )
+        identity = _identity_from_registered_holon(agent_name)
+        if identity is None:
+            identity = AgentIdentity(
+                name=agent_name, role="general",
+                system_prompt=f"You are {agent_name}, an autonomous agent in dharma_swarm.",
+            )
 
     if model:
-        identity.model = model
+        # Copy before overriding: presets are shared module state, and mutating
+        # them leaks the override into every later wake in the same process.
+        identity = replace(identity, model=model)
 
     agent = AutonomousAgent(identity)
     print(f"Waking {agent_name}...")

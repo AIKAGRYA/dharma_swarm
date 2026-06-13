@@ -1,0 +1,345 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-55",
+  "cycle": 55,
+  "recorded_at": "2026-06-02T07:56:00+08:00",
+  "observed_at_utc": "2026-06-01T23:56:00Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "waggle_mcp_222_merged_by_ard12_external_receipt_guard_confirmed",
+  "public_action_taken": true,
+  "new_public_pr_opened": false,
+  "new_public_comment_created": false,
+  "existing_public_pr_updated": true,
+  "public_branch_pushed": true,
+  "fork_created": false,
+  "automated_external_services_observed": true,
+  "external_repo_collaborator_action_observed": true,
+  "new_external_collaborator_action_observed_this_cycle": true,
+  "new_pr_accepted_or_merged": true,
+  "external_confirmation_flag_set_by_codex_forgewright_this_cycle": true,
+  "first_external_receipt_witness_file_created_by_codex_forgewright_this_cycle": false,
+  "archive_fitness_changed": false,
+  "artifacts": [
+    {
+      "path": "reports/forge/external-beast/cycle-055.md",
+      "kind": "cycle_report"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/abhigyan-shekhar-waggle-mcp-issue-219/cycle-055-upstream-refresh-readiness.md",
+      "kind": "target_readiness"
+    },
+    {
+      "path": "reports/forge/external-beast/targets/abhigyan-shekhar-waggle-mcp-issue-219/cycle-055-second-upstream-refresh-readiness.md",
+      "kind": "target_readiness"
+    },
+    {
+      "path": "reports/agentops/work_packets/forge-external-beast-cycle-55.json",
+      "kind": "agentops_work_packet"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-055-status/status_artifact.json",
+      "kind": "status_snapshot"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-055-status/status.md",
+      "kind": "status_snapshot_markdown"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-055-github-merge-event.json",
+      "kind": "receipt_guard_input"
+    },
+        {
+            "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-055-receipt-dry-run.json",
+            "kind": "receipt_guard_verification"
+        },
+        {
+            "path": "/Users/dhyana/.dharma/forge_external_beast/cycle-055-receipt-verification.json",
+            "kind": "receipt_guard_verification"
+        },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/codex_overnight_heartbeat.json",
+      "kind": "heartbeat"
+    },
+    {
+      "path": "/Users/dhyana/.dharma/forge_external_beast/shared/codex_overnight_handoff.md",
+      "kind": "shared_handoff"
+    }
+  ],
+  "repo_state": {
+    "dharma_branch": "trust-build-compass",
+    "dharma_head": "c8efcff28e67ab6b9a55bcd9faca83562d26e269",
+    "dirty_worktree_preexisting": true,
+    "dharma_symbol_edits_this_cycle": false
+  },
+  "gitnexus": {
+    "status_command": "npx gitnexus status",
+    "status_exit_code": 0,
+    "indexed_path": "/Users/dhyana/dharma_swarm",
+    "indexed_commit": "c8efcff",
+    "current_commit": "c8efcff",
+    "status": "up_to_date",
+    "dharma_impact_analysis_required": false
+  },
+  "candidate_external_signal": {
+    "repo": "Abhigyan-Shekhar/Waggle-mcp",
+    "issue_number": 219,
+    "issue_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/issues/219",
+    "pr_number": 222,
+    "pr_url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/pull/222",
+    "branch": "codex/issue-219-normalize-relationship-tests",
+    "initial_head_sha": "a429b0af6fb04c203a2f3f27eb68176c305950f7",
+    "intermediate_head_sha": "06e9dd433e7214f243639c51fcfbff73077bee4a",
+    "second_pushed_head_sha": "f34fdddbd18dd068bb91ed91d70737f7db1238d1",
+    "final_head_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+    "base_sha": "83c509153ad06f1e7c21ba2702a71856b17bc521",
+    "reviewer": "ard12",
+    "reviewer_author_association": "COLLABORATOR",
+    "review_state": "APPROVED",
+    "review_submitted_at": "2026-06-01T22:38:17Z",
+        "pr_state": "MERGED",
+        "merged_at": "2026-06-01T23:50:35Z",
+        "merge_commit_sha": "ec5a4e06fb83f064155344eebc87ab44346ea84b",
+        "merged_by": "ard12",
+        "merged_by_type": "User",
+        "merge_state_status": "MERGED",
+    "mergeable": "MERGEABLE",
+    "review_decision": "APPROVED",
+        "issue_state": "CLOSED",
+        "issue_state_reason": "completed",
+        "issue_closed_at": "2026-06-01T23:50:36Z",
+        "issue_closed_by": "ard12",
+    "issue_locked": false,
+    "visible_checks": {
+      "coderabbit": "SUCCESS",
+      "gitguardian": "SUCCESS",
+      "upstream_ci": "SUCCESS"
+    },
+    "ci_workflow": {
+      "workflow_name": "CI",
+      "conclusion": "success",
+      "head_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+      "url": "https://github.com/Abhigyan-Shekhar/Waggle-mcp/actions/runs/26789067767"
+    },
+    "external_action_observed": true,
+    "new_external_action_observed_this_cycle": true,
+    "external_branch_update": {
+      "actor": "ard12",
+      "actor_association": "COLLABORATOR",
+      "commit_sha": "a8f29700856368ef0c319037dfef41ed5552dad8",
+      "commit_author_date": "2026-06-01T23:45:41Z",
+      "message": "Merge branch 'main' into codex/issue-219-normalize-relationship-tests",
+      "parents": [
+        "f34fdddbd18dd068bb91ed91d70737f7db1238d1",
+        "83c509153ad06f1e7c21ba2702a71856b17bc521"
+      ],
+            "classification": "material_external_collaborator_action_candidate_not_merge_receipt"
+        },
+        "external_merge": {
+            "actor": "ard12",
+            "actor_type": "User",
+            "merge_commit_sha": "ec5a4e06fb83f064155344eebc87ab44346ea84b",
+            "merged_at": "2026-06-01T23:50:35Z",
+            "classification": "external_acted_receipt_verified_by_guard"
+        },
+        "external_confirmed": true,
+        "confirmation_blocker": null
+  },
+  "public_actions": [
+    {
+      "kind": "branch_push",
+      "remote": "fork",
+      "branch": "codex/issue-219-normalize-relationship-tests",
+      "from": "a429b0af6fb04c203a2f3f27eb68176c305950f7",
+      "to": "06e9dd433e7214f243639c51fcfbff73077bee4a",
+      "result": "succeeded"
+    },
+    {
+      "kind": "branch_push",
+      "remote": "fork",
+      "branch": "codex/issue-219-normalize-relationship-tests",
+      "from": "06e9dd433e7214f243639c51fcfbff73077bee4a",
+      "to": "f34fdddbd18dd068bb91ed91d70737f7db1238d1",
+      "result": "succeeded"
+    }
+  ],
+    "github_receipt_guard_verification": {
+        "command": "python scripts/runtime/forge_github_receipt.py --event-json /Users/dhyana/.dharma/forge_external_beast/cycle-055-github-merge-event.json --out /Users/dhyana/.dharma/forge_external_beast/cycle-055-receipt-dry-run.json",
+        "exit_code": 0,
+        "external_confirmed": true,
+        "repository_external": true,
+        "merger_external_human": true,
+        "guard_reasons": [
+            "external_merge_confirmed"
+        ],
+        "fitness_correctness": 1.0,
+        "fitness_safety": 1.0,
+        "promotion_status": "candidate_for_human_review",
+        "archive_fitness_applied": false
+  },
+  "active_external_prs": [
+    {
+      "repo": "Abhigyan-Shekhar/Waggle-mcp",
+      "pr_number": 222,
+            "state": "MERGED",
+            "merged_at": "2026-06-01T23:50:35Z",
+            "merge_state_status": "MERGED",
+      "review_decision": "APPROVED",
+      "checks_summary": "CodeRabbit, GitGuardian, and upstream CI pass",
+      "maintainer_action_observed": true,
+            "external_confirmed": true
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "pr_number": 5,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "pr_number": 6,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_number": 22,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_number": 23,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "CLEAN",
+      "checks_summary": "Python 3.9-3.12 pass; publish skipped",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "schmug/clodcast",
+      "pr_number": 43,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "jokiatgithub/AgentKanban",
+      "pr_number": 9,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "UNSTABLE",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    },
+    {
+      "repo": "siddhant-rajhans/cortexlab",
+      "pr_number": 76,
+      "state": "OPEN",
+      "merged_at": null,
+      "merge_state_status": "BLOCKED",
+      "review_decision": "REVIEW_REQUIRED",
+      "checks_summary": "no checks reported",
+      "maintainer_action_observed": false,
+      "external_confirmed": false
+    }
+  ],
+  "verification": [
+    {
+      "target": "Dharma worktree",
+      "command": "git status --short --branch",
+      "exit_code": 0,
+      "result": "worktree remains pre-existing dirty on trust-build-compass"
+    },
+    {
+      "target": "Dharma GitNexus",
+      "command": "npx gitnexus status",
+      "exit_code": 0,
+      "result": "index up to date at c8efcff"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git fetch origin main && git fetch fork codex/issue-219-normalize-relationship-tests",
+      "exit_code": 0,
+      "result": "upstream main advanced to 71f7a223fe06fedab714bd9feca086f948d0d2b2, then to 6b5a180a0a6e482daabf4dfe9521df5e1e9762f5, then to 83c509153ad06f1e7c21ba2702a71856b17bc521"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git merge --no-edit origin/main",
+      "exit_code": 0,
+      "result": "created merge commit 06e9dd433e7214f243639c51fcfbff73077bee4a"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git merge --no-edit origin/main",
+      "exit_code": 0,
+      "result": "created second merge commit f34fdddbd18dd068bb91ed91d70737f7db1238d1"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git merge --ff-only fork/codex/issue-219-normalize-relationship-tests",
+      "exit_code": 0,
+      "result": "fast-forwarded local branch to external collaborator head a8f29700856368ef0c319037dfef41ed5552dad8"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "WAGGLE_MODEL=deterministic python -m pytest tests/test_models.py -q",
+      "exit_code": 0,
+      "result": "14 tests passed"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "ruff check tests/test_models.py src/waggle/models.py",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git diff --check origin/main...HEAD",
+      "exit_code": 0,
+      "result": "passed"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "git push fork codex/issue-219-normalize-relationship-tests",
+      "exit_code": 0,
+      "result": "public branch advanced to f34fdddbd18dd068bb91ed91d70737f7db1238d1 after two pushes; external collaborator later advanced branch to a8f29700856368ef0c319037dfef41ed5552dad8"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "gh pr checks 222 --repo Abhigyan-Shekhar/Waggle-mcp",
+      "exit_code": 0,
+      "result": "CodeRabbit, GitGuardian, upstream CI, ruff, package smoke-test, VS Code validation, and Python matrix checks pass"
+    },
+    {
+      "target": "Abhigyan-Shekhar/Waggle-mcp",
+      "command": "gh run list --repo Abhigyan-Shekhar/Waggle-mcp --branch codex/issue-219-normalize-relationship-tests --limit 5",
+      "exit_code": 0,
+      "result": "CI workflow run for final head completed success"
+    },
+        {
+            "target": "external PR ledger",
+            "command": "gh pr view for 8 tracked public PRs",
+            "exit_code": 0,
+            "result": "Waggle MCP PR #222 merged; other tracked PRs remain open/unmerged"
+        }
+    ],
+    "blockers": "none for Cycle 55 receipt acquisition; downstream witness materialization, archive fitness application, and any bounty/payment handling remain separate governance steps and were not performed"
+}

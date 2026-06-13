@@ -9,15 +9,15 @@ Both compose PersistentAgent which composes AutonomousAgent.
 
 from __future__ import annotations
 
-import os
-
+from dharma_swarm.api_keys import ANTHROPIC_API_KEY_ENV, env_has_value
 from dharma_swarm.daemon_config import V7_BASE_RULES
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import AgentRole, ProviderType
 
 
 def _resolve_conductor_provider() -> ProviderType:
     """Pick the best available provider for conductors (Anthropic > Claude Code)."""
-    if os.environ.get("ANTHROPIC_API_KEY"):
+    if env_has_value(ANTHROPIC_API_KEY_ENV):
         return ProviderType.ANTHROPIC
     return ProviderType.CLAUDE_CODE
 
@@ -72,7 +72,7 @@ CONDUCTOR_CLAUDE_CONFIG = {
     "name": "conductor_claude",
     "role": AgentRole.CONDUCTOR,
     "provider_type": _resolve_conductor_provider(),
-    "model": "claude-opus-4-6",
+    "model": canonical_default_model(ProviderType.ANTHROPIC),
     "wake_interval_seconds": 3600.0,
     "system_prompt": _CONDUCTOR_CLAUDE_PROMPT,
     "max_turns": 15,
@@ -82,7 +82,7 @@ CONDUCTOR_CODEX_CONFIG = {
     "name": "conductor_codex",
     "role": AgentRole.CONDUCTOR,
     "provider_type": _resolve_conductor_provider(),
-    "model": "claude-sonnet-4-20250514",
+    "model": canonical_default_model(ProviderType.CLAUDE_CODE),
     "wake_interval_seconds": 1800.0,
     "system_prompt": _CONDUCTOR_CODEX_PROMPT,
     "max_turns": 10,

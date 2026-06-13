@@ -1,0 +1,173 @@
+{
+  "schema_version": "agentops_work_packet.v1",
+  "packet_id": "forge-reality-arena-master-cycle-23",
+  "created_at_utc": "2026-06-02T08:56:40Z",
+  "agent": "codex_5_5_cli",
+  "role": "codex_forgewright",
+  "authority": "evidence-only",
+  "mission": "Forge Reality Arena Hydra Master Spec",
+  "track": "dharma-reward-forge-v0",
+  "lane": "forge-reality-arena-v0",
+  "cycle": {
+    "operator_cycle": 9,
+    "master_cycle": 23
+  },
+  "result": "Added a deterministic coordination scenario for the 30-day guardrail that freezes promotion when dense gains rise while sparse external anchors stagnate. Regenerated the coordination gym at 8 repetitions, increasing live coverage to 21 unique scenarios and 168 passed local episodes while preserving zero external confirmation and zero fitness-eligible receipts.",
+  "patch_hash": "sha256:6e313ed81c8628b1a815d330e31b0137742fab9416ce72a914346e5b3441119a",
+  "content_hash_inputs": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py",
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json"
+  ],
+  "files_changed": [
+    "scripts/runtime/forge_swarm_coordination_gym.py",
+    "tests/test_forge_swarm_coordination_gym.py",
+    "tests/test_forge_reality_arena_status.py"
+  ],
+  "artifacts_refreshed": [
+    "reports/forge/forge-reality-arena/coordination-gym/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/dense-events/normalized_dense_eval_events.json",
+    "reports/forge/forge-reality-arena/docker-sandbox/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/benchmark-adapter/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/fitness-boundary-dry-run/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/authority-scan/verifier_artifact.json",
+    "reports/forge/forge-reality-arena/status_artifact.json",
+    "reports/forge/forge-reality-arena/status.md",
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+  ],
+  "new_learning_artifacts": [
+    "dense_gain_sparse_anchor_stagnation scenario in scripts/runtime/forge_swarm_coordination_gym.py"
+  ],
+  "status_snapshot": {
+    "dense_reps": 100,
+    "unique_dense_packets": 3,
+    "duplicate_dense_artifacts": 97,
+    "transfer_passed_reps": 94,
+    "base_memorized_candidates_denied": 95,
+    "coordination_scenarios_run": 168,
+    "coordination_unique_scenarios": 21,
+    "coordination_min_repetitions_per_scenario": 8,
+    "coordination_scenarios_passed": 168,
+    "coordination_scenarios_failed": 0,
+    "failure_capsules_written": 20,
+    "failure_capsule_failure_classes": 12,
+    "failure_capsules_should_feed_fitness": 0,
+    "docker_sandbox_status": "smoke_passed",
+    "benchmark_adapter_status": "verified",
+    "fitness_boundary_dry_run_status": "verified",
+    "fitness_boundary_candidates_for_human_review": 94,
+    "transfer_gated_improvement_candidates": 94,
+    "fitness_boundary_blocked_candidates": 6,
+    "authority_scan_status": "passed",
+    "authority_scan_scanned_files": 60,
+    "authority_scan_violations": 0,
+    "authority_scan_blockers": 0,
+    "fitness_eligible_receipts": 0,
+    "external_anchors_observed_not_owned": 2,
+    "target_missing": []
+  },
+  "test_commands": [
+    {
+      "command": "make onboard",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "python3 -m py_compile scripts/runtime/forge_swarm_coordination_gym.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_swarm_coordination_gym.py tests/test_forge_reality_arena_status.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "37 passed, 1 warning"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_swarm_coordination_gym.py --repetitions 8",
+      "exit_code": 0,
+      "outcome": "wrote 168-episode coordination artifact with 21 unique scenarios"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_dense_eval_normalizer.py",
+      "exit_code": 0,
+      "outcome": "wrote normalized dense-event ledger"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_docker_sandbox.py",
+      "exit_code": 0,
+      "outcome": "wrote Docker sandbox verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_benchmark_adapter.py",
+      "exit_code": 0,
+      "outcome": "wrote benchmark adapter verifier artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_fitness_boundary_dry_run.py",
+      "exit_code": 0,
+      "outcome": "wrote fitness-boundary dry-run artifact"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_authority_scan.py",
+      "exit_code": 0,
+      "outcome": "scanned 60 scoped JSON files, 0 violations"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 scripts/runtime/forge_reality_arena_status.py",
+      "exit_code": 0,
+      "outcome": "wrote status_artifact.json, status.md, and forge-reality-arena-status.json"
+    },
+    {
+      "command": "PATH=\"/Users/dhyana/dharma_swarm/.venv/bin:$PATH\" python3 -m pytest tests/test_forge_reality_arena_status.py tests/test_forge_swarm_coordination_gym.py tests/test_forge_dense_eval_normalizer.py tests/test_forge_failure_capsule.py tests/test_forge_docker_sandbox.py tests/test_forge_benchmark_adapter.py tests/test_forge_fitness_boundary_dry_run.py tests/test_forge_reality_arena_authority_scan.py -q --tb=short",
+      "exit_code": 0,
+      "outcome": "51 passed, 1 warning"
+    }
+  ],
+  "tooling_notes": [
+    {
+      "tool": "GitNexus impact",
+      "status": "blocked",
+      "detail": "Repository /Users/dhyana/dharma_swarm was not available in GitNexus. The tool listed only sibling or stale worktrees, so Context+ blast radius and manual file-level impact checks were used."
+    },
+    {
+      "tool": "Context+ blast radius",
+      "status": "completed",
+      "detail": "SCENARIOS blast radius reported 10 usages across the gym script, gym tests, and historical receipts; live code impact was limited to generated counts and tests."
+    },
+    {
+      "tool": "codebase-retrieval MCP",
+      "status": "blocked",
+      "detail": "Failed to index /Users/dhyana/dharma_swarm for this cycle; filesystem/context checks and focused tests were used instead."
+    }
+  ],
+  "external_boundary": {
+    "external_actions_performed": false,
+    "external_repo_contact": false,
+    "published": false,
+    "pushed": false,
+    "merged": false,
+    "payment_action": false,
+    "external_confirmed": false,
+    "archive_fitness_changed": false,
+    "fitness_eligible_receipts": 0
+  },
+  "acceptance": {
+    "concrete_improvement": "new deterministic scorer scenario for dense-gain versus sparse-anchor stagnation",
+    "status_refreshed": true,
+    "agentops_status_refreshed": true,
+    "repo_local_receipt_required": true,
+    "canonical_ds_goal_context_available": false,
+    "dense_training_signal_not_fitness_authority": true,
+    "failure_capsules_should_feed_fitness_false": true,
+    "authority_scan_passed": true,
+    "fitness_eligible_receipts_zero": true,
+    "archive_fitness_mutated": false
+  },
+  "next": "Add a master-spec long-run backlog audit so status can distinguish saturated 72-hour targets from remaining 30-day internal iteration goals without granting dense evals fitness authority."
+}

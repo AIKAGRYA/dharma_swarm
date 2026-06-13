@@ -69,8 +69,9 @@ def _has_openrouter_key() -> bool:
 
 
 def _has_ollama_key() -> bool:
-    import os
-    return bool(os.environ.get("OLLAMA_API_KEY", "").strip())
+    from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_has_value
+
+    return env_has_value(OLLAMA_API_KEY_ENV)
 
 
 def _resolve_default_crew() -> list[dict]:

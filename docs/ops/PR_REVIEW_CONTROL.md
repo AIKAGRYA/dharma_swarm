@@ -108,9 +108,10 @@ explicit command:
 @merge_master_mike merge when clean
 ```
 
-In that mode Mike still blocks unless required receipts such as
-`copilot_review_receipt.json`, `claude_review_receipt.json`, and
-`devin_review_receipt.json` are present and acceptable.
+In that mode Mike still blocks unless the required reviewer receipts are present
+and acceptable. The default quorum is `codex,claude`. The special
+`required_reviewers=none` policy is reserved for docs-low automation where the
+dispatcher has already limited the diff to documentation/report projections.
 
 ## Merge Hygiene Quorum
 
@@ -163,6 +164,11 @@ make pr-run-codex PR=397
 make pr-run-claude PR=397
 make pr-gate PR=397
 ```
+
+For a docs-low generated or projection-only PR, the hosted automerge dispatcher
+may call the same adapter with `required_reviewers=none`. That path is not a
+general reviewer bypass; the workflow skips any code, workflow, test, runtime,
+dashboard, API, or script path.
 
 For Devin-assisted queue cleanup, use the AGNI/NATS playbook:
 
@@ -359,8 +365,7 @@ The gate blocks when any of these are true:
 - GitHub review decision is `CHANGES_REQUESTED`.
 - Coherence Delta fields are missing or placeholders.
 - Review threads are unresolved.
-  - `codex_review.md` or `claude_review.md` is missing.
-  - `codex_review_receipt.json` or `claude_review_receipt.json` is missing or invalid.
+- A required reviewer output or receipt is missing or invalid.
 - Claude is missing and `--allow-backup-reviewer` is absent.
 - Claude is missing, backup fallback is enabled, and no named backup reviewer
   receipt is acceptable.

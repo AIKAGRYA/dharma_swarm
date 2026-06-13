@@ -1,0 +1,199 @@
+{
+  "schema_version": "codex_agent_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-7",
+  "created_at": "2026-06-01T19:09:41+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "scope": "Perform receipt watch on the active Guild PR, live-score fresher external candidates, select one bounded low-competition target if readiness passes, implement/test locally, and open one transparent public PR only after the target packet is written.",
+  "targets": [
+    {
+      "repository": "Yasuno-5555/Guild",
+      "issue": 1,
+      "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+      "pr": 7,
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "fork": "AmitabhainArunachala/Guild",
+      "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "local_branch": "codex/issue-1-invalid-bounty-fixtures",
+      "commit": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "role": "existing_receipt_watch"
+    },
+    {
+      "repository": "ferro-labs/ferrolabs-python-sdk",
+      "issue": 11,
+      "issue_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/issues/11",
+      "pr": 22,
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "fork": "AmitabhainArunachala/ferrolabs-python-sdk",
+      "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/ferro-labs-ferrolabs-python-sdk",
+      "local_branch": "codex/issue-11-admin-plugins-list-tests",
+      "base_branch": "development",
+      "commit": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "role": "new_public_pr"
+    }
+  ],
+  "actions": [
+    "inspected dharma_swarm worktree without cleaning or reverting user changes",
+    "read Forge Council protocol and prior external-beast cycle/readiness artifacts",
+    "used GitHub connector and gh CLI to recheck Guild PR #7 state, comments, reviews, review threads, branch checks, issue state, issue events, workflow run, and commit status",
+    "reran focused local verification for the submitted Guild patch",
+    "rechecked labmain/ai-agent-pay-demo issue #35 and rejected it again due to heavy direct PR competition",
+    "ran broader GitHub issue searches for zero-comment/no-assignee good-first/test targets",
+    "selected ferro-labs/ferrolabs-python-sdk issue #11 after live repo, issue, competition, branch, contribution-rule, and AI-rule checks",
+    "cloned ferro-labs/ferrolabs-python-sdk under the writable external state directory",
+    "created branch codex/issue-11-admin-plugins-list-tests from origin/development",
+    "created a Python 3.11 uv virtual environment and installed dev dependencies",
+    "ran baseline pytest, ruff, and mypy on the Ferro target before editing",
+    "added the missing admin.plugins.list() tests and changelog note",
+    "ran post-patch pytest, ruff, mypy, and diff whitespace checks",
+    "wrote the Ferro target readiness packet before public fork/push/PR actions",
+    "ran a final issue and competition live recheck immediately before public action",
+    "created the operator-controlled fork AmitabhainArunachala/ferrolabs-python-sdk",
+    "committed and pushed the branch to the fork",
+    "opened PR #22 into ferro-labs/ferrolabs-python-sdk:development with an AI-assisted/operator-approved disclosure",
+    "performed post-PR receipt watch for PR #22 and classified CI action_required as fork workflow gating",
+    "updated target readiness packets and recorded the cycle 7 report"
+  ],
+  "public_actions": [
+    {
+      "type": "fork",
+      "repository": "ferro-labs/ferrolabs-python-sdk",
+      "fork": "https://github.com/AmitabhainArunachala/ferrolabs-python-sdk"
+    },
+    {
+      "type": "push",
+      "repository": "AmitabhainArunachala/ferrolabs-python-sdk",
+      "branch": "codex/issue-11-admin-plugins-list-tests",
+      "commit": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe"
+    },
+    {
+      "type": "pull_request",
+      "repository": "ferro-labs/ferrolabs-python-sdk",
+      "pr": 22,
+      "url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "base": "development",
+      "head": "AmitabhainArunachala:codex/issue-11-admin-plugins-list-tests",
+      "transparent_ai_assistance_disclosure": true
+    }
+  ],
+  "candidate_rechecks": [
+    {
+      "repository": "labmain/ai-agent-pay-demo",
+      "issue": 35,
+      "issue_url": "https://github.com/labmain/ai-agent-pay-demo/issues/35",
+      "state": "open",
+      "locked": false,
+      "comments": 11,
+      "acceptance_criteria_clear": true,
+      "selected": false,
+      "rejection_reason": "High visible competition and payment-claim noise; many open PRs already target the same empty-response fix path."
+    },
+    {
+      "repository": "ferro-labs/ferrolabs-python-sdk",
+      "issue": 11,
+      "issue_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/issues/11",
+      "state": "open",
+      "locked": false,
+      "comments": 0,
+      "assignees": [],
+      "acceptance_criteria_clear": true,
+      "selected": true,
+      "selection_reason": "Small test-only scope, explicit acceptance criteria, local test suite runnable, active maintainers, and no competing open PR for the same issue."
+    }
+  ],
+  "verification": [
+    {
+      "command": "git status --short",
+      "workdir": "/Users/dhyana/dharma_swarm",
+      "outcome": "passed; dirty worktree confirmed and left untouched except cycle report artifacts"
+    },
+    {
+      "command": "GitHub connector _get_pr_info/_fetch_pr_comments/_list_pull_request_reviews/_list_pull_request_review_threads for Yasuno-5555/Guild#7",
+      "outcome": "passed; PR open, non-draft, mergeable, unchanged, and no discussion/review activity"
+    },
+    {
+      "command": "gh pr checks 7 --repo Yasuno-5555/Guild",
+      "outcome": "reported no checks on the branch"
+    },
+    {
+      "command": "gh run view 26749510285 --repo Yasuno-5555/Guild",
+      "outcome": "passed; CI run action_required with no jobs"
+    },
+    {
+      "command": "cargo test -p guild-spec",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed; 12 tests"
+    },
+    {
+      "command": "invalid-fixture CLI validation loop over examples/invalid-fixtures/*.yml",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed expected exits"
+    },
+    {
+      "command": "git diff --check origin/main..HEAD",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+      "outcome": "passed"
+    },
+    {
+      "command": "gh api repos/ferro-labs/ferrolabs-python-sdk/issues/11",
+      "outcome": "passed; issue #11 open, unlocked, unassigned, 0 comments"
+    },
+    {
+      "command": "gh search prs --repo ferro-labs/ferrolabs-python-sdk --state open 'admin.plugins.list OR plugins list OR issue 11'",
+      "outcome": "passed; returned [] before public action"
+    },
+    {
+      "command": ".venv/bin/python -m pytest tests/test_sdk.py -q",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/ferro-labs-ferrolabs-python-sdk",
+      "outcome": "passed before patch with 61 tests and after patch with 63 tests"
+    },
+    {
+      "command": ".venv/bin/ruff check ferrolabsai tests",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/ferro-labs-ferrolabs-python-sdk",
+      "outcome": "passed before and after patch"
+    },
+    {
+      "command": ".venv/bin/mypy ferrolabsai",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/ferro-labs-ferrolabs-python-sdk",
+      "outcome": "passed before and after patch with existing warning that pyproject python_version 3.9 is not supported by this mypy version"
+    },
+    {
+      "command": "git diff --check",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/clones/ferro-labs-ferrolabs-python-sdk",
+      "outcome": "passed"
+    },
+    {
+      "command": "GitHub connector _get_pr_info/_fetch_pr_comments/_list_pull_request_reviews/_list_pull_request_review_threads for ferro-labs/ferrolabs-python-sdk#22",
+      "outcome": "passed; PR open, non-draft, mergeable, no discussion/review activity"
+    },
+    {
+      "command": "gh pr checks 22 --repo ferro-labs/ferrolabs-python-sdk",
+      "outcome": "reported no checks on the branch"
+    },
+    {
+      "command": "gh run view 26751209862 --repo ferro-labs/ferrolabs-python-sdk",
+      "outcome": "passed; CI run action_required with no jobs"
+    }
+  ],
+  "readiness_gate": {
+    "passed": true,
+    "target_packet": "reports/forge/external-beast/targets/ferro-labs-ferrolabs-python-sdk-issue-11/readiness.md",
+    "basis": "Final live recheck confirmed issue #11 still open/unlocked, no comments, no assignee, no competing PR; local implementation complete and relevant tests/lint/type checks passed.",
+    "external_confirmed": false
+  },
+  "maintainer_action": {
+    "observed": false,
+    "details": "Guild PR #7 and Ferro PR #22 have no reviews, comments, inline threads, accepted changes, merges, closes, status contexts, or workflow approval events. CI action_required states are platform gating only."
+  },
+  "forbidden_state_changes": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_public_branch_this_cycle": true,
+    "opened_pr_this_cycle": true,
+    "posted_comment_this_cycle": false,
+    "set_external_confirmed": false,
+    "created_first_external_receipt_witness": false,
+    "set_nonzero_archive_fitness": false
+  }
+}

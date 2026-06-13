@@ -17,12 +17,18 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from dharma_swarm.models import _new_id, _utc_now
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
+from dharma_swarm.models import ProviderType, _new_id, _utc_now
 from dharma_swarm.runtime_provider import (
     PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS,
     complete_via_preferred_runtime_providers,
 )
 from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
+
+_DREAM_OPENROUTER_MODEL = canonical_default_model(ProviderType.OPENROUTER)
+_DREAM_ANTHROPIC_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
+_EXTRACTION_OPENROUTER_MODEL = canonical_default_model(ProviderType.OPENROUTER_FREE)
+_EXTRACTION_ANTHROPIC_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
 
 
 # === Data Models ===
@@ -210,8 +216,8 @@ Stop when the transmission stops. Mark the end with ~"""
             dream_prose = await self._complete_dream_text(
                 system_prompt=self._HUM_SYSTEM_PROMPT,
                 user_prompt=prompt,
-                openrouter_model="anthropic/claude-3.5-sonnet",
-                anthropic_model="claude-sonnet-4-20250514",
+                openrouter_model=_DREAM_OPENROUTER_MODEL,
+                anthropic_model=_DREAM_ANTHROPIC_MODEL,
                 max_tokens=2048,
                 temperature=0.9,
                 timeout_seconds=120.0,
@@ -237,8 +243,8 @@ Salience guide: 0.9+ = genuinely novel cross-domain bridge not stated in either 
 0.7-0.9 = real connection, non-obvious. 0.5-0.7 = interesting but derivable. Below 0.5 = noise."""
             raw = await self._complete_dream_text(
                 user_prompt=extraction_prompt,
-                openrouter_model="anthropic/claude-3-haiku",
-                anthropic_model="claude-haiku-4-5-20251001",
+                openrouter_model=_EXTRACTION_OPENROUTER_MODEL,
+                anthropic_model=_EXTRACTION_ANTHROPIC_MODEL,
                 max_tokens=600,
                 temperature=0.2,
                 timeout_seconds=120.0,
@@ -317,8 +323,8 @@ Discard any association that is just a paraphrase of something a source file alr
             dream_prose = await self._complete_dream_text(
                 system_prompt=self._HUM_SYSTEM_PROMPT,
                 user_prompt=prompt,
-                openrouter_model="anthropic/claude-3.5-sonnet",
-                anthropic_model="claude-sonnet-4-20250514",
+                openrouter_model=_DREAM_OPENROUTER_MODEL,
+                anthropic_model=_DREAM_ANTHROPIC_MODEL,
                 max_tokens=3000,
                 temperature=0.9,
                 timeout_seconds=180.0,
@@ -326,8 +332,8 @@ Discard any association that is just a paraphrase of something a source file alr
 
             raw = await self._complete_dream_text(
                 user_prompt=extraction_template.replace("{dream_prose}", dream_prose),
-                openrouter_model="anthropic/claude-3-haiku",
-                anthropic_model="claude-haiku-4-5-20251001",
+                openrouter_model=_EXTRACTION_OPENROUTER_MODEL,
+                anthropic_model=_EXTRACTION_ANTHROPIC_MODEL,
                 max_tokens=4000,
                 temperature=0.2,
                 timeout_seconds=120.0,

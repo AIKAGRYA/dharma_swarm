@@ -897,6 +897,7 @@ def _runtime_state_row(
 def build_control_surface_rows(
     repo_root: Path | None = None,
     runtime_db: Path | None = None,
+    memory_depth: str = "snapshot",
 ) -> list[ControlSurfaceRow]:
     """Build the full control surface projection.
 
@@ -978,7 +979,8 @@ def build_control_surface_rows(
     rows.extend(_live_ops_census_rows(root))
 
     # M) MemoryKernel operator controls
-    rows.extend(memory_kernel_control_rows(root))
+    memory_projection_depth = "deep" if memory_depth == "deep" else "snapshot"
+    rows.extend(memory_kernel_control_rows(root, depth=memory_projection_depth))
 
     # N) Go receipts (optional)
     rows.extend(_go_receipt_rows(root))
@@ -999,10 +1001,11 @@ def build_control_surface_rows(
 def build_control_surface_summary(
     rows: list[ControlSurfaceRow] | None = None,
     repo_root: Path | None = None,
+    memory_depth: str = "snapshot",
 ) -> dict[str, Any]:
     """Build a lightweight summary of the control surface."""
     if rows is None:
-        rows = build_control_surface_rows(repo_root=repo_root)
+        rows = build_control_surface_rows(repo_root=repo_root, memory_depth=memory_depth)
 
     counts: dict[str, int] = {}
     for state in COHERENCE_STATES:

@@ -187,6 +187,10 @@ export function fetchHealth(): Promise<ApiResponse<HealthOut>> {
   return apiGet<HealthOut>("/api/health");
 }
 
+export function backendLivenessPath(): string {
+  return apiPath("/api/verify/health");
+}
+
 export function fetchAnomalies(): Promise<ApiResponse<AnomalyOut[]>> {
   return apiGet<AnomalyOut[]>("/api/health/anomalies");
 }

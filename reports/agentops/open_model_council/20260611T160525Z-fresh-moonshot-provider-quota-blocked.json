@@ -1,0 +1,19 @@
+{
+  "agent_uid": "moonshot_kimi_lane",
+  "created_at": "2026-06-11T16:25:55Z",
+  "error": "Moonshot lane was not attempted because current provider status did not show available Moonshot quota/config. Prior council evidence also recorded Moonshot quota/balance blocked.",
+  "extracted_recommendations": [],
+  "model": "kimi-k2.6",
+  "model_authored": false,
+  "peer_model_processed_claim": false,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md",
+  "prompt_sha256": "38389a0a61b7a0070e3a30507c2bd55bdab12cc587e651430338a13808e6bbef",
+  "provider": "moonshot",
+  "requested_model": "kimi-k2.6",
+  "response": "",
+  "response_sha256": "",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": false,
+  "status": "blocked",
+  "typed_failure": "provider_quota_blocked"
+}

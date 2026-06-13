@@ -1,0 +1,150 @@
+{
+  "packet_id": "forge-external-beast-cycle-14",
+  "cycle": 14,
+  "recorded_at": "2026-06-01T20:43:32+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "public_pr_opened",
+  "external_confirmed": false,
+  "first_external_receipt_witness_created": false,
+  "archive_fitness_changed": false,
+  "existing_pr_watch": [
+    {
+      "repo": "abduznik/instrumation",
+      "pr_url": "https://github.com/abduznik/instrumation/pull/98",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+      "maintainer_action_observed": false
+    },
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/9",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "a1b47e6969b8507df4cffba3726ddf86d99e1e2c",
+      "maintainer_action_observed": false
+    },
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "maintainer_action_observed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "maintainer_action_observed": false
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/23",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "12b87ab1f96cb02da0217aff7af2aead22967f66",
+      "maintainer_action_observed": false
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "pr_url": "https://github.com/avanlolee/open-dtc-ops/pull/6",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "5bed1aeb9c4db910328f1f70d7bc21b2671c8333",
+      "maintainer_action_observed": false
+    }
+  ],
+  "target": {
+    "repo": "leticiv/intigriti-asset-copier",
+    "issue_url": "https://github.com/leticiv/intigriti-asset-copier/issues/1",
+    "pr_url": "https://github.com/leticiv/intigriti-asset-copier/pull/6",
+    "fork": "AmitabhainArunachala/intigriti-asset-copier",
+    "branch": "codex/issue-1-export-format-selector",
+    "commit_sha": "dbf9fbb579d45cb3f9e4fa31f6d0bd5b73393a4b",
+    "base_sha": "df6208538d4b07184644afa09fb3614807420df1",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/leticiv-intigriti-asset-copier"
+  },
+  "readiness_gate": {
+    "packet_path": "reports/forge/external-beast/targets/leticiv-intigriti-asset-copier-issue-1/readiness.md",
+    "source_url_recorded": true,
+    "live_source_state_recorded": true,
+    "competition_scan_recorded": true,
+    "local_clone_or_fork_plan_recorded": true,
+    "acceptance_criteria_recorded": true,
+    "implementation_summary_recorded": true,
+    "test_command_and_result_recorded": true,
+    "public_action_plan_recorded": true,
+    "lease_fit_recorded": true,
+    "rollback_plan_recorded": true
+  },
+  "live_checks": {
+    "issue_open": true,
+    "issue_locked": false,
+    "issue_comments_before_action": 0,
+    "issue_assignees_before_action": 0,
+    "open_pr_competition_before_action": 0,
+    "linked_closing_prs_before_action": 0,
+    "pr_open": true,
+    "pr_draft": false,
+    "pr_mergeable": "MERGEABLE",
+    "maintainer_action_observed": false,
+    "github_actions_state": "no_status_checks_reported"
+  },
+  "implementation": {
+    "summary": "Added a persisted modal format selector for plain text, JSON, and CSV exports in the Intigriti asset copier userscript.",
+    "files_changed_in_target_repo": [
+      "README.md",
+      "intigriti-asset-copier.user.js"
+    ],
+    "additions": 179,
+    "deletions": 16
+  },
+  "tests": [
+    {
+      "command": "node --check intigriti-asset-copier.user.js",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check origin/main..HEAD",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "git diff --check -- reports/forge/external-beast/targets/leticiv-intigriti-asset-copier-issue-1/readiness.md",
+      "exit_code": 0,
+      "outcome": "passed"
+    }
+  ],
+  "public_actions": [
+    "created fork AmitabhainArunachala/intigriti-asset-copier",
+    "pushed branch codex/issue-1-export-format-selector",
+    "opened PR https://github.com/leticiv/intigriti-asset-copier/pull/6"
+  ],
+  "guardrails": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_dharma_swarm_main": false,
+    "merged_protected_branch": false,
+    "published_broad_claim": false,
+    "set_nonzero_archive_fitness": false,
+    "escalated_to_v2_autonomy": false
+  },
+  "blocker": "No external acted receipt yet; PR 6 and earlier open PRs await external maintainer action."
+}

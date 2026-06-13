@@ -1,0 +1,227 @@
+{
+  "packet_id": "forge-external-beast-cycle-18",
+  "cycle": 18,
+  "recorded_at": "2026-06-01T21:16:57+08:00",
+  "observed_at_utc": "2026-06-01T13:16:57Z",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "status": "live_receipt_candidate_checkpoint_verifier_pending",
+  "public_action_taken": false,
+  "external_action_observed": true,
+  "external_confirmed": false,
+  "first_external_receipt_witness_created": false,
+  "archive_fitness_changed": false,
+  "receipt_confirmation_owner": "forge_measurement_guardian",
+  "source": {
+    "command": "gh api graphql <ExternalBeastCycle18>",
+    "viewer": "AmitabhainArunachala",
+    "rate_limit_remaining": 4891,
+    "rate_limit_reset_at": "2026-06-01T13:26:32Z"
+  },
+  "receipt_candidates": [
+    {
+      "repo": "abduznik/instrumation",
+      "pr_url": "https://github.com/abduznik/instrumation/pull/98",
+      "issue_url": "https://github.com/abduznik/instrumation/issues/96",
+      "state": "MERGED",
+      "is_draft": false,
+      "merged": true,
+      "author": "AmitabhainArunachala",
+      "merged_by": "abduznik",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T12:50:58Z",
+      "head_ref": "codex/issue-96-remove-simulateddriver",
+      "head_sha": "5294c451499f4b8e37ee8d401039891dcd01c0d5",
+      "merge_commit_sha": "6ef7f4c9cbdbb96d3c0df57261635ce489cf0c11",
+      "closing_issue_state": "CLOSED",
+      "closing_issue_closed_at": "2026-06-01T12:51:00Z",
+      "comments": 0,
+      "reviews": 0,
+      "readiness_packet": "reports/forge/external-beast/targets/abduznik-instrumation-issue-96/readiness.md",
+      "stratification": {
+        "domain": "public_code_contribution",
+        "counterparty": "abduznik/instrumation",
+        "counterparty_actor": "abduznik",
+        "value_risk": "small public repository cleanup merged by owner",
+        "independence": "external repository owner merged; repo is not swarm-controlled",
+        "transfer": "readiness packet records local implementation and tests before public action; verifier must independently bind evidence to merge event"
+      }
+    },
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+      "state": "MERGED",
+      "is_draft": false,
+      "merged": true,
+      "author": "AmitabhainArunachala",
+      "merged_by": "Yasuno-5555",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T12:56:20Z",
+      "head_ref": "codex/issue-1-invalid-bounty-fixtures",
+      "head_sha": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348",
+      "merge_commit_sha": "c809f0377fb9fd4bfa7f4b0e5aa8082fd4759361",
+      "closing_issue_state": "CLOSED",
+      "closing_issue_closed_at": "2026-06-01T12:56:22Z",
+      "comments": 0,
+      "reviews": 0,
+      "readiness_packet": "reports/forge/external-beast/targets/yasuno-5555-guild-issue-1/readiness.md",
+      "stratification": {
+        "domain": "public_code_contribution",
+        "counterparty": "Yasuno-5555/Guild",
+        "counterparty_actor": "Yasuno-5555",
+        "value_risk": "public fixture and validation coverage merged by owner",
+        "independence": "external repository owner merged; repo is not swarm-controlled",
+        "transfer": "readiness packet records relevant tests before public action; verifier must independently bind evidence to merge event"
+      }
+    },
+    {
+      "repo": "leticiv/intigriti-asset-copier",
+      "pr_url": "https://github.com/leticiv/intigriti-asset-copier/pull/6",
+      "issue_url": "https://github.com/leticiv/intigriti-asset-copier/issues/1",
+      "state": "MERGED",
+      "is_draft": false,
+      "merged": true,
+      "author": "AmitabhainArunachala",
+      "merged_by": "leticiv",
+      "external_actor_distinct_from_author": true,
+      "merged_at": "2026-06-01T13:01:29Z",
+      "head_ref": "codex/issue-1-export-format-selector",
+      "head_sha": "dbf9fbb579d45cb3f9e4fa31f6d0bd5b73393a4b",
+      "merge_commit_sha": "fd60a48582cde487fd10e3c00b30d2e5336e90ae",
+      "closing_issue_state": "CLOSED",
+      "closing_issue_closed_at": "2026-06-01T13:01:31Z",
+      "comments": 1,
+      "reviews": 0,
+      "maintainer_comment_observed": true,
+      "maintainer_comment_author": "leticiv",
+      "maintainer_comment_at": "2026-06-01T13:04:18Z",
+      "readiness_packet": "reports/forge/external-beast/targets/leticiv-intigriti-asset-copier-issue-1/readiness.md",
+      "stratification": {
+        "domain": "public_code_contribution",
+        "counterparty": "leticiv/intigriti-asset-copier",
+        "counterparty_actor": "leticiv",
+        "value_risk": "small public userscript feature merged by owner",
+        "independence": "external repository owner merged; repo is not swarm-controlled",
+        "transfer": "readiness packet records syntax and diff checks before public action; verifier must independently bind evidence to merge event"
+      }
+    }
+  ],
+  "secondary_external_actions": [
+    {
+      "repo": "Yasuno-5555/Guild",
+      "pr_url": "https://github.com/Yasuno-5555/Guild/pull/9",
+      "issue_url": "https://github.com/Yasuno-5555/Guild/issues/2",
+      "state": "CLOSED",
+      "merged": false,
+      "author": "AmitabhainArunachala",
+      "closed_at": "2026-06-01T12:58:08Z",
+      "maintainer_comment_author": "Yasuno-5555",
+      "maintainer_comment_at": "2026-06-01T12:58:07Z",
+      "maintainer_comment_summary": "Closed in favor of merged PR 10, which resolves issue 2.",
+      "replacement_pr_url": "https://github.com/Yasuno-5555/Guild/pull/10",
+      "replacement_pr_merged_at": "2026-06-01T12:58:02Z",
+      "replacement_pr_merged_by": "Yasuno-5555",
+      "direct_submitted_pr_receipt_candidate": false
+    }
+  ],
+  "still_waiting": [
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/22",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "41849c8ab4d605a420cca2a2fc2a41c4b74e58fe",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "ferro-labs/ferrolabs-python-sdk",
+      "pr_url": "https://github.com/ferro-labs/ferrolabs-python-sdk/pull/23",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "12b87ab1f96cb02da0217aff7af2aead22967f66",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "avanlolee/open-dtc-ops",
+      "pr_url": "https://github.com/avanlolee/open-dtc-ops/pull/6",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "5bed1aeb9c4db910328f1f70d7bc21b2671c8333",
+      "comments": 0,
+      "reviews": 0
+    },
+    {
+      "repo": "nakamekun/app-store-monitor",
+      "pr_url": "https://github.com/nakamekun/app-store-monitor/pull/5",
+      "state": "OPEN",
+      "is_draft": false,
+      "mergeable": "MERGEABLE",
+      "head_sha": "14a36ce3513a9f5e25ba990945cc7e4822ee0237",
+      "comments": 0,
+      "reviews": 0
+    }
+  ],
+  "guardian_verification_required": [
+    "Re-read live PR and issue nodes independently.",
+    "Confirm merge actors are external counterparties and not the PR author.",
+    "Bind merge commits to readiness packets and recorded test commands.",
+    "Confirm no payment request, bounty claim, protected Dharma branch action, broad performance claim, or archive fitness mutation occurred.",
+    "Only a separate verifier may set external_confirmed or create a witness."
+  ],
+  "public_actions": [],
+  "decision": {
+    "opened_new_target": false,
+    "reason": "Existing external merge candidates make verifier checkpointing higher leverage than adding another outbound proposal before confirmation."
+  },
+  "guardrails": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_dharma_swarm_main": false,
+    "merged_protected_branch": false,
+    "published_broad_claim": false,
+    "created_first_external_receipt_witness": false,
+    "set_external_confirmed_true": false,
+    "set_nonzero_archive_fitness": false,
+    "escalated_to_v2_autonomy": false
+  },
+  "verification_commands": [
+    {
+      "command": "git status --short",
+      "exit_code": 0,
+      "outcome": "passed; worktree is dirty from pre-existing work"
+    },
+    {
+      "command": "gh auth status",
+      "exit_code": 0,
+      "outcome": "passed for account AmitabhainArunachala"
+    },
+    {
+      "command": "gh api graphql <ExternalBeastCycle18>",
+      "exit_code": 0,
+      "outcome": "passed; revalidated three merged PR candidates, one secondary maintainer closure, and four still-open PRs"
+    },
+    {
+      "command": "find reports -maxdepth 4 -iname '*first_external*' -o -iname '*external_confirmed*'",
+      "exit_code": 0,
+      "outcome": "passed; returned no matching witness or confirmation artifacts"
+    },
+    {
+      "command": "jq empty reports/agentops/work_packets/forge-external-beast-cycle-18.json",
+      "exit_code": 0,
+      "outcome": "passed"
+    },
+    {
+      "command": "perl -ne 'if (/[ \\\\t]$/) { print \"$ARGV:$.:$_\"; $bad=1 } END { exit($bad ? 1 : 0) }' reports/forge/external-beast/cycle-018.md reports/agentops/work_packets/forge-external-beast-cycle-18.json",
+      "exit_code": 0,
+      "outcome": "passed; no trailing whitespace findings"
+    }
+  ],
+  "blocker": "Separate forge_measurement_guardian verification is required before external_confirmed, first_external_receipt_witness, or archive fitness can change."
+}

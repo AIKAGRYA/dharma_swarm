@@ -1,0 +1,101 @@
+{
+  "schema_version": "codex_agent_work_packet.v1",
+  "packet_id": "forge-external-beast-cycle-2",
+  "created_at": "2026-06-01T18:31:31+08:00",
+  "actor": "codex_forgewright",
+  "mode": "external-approved",
+  "scope": "Recheck the selected external target, triage the full-suite sandbox blocker, and if the readiness gate passes, open one transparent public PR.",
+  "target": {
+    "repository": "Yasuno-5555/Guild",
+    "issue": 1,
+    "issue_url": "https://github.com/Yasuno-5555/Guild/issues/1",
+    "pr": 7,
+    "pr_url": "https://github.com/Yasuno-5555/Guild/pull/7",
+    "fork": "AmitabhainArunachala/Guild",
+    "local_clone": "/Users/dhyana/.dharma/forge_external_beast/clones/Yasuno-5555-Guild",
+    "local_branch": "codex/issue-1-invalid-bounty-fixtures",
+    "commit": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348"
+  },
+  "actions": [
+    "inspected dharma_swarm worktree without cleaning or reverting user changes",
+    "live-rechecked issue state, repository state, and open PR competition",
+    "checked target repository docs for AI-assistance or contribution restrictions",
+    "reran relevant Rust and CLI validation tests for the local patch",
+    "reproduced guild-sandbox::tests::test_sandbox_security_enforcement failure on the patched branch",
+    "created a clean upstream worktree at origin/main and reproduced the same guild-sandbox failure there",
+    "updated the target readiness packet before public push or PR action",
+    "committed the external clone patch",
+    "created operator-controlled fork AmitabhainArunachala/Guild",
+    "pushed branch codex/issue-1-invalid-bounty-fixtures to the fork",
+    "opened transparent PR #7 into Yasuno-5555/Guild:main"
+  ],
+  "public_actions": [
+    {
+      "type": "fork_created_or_reused",
+      "url": "https://github.com/AmitabhainArunachala/Guild"
+    },
+    {
+      "type": "branch_pushed",
+      "branch": "codex/issue-1-invalid-bounty-fixtures",
+      "repository": "AmitabhainArunachala/Guild",
+      "commit": "1444b1538c2fd6cf640734a3f3faa7a9f2b1a348"
+    },
+    {
+      "type": "pull_request_opened",
+      "url": "https://github.com/Yasuno-5555/Guild/pull/7",
+      "base": "Yasuno-5555/Guild:main",
+      "head": "AmitabhainArunachala:codex/issue-1-invalid-bounty-fixtures"
+    }
+  ],
+  "verification": [
+    {
+      "command": "cargo test -p guild-spec",
+      "outcome": "passed"
+    },
+    {
+      "command": "for fixture in examples/invalid-fixtures/*.yml; do cargo run -q -p guild-cli -- --format json bounty validate \"$fixture\"; done",
+      "outcome": "passed expected fixture exits and warning"
+    },
+    {
+      "command": "cargo check",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test -p guild-cli",
+      "outcome": "passed"
+    },
+    {
+      "command": "cargo test --workspace --exclude guild-sandbox",
+      "outcome": "passed"
+    },
+    {
+      "command": "timeout 120s cargo test -p guild-sandbox test_sandbox_security_enforcement -- --nocapture",
+      "outcome": "failed on patched branch: pre-existing sandbox assertion failure"
+    },
+    {
+      "command": "timeout 120s cargo test -p guild-sandbox test_sandbox_security_enforcement -- --nocapture",
+      "workdir": "/Users/dhyana/.dharma/forge_external_beast/worktrees/Yasuno-5555-Guild-upstream-main",
+      "outcome": "failed on clean origin/main with the same assertion"
+    }
+  ],
+  "readiness_gate": {
+    "passed": true,
+    "basis": "Relevant tests passed; the only full-suite failure was reproduced unchanged on clean upstream origin/main and is outside the touched crates.",
+    "external_confirmed": false
+  },
+  "maintainer_action": {
+    "observed": false,
+    "details": "PR #7 has no reviews, comments, status checks, merge, or acceptance yet."
+  },
+  "forbidden_state_changes": {
+    "spent_money": false,
+    "requested_payment": false,
+    "claimed_bounty": false,
+    "pushed_public_branch": true,
+    "opened_pr": true,
+    "posted_comment": false,
+    "set_external_confirmed": false,
+    "created_first_external_receipt_witness": false,
+    "set_nonzero_archive_fitness": false
+  }
+}

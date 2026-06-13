@@ -26,6 +26,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from dharma_swarm.api_keys import OPENROUTER_API_KEY_ENV, env_value
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
@@ -845,7 +846,7 @@ def _llm_rerank(query: str, results: list[dict], top_k: int = 10) -> list[dict]:
     if len(results) <= top_k:
         return results
 
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+    api_key = env_value(OPENROUTER_API_KEY_ENV)
     if not api_key:
         return results[:top_k]
 

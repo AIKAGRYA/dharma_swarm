@@ -18,7 +18,18 @@ from dharma_swarm.autonomous_agent import (
     AgentResult,
     AutonomousAgent,
     _DANGEROUS_PATTERNS,
+    _identity_from_registered_holon,
+    cli_wake,
 )
+from dharma_swarm.models import ProviderType
+
+# Cross-lane drift guard: the TUI-alias model resolver ships on the
+# holon/spine-v1 lane and is absent here. Skip its tests instead of breaking
+# collection for the whole module.
+try:
+    from dharma_swarm.autonomous_agent import _resolve_agent_model_override
+except ImportError:
+    _resolve_agent_model_override = None
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +78,72 @@ class TestAgentIdentity:
         b = AgentIdentity(name="b", role="x", system_prompt="y")
         a.allowed_tools.append("custom")
         assert "custom" not in b.allowed_tools
+
+    def test_registered_holon_identity_uses_active_prompt(self, tmp_path):
+        agent_dir = tmp_path / "registered_agent"
+        (agent_dir / "prompt_variants").mkdir(parents=True)
+        (agent_dir / "identity.json").write_text(
+            json.dumps(
+                {
+                    "model": "gpt-5.5",
+                    "provider": "codex",
+                    "role": "lead_orchestrator",
+                    "storage_root": str(agent_dir),
+                    "system_prompt": "fallback prompt",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (agent_dir / "prompt_variants" / "active.txt").write_text(
+            "REAL REGISTERED SOUL",
+            encoding="utf-8",
+        )
+
+        ident = _identity_from_registered_holon(
+            "registered_agent",
+            agents_root=tmp_path,
+        )
+
+        assert ident is not None
+        assert ident.name == "registered_agent"
+        assert ident.role == "lead_orchestrator"
+        assert ident.model == "gpt-5.5"
+        assert ident.provider == "codex"
+        assert ident.system_prompt == "REAL REGISTERED SOUL"
+        assert ident.allowed_tools == []
+        assert ident.working_directory == str(agent_dir)
+
+    def test_unregistered_holon_identity_returns_none(self, tmp_path):
+        assert _identity_from_registered_holon("missing", agents_root=tmp_path) is None
+
+    def test_generic_stub_still_available_for_unregistered_name(self):
+        agent_name = "not_registered_anywhere"
+        ident = _identity_from_registered_holon(
+            agent_name,
+            agents_root=Path("/tmp/nope"),
+        )
+        assert ident is None
+        stub = AgentIdentity(
+            name=agent_name,
+            role="general",
+            system_prompt=f"You are {agent_name}, an autonomous agent in dharma_swarm.",
+        )
+        prompt = AutonomousAgent(stub)._build_system_prompt("", [])
+        assert f"You are {agent_name}, an autonomous agent in dharma_swarm." in prompt
+
+    def test_real_registered_composer_souls_compose_into_prompt(self):
+        cases = [
+            ("fable_composer", "This file is not documentation about a seat"),
+            ("codex_composer", "TaskClaim versus ExecutionLease boundary"),
+        ]
+        for name, fragment in cases:
+            identity_path = Path.home() / ".dharma" / "agents" / name / "identity.json"
+            if not identity_path.exists():
+                pytest.skip(f"{name} not registered on this machine")
+            ident = _identity_from_registered_holon(name)
+            assert ident is not None
+            prompt = AutonomousAgent(ident)._build_system_prompt("", [])
+            assert fragment in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -562,6 +639,61 @@ class TestPresetAgents:
         witness = PRESET_AGENTS["witness"]
         assert "write_file" not in witness.allowed_tools
 
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="claude_code preset lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    def test_preset_agents_use_subscription_claude_code_lane(self):
+        for ident in PRESET_AGENTS.values():
+            assert ident.provider == "claude_code"
+            assert ident.model == "claude-sonnet-4-6"
+
+
+@pytest.mark.skipif(
+    _resolve_agent_model_override is None,
+    reason="_resolve_agent_model_override not on this branch (holon/spine-v1 lane drift)",
+)
+class TestCliWakeModelRouting:
+    def test_resolves_tui_model_aliases(self):
+        assert _resolve_agent_model_override("gemini") == (
+            "openrouter_direct",
+            "google/gemini-2.5-pro",
+        )
+        assert _resolve_agent_model_override("glm-5") == ("ollama", "glm-5:cloud")
+        assert _resolve_agent_model_override("codex") == ("codex", "gpt-5.4")
+
+    def test_resolves_explicit_provider_model_route(self):
+        assert _resolve_agent_model_override("openrouter:anthropic/claude-opus-4-6") == (
+            "openrouter_direct",
+            "anthropic/claude-opus-4-6",
+        )
+        assert _resolve_agent_model_override("google_ai:gemini-2.5-flash") == (
+            "google_ai",
+            "gemini-2.5-flash",
+        )
+
+    @pytest.mark.asyncio
+    async def test_cli_wake_model_override_does_not_mutate_preset(self, monkeypatch, capsys):
+        original = PRESET_AGENTS["reviewer"]
+        captured: list[AgentIdentity] = []
+
+        async def fake_wake(self, task):
+            captured.append(self.identity)
+            assert task == "check routing"
+            return AgentResult(summary="done")
+
+        monkeypatch.setattr(AutonomousAgent, "wake", fake_wake)
+
+        await cli_wake("reviewer", "check routing", model="gemini")
+
+        assert captured
+        assert captured[0].provider == "openrouter_direct"
+        assert captured[0].model == "google/gemini-2.5-pro"
+        assert PRESET_AGENTS["reviewer"] is original
+        assert PRESET_AGENTS["reviewer"].provider == "claude_code"
+        assert PRESET_AGENTS["reviewer"].model == "claude-sonnet-4-6"
+        assert "Waking reviewer on openrouter:google/gemini-2.5-pro" in capsys.readouterr().out
+
 
 # ---------------------------------------------------------------------------
 # LLM provider dispatch
@@ -607,6 +739,36 @@ class TestCallLLM:
         agent._call_codex = AsyncMock(return_value={"text": [], "tool_uses": []})
         await agent._call_llm("sys", [], [])
         agent._call_codex.assert_awaited_once()
+
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="claude_code dispatch lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    @pytest.mark.asyncio
+    async def test_claude_code_dispatch(self):
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s", provider="claude_code",
+        )
+        agent = AutonomousAgent(ident)
+        agent._call_claude_code = AsyncMock(return_value={"text": [], "tool_uses": []})
+        await agent._call_llm("sys", [], [])
+        agent._call_claude_code.assert_awaited_once()
+
+    @pytest.mark.skipif(
+        _resolve_agent_model_override is None,
+        reason="openrouter_direct dispatch lane not on this branch (holon/spine-v1 lane drift)",
+    )
+    @pytest.mark.asyncio
+    async def test_openrouter_direct_dispatch(self):
+        ident = AgentIdentity(
+            name="t", role="r", system_prompt="s", provider="openrouter_direct",
+        )
+        agent = AutonomousAgent(ident)
+        agent._call_direct_runtime_provider = AsyncMock(return_value={"text": [], "tool_uses": []})
+        await agent._call_llm("sys", [], [])
+        agent._call_direct_runtime_provider.assert_awaited_once_with(
+            ProviderType.OPENROUTER, "sys", [], []
+        )
 
 
 # ---------------------------------------------------------------------------
