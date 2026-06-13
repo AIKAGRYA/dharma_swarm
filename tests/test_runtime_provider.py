@@ -119,7 +119,7 @@ def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
 
 def test_runtime_provider_openrouter_default_model_matches_canonical_hierarchy() -> None:
     assert DEFAULT_OPENROUTER_MODEL == DEFAULT_MODELS[ProviderType.OPENROUTER]
-    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.5"
+    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.6"
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkeypatch) -> None:

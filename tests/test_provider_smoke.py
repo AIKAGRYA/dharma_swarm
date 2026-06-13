@@ -156,15 +156,15 @@ def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatc
     assert payload["ollama"]["transport_mode"] == "cloud_api"
     assert payload["ollama"]["strongest_installed"] is None
     assert payload["ollama"]["status"] == "ok"
-    assert "kimi-k2.5:cloud" in payload["ollama"]["catalog_models"]
-    assert "minimax-m2.7:cloud" in payload["ollama"]["catalog_models"]
+    assert "kimi-k2.6:cloud" in payload["ollama"]["catalog_models"]
+    assert "minimax-m3:cloud" in payload["ollama"]["catalog_models"]
     assert payload["nvidia_nim"]["status"] == "ok"
     assert payload["nvidia_nim"]["deployment_mode"] == "hosted_api"
-    assert "moonshotai/kimi-k2.5" in payload["nvidia_nim"]["catalog_models"]["self_hosted"]
+    assert "moonshotai/kimi-k2.6" in payload["nvidia_nim"]["catalog_models"]["self_hosted"]
     assert payload["nvidia_nim"]["strongest_verified"]
     assert payload["openrouter"]["status"] == "ok"
     assert payload["openrouter"]["strongest_verified"]
-    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
+    assert openrouter_calls == ["moonshotai/kimi-k2.6"]
 
 
 def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) -> None:
@@ -199,8 +199,8 @@ def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) ->
 
     assert payload["nvidia_nim"]["status"] == "missing_config"
     assert payload["openrouter"]["status"] == "insufficient_credits"
-    assert nim_calls == ["nvidia/llama-3.1-nemotron-ultra-253b-v1"]
-    assert openrouter_calls == ["moonshotai/kimi-k2.5"]
+    assert nim_calls == ["moonshotai/kimi-k2.6"]
+    assert openrouter_calls == ["moonshotai/kimi-k2.6"]
 
 
 def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:
@@ -211,7 +211,7 @@ def test_run_provider_smoke_skips_empty_openrouter_outputs(monkeypatch) -> None:
         return {"status": "ok", "model": model, "response_preview": "OK", "usage": {}}
 
     async def _fake_openrouter(model: str):
-        if model == "moonshotai/kimi-k2.5":
+        if model == "moonshotai/kimi-k2.6":
             return {
                 "status": "empty_response",
                 "model": model,

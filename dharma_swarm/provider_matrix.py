@@ -23,6 +23,7 @@ from dharma_swarm.model_hierarchy import (
     provider_lane_role,
 )
 from dharma_swarm.models import LLMRequest, ProviderType
+from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
     resolve_runtime_provider_config,
@@ -590,10 +591,27 @@ def _should_load_probe_snapshot(env: Mapping[str, str] | None) -> bool:
     return env is None or bool(env)
 
 
+def _ollama_cloud(name: str) -> str:
+    """Return an Ollama-cloud model id, asserting it is in the canonical
+    floor stable (OLLAMA_CLOUD_FRONTIER_MODELS). Guards against the matrix
+    lanes drifting away from the >= K2.6 frontier the hierarchy declares."""
+    if name not in OLLAMA_CLOUD_FRONTIER_MODELS:
+        raise ValueError(
+            f"{name!r} is not in OLLAMA_CLOUD_FRONTIER_MODELS "
+            f"({OLLAMA_CLOUD_FRONTIER_MODELS}); update the matrix lane to a "
+            "canonical >= K2.6 cloud model."
+        )
+    return name
+
+
 def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType, str, LaneRole]]:
-    kimi_model = _env_value(env, "DGC_DIRECTOR_KIMI_MODEL", "moonshotai/kimi-k2.5")
-    glm_model = _env_value(env, "DGC_DIRECTOR_GLM_MODEL", "z-ai/glm-5")
-    minimax_model = _env_value(env, "DGC_DIRECTOR_MINIMAX_MODEL", "minimaxai/minimax-m2.5")
+    # Director model defaults read from the canonical floor (>= Kimi K2.6).
+    # The K2.6 power-floor banishes the prior sub-floor defaults
+    # (kimi-k2.5 -> k2.6, glm-5 -> glm-5.1, minimax-m2.5 -> m3); env overrides
+    # still win for operator-pinned lanes.
+    kimi_model = _env_value(env, "DGC_DIRECTOR_KIMI_MODEL", DEFAULT_MODELS[ProviderType.OPENROUTER])
+    glm_model = _env_value(env, "DGC_DIRECTOR_GLM_MODEL", "z-ai/glm-5.1")
+    minimax_model = _env_value(env, "DGC_DIRECTOR_MINIMAX_MODEL", "minimaxai/minimax-m3")
     qwen_builder_model = _env_value(env, "DGC_DIRECTOR_QWEN_MODEL", "qwen/qwen3-coder")
     codex_model = (
         resolve_runtime_provider_config(ProviderType.CODEX, env=env).default_model
@@ -612,11 +630,11 @@ def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType
         (ProviderType.CODEX, codex_model, LaneRole.PRIMARY_DRIVER),
         (ProviderType.CLAUDE_CODE, claude_cli_model, LaneRole.PRIMARY_DRIVER),
         (ProviderType.ANTHROPIC, anthropic_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.OLLAMA, "glm-5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "deepseek-v3.2:cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "kimi-k2.5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "qwen3-coder:480b-cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "minimax-m2.7:cloud", LaneRole.CHALLENGER),
+        (ProviderType.OLLAMA, _ollama_cloud("glm-5.1:cloud"), LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, _ollama_cloud("deepseek-v4-pro:cloud"), LaneRole.BULK_BUILDER),
+        (ProviderType.OLLAMA, _ollama_cloud("kimi-k2.6:cloud"), LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, _ollama_cloud("qwen3-coder:480b-cloud"), LaneRole.BULK_BUILDER),
+        (ProviderType.OLLAMA, _ollama_cloud("minimax-m3:cloud"), LaneRole.CHALLENGER),
         (ProviderType.NVIDIA_NIM, DEFAULT_MODELS[ProviderType.NVIDIA_NIM], LaneRole.VALIDATOR),
         (ProviderType.NVIDIA_NIM, kimi_model, LaneRole.RESEARCH_DELEGATE),
         (ProviderType.NVIDIA_NIM, glm_model, LaneRole.RESEARCH_DELEGATE),
@@ -625,7 +643,7 @@ def _live25_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType
         (ProviderType.OPENROUTER, glm_model, LaneRole.RESEARCH_DELEGATE),
         (ProviderType.OPENROUTER, qwen_builder_model, LaneRole.BULK_BUILDER),
         (ProviderType.OPENROUTER, "openai/gpt-5-codex", LaneRole.BULK_BUILDER),
-        (ProviderType.OPENROUTER, "deepseek/deepseek-r1", LaneRole.CHALLENGER),
+        (ProviderType.OPENROUTER, "deepseek/deepseek-v4-pro", LaneRole.CHALLENGER),
         (ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE], LaneRole.GENERAL_SUPPORT),
         (ProviderType.GROQ, DEFAULT_MODELS[ProviderType.GROQ], LaneRole.VALIDATOR),
         (ProviderType.CEREBRAS, DEFAULT_MODELS[ProviderType.CEREBRAS], LaneRole.BULK_BUILDER),
@@ -650,10 +668,10 @@ def _quick_blueprints(env: Mapping[str, str] | None) -> list[tuple[ProviderType,
     return [
         (ProviderType.CODEX, codex_model, LaneRole.PRIMARY_DRIVER),
         (ProviderType.CLAUDE_CODE, claude_cli_model, LaneRole.PRIMARY_DRIVER),
-        (ProviderType.OLLAMA, "glm-5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "qwen3-coder:480b-cloud", LaneRole.BULK_BUILDER),
-        (ProviderType.OLLAMA, "kimi-k2.5:cloud", LaneRole.RESEARCH_DELEGATE),
-        (ProviderType.OLLAMA, "minimax-m2.7:cloud", LaneRole.CHALLENGER),
+        (ProviderType.OLLAMA, _ollama_cloud("glm-5.1:cloud"), LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, _ollama_cloud("qwen3-coder:480b-cloud"), LaneRole.BULK_BUILDER),
+        (ProviderType.OLLAMA, _ollama_cloud("kimi-k2.6:cloud"), LaneRole.RESEARCH_DELEGATE),
+        (ProviderType.OLLAMA, _ollama_cloud("minimax-m3:cloud"), LaneRole.CHALLENGER),
         (ProviderType.NVIDIA_NIM, DEFAULT_MODELS[ProviderType.NVIDIA_NIM], LaneRole.VALIDATOR),
         (ProviderType.OPENROUTER_FREE, DEFAULT_MODELS[ProviderType.OPENROUTER_FREE], LaneRole.GENERAL_SUPPORT),
         (ProviderType.GROQ, DEFAULT_MODELS[ProviderType.GROQ], LaneRole.VALIDATOR),

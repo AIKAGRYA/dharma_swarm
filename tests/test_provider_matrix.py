@@ -27,17 +27,17 @@ def test_build_default_matrix_targets_keeps_sovereign_lanes_first() -> None:
 
     assert targets[0].provider == ProviderType.CODEX
     assert targets[0].lane_role == LaneRole.PRIMARY_DRIVER
-    assert targets[0].model == "gpt-5.4"
+    assert targets[0].model == "gpt-5.5"
     assert targets[1].provider == ProviderType.CLAUDE_CODE
     assert targets[1].lane_role == LaneRole.PRIMARY_DRIVER
-    assert targets[1].model == "claude-opus-4-6"
+    assert targets[1].model == "claude-opus-4-8"
 
     delegated = [target for target in targets if target.lane_role != LaneRole.PRIMARY_DRIVER]
     assert delegated
     assert any(target.provider == ProviderType.OLLAMA for target in delegated)
-    assert any(target.model == "kimi-k2.5:cloud" for target in targets)
+    assert any(target.model == "kimi-k2.6:cloud" for target in targets)
     assert any(target.model == "qwen3-coder:480b-cloud" for target in targets)
-    assert any(target.model == "minimax-m2.7:cloud" for target in targets)
+    assert any(target.model == "minimax-m3:cloud" for target in targets)
     assert len(targets) >= 20
 
 

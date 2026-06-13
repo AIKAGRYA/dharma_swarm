@@ -14,6 +14,7 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_has_value
+from dharma_swarm.model_hierarchy import default_model
 from dharma_swarm.models import LLMRequest, ProviderType
 from dharma_swarm.ollama_config import (
     OLLAMA_CLOUD_FRONTIER_MODELS,
@@ -40,23 +41,26 @@ _PROVIDER_WIDE_TERMINAL_STATUSES = {
     "insufficient_credits",
     "missing_config",
 }
+# Smoke-probe frontier candidates derive their primary from the canonical
+# hierarchy (the ONE WAY). The Kimi K2.6 power floor (model_hierarchy.py)
+# forbids probing any sub-floor model, so these lists carry the canonical
+# default (>= K2.6) first, then floor-compliant secondaries verified serving
+# on the same provider (NVIDIA free-tier: minimax-m3, mistral-large-3 per
+# model_hierarchy DEFAULT_MODELS notes; OpenRouter falls back to the free
+# floor lane).
 _NIM_HOSTED_FRONTIER_MODELS = (
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
+    default_model(ProviderType.NVIDIA_NIM),
+    "minimaxai/minimax-m3",
+    "mistralai/mistral-large-3-675b-instruct-2512",
 )
 _NIM_SELF_HOSTED_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "zai-org/GLM-5",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
+    default_model(ProviderType.NVIDIA_NIM),
+    "minimaxai/minimax-m3",
+    "mistralai/mistral-large-3-675b-instruct-2512",
 )
 _OPENROUTER_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "z-ai/glm-5",
-    "openai/gpt-5-codex",
-    "deepseek/deepseek-r1",
-    "qwen/qwen3-235b-a22b",
+    default_model(ProviderType.OPENROUTER),
+    default_model(ProviderType.OPENROUTER_FREE),
 )
 _OLLAMA_NON_CHAT_MARKERS = (
     "embed",
