@@ -214,9 +214,13 @@ class TestSelectProviders:
 
 class TestModelHints:
     def test_free_tier_ollama_hint(self, router: SmartRouter) -> None:
+        # Tracks the canonical >=Kimi-K2.6 floor default for OLLAMA rather than a
+        # frozen sub-floor literal (was glm-5; now deepseek-v4-pro:cloud).
+        from dharma_swarm.model_hierarchy import DEFAULT_MODELS
+
         hint = router.model_hint_for(CostTier.FREE, ProviderType.OLLAMA)
         assert hint is not None
-        assert "glm-5" in hint
+        assert hint == DEFAULT_MODELS[ProviderType.OLLAMA]
 
     def test_premium_tier_anthropic_hint(self, router: SmartRouter) -> None:
         hint = router.model_hint_for(CostTier.PREMIUM, ProviderType.ANTHROPIC)

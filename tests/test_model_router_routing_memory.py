@@ -50,8 +50,8 @@ async def test_model_router_uses_persistent_routing_memory_to_reorder(tmp_path) 
     # Record outcomes using the DEFAULT_MODELS hints that will be looked up
     from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 
-    anthropic_model = DEFAULT_MODELS.get(ProviderType.ANTHROPIC, "claude-opus-4-6")
-    orfree_model = DEFAULT_MODELS.get(ProviderType.OPENROUTER_FREE, "meta-llama/llama-3.3-70b-instruct:free")
+    anthropic_model = DEFAULT_MODELS[ProviderType.ANTHROPIC]
+    orfree_model = DEFAULT_MODELS[ProviderType.OPENROUTER_FREE]
 
     for _ in range(4):
         store.record_outcome(
@@ -100,6 +100,14 @@ async def test_model_router_uses_persistent_routing_memory_to_reorder(tmp_path) 
 
 
 async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) -> None:
+    # The routing-memory lane keys on (provider, model); the seed hints must
+    # track the canonical DEFAULT_MODELS the router resolves at route time, or
+    # the boost lands under a stale key and never gets applied.
+    from dharma_swarm.model_hierarchy import DEFAULT_MODELS
+
+    anthropic_model = DEFAULT_MODELS[ProviderType.ANTHROPIC]
+    orfree_model = DEFAULT_MODELS[ProviderType.OPENROUTER_FREE]
+
     store = RoutingMemoryStore(tmp_path / "routing.sqlite3")
     route_request = ProviderRouteRequest(
         action_name="triage_notes",
@@ -128,9 +136,9 @@ async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) ->
         decision=ProviderRouteDecision(
             path=RoutePath.REFLEX,
             selected_provider=ProviderType.OPENROUTER_FREE,
-            selected_model_hint="meta-llama/llama-3.3-70b-instruct:free",
+            selected_model_hint=orfree_model,
             fallback_providers=[ProviderType.ANTHROPIC],
-            fallback_model_hints=["claude-opus-4-6"],
+            fallback_model_hints=[anthropic_model],
             confidence=0.8,
             requires_human=False,
             reasons=["seed_feedback"],
@@ -146,9 +154,9 @@ async def test_model_router_posthoc_feedback_reorders_future_routes(tmp_path) ->
         decision=ProviderRouteDecision(
             path=RoutePath.DELIBERATIVE,
             selected_provider=ProviderType.ANTHROPIC,
-            selected_model_hint="claude-opus-4-6",
+            selected_model_hint=anthropic_model,
             fallback_providers=[ProviderType.OPENROUTER_FREE],
-            fallback_model_hints=["meta-llama/llama-3.3-70b-instruct:free"],
+            fallback_model_hints=[orfree_model],
             confidence=0.8,
             requires_human=False,
             reasons=["seed_feedback"],

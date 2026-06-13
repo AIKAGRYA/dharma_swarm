@@ -667,8 +667,11 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
     provider = OllamaProvider()
+    # >=Kimi-K2.6 floor: glm-5.1 is the frontier-chain head; on a 500 it falls
+    # through to the next chain member (deepseek-v4-pro). The pre-floor sub-floor
+    # pair (glm-5 -> deepseek-v3.2) was banished from the frontier chain.
     req = LLMRequest(
-        model="glm-5:cloud",
+        model="glm-5.1:cloud",
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=32,
     )
@@ -689,7 +692,7 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
         def json():
             return {
                 "choices": [{"message": {"content": "fallback ok"}, "finish_reason": "stop"}],
-                "model": "deepseek-v3.2",
+                "model": "deepseek-v4-pro",
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             }
 
@@ -705,8 +708,8 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
     out = await provider.complete(req)
 
     assert out.content == "fallback ok"
-    assert out.model == "deepseek-v3.2"
-    assert attempts[:2] == ["glm-5", "deepseek-v3.2"]
+    assert out.model == "deepseek-v4-pro"
+    assert attempts[:2] == ["glm-5.1", "deepseek-v4-pro"]
 
 
 @pytest.mark.asyncio

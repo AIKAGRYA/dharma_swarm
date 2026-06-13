@@ -104,10 +104,10 @@ def test_model_hint_for_provider_prefers_kimi_for_japanese() -> None:
         default_hint="openai/gpt-5-codex",
         signals=signals,
     )
-    assert hint == "moonshotai/kimi-k2.5"
+    assert hint == "moonshotai/kimi-k2.6"
 
 
-def test_model_hint_for_provider_prefers_glm_and_nemotron_for_reasoning() -> None:
+def test_model_hint_for_provider_prefers_glm_and_kimi_for_reasoning() -> None:
     request = LLMRequest(
         model="x",
         messages=[{"role": "user", "content": "Analyze the failure chain step by step and reason carefully."}],
@@ -125,8 +125,8 @@ def test_model_hint_for_provider_prefers_glm_and_nemotron_for_reasoning() -> Non
         signals=signals,
     )
 
-    assert openrouter_hint == "z-ai/glm-5"
-    assert nim_hint == "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    assert openrouter_hint == "z-ai/glm-5.1"
+    assert nim_hint == "moonshotai/kimi-k2.6"
 
 
 def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -> None:
@@ -142,7 +142,7 @@ def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -
         default_hint="meta/llama-3.3-70b-instruct",
         signals=signals,
     )
-    assert jp_hint == "moonshotai/kimi-k2.5"
+    assert jp_hint == "moonshotai/kimi-k2.6"
 
     reasoning_request = LLMRequest(
         model="x",
@@ -154,7 +154,7 @@ def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -
         default_hint="meta/llama-3.3-70b-instruct",
         signals=reasoning_signals,
     )
-    assert reasoning_hint == "zai-org/GLM-5"
+    assert reasoning_hint == "zai-org/GLM-5.1"
 
 
 def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> None:
@@ -171,7 +171,7 @@ def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> N
         default_hint="llama3.2",
         signals=jp_signals,
     )
-    assert jp_hint == "kimi-k2.5:cloud"
+    assert jp_hint == "kimi-k2.6:cloud"
 
     reasoning_request = LLMRequest(
         model="x",
@@ -183,7 +183,7 @@ def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> N
         default_hint="llama3.2",
         signals=reasoning_signals,
     )
-    assert reasoning_hint == "glm-5:cloud"
+    assert reasoning_hint == "glm-5.1:cloud"
 
 
 def test_classify_context_tier_thresholds() -> None:

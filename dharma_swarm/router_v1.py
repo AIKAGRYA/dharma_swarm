@@ -410,48 +410,48 @@ def model_hint_for_provider(
 
     if signals.context_tier in {"LONG", "VERY_LONG"}:
         if provider == ProviderType.OPENAI:
-            return "gpt-4.1"
+            return "gpt-5.5"
         if provider == ProviderType.ANTHROPIC:
-            return "claude-sonnet-4-6"
+            return "claude-opus-4-8"
         if provider == ProviderType.OPENROUTER:
-            return "moonshotai/kimi-k2.5"
+            return "moonshotai/kimi-k2.6"
         if provider == ProviderType.NVIDIA_NIM and nim_self_hosted:
-            return "moonshotai/kimi-k2.5"
+            return "moonshotai/kimi-k2.6"
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "kimi-k2.5:cloud"
+            return "kimi-k2.6:cloud"
         if provider == ProviderType.GOOGLE_AI:
-            return "gemini-2.5-flash"
+            return "gemini-3-pro"
 
     if signals.language_code in {"ja", "en_ja_mixed"}:
         if provider == ProviderType.OPENROUTER:
-            return "moonshotai/kimi-k2.5"
+            return "moonshotai/kimi-k2.6"
         if provider == ProviderType.ANTHROPIC:
-            return "claude-sonnet-4-6"
+            return "claude-opus-4-8"
         if provider == ProviderType.NVIDIA_NIM and nim_self_hosted:
-            return "moonshotai/kimi-k2.5"
+            return "moonshotai/kimi-k2.6"
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "kimi-k2.5:cloud"
+            return "kimi-k2.6:cloud"
 
     if signals.complexity_tier == "REASONING":
         if provider == ProviderType.ANTHROPIC:
-            return "claude-opus-4-6"
+            return "claude-opus-4-8"
         if provider == ProviderType.OPENAI:
-            return "gpt-5"
+            return "gpt-5.5"
         if provider == ProviderType.OPENROUTER:
-            return "z-ai/glm-5"
+            return "z-ai/glm-5.1"
         if provider == ProviderType.NVIDIA_NIM:
             if nim_self_hosted:
-                return "zai-org/GLM-5"
-            return "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+                return "zai-org/GLM-5.1"
+            return "moonshotai/kimi-k2.6"
         if provider == ProviderType.OLLAMA and ollama_cloud:
-            return "glm-5:cloud"
+            return "glm-5.1:cloud"
         if provider == ProviderType.GROQ:
-            return "llama-3.3-70b-versatile"
+            return "moonshotai/kimi-k2-instruct"
         if provider == ProviderType.CEREBRAS:
-            return "llama-3.3-70b"
+            return "qwen-3-235b-a22b-instruct-2507"
         if provider == ProviderType.SILICONFLOW:
             return "Qwen/Qwen3-Coder-480B-A35B-Instruct"
         if provider == ProviderType.GOOGLE_AI:
-            return "gemini-2.5-flash"
+            return "gemini-3-pro"
 
     return effective_default_hint

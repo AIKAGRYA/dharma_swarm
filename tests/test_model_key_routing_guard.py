@@ -78,8 +78,7 @@ KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
         ("dharma_swarm/agent_constitution.py", "claude-sonnet-4-20250514"): 2,
         ("dharma_swarm/assurance/agents.py", "claude-opus-4-20250514"): 1,
         ("dharma_swarm/assurance/agents.py", "claude-sonnet-4-20250514"): 1,
-        ("dharma_swarm/autonomous_agent.py", "claude-sonnet-4-20250514"): 1,
-        ("dharma_swarm/autonomous_agent.py", "claude-sonnet-4-6"): 5,
+        ("dharma_swarm/autonomous_agent.py", "claude-sonnet-4-20250514"): 6,
         ("dharma_swarm/daemon_config.py", "anthropic/claude-sonnet-4"): 1,
         ("dharma_swarm/dharma_context_mcp.py", "meta-llama/llama-3.3-70b-instruct:free"): 1,
         ("dharma_swarm/external_agent_registration.py", "moonshotai/kimi-k2.6"): 1,
@@ -163,6 +162,8 @@ KNOWN_MODEL_LITERAL_DEBT: Counter[tuple[str, str]] = Counter(
 
 KNOWN_RAW_KEY_READ_DEBT: Counter[tuple[str, str, str]] = Counter(
     {
+        # pulse.py: guarded availability probe for claude bare mode (not a key inject).
+        ("dharma_swarm/pulse.py", "os.environ.get", "ANTHROPIC_API_KEY"): 1,
         ("dharma_swarm/tui_legacy.py", "os.getenv", "MOONSHOT_API_KEY"): 1,
         ("dharma_swarm/tui_legacy.py", "os.getenv", "OLLAMA_API_KEY"): 1,
         ("scripts/allout_autopilot.py", "os.getenv", "NGC_API_KEY"): 1,

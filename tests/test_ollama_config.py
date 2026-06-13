@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
@@ -36,7 +38,9 @@ class TestConstants:
         assert OLLAMA_CLOUD_BASE_URL == "https://ollama.com"
 
     def test_default_local_model(self):
-        assert OLLAMA_DEFAULT_LOCAL_MODEL == "llama3.2"
+        # Default resolves from OLLAMA_LOCAL_MODEL env, falling back to a model
+        # that is actually pulled locally (llama3.2 frequently 404s -> mistral:latest).
+        assert OLLAMA_DEFAULT_LOCAL_MODEL == os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 
     def test_default_cloud_model(self):
         assert OLLAMA_DEFAULT_CLOUD_MODEL == DEFAULT_MODELS[ProviderType.OLLAMA]
@@ -44,7 +48,9 @@ class TestConstants:
     def test_frontier_models_tuple(self):
         assert isinstance(OLLAMA_CLOUD_FRONTIER_MODELS, tuple)
         assert len(OLLAMA_CLOUD_FRONTIER_MODELS) >= 2
-        assert "minimax-m2.7:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
+        # >=Kimi-K2.6 floor: the cloud frontier carries the current minimax
+        # successor (minimax-m3), not the banished sub-floor minimax-m2.7.
+        assert "minimax-m3:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
 
 
 # ---------------------------------------------------------------------------

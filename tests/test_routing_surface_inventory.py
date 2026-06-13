@@ -31,6 +31,10 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
         "dharma_swarm/api_key_audit.py",
         "dharma_swarm/autonomous_agent.py",
         "dharma_swarm/consolidation.py",
+        # holon pair brings up its own runtime providers (fallback chain, no router).
+        "dharma_swarm/holon_bridge.py",
+        # living-agent-kernel worker constructs a runtime provider per wake.
+        "dharma_swarm/operator_core/living_agent_kernel_provider_worker.py",
         "dharma_swarm/provider_matrix.py",
         "dharma_swarm/provider_smoke.py",
         "dharma_swarm/runtime_provider.py",
@@ -77,7 +81,11 @@ def test_dashboard_chat_bypass_remains_inventoried() -> None:
 def test_autonomous_agent_exposes_model_router_and_codex_stays_direct() -> None:
     src = (REPO_ROOT / "dharma_swarm/autonomous_agent.py").read_text(encoding="utf-8")
     assert "def __init__(self, identity: AgentIdentity, *, model_router:" in src
-    assert src.count("await self._model_router.complete_for_task(") == 1
+    # Two router-routed lanes flow through ModelRouter.complete_for_task: the
+    # openrouter lane and the anthropic lane (the latter routed through the
+    # provider stack per the 2026-06 runtime fix). codex is the only lane that
+    # must NOT route through the model router (it stays direct, asserted below).
+    assert src.count("await self._model_router.complete_for_task(") == 2
     codex_start = src.index("async def _call_codex")
     nxt = src.find("\n    async def ", codex_start + 1)
     codex_block = src[codex_start:nxt] if nxt != -1 else src[codex_start:]
