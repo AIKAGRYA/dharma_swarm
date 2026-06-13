@@ -29,8 +29,10 @@ Write behavior: never writes. Exit code: always 0 (informational).
 from __future__ import annotations
 
 import argparse
+import datetime
 import importlib.util
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass, field
@@ -38,6 +40,13 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _state_dir() -> Path:
+    """Resolve the dharma state root the same way the census owner does
+    (honors DHARMA_STATE_DIR). This view reads receipts from there; it
+    never writes."""
+    return Path(os.environ.get("DHARMA_STATE_DIR", "~/.dharma")).expanduser()
 
 ORGANISM_DOC = REPO_ROOT / "foundations/THE_ORGANISM.md"
 NORTH_STAR_DOC = REPO_ROOT / "docs/vision_maps/NORTH_STAR.md"
@@ -127,6 +136,24 @@ class Loop1Closure:
 
 
 @dataclass
+class LoopClosure:
+    """Read-only closure projection for one cybernetic loop (Phase 2).
+
+    verdict is one of LIVE / PARTIAL / NOT-LIVE, decided by the loop's own
+    liveCondition applied to its declared receipt surface. This view owns
+    no fact — it reads the surface its loop's owner writes and never writes
+    anything itself. Honest by construction: NOT-LIVE whenever the surface
+    lacks fresh, real, discriminating data; PARTIAL when the sense/constrain
+    arm is live but act/adapt does not close (typically gated behind Loop 1).
+    """
+    loop: int
+    name: str
+    verdict: str = "NOT-LIVE"
+    latest: str = ""
+    reason: str = ""
+
+
+@dataclass
 class OrientationPacket:
     identity: Identity
     organs: list[Organ]
@@ -135,6 +162,7 @@ class OrientationPacket:
     liveness: Liveness
     broken: list[BrokenItem]
     loop1: Loop1Closure
+    loops: list[LoopClosure] = field(default_factory=list)
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -324,6 +352,368 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
     return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
 
 
+# ---------------------------------------------------------------------------
+# Phase 2 — read-only closure checks for the fed-cascade loops.
+# Each builder reads ONLY the receipt surface its loop's owner writes, applies
+# that loop's liveCondition, and returns LIVE / PARTIAL / NOT-LIVE. No surface
+# is written. Verdicts are honest: NOT-LIVE when fresh real data is absent.
+# ---------------------------------------------------------------------------
+
+_FRESH_WINDOW_S = 24 * 3600
+
+
+def _now_utc() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def _parse_ts(value: Any) -> datetime.datetime | None:
+    """Parse either an ISO-8601 string (with or without Z/offset) or a unix
+    epoch float into a tz-aware UTC datetime. Returns None on failure."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            return datetime.datetime.fromtimestamp(float(value), datetime.timezone.utc)
+        except Exception:
+            return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        return datetime.datetime.fromtimestamp(float(s), datetime.timezone.utc)
+    except (ValueError, OSError):
+        pass
+    iso = s.replace("Z", "+00:00")
+    try:
+        dt = datetime.datetime.fromisoformat(iso)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
+def _age_seconds(dt: datetime.datetime | None) -> float | None:
+    if dt is None:
+        return None
+    return (_now_utc() - dt).total_seconds()
+
+
+def _iter_jsonl(path: Path):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            yield json.loads(line)
+        except Exception:
+            continue
+
+
+def _witness_path(state_dir: Path, when: datetime.datetime | None = None) -> Path:
+    when = when or _now_utc()
+    return state_dir / "witness" / f"witness_{when:%Y%m%d}.jsonl"
+
+
+# Real loop-driven action prefixes (pulse, dispatch, landscape-probe, etc.).
+# A row counts as "real loop work" by matching one of these positively;
+# sentinel/test-fixture probes (closure-proof, destructive-command probes)
+# simply fail to match and are excluded.
+_REAL_ACTION_MARKERS = (
+    "pulse",
+    "dispatch task",
+    "landscape probe",
+    "mark task done",
+)
+
+
+def build_loop6_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 6 (Witness Auditor). Receipt: witness_<today>.jsonl daily log.
+
+    LIVE-arm condition: latest entry < 24h old, phase+outcome+action populated,
+    outcomes discriminating (BLOCKED/WARN present, not all PASS), and rows
+    dominated by real loop actions (pulse/dispatch/landscape-probe), not only
+    sentinel probes. FULL closure also needs the ADAPT arm (WitnessAuditor LLM
+    findings -> evolution fitness) which is provider-gated behind Loop 1 -> so
+    the honest ceiling here is PARTIAL even when the sense/constrain arm is live.
+    """
+    sd = state_dir or _state_dir()
+    loop = LoopClosure(loop=6, name="Witness Auditor")
+    path = _witness_path(sd)
+    rows = list(_iter_jsonl(path))
+    if not rows:
+        loop.reason = f"no witness rows in {path}"
+        return loop
+    latest = rows[-1]
+    age = _age_seconds(_parse_ts(latest.get("ts")))
+    fresh = age is not None and age < _FRESH_WINDOW_S
+    populated = all(latest.get(k) for k in ("phase", "outcome", "action"))
+    outcomes = {str(r.get("outcome", "")) for r in rows}
+    discriminating = bool(outcomes & {"BLOCKED", "WARN"}) and "PASS" in outcomes
+    real = sum(
+        1 for r in rows
+        if any(m in str(r.get("action", "")).lower() for m in _REAL_ACTION_MARKERS)
+    )
+    real_dominated = real > len(rows) // 2
+    loop.latest = f"{latest.get('ts','')} outcome={latest.get('outcome','')}"
+    if fresh and populated and discriminating and real_dominated:
+        loop.verdict = "PARTIAL"
+        loop.reason = (
+            f"sense+constrain LIVE ({len(rows)} rows, outcomes={sorted(outcomes)}, "
+            f"{real} real-action rows); ADAPT arm (WitnessAuditor LLM findings -> "
+            "evolution fitness) gated behind Loop 1, so not FULL closure"
+        )
+    else:
+        loop.verdict = "NOT-LIVE"
+        loop.reason = (
+            f"fresh={fresh} populated={populated} discriminating={discriminating} "
+            f"real_dominated={real_dominated} ({real}/{len(rows)} real-action rows)"
+        )
+    return loop
+
+
+def build_loop2_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 2 (Organism Heartbeat). Receipts: algedonic_signals.jsonl
+    (omega_divergence/telos_drift rows = heartbeat-sourced) + the heartbeat
+    decision store organism_memory/entities.jsonl (algedonic_event/gnani_verdict).
+
+    LIVE needs: a heartbeat-sourced row < 24h old whose value moves across the
+    window (real moving OrganismPulse invariant, not a constant sentinel) AND a
+    corresponding fresh heartbeat-decision row in the same window (INTERPRET+act).
+    PARTIAL when SENSE->INTERPRET fired but the decision store is stale / no
+    daemon running (ACT/ADAPT does not close).
+    """
+    sd = state_dir or _state_dir()
+    loop = LoopClosure(loop=2, name="Organism Heartbeat")
+    sig_path = sd / "algedonic_signals.jsonl"
+    hb = [r for r in _iter_jsonl(sig_path)
+          if str(r.get("kind")) in {"omega_divergence", "telos_drift"}]
+    if not hb:
+        loop.reason = f"no heartbeat-sourced rows in {sig_path}"
+        return loop
+    latest = hb[-1]
+    age = _age_seconds(_parse_ts(latest.get("timestamp")))
+    sense_fresh = age is not None and age < _FRESH_WINDOW_S
+    values = {round(float(r.get("value", 0.0)), 6) for r in hb if "value" in r}
+    moving = len(values) > 1
+    loop.latest = (f"{latest.get('kind')} value={latest.get('value')} "
+                   f"age_h={round(age/3600,1) if age is not None else 'NA'}")
+
+    # ACT/ADAPT: fresh heartbeat-decision row in organism_memory/entities.jsonl.
+    ent_path = sd / "organism_memory" / "entities.jsonl"
+    decision_age: float | None = None
+    for r in _iter_jsonl(ent_path):
+        if str(r.get("entity_type")) in {"algedonic_event", "gnani_verdict"}:
+            a = _age_seconds(_parse_ts(r.get("timestamp")))
+            if a is not None and (decision_age is None or a < decision_age):
+                decision_age = a
+    decision_fresh = decision_age is not None and decision_age < _FRESH_WINDOW_S
+
+    if sense_fresh and moving and decision_fresh:
+        loop.verdict = "LIVE"
+        loop.reason = ("SENSE->INTERPRET->ACT closes: fresh moving heartbeat "
+                       "signal + fresh heartbeat-decision row")
+    elif sense_fresh and moving:
+        loop.verdict = "PARTIAL"
+        da = "none" if decision_age is None else f"{round(decision_age/3600,1)}h old"
+        loop.reason = ("SENSE->INTERPRET LIVE (fresh moving OrganismPulse) but "
+                       f"ACT/ADAPT does not close: heartbeat-decision store {da}")
+    else:
+        loop.verdict = "NOT-LIVE"
+        loop.reason = (f"sense_fresh={sense_fresh} moving={moving} "
+                       f"({len(values)} distinct values)")
+    return loop
+
+
+def build_loop5_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 5 (Zeitgeist Scanner). Receipt: meta/gate_pressure.json — the
+    ADAPT-half surface that closes the S3<->S4 feedback (telos_gates reads it).
+
+    Mechanically LIVE needs: file exists, expires > now (signal not expired),
+    trust_mode_override non-empty, mtime recent. FULL closure additionally
+    requires the driving witness BLOCKED window to contain real agent-attributed
+    actions rather than test fixtures — when the gate-block signal derives from
+    test-fixture witness rows, the loop adapts on synthetic data -> PARTIAL.
+    """
+    sd = state_dir or _state_dir()
+    loop = LoopClosure(loop=5, name="Zeitgeist Scanner")
+    gp_path = sd / "meta" / "gate_pressure.json"
+    if not gp_path.exists():
+        loop.reason = f"no gate_pressure.json at {gp_path}"
+        return loop
+    try:
+        gp = json.loads(gp_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        loop.reason = f"gate_pressure.json unreadable: {exc}"
+        return loop
+    now = _now_utc().timestamp()
+    not_expired = float(gp.get("expires", 0) or 0) > now
+    override = str(gp.get("trust_mode_override", "") or "")
+    try:
+        mtime_age = now - gp_path.stat().st_mtime
+    except Exception:
+        mtime_age = None
+    mtime_recent = mtime_age is not None and mtime_age < _FRESH_WINDOW_S
+    loop.latest = f"override={override!r} expires_in_s={round(float(gp.get('expires',0) or 0)-now)}"
+    mechanically_live = not_expired and bool(override) and mtime_recent
+    if not mechanically_live:
+        loop.verdict = "NOT-LIVE"
+        loop.reason = (f"not_expired={not_expired} override={bool(override)} "
+                       f"mtime_recent={mtime_recent}")
+        return loop
+
+    # FULL closure gate: are the BLOCKED witness rows real-agent-attributed?
+    rows = list(_iter_jsonl(_witness_path(sd)))[-200:]
+    blocked = [r for r in rows if str(r.get("outcome")) == "BLOCKED"]
+    real_blocked = sum(
+        1 for r in blocked
+        if any(m in str(r.get("action", "")).lower() for m in _REAL_ACTION_MARKERS)
+    )
+    if blocked and real_blocked > 0:
+        loop.verdict = "LIVE"
+        loop.reason = (f"S3<->S4 closed on real data: {real_blocked}/{len(blocked)} "
+                       "BLOCKED rows are real-agent-attributed")
+    else:
+        loop.verdict = "PARTIAL"
+        loop.reason = (f"loop mechanically closed (signal fresh) but driven by "
+                       f"{0 if not blocked else 'test-fixture'} real-agent BLOCKED "
+                       f"rows ({real_blocked}/{len(blocked)} real) — adapts on synthetic")
+    return loop
+
+
+def build_loop9_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 9 (Conductors). Real receipt: conductor_wake witness entries +
+    conductor_*_notes.md narrative updates.
+
+    LIVE needs a conductor_wake entry < 24h old whose outcome is an ACTED
+    result (not just a pre-action telos-gate WARN on a proposed self-task) AND
+    a fresh conductor-notes update. When wakes only emit WARN proposals (no
+    provider-backed act/adapt receipt) and notes are stale -> NOT-LIVE.
+    """
+    sd = state_dir or _state_dir()
+    loop = LoopClosure(loop=9, name="Conductors")
+    rows = [r for r in _iter_jsonl(_witness_path(sd))
+            if "conductor_wake" in {str(r.get("phase")), str(r.get("think_phase"))}]
+    acted = [r for r in rows
+             if str(r.get("outcome", "")).upper() not in {"WARN", ""}
+             and (_age_seconds(_parse_ts(r.get("ts"))) or _FRESH_WINDOW_S * 2)
+             < _FRESH_WINDOW_S]
+    # Fresh conductor-notes update in the same window?
+    notes_fresh = False
+    now = _now_utc().timestamp()
+    for note in ("conductor_claude_notes.md", "conductor_codex_notes.md"):
+        p = sd / "shared" / note
+        if p.exists() and (now - p.stat().st_mtime) < _FRESH_WINDOW_S:
+            notes_fresh = True
+            break
+    if rows:
+        warn = sum(1 for r in rows if str(r.get("outcome", "")).upper() == "WARN")
+        loop.latest = f"{len(rows)} conductor_wake rows ({warn} WARN)"
+    else:
+        loop.latest = "no conductor_wake rows today"
+    if acted and notes_fresh:
+        loop.verdict = "LIVE"
+        loop.reason = "fresh acted conductor_wake + fresh conductor notes"
+    else:
+        loop.verdict = "NOT-LIVE"
+        loop.reason = (
+            "conductor wakes are pre-action telos-gate WARN proposals only "
+            "(no provider-backed act/adapt receipt); conductor work still blocked "
+            "on an available LLM (gated behind Loop 1)")
+    return loop
+
+
+def _loop1_gated(loop: int, name: str, detail: str) -> LoopClosure:
+    """Loops whose act/adapt arm cannot close until Loop 1's provider chain
+    closes. They run sense/record on real or fixture data, but the closing arm
+    is provider-gated. Honest verdict: NOT-LIVE (closing arm absent) with the
+    Loop-1 dependency named. No receipt surface here proves a closed cycle."""
+    return LoopClosure(
+        loop=loop, name=name, verdict="NOT-LIVE",
+        latest="closing arm provider-gated", reason=detail)
+
+
+def build_loop3_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 3 (Evolution / DarwinEngine). Closing arm = real FitnessScore from
+    completed tasks archived to evolution/archive.jsonl. Real fitness
+    computation is blocked on Loop 1 producing completed tasks."""
+    return _loop1_gated(
+        3, "Evolution Loop",
+        "evolution machinery records meta-updates, but real FitnessScore "
+        "computation (ADAPT arm) is blocked on Loop 1 producing completed tasks")
+
+
+def build_loop4_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 4 (Consolidation / Memory). Closing arm = consolidating real
+    agent-produced outputs. Only heartbeat data exists to consolidate; no
+    agent outputs until Loop 1 closes."""
+    return _loop1_gated(
+        4, "Consolidation Loop",
+        "consolidation pipeline + dedup work on heartbeat data, but there are "
+        "no agent-produced outputs to consolidate until Loop 1 closes")
+
+
+def build_loop7_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 7 (Training Flywheel). Closing arm = scoring real agent
+    trajectories and reinforcing strategies. Traces are test fixtures until
+    Loop 1 produces real trajectories."""
+    return _loop1_gated(
+        7, "Training Flywheel",
+        "quality-gate evaluations run, but trajectory scoring/reinforcement "
+        "(ADAPT arm) has no real agent trajectories until Loop 1 closes")
+
+
+def build_loop8_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 8 (Recognition / Strange Loop). Closing arm = cascade eigenform
+    convergence feeding the recognition seed from real loop history. Periodic
+    trigger depends on LoopEngine schedule activation, itself gated by Loop 1."""
+    return _loop1_gated(
+        8, "Recognition Loop",
+        "recognition-seed computation is wired, but eigenform convergence over "
+        "real loop history (ADAPT arm) awaits LoopEngine activation gated by Loop 1")
+
+
+def build_loop10_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 10 (Context Agent). Depends entirely on Loop 1 (a running
+    AgentRunner with a real provider). No closing receipt until then."""
+    return _loop1_gated(
+        10, "Context Agent",
+        "depends on a running AgentRunner with a real provider; no closing "
+        "receipt exists until Loop 1 closes")
+
+
+def build_loop11_closure(state_dir: Path | None = None) -> LoopClosure:
+    """Loop 11 (Replication Monitor). Replication path is structurally correct
+    but no trigger events have fired; closing arm gated behind Loop 1."""
+    return _loop1_gated(
+        11, "Replication Monitor",
+        "replication path structurally correct (MM-02/03 resolved) but no "
+        "trigger events yet; closing arm gated behind Loop 1")
+
+
+# Builder registry in render order (fed cascade: 6,2,5,9 then 3,4,7,8,10,11).
+_LOOP_BUILDERS = [
+    build_loop6_closure,
+    build_loop2_closure,
+    build_loop5_closure,
+    build_loop9_closure,
+    build_loop3_closure,
+    build_loop4_closure,
+    build_loop7_closure,
+    build_loop8_closure,
+    build_loop10_closure,
+    build_loop11_closure,
+]
+
+
+def build_loop_closures(state_dir: Path | None = None) -> list[LoopClosure]:
+    return [b(state_dir) for b in _LOOP_BUILDERS]
+
+
 def build_packet() -> OrientationPacket:
     return OrientationPacket(
         identity=build_identity(),
@@ -333,6 +723,7 @@ def build_packet() -> OrientationPacket:
         liveness=build_liveness(),
         broken=build_broken(),
         loop1=build_loop1_closure(),
+        loops=build_loop_closures(),
     )
 
 
@@ -375,13 +766,19 @@ def render(packet: OrientationPacket) -> None:
     for surface in packet.liveness.surfaces:
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
 
-    _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
+    _section("LOOP CLOSURE — owners: delegation_runs + ~/.dharma receipt surfaces (read-only)")
     c = packet.loop1
-    print(f"  Loop 1 (provider chain + dispatch): {'LIVE' if c.live else 'NOT LIVE'}")
+    print(f"  Loop 1 (provider chain + dispatch): {'LIVE' if c.live else 'NOT-LIVE'}")
     if c.provider or c.model:
         print(f"    latest receipt: provider={c.provider!r} model={c.model!r}")
     if c.detail:
         print(f"    {c.detail}")
+    for lp in packet.loops:
+        print(f"  Loop {lp.loop} ({lp.name}): {lp.verdict}")
+        if lp.latest:
+            print(f"    latest: {lp.latest}")
+        if lp.reason:
+            print(f"    {lp.reason}")
 
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:
