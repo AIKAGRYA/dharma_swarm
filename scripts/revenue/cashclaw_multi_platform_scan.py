@@ -38,6 +38,29 @@ def extract_value(text):
             return int(float(m.group(1).replace(',', '')))
     return 0
 
+
+# Cache for repo merge-rate checks
+_merge_cache = {}
+
+def check_merge_rate(owner, name):
+    """Check if a repo actually merges PRs. Returns (merged_count, checked_count).
+    Farms have 0 merged PRs."""
+    repo_key = f"{owner}/{name}"
+    if repo_key in _merge_cache:
+        return _merge_cache[repo_key]
+    if not owner or not name:
+        _merge_cache[repo_key] = (0, 0)
+        return (0, 0)
+    jq = '[.[] | select(.merged_at != null)] | length'
+    try:
+        merged = gh_api(f"repos/{owner}/{name}/pulls?state=closed&sort=updated&direction=desc&per_page=20", jq=jq)
+        merged = int(merged) if merged else 0
+    except Exception:
+        merged = 0
+    _merge_cache[repo_key] = (merged, 20)
+    return (merged, 20)
+
+
 def scan_github_bounties():
     """Scan GitHub for bounty-labeled issues."""
     results = []
@@ -93,11 +116,37 @@ def main():
     with_value = [b for b in unique if b['value_usd'] > 0]
     without_value = [b for b in unique if b['value_usd'] == 0]
     with_value.sort(key=lambda x: x['value_usd'], reverse=True)
-    print(f"\n=== BOUNTIES WITH KNOWN VALUE ({len(with_value)}) ===\n")
+    # Check merge rates for top bounties to detect farms
+    checked_repos = {}
     for b in with_value[:30]:
-        print(f"  ${b['value_usd']:>6,}  {b['title'][:70]}")
-        print(f"          {b['url']}")
-        print(f"          Source: {b['source']}  Labels: {', '.join(b['labels'][:3])}")
+        rk = f"{b['owner']}/{b['name']}"
+        if rk not in checked_repos:
+            merged, total = check_merge_rate(b['owner'], b['name'])
+            checked_repos[rk] = merged
+            b['repo_merged_prs'] = merged
+        else:
+            b['repo_merged_prs'] = checked_repos[rk]
+    farm_bounties = [b for b in with_value[:30] if b.get('repo_merged_prs', -1) == 0]
+    real_bounties = [b for b in with_value[:30] if b.get('repo_merged_prs', -1) > 0]
+    unchecked = [b for b in with_value if 'repo_merged_prs' not in b]
+    print(f"\n=== BOUNTIES WITH KNOWN VALUE ({len(with_value)}) ===\n")
+    if real_bounties:
+        print(f"  --- REAL REPOS (proven merge history) ---")
+        for b in real_bounties:
+            print(f"  ${b['value_usd']:>6,}  [{b['repo_merged_prs']} merges]  {b['title'][:60]}")
+            print(f"          {b['url']}")
+            print()
+    if unchecked:
+        print(f"  --- UNCHECKED (top {min(len(unchecked), 10)}) ---")
+        for b in unchecked[:10]:
+            print(f"  ${b['value_usd']:>6,}  {b['title'][:70]}")
+            print(f"          {b['url']}")
+            print()
+    if farm_bounties:
+        print(f"  --- FARM REPOS (0 merges — DO NOT CLAIM) ---")
+        for b in farm_bounties[:10]:
+            rk = f"{b['owner']}/{b['name']}"
+            print(f"  ${b['value_usd']:>6,}  [0 merges]  {rk}  {b['title'][:50]}")
         print()
     print(f"\n=== BOUNTIES WITHOUT PARSED VALUE ({len(without_value)}) ===\n")
     for b in without_value[:10]:
@@ -109,6 +158,11 @@ def main():
     print(f"  Total bounties found: {len(unique)}")
     print(f"  With known value: {len(with_value)} (${total_value:,})")
     print(f"  Value unknown: {len(without_value)}")
+    farm_count = len([b for b in with_value if b.get('repo_merged_prs') == 0])
+    real_count = len([b for b in with_value if b.get('repo_merged_prs', 0) > 0])
+    if farm_count or real_count:
+        print(f"  Farm repos detected (0 merges): {farm_count} bounties — SKIP THESE")
+        print(f"  Real repos (proven merges): {real_count} bounties — TARGET THESE")
     if with_value:
         print(f"  Top bounty: ${with_value[0]['value_usd']:,}")
     out_dir = os.path.expanduser('~/.cashclaw')
