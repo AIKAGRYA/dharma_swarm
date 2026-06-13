@@ -1,0 +1,267 @@
+# Anti-Slop And Vibe-Code
+
+**Consolidated from 4 source files. Provenance: `09_PROVENANCE.md`.**
+**Last source touched:** 2026-06-12
+
+Role: report. This file consolidates the scattered vibe-code / AI-slop audit
+reports into the findings that still describe real structural debt, hygiene
+risk, or agentic-governance gaps in the repo today. The live doctrine these
+findings feed (the 10 CI-gated rules and the 70-pattern hygiene catalogue) is
+pointed to, not copied. Forward-looking control proposals stay in their source
+docs; only their embedded scan receipts are carried here as findings.
+
+## Headline state
+
+The slop posture is well instrumented: 10 CI-gated anti-slop rules
+(`docs/governance/ANTI_SLOP_RULES.md`), a 70-pattern hygiene catalogue
+(`docs/governance/hygiene/`), and a shipped quality membrane
+(`make verify-quality-membrane`). The open debt is structural, not doctrinal:
+zero integration tests, 73-76 duplicate time-helper clones, 11 import cycles,
+~23 sync-I/O-in-async sites, 390 dead doc links, and README drift. Most are
+OPEN and belong on the touched-file ratchet. Agentic-governance gaps
+(instruction taint registry, tool capability ledger) are scoped but not yet
+built; the capability gap overlaps the live spine-adoption track.
+
+## Findings (sorted by severity, then date desc)
+
+### MAJOR · AS-01 · Test suite is mock-heavy
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: No integration tests exist — `tests/integration/` is absent while the
+  suite carries 4,685 `MagicMock`/`patch`/`mock_` references (Q3). 254 test
+  functions assert only `assert result` / `is not None` / `len(x) > 0`
+  (Q2), concentrated in `tests/test_cascade.py` (28), `tests/test_evolution.py`
+  (23), `tests/test_selector.py` (16), `tests/test_telos_gates.py` (15). The
+  positive-to-exception assertion ratio is 42.7:1 (15,507 vs 363, Q1), and
+  mutation testing has never run — no `mutmut`/`cosmic-ray` config (Q5).
+- Status: OPEN
+
+### MAJOR · AS-02 · Unowned duplicate helper clones
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`, `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md`, `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-09
+- Detail: The single largest DRY violation. `_utc_now()` is defined 73-76 times
+  across the codebase (audit Q29 counts 76; the deep-dive AST scan counts 73);
+  the AST scan also finds `_utc_now_iso` 40, `_new_id` 24, `_read_json` 19,
+  `_clamp01` 12, `_build_prompt` 7. Example sites: `agent_runner.py:441`,
+  `memory_kernel/census.py:686`, `a2a/node_gateway.py:206`,
+  `decision_ontology.py:26`. The control is not "ban helpers" but "ban unowned
+  behavior clones" — centralize or mark intentionally local with a reason.
+- Status: OPEN
+
+### MAJOR · AS-03 · Oversized modules off allowlist
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`, `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-09
+- Detail: Files over 1000 LOC number 25 (audit Q12) to 41 (deep-dive scan).
+  Top: `thinkodynamic_director.py` 5,173, `telos_substrate.py` 4,512,
+  `runtime_state.py` 3,796, `evolution.py` 3,465, `agent_runner.py` 3,355. Anti-
+  slop Rule 10 (`dharma.module-line-budget`) grandfathers a list, but
+  `runtime_state.py`, `ontology.py` (2,416), `orchestrate_live.py` (2,257),
+  `operator_bridge.py` (1,819), and `tui_legacy.py` (1,795) exceed 1000 LOC and
+  are absent from that allowlist. Fix is a per-touched-file ratchet, not a
+  global block.
+- Status: OPEN
+
+### MAJOR · AS-04 · Eleven import cycles
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 11 import cycles (SCCs with more than one module, Q13). Largest is a
+  9-module ontology cycle (`revenue.telic_bridge` to `ontology_hub` to
+  `ontology_runtime` to `lineage` to `ontology`). Others:
+  `router_v1 -> smart_router -> swarm_router -> provider_policy` (4),
+  `providers -> runtime_provider` (2). Axiom A7 forbids new circular imports but
+  these existing cycles remain and no `import-linter` runs in CI.
+- Status: OPEN
+
+### MAJOR · AS-05 · Dead intra-repo doc links
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 390 dead links out of 1,173 intra-repo markdown links, 33% rot (Q9).
+  `README.md` links a root `AGENTS.md` that is missing. Bulk dead links in
+  `reports/architectural/strange_loop_swarm_20260314/` use absolute paths like
+  `/Users/dhyana/dharma_swarm/...` that never resolved off the author machine.
+- Status: OPEN
+
+### MAJOR · AS-06 · README lists missing targets
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: All 6 `make` targets in the README "Common Commands" section do not
+  exist in the Makefile (Q7): `make xray`, `make compile`, `make test-smoke`,
+  `make test-all`, `make dashboard-lint`, `make dashboard-build`. The real
+  targets are `test`, `test-fast`, `lint`. This breaks first-run onboarding.
+- Status: OPEN
+
+### MAJOR · AS-07 · SQL built with f-strings
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 41 f-string SQL interpolation sites (Q23). `ontology_hub.py:382`
+  (`f"SELECT * FROM links WHERE {where}"`), `task_board.py:173`,
+  `telemetry_views.py:139,148,157`, `guardian_runtime_checks.py:262`. Most
+  interpolate table or column names (not user input) and still bind values with
+  `?`, and most carry `noqa: S608`. Residual risk is any user-sourced table
+  name; the fix is a `_safe_table_name()` validator for dynamic references.
+- Status: OPEN
+
+### MAJOR · AS-08 · Sync IO inside async
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`, `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md`, `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-09
+- Detail: Blocking I/O in `async def` bodies. The audit's broad grep finds 23
+  sites (Q38): `orchestrator.py:1893,2612,2614`, `cascade.py:435`,
+  `autoresearch_loop.py:507` (`subprocess.run`), `handoff.py:332,349`,
+  `dse_integration.py:969,977`, `autonomous_agent.py:991`,
+  `subconscious_v2.py:706`. The dedicated detector
+  `scripts/governance/hygiene/sync_in_async.py` reports 11 (lower false-positive
+  set), production-ish in `autoresearch_loop.py`, `review_cycle.py`,
+  `roaming_dispatch_daemon.py`, `thinkodynamic_director.py`, `zeitgeist.py`. Fix:
+  `aiofiles.open()` (already a dependency) and `asyncio.create_subprocess_exec`.
+- Status: OPEN
+
+### MAJOR · AS-09 · Silent broad exception handlers
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 1 bare `except:` plus 793 `except Exception:` blocks; 128 of them are
+  followed by `pass`, `return None`, or a bare `return` with no logging (Q33).
+  Sites: `terminal_commands/diagnostics.py:113,119,187,207,221`,
+  `terminal_commands/stigmergy.py:191`, `terminal_commands/agents.py:79`. Fix is
+  to add `logger.debug(..., exc_info=True)` to the silent handlers.
+- Status: OPEN
+
+### MINOR · AS-10 · Re-raise loses cause
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 35 sites catch an exception and raise a different type without
+  `from e`, dropping the original traceback (Q36): `cron_scheduler.py:108`,
+  `mcp_server.py:25`, `provider_policy.py:571`, `providers.py:1996`,
+  `api.py:340`. Batch-fixable by regex.
+- Status: OPEN
+
+### MINOR · AS-11 · Permissive CORS defaults
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: `api/main.py:246-250` configures `CORSMiddleware` with
+  `allow_methods=["*"]`, `allow_headers=["*"]`, and `allow_credentials=True`
+  (Q27). Origins are env-configurable and default to localhost, so this is
+  permissive rather than wide open. Restrict methods and headers to what the
+  dashboard actually uses.
+- Status: OPEN
+
+### MINOR · AS-12 · Secrets scan unavailable
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: The `make gitleaks` target exists but the `gitleaks` binary is not
+  installed, so the repo cannot scan for committed secrets (Q22). Install
+  `gitleaks` in the environment blueprint. Bandit reports 5 HIGH that are all
+  content-hashing `md5`/`sha1` (not cryptographic, Q25/Q28).
+- Status: OPEN
+
+### MINOR · AS-13 · Logging mostly unstructured
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-07
+- Detail: 1,170 `print()` calls in production paths (Q50, mostly CLI/TUI output
+  where `print` is correct) and only 2.5% structured logging — 45 key=value of
+  1,793 `logger.*()` calls (Q51). Adopt structured logging for new code starting
+  with `dharma_swarm/spine/` and `orchestrator.py`.
+- Status: OPEN
+
+### MINOR · AS-14 · Agentic governance gaps
+
+- Sources: `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md`, `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-09
+- Detail: Two agent-specific risks are measured but not yet gated. (1)
+  Instruction authority is implicit: an instruction-shaped scan flagged 142
+  files, of which only 9 are trusted by path and 133 are data-like, so agents
+  may treat reports or memory as authority (backlog P0-002, deep-dive gap 1). No
+  `instruction_surfaces.yaml` registry exists yet. (2) Tool side-effect surfaces
+  are not saturated with `ExecutionIdentity` — `ToolRegistry.dispatch` has
+  optional identity and side-effect hooks but high-risk boundaries do not fail
+  closed (backlog P1-006, deep-dive gap 2). This overlaps the live
+  spine-adoption track (`tool_registry_dispatch`, `self_modification_loop`,
+  `mcp_tool_access` are the adapter-ready surfaces).
+- Status: IN PROGRESS — capability gap tracked by `runtime-truth-spine-adoption-2026-06`
+
+### INFO · AS-15 · Supply-chain and CI gaps
+
+- Sources: `reports/audits/vibe_code_audit_2026-06-07.md`, `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md`, `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`
+- First reported: 2026-06-07
+- Last confirmed: 2026-06-09
+- Detail: 2 of 20 workflows lack an explicit `permissions` block; 6 use secrets
+  and 6 use `GITHUB_TOKEN`; no `pull_request_target`, `write-all`, unpinned
+  action refs, or `curl | sh` were found (backlog P0-004, deep-dive gap 8). JS
+  manifests carry semver ranges (`dashboard/package.json` 26,
+  `terminal/package.json` 11, `desktop-shell/package.json` 1); Python deps are
+  clean — no slopsquats, no `eval`/`exec` on user data, no deprecated SDK
+  patterns (audit Q17-Q21).
+- Status: OPEN
+
+### INFO · AS-16 · Quality membrane shipped
+
+- Sources: `reports/quality/anti_vibe/20260605-dharma-swarm-anti-vibe-quality-index/handoff.md`
+- First reported: 2026-06-05
+- Last confirmed: 2026-06-12
+- Detail: The anti-vibe cleanup converted six categories from narrative to
+  executable gates: strict runtime-name gate (`ruff F821,F811`), a deterministic
+  `make test-fast` lane (10,674 passed), generated-artifact quarantine in X-Ray,
+  refreshed DocOps count assertions, a source-only module-coherence inventory
+  (`make module-coherence`), and a fail-closed A2A readiness gate
+  (`make a2a-score-strict`). Residual watch-items: an `aiosqlite` event-loop
+  warning in `tests/test_verify_api.py`; an intermittent flake in
+  `tests/test_living_agent_kernel_workers.py`; and live A2A readiness is
+  intentionally DEGRADED (exit 2) until pending task `forge-v0.1-001` is closed
+  through the governed queue lifecycle.
+- Status: RESOLVED — gates shipped; residual watch-items OPEN
+
+## Live tooling pointers
+
+- [ANTI_SLOP_RULES.md](../governance/ANTI_SLOP_RULES.md) — the 10 CI-gated rules (`.semgrep/dharma-anti-slop.yml` plus workflows).
+- [VIBE_CODE_HYGIENE.md](../governance/VIBE_CODE_HYGIENE.md) — 54-antipattern catalogue feeding `scripts/governance/vibe_code_scan.sh`.
+- [hygiene/CATALOGUE.md](../governance/hygiene/CATALOGUE.md) and [hygiene/AI_AGENT_GOVERNANCE.md](../governance/hygiene/AI_AGENT_GOVERNANCE.md) — the 70-pattern catalogue and AI-agent evidence-grade governance.
+- [PR_QUALITY_GATES.md](../governance/PR_QUALITY_GATES.md) — PR-time quality gates.
+- Detectors: `scripts/governance/hygiene/sync_in_async.py`, `scripts/governance/hygiene/scan.py`, `scripts/governance/check_module_budget.py`, `scripts/governance/verify_quality_membrane.py`.
+
+## Superseded or archived sources
+
+- `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md` and
+  `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md` are
+  proposal docs (a 15-item control backlog P0-001..P3-015 and a 0-30-60-90
+  control roadmap). Their embedded scan receipts are carried as findings above;
+  the control roadmap itself stays in the source and feeds the hygiene patterns.
+- The handoff reports point-in-time counts (858 markdown, 680 modules, 608 test
+  files as of 2026-06-05) that are superseded by the live counts in
+  `docs/governance/SOVEREIGN_MANIFEST.md`; not carried as findings.
+
+## Conflicts resolved
+
+- `_utc_now()` count: audit Q29 says 76 (grep), deep-dive AST scan says 73, both
+  dated 2026-06-07. Kept both with the AST variant breakdown; neither is wrong,
+  they differ by method.
+- Files over 1000 LOC: audit Q12 says 25, deep-dive says 41. Different
+  thresholds and scan scope; both cited.
+- Sync-I/O-in-async: audit Q38 broad grep says 23, the dedicated
+  `sync_in_async.py` detector says 11. The detector has the lower false-positive
+  set; both cited so neither count is lost.
