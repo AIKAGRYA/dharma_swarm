@@ -576,7 +576,8 @@ def build_loop5_closure(state_dir: Path | None = None) -> LoopClosure:
     if blocked and real_blocked > 0:
         loop.verdict = "LIVE"
         loop.reason = (f"S3<->S4 closed on real data: {real_blocked}/{len(blocked)} "
-                       "BLOCKED rows are real-agent-attributed")
+                       "BLOCKED rows carry real loop-action work (pulse/dispatch/"
+                       "landscape-probe), not test fixtures")
     else:
         loop.verdict = "PARTIAL"
         loop.reason = (f"loop mechanically closed (signal fresh) but driven by "
