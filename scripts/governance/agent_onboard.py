@@ -621,6 +621,9 @@ def render_broken_register() -> None:
         print("  Top open items:")
         for it in top:
             print(f"    - [{it['status_word']}] {it['heading']}")
+    corral = REPO_ROOT / "DE_BUG_CORRAL" / "00.md"
+    marker = "" if corral.exists() else "  [index pending]"
+    print(f"  Bug Corral   : DE_BUG_CORRAL/00.md{marker}  (consolidated bug / slop / drift / hygiene findings)")
 
 
 # Fallback only — the live list is parsed from SOVEREIGN_MANIFEST.md at

@@ -31,6 +31,7 @@ The onboarding command (`make onboard`) lists the depth pointers inline. The sam
 - [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md) — settled truths, unresolved gaps, "do not build new, wire existing" list. *Does what I'm about to do duplicate something that already exists?*
 - [`docs/governance/CANONICAL_DOC_STACK.md`](CANONICAL_DOC_STACK.md) — doc hierarchy, ownership table, anti-doc-maze rules. *Which file owns the truth I'm about to write down?*
 - [`docs/governance/ANTI_SLOP_RULES.md`](ANTI_SLOP_RULES.md) — explicit do-nots backed by Semgrep rules.
+- [`DE_BUG_CORRAL/00.md`](../../DE_BUG_CORRAL/00.md) — the Bug Corral: consolidated bug / slop / drift / hygiene findings, each traceable to sources via `DE_BUG_CORRAL/09.md`. *What is already known to be broken, risky, or stale before I start?*
 
 If any of these contradict each other on numbers, trust SOVEREIGN_MANIFEST first, then CLAUDE.md, then the audit, then CANONICAL_DOC_STACK. Each is authoritative for the topic CANONICAL_DOC_STACK assigns it.
 
@@ -332,4 +333,5 @@ When a track's `completion_criteria` all pass, the substrate-nativeness estimate
 - New behavioral rule → `CLAUDE.md` (edit, don't fork).
 - New plan → `docs/plans/<date>-<slug>.md` (the existing convention).
 - Drift you discover in old docs → log it in `docs/governance/REPO_GOVERNANCE_AUDIT.md`. Do not silently fix without logging.
+- A bug / slop / drift / hygiene finding → check it is not already in `DE_BUG_CORRAL/` first; the corral is the consolidated front door, with sources in `DE_BUG_CORRAL/09.md`.
 - Build-session pointers → this file. Keep it short. If it grows past one screen of read-order plus current track, split the bloat back into the canonical docs it should live in.

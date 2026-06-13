@@ -273,6 +273,11 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 - Use `scripts/` for operator utilities and shell scripts
 - Use `api/` for FastAPI routers and backend code
 - Use `dashboard/` for Next.js frontend code
+- Use `DE_BUG_CORRAL/` for consolidated bug / slop / drift / hygiene findings
+
+## Bug Corral — single front door for findings
+
+`DE_BUG_CORRAL/` is the one place for repo bugs, slop, drift, duplicate, hygiene, and systemic quality findings. Start at `DE_BUG_CORRAL/00.md` (index) and trace any finding to its sources via `DE_BUG_CORRAL/09.md` (provenance). It is a `report`/`reference` surface, not a canonical authority; live ledgers (`docs/state/BROKEN_REGISTER.md`, `docs/governance/REPO_GOVERNANCE_AUDIT.md`) remain the owners it points to.
 
 ## Project Architecture
 
