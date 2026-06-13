@@ -154,6 +154,29 @@ class LoopClosure:
 
 
 @dataclass
+class RoutingTruth:
+    """Read-only projection of routing reality from the delegation_runs
+    receipts: the latest served provider+model, receipt-fill ratio, count of
+    fresh-today receipts, and a >=Kimi-K2.6 power-floor PASS/FAIL on the latest
+    served model. This view owns no fact — it reads the receipt_json column the
+    spine dispatch writes (runtime_state owner) and writes nothing.
+
+    floor_class is AT-OR-ABOVE / BELOW / UNKNOWN; floor_pass mirrors AT-OR-ABOVE.
+    The floor is operator rule (model_hierarchy.MODEL_POWER_FLOOR = Kimi K2.6):
+    a served model weaker than K2.6 is a routing regression and reads BELOW.
+    """
+    served_provider: str = ""
+    served_model: str = ""
+    total: int = 0
+    receipted: int = 0
+    fill_pct: float = 0.0
+    fresh_today: int = 0
+    floor_class: str = "UNKNOWN"
+    floor_pass: bool = False
+    detail: str = ""
+
+
+@dataclass
 class OrientationPacket:
     identity: Identity
     organs: list[Organ]
@@ -162,6 +185,7 @@ class OrientationPacket:
     liveness: Liveness
     broken: list[BrokenItem]
     loop1: Loop1Closure
+    routing_truth: RoutingTruth
     loops: list[LoopClosure] = field(default_factory=list)
 
 
@@ -357,6 +381,122 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
     else:
         detail = "latest dispatch receipt carries provider+model, fresh <24h"
     return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
+
+
+# ---------------------------------------------------------------------------
+# Routing truth — >=Kimi-K2.6 power-floor classification (read-only).
+# Owner of the floor rule: model_hierarchy.MODEL_POWER_FLOOR (= Kimi K2.6).
+# FRONTIER_FLOOR is the small allowlist of >=K2.6 model SUBSTRINGS; any served
+# model whose lowercased name contains one of them classifies AT-OR-ABOVE.
+# Anything else (and no UNKNOWN escape) reads BELOW — a routing regression.
+# Substrings are precise enough that sub-floor siblings do NOT match: 'kimi-k2.6'
+# / 'kimi-k2.7' match only the >=floor Kimi gens, never 'kimi-k2.5'.
+# ---------------------------------------------------------------------------
+FRONTIER_FLOOR: tuple[str, ...] = (
+    "kimi-k2.6",
+    "kimi-k2.7",
+    "deepseek-v4-pro",
+    "glm-5.1",
+    "minimax-m3",
+    "qwen3-coder",
+    "mistral-large-3",
+    "gpt-5.5",
+    "claude-opus-4-8",
+    "claude-opus-4.8",
+    "gemini-3-pro",
+)
+
+
+def classify_floor(model: Any) -> str:
+    """Classify a served model name against the Kimi-K2.6 power floor.
+
+    Returns AT-OR-ABOVE when the lowercased name contains a FRONTIER_FLOOR
+    substring, UNKNOWN when the name is empty/None, and BELOW otherwise.
+    BELOW is the honest verdict for a sub-floor served model (a routing
+    regression), never silently upgraded."""
+    if not model:
+        return "UNKNOWN"
+    name = str(model).lower()
+    for sub in FRONTIER_FLOOR:
+        if sub in name:
+            return "AT-OR-ABOVE"
+    return "BELOW"
+
+
+def build_routing_truth(db_path: Any = None) -> RoutingTruth:
+    """Project routing reality from the delegation_runs receipts (read-only).
+
+    Reports the latest served provider+model (by started_at, then rowid),
+    receipt-fill ratio (receipted / total), count of fresh-today receipts
+    (real receipt_json, started_at < 24h), and the >=K2.6 floor verdict on the
+    latest served model. Owns nothing: reads the receipt_json column the spine
+    dispatch writes; writes nothing."""
+    import sqlite3
+
+    path = Path(db_path) if db_path is not None else _runtime_db_path()
+    if not Path(path).exists():
+        return RoutingTruth(detail=f"no runtime db at {path}")
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except Exception:
+        try:
+            conn = sqlite3.connect(str(path))
+        except Exception as exc:  # pragma: no cover - defensive
+            return RoutingTruth(detail=f"db unreadable: {exc}")
+    try:
+        rows = conn.execute(
+            "SELECT receipt_json, started_at FROM delegation_runs "
+            "ORDER BY started_at DESC, rowid DESC"
+        ).fetchall()
+    except Exception as exc:
+        conn.close()
+        return RoutingTruth(detail=f"delegation_runs query failed: {exc}")
+    conn.close()
+
+    total = len(rows)
+    receipted = 0
+    fresh_today = 0
+    latest_provider = ""
+    latest_model = ""
+    for receipt_json, started_at in rows:
+        if not receipt_json:
+            continue
+        try:
+            blob = json.loads(receipt_json)
+        except Exception:
+            continue
+        receipted += 1
+        provider = str(blob.get("provider", "") or "")
+        model = str(blob.get("model", "") or "")
+        # Rows are ordered newest-first; the first real receipt is the latest.
+        if not latest_model and not latest_provider and (provider or model):
+            latest_provider, latest_model = provider, model
+        age = _age_seconds(_parse_ts(started_at))
+        if age is not None and age < _FRESH_WINDOW_S:
+            fresh_today += 1
+
+    fill_pct = (100.0 * receipted / total) if total else 0.0
+    floor_class = classify_floor(latest_model)
+    floor_pass = floor_class == "AT-OR-ABOVE"
+    if total == 0:
+        detail = "no delegation_runs rows"
+    elif not latest_model:
+        detail = f"{receipted}/{total} receipted but none carry a served model"
+    else:
+        detail = (f"latest served {latest_provider}:{latest_model} "
+                  f"is {floor_class} the Kimi-K2.6 floor; "
+                  f"{receipted}/{total} receipted, {fresh_today} fresh <24h")
+    return RoutingTruth(
+        served_provider=latest_provider,
+        served_model=latest_model,
+        total=total,
+        receipted=receipted,
+        fill_pct=round(fill_pct, 1),
+        fresh_today=fresh_today,
+        floor_class=floor_class,
+        floor_pass=floor_pass,
+        detail=detail,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -731,6 +871,7 @@ def build_packet() -> OrientationPacket:
         liveness=build_liveness(),
         broken=build_broken(),
         loop1=build_loop1_closure(),
+        routing_truth=build_routing_truth(),
         loops=build_loop_closures(),
     )
 
@@ -773,6 +914,16 @@ def render(packet: OrientationPacket) -> None:
         print(f"  Generated: {packet.liveness.generated_at}")
     for surface in packet.liveness.surfaces:
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
+
+    _section("ROUTING TRUTH — owner: delegation_runs receipts (read-only); floor: model_hierarchy.MODEL_POWER_FLOOR (Kimi K2.6)")
+    rt = packet.routing_truth
+    floor_marker = {"AT-OR-ABOVE": "PASS", "BELOW": "FAIL", "UNKNOWN": "n/a"}.get(
+        rt.floor_class, "n/a")
+    print(f"  Latest served: provider={rt.served_provider!r} model={rt.served_model!r}")
+    print(f"  >=K2.6 floor: {floor_marker} ({rt.floor_class})")
+    print(f"  Receipt fill: {rt.receipted}/{rt.total} ({rt.fill_pct}%)  ·  fresh <24h: {rt.fresh_today}")
+    if rt.detail:
+        print(f"    {rt.detail}")
 
     _section("LOOP CLOSURE — owners: delegation_runs + ~/.dharma receipt surfaces (read-only)")
     c = packet.loop1

@@ -39,7 +39,7 @@ def test_packet_has_all_axes():
     packet = og.build_packet()
     data = og.asdict(packet)
     assert set(data) == {"identity", "organs", "tracks", "custody",
-                         "liveness", "broken", "loop1", "loops"}
+                         "liveness", "broken", "loop1", "routing_truth", "loops"}
 
 
 def test_identity_serves_the_one_line():
@@ -236,3 +236,139 @@ def test_loop_checks_write_nothing(tmp_path):
     # Building closures must not create files in an empty state dir.
     og.build_loop_closures(state_dir=tmp_path)
     assert not any(tmp_path.iterdir())
+
+
+# --- Routing-truth: >=K2.6 power-floor classification (no network/spend) -----
+
+def _write_delegation_db(path: Path, rows: list[dict]) -> None:
+    """Write a minimal delegation_runs table mirroring runtime_state's schema:
+    the routing-truth panel reads receipt_json + started_at only."""
+    import sqlite3
+
+    conn = sqlite3.connect(str(path))
+    conn.execute(
+        "CREATE TABLE delegation_runs ("
+        " run_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, status TEXT NOT NULL,"
+        " started_at TEXT NOT NULL, receipt_json TEXT)"
+    )
+    for i, r in enumerate(rows):
+        conn.execute(
+            "INSERT INTO delegation_runs (run_id, task_id, status, started_at,"
+            " receipt_json) VALUES (?,?,?,?,?)",
+            (f"run_{i}", f"task_{i}", r.get("status", "completed"),
+             r.get("started_at", _now_iso()),
+             json.dumps(r["receipt"]) if r.get("receipt") is not None else None),
+        )
+    conn.commit()
+    conn.close()
+
+
+def test_floor_classifies_at_or_above_frontier_set():
+    # The whole >=K2.6 frontier set must classify AT-OR-ABOVE.
+    at_or_above = [
+        "deepseek-v4-pro:cloud", "z-ai/glm-5.1:free", "moonshotai/kimi-k2.6",
+        "kimi-k2.7", "minimaxai/minimax-m3", "qwen3-coder:480b-cloud",
+        "mistral-large-3-675b", "gpt-5.5", "claude-opus-4-8", "gemini-3-pro",
+    ]
+    for m in at_or_above:
+        assert og.classify_floor(m) == "AT-OR-ABOVE", m
+
+
+def test_floor_flags_sub_floor_served_models_below():
+    # Sub-floor models the operator banished must classify BELOW.
+    below = [
+        "meta/llama-3.3-70b-instruct", "moonshotai/kimi-k2.5",
+        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    ]
+    for m in below:
+        assert og.classify_floor(m) == "BELOW", m
+
+
+def test_floor_empty_model_is_unknown():
+    assert og.classify_floor("") == "UNKNOWN"
+    assert og.classify_floor(None) == "UNKNOWN"  # type: ignore[arg-type]
+
+
+def test_spine_served_model_classified_at_or_above_floor(tmp_path):
+    # When the spine dispatch records a served model, the make-orient routing
+    # check classifies it AT-OR-ABOVE the Kimi K2.6 floor (the default-dispatch
+    # frontier brain, deepseek-v4-pro:cloud, is >= floor — not sub-floor).
+    db = tmp_path / "runtime.db"
+    _write_delegation_db(db, [
+        {"receipt": {"provider": "ollama", "model": "deepseek-v4-pro:cloud",
+                     "status": "ok", "latency_ms": 1200}},
+    ])
+    rt = og.build_routing_truth(db_path=db)
+    assert rt.served_model == "deepseek-v4-pro:cloud"
+    assert rt.served_provider == "ollama"
+    assert rt.floor_class == "AT-OR-ABOVE"
+    assert rt.floor_pass is True
+
+
+def test_spine_sub_floor_served_model_flagged_below(tmp_path):
+    # A sub-floor served model (the historical llama-3.3-70b receipt) must be
+    # flagged BELOW floor by the routing-truth check.
+    db = tmp_path / "runtime.db"
+    _write_delegation_db(db, [
+        {"receipt": {"provider": "nvidia_nim",
+                     "model": "meta/llama-3.3-70b-instruct",
+                     "status": "ok", "latency_ms": 28147}},
+    ])
+    rt = og.build_routing_truth(db_path=db)
+    assert rt.served_model == "meta/llama-3.3-70b-instruct"
+    assert rt.floor_class == "BELOW"
+    assert rt.floor_pass is False
+
+
+def test_routing_truth_fill_and_fresh_counts(tmp_path):
+    db = tmp_path / "runtime.db"
+    stale = (datetime.datetime.now(datetime.timezone.utc)
+             - datetime.timedelta(hours=48)).isoformat()
+    _write_delegation_db(db, [
+        # fresh, receipted, at-or-above (this is the LATEST by started_at)
+        {"receipt": {"provider": "ollama", "model": "glm-5.1:cloud",
+                     "status": "ok", "latency_ms": 900},
+         "started_at": _now_iso()},
+        # stale but receipted
+        {"receipt": {"provider": "nvidia_nim", "model": "moonshotai/kimi-k2.6",
+                     "status": "ok", "latency_ms": 1500},
+         "started_at": stale},
+        # no receipt at all (un-receipted dispatch)
+        {"receipt": None, "started_at": _now_iso()},
+    ])
+    rt = og.build_routing_truth(db_path=db)
+    assert rt.total == 3
+    assert rt.receipted == 2
+    assert 60.0 < rt.fill_pct < 70.0  # 2/3
+    assert rt.fresh_today == 1        # only the latest fresh receipt is <24h
+    # Latest by started_at is the fresh glm-5.1 row -> at-or-above.
+    assert rt.served_model == "glm-5.1:cloud"
+    assert rt.floor_class == "AT-OR-ABOVE"
+
+
+def test_routing_truth_no_db_is_honest(tmp_path):
+    rt = og.build_routing_truth(db_path=tmp_path / "nope.db")
+    assert rt.total == 0
+    assert rt.receipted == 0
+    assert rt.served_model == ""
+    assert rt.floor_class == "UNKNOWN"
+    assert rt.floor_pass is False
+
+
+def test_routing_truth_in_packet_and_render():
+    # The packet carries a routing_truth axis and render does not crash.
+    packet = og.build_packet()
+    assert hasattr(packet, "routing_truth")
+    og.render(packet)  # smoke: must not raise
+
+
+def test_routing_truth_writes_nothing(tmp_path):
+    db = tmp_path / "runtime.db"
+    _write_delegation_db(db, [
+        {"receipt": {"provider": "ollama", "model": "deepseek-v4-pro:cloud",
+                     "status": "ok", "latency_ms": 1000}},
+    ])
+    before = sorted(p.name for p in tmp_path.iterdir())
+    og.build_routing_truth(db_path=db)
+    after = sorted(p.name for p in tmp_path.iterdir())
+    assert before == after
