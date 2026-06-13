@@ -20,7 +20,7 @@ def test_packet_has_all_axes():
     packet = og.build_packet()
     data = og.asdict(packet)
     assert set(data) == {"identity", "organs", "tracks", "custody",
-                         "liveness", "broken"}
+                         "liveness", "broken", "loop1"}
 
 
 def test_identity_serves_the_one_line():

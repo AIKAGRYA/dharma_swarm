@@ -2212,6 +2212,18 @@ class Orchestrator:
             context_id=str(ident.get("session_id", "") or ""),
             task_id=td.task_id,
         )
+        # Dispatch-time source of truth for provider/model: the runner's static
+        # config (AgentRunner._config) — config.provider is a ProviderType
+        # (string via .value, exactly as agent_runner.py:885) and config.model is
+        # the model string (agent_runner.py:886). run_task() returns only the
+        # completion text, so it cannot supply these; the config is the only
+        # available dispatch-time source. Tolerant of a missing/partial config
+        # (falls back to the empty-string EvidenceReceipt defaults).
+        _cfg = getattr(runner, "_config", None)
+        _prov = getattr(_cfg, "provider", None)
+        provider = getattr(_prov, "value", _prov) if _prov is not None else "orchestrator"
+        provider = str(provider) if provider else "orchestrator"
+        model = str(getattr(_cfg, "model", "") or "")
         started = datetime.now(timezone.utc)
         captured: dict[str, Any] = {}
 
@@ -2219,6 +2231,7 @@ class Orchestrator:
             task: dict[str, Any], agent_id: str, context_id: str, routing: RoutingDecision
         ) -> EvidenceReceipt:
             status, err_source, err_detail = "ok", "none", None
+            in_tokens = out_tokens = None
             try:
                 captured["result"] = await asyncio.wait_for(
                     runner.run_task(captured["_task_obj"]), timeout=timeout_seconds
@@ -2230,12 +2243,19 @@ class Orchestrator:
                 captured["exc"] = exc
                 status, err_source, err_detail = "failed", "internal_error", str(exc)
             finished = datetime.now(timezone.utc)
+            # Surface token usage only when the runner's last-completion state
+            # exposes it (no fabrication — None stays None when absent).
+            _usage = getattr(runner, "_last_usage", None)
+            if isinstance(_usage, dict):
+                in_tokens = _usage.get("input_tokens")
+                out_tokens = _usage.get("output_tokens")
             return EvidenceReceipt(
                 trace_id=str(ident.get("trace_id", "") or ""),
                 context_id=context_id,
                 task_id=td.task_id,
                 agent_id=agent_id,
-                provider="orchestrator",
+                provider=provider,
+                model=model,
                 operation="invoke_agent",
                 provider_attempted=True,
                 status=status,
@@ -2244,6 +2264,8 @@ class Orchestrator:
                 started_at=started,
                 finished_at=finished,
                 latency_ms=int((finished - started).total_seconds() * 1000),
+                input_tokens=in_tokens,
+                output_tokens=out_tokens,
                 routing_decision_id=routing.decision_id,
                 attributes={"router": "orchestrator_dispatch"},
             )

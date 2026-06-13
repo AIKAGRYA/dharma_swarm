@@ -114,6 +114,19 @@ class BrokenItem:
 
 
 @dataclass
+class Loop1Closure:
+    """Loop 1 (provider chain + dispatch) closure proof, projected read-only
+    from the latest delegation_runs receipt. LIVE only when that receipt
+    carries a non-empty provider AND model — the spine dispatch actually
+    recorded which brain answered. Owner of the fact: runtime_state's
+    delegation_runs.receipt_json; this view never writes."""
+    live: bool
+    provider: str = ""
+    model: str = ""
+    detail: str = ""
+
+
+@dataclass
 class OrientationPacket:
     identity: Identity
     organs: list[Organ]
@@ -121,6 +134,7 @@ class OrientationPacket:
     custody: CustodyReport
     liveness: Liveness
     broken: list[BrokenItem]
+    loop1: Loop1Closure
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -254,6 +268,62 @@ def build_broken() -> list[BrokenItem]:
     return [i for i in items if i.status not in {"FIXED", "CLOSED"}]
 
 
+def _runtime_db_path() -> Any:
+    """Resolve the runtime-state db path from its owner (runtime_state),
+    not a hardcoded literal. Borrows the owner's DEFAULT_RUNTIME_DB constant."""
+    try:
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
+        return DEFAULT_RUNTIME_DB
+    except Exception:
+        return Path.home() / ".dharma" / "state" / "runtime.db"
+
+
+def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
+    """Project Loop 1 closure from the latest delegation_runs receipt.
+
+    LIVE only when the most recent receipt (by started_at, then rowid) carries
+    a non-empty provider AND model. This view owns nothing — it reads the
+    receipt_json column the spine dispatch writes (runtime_state owner)."""
+    import sqlite3
+
+    path = Path(db_path) if db_path is not None else _runtime_db_path()
+    if not Path(path).exists():
+        return Loop1Closure(live=False, detail=f"no runtime db at {path}")
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except Exception:
+        try:
+            conn = sqlite3.connect(str(path))
+        except Exception as exc:  # pragma: no cover - defensive
+            return Loop1Closure(live=False, detail=f"db unreadable: {exc}")
+    try:
+        row = conn.execute(
+            "SELECT receipt_json FROM delegation_runs "
+            "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
+            "ORDER BY started_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+    except Exception as exc:
+        conn.close()
+        return Loop1Closure(live=False, detail=f"delegation_runs query failed: {exc}")
+    conn.close()
+    if not row or not row[0]:
+        return Loop1Closure(live=False, detail="no persisted EvidenceReceipt yet")
+    try:
+        blob = json.loads(row[0])
+    except Exception:
+        return Loop1Closure(live=False, detail="latest receipt_json unparseable")
+    provider = str(blob.get("provider", "") or "")
+    model = str(blob.get("model", "") or "")
+    live = bool(provider and model)
+    detail = (
+        "latest dispatch receipt carries provider+model"
+        if live
+        else "latest receipt missing provider and/or model"
+    )
+    return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
+
+
 def build_packet() -> OrientationPacket:
     return OrientationPacket(
         identity=build_identity(),
@@ -262,6 +332,7 @@ def build_packet() -> OrientationPacket:
         custody=build_custody(),
         liveness=build_liveness(),
         broken=build_broken(),
+        loop1=build_loop1_closure(),
     )
 
 
@@ -303,6 +374,14 @@ def render(packet: OrientationPacket) -> None:
         print(f"  Generated: {packet.liveness.generated_at}")
     for surface in packet.liveness.surfaces:
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
+
+    _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
+    c = packet.loop1
+    print(f"  Loop 1 (provider chain + dispatch): {'LIVE' if c.live else 'NOT LIVE'}")
+    if c.provider or c.model:
+        print(f"    latest receipt: provider={c.provider!r} model={c.model!r}")
+    if c.detail:
+        print(f"    {c.detail}")
 
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:
