@@ -13,6 +13,7 @@ latest delegation_runs receipt has non-empty provider AND model.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import sqlite3
 import types
@@ -120,12 +121,13 @@ def test_orient_marks_loop1_live_only_with_provider_and_model(tmp_path):
     closure = og.build_loop1_closure(db_path=db_path)
     assert closure.live is False
 
-    # Latest receipt with provider AND model -> LIVE.
+    # Latest receipt with provider AND model AND fresh (<24h) -> LIVE.
+    _fresh = datetime.datetime.now(datetime.timezone.utc).isoformat()
     conn = sqlite3.connect(db_path)
     conn.execute(
         "INSERT INTO delegation_runs (task_id, status, started_at, receipt_json) "
-        "VALUES ('t-real', 'completed', '2026-06-13T01:00:00Z', ?)",
-        (json.dumps({"provider": "openrouter", "model": "z-ai/glm-4.6"}),),
+        "VALUES ('t-real', 'completed', ?, ?)",
+        (_fresh, json.dumps({"provider": "openrouter", "model": "z-ai/glm-4.6"})),
     )
     conn.commit()
     conn.close()
@@ -133,3 +135,37 @@ def test_orient_marks_loop1_live_only_with_provider_and_model(tmp_path):
     assert closure.live is True
     assert closure.provider == "openrouter"
     assert closure.model == "z-ai/glm-4.6"
+
+
+def test_loop1_closure_requires_fresh_receipt(tmp_path):
+    """A receipt with provider+model but >24h old reads NOT-LIVE: Loop 1
+    closure means continuous dispatch, not one stale receipt frozen in time."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parents[1] / "scripts/governance/orientation_graph.py"
+    spec = importlib.util.spec_from_file_location("orientation_graph_loop1_stale", script)
+    og = importlib.util.module_from_spec(spec)
+    sys.modules["orientation_graph_loop1_stale"] = og
+    spec.loader.exec_module(og)
+
+    db_path = tmp_path / "runtime.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE delegation_runs (task_id TEXT PRIMARY KEY, status TEXT, "
+        "started_at TEXT, receipt_json TEXT)"
+    )
+    stale = (
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=400)
+    ).isoformat()
+    conn.execute(
+        "INSERT INTO delegation_runs (task_id, status, started_at, receipt_json) "
+        "VALUES ('t-stale', 'completed', ?, ?)",
+        (stale, json.dumps({"provider": "ollama", "model": "mistral:latest"})),
+    )
+    conn.commit()
+    conn.close()
+    closure = og.build_loop1_closure(db_path=db_path)
+    assert closure.live is False
+    assert "stale" in closure.detail.lower()

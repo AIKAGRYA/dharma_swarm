@@ -311,8 +311,10 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
     """Project Loop 1 closure from the latest delegation_runs receipt.
 
     LIVE only when the most recent receipt (by started_at, then rowid) carries
-    a non-empty provider AND model. This view owns nothing — it reads the
-    receipt_json column the spine dispatch writes (runtime_state owner)."""
+    a non-empty provider AND model AND is fresh (< 24h old). A stale newest
+    receipt means Loop 1 is not closing continuously, so it reads NOT-LIVE.
+    This view owns nothing — it reads the receipt_json column the spine
+    dispatch writes (runtime_state owner)."""
     import sqlite3
 
     path = Path(db_path) if db_path is not None else _runtime_db_path()
@@ -327,7 +329,7 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
             return Loop1Closure(live=False, detail=f"db unreadable: {exc}")
     try:
         row = conn.execute(
-            "SELECT receipt_json FROM delegation_runs "
+            "SELECT receipt_json, started_at FROM delegation_runs "
             "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
             "ORDER BY started_at DESC, rowid DESC LIMIT 1"
         ).fetchone()
@@ -343,12 +345,17 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
         return Loop1Closure(live=False, detail="latest receipt_json unparseable")
     provider = str(blob.get("provider", "") or "")
     model = str(blob.get("model", "") or "")
-    live = bool(provider and model)
-    detail = (
-        "latest dispatch receipt carries provider+model"
-        if live
-        else "latest receipt missing provider and/or model"
-    )
+    has_pm = bool(provider and model)
+    age = _age_seconds(_parse_ts(row[1]))
+    fresh = age is not None and age < _FRESH_WINDOW_S
+    live = has_pm and fresh
+    if not has_pm:
+        detail = "latest receipt missing provider and/or model"
+    elif not fresh:
+        hrs = f"{age / 3600:.1f}h" if age is not None else "unknown age"
+        detail = f"latest real receipt is stale ({hrs} old, >24h) — Loop 1 not closing continuously"
+    else:
+        detail = "latest dispatch receipt carries provider+model, fresh <24h"
     return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
 
 
