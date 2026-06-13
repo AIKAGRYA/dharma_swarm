@@ -70,3 +70,22 @@ def test_json_mode_is_machine_parseable():
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert "identity" in payload and "organs" in payload
+
+
+def test_liveness_uses_census_id_and_flags_stale_receipts(tmp_path,
+                                                          monkeypatch):
+    receipt = tmp_path / "live_process_census.json"
+    receipt.write_text(json.dumps({
+        "generated_at": "1970-01-01T00:00:00Z",
+        "surfaces": [
+            {"id": "local_nats", "label": "Local NATS", "status": "live"},
+        ],
+    }), encoding="utf-8")
+    monkeypatch.setattr(og, "_census_receipt_path", lambda: receipt)
+
+    liveness = og.build_liveness()
+
+    assert liveness.surfaces[0]["id"] == "local_nats"
+    assert liveness.stale is True
+    assert liveness.age_hours is not None
+    assert liveness.age_hours > 24

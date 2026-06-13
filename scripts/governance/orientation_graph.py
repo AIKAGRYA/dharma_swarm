@@ -34,6 +34,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ PORTFOLIO = REPO_ROOT / "docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 ASSERTIONS = REPO_ROOT / "docs/docops/assertions.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
+CENSUS_STALE_AFTER_HOURS = 24
 
 
 def _census_receipt_path() -> Path | None:
@@ -103,6 +105,8 @@ class CustodyReport:
 class Liveness:
     receipt: str
     generated_at: str = ""
+    stale: bool = False
+    age_hours: float | None = None
     surfaces: list[dict[str, str]] = field(default_factory=list)
 
 
@@ -218,15 +222,32 @@ def build_liveness() -> Liveness:
         if not isinstance(surface, dict):
             continue
         surfaces.append({
-            "id": str(surface.get("surface_id", "")),
+            "id": str(surface.get("surface_id") or surface.get("id", "")),
             "label": str(surface.get("label", "")),
             "status": str(surface.get("status", "")),
         })
+    generated_at = str(payload.get("generated_at", ""))
+    age_hours = _age_hours(generated_at)
     return Liveness(
         receipt=str(receipt_path),
-        generated_at=str(payload.get("generated_at", "")),
+        generated_at=generated_at,
+        stale=age_hours is not None and age_hours > CENSUS_STALE_AFTER_HOURS,
+        age_hours=age_hours,
         surfaces=surfaces,
     )
+
+
+def _age_hours(timestamp: str) -> float | None:
+    if not timestamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    delta = datetime.now(UTC) - parsed.astimezone(UTC)
+    return round(delta.total_seconds() / 3600, 1)
 
 
 _BR_HEAD = re.compile(r"^###\s+(?P<id>BR-\d+)\s*[—-]\s*(?P<title>.+)$")
@@ -300,7 +321,11 @@ def render(packet: OrientationPacket) -> None:
     _section("LIVENESS — owner: live ops census receipt (read-only)")
     print(f"  Receipt: {packet.liveness.receipt}")
     if packet.liveness.generated_at:
-        print(f"  Generated: {packet.liveness.generated_at}")
+        stale = " STALE" if packet.liveness.stale else ""
+        age = ""
+        if packet.liveness.age_hours is not None:
+            age = f" ({packet.liveness.age_hours}h old{stale})"
+        print(f"  Generated: {packet.liveness.generated_at}{age}")
     for surface in packet.liveness.surfaces:
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
 
