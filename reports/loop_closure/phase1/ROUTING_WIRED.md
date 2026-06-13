@@ -159,3 +159,35 @@ adoption* by the daemon is gated on operator merge #590 + restart.
 - Served-model distribution 100% >=K2.6 frontier, 0 sub-floor.
 - `make orient` routing-truth panel reading LIVE: 493/4465 (11.0%), fresh<24h=29, latest served AT-OR-ABOVE, floor_pass=True.
 - Adversarial tally 0/4 refuted, no unrefuted holes.
+
+---
+
+## Floor airtight (router_v1 leak closed) — addendum 2026-06-14
+
+The K2.6 floor is now **airtight on the code surface**, closing the one remaining
+leak: as of commit `14447e33e`, `dharma_swarm/router_v1.py` carries **zero
+sub-floor model strings used as routing targets** (verified by a literal token
+grep — every remaining sub-floor name lives only in a comment or a banish-list,
+never as a quoted routing target), and the same holds across the whole routing
+surface (`model_hierarchy.py`, `ollama_config.py`, `model_catalog.py`,
+`smart_router.py`). The router now emits `>=K2.6` tier hints and registers
+frontier literals only. The named routing-surface test suite is fully green
+(6 previously-broken files all pass; 164 passed standalone, 200 passed with the
+two related suites). This is the airtight-floor guarantee at the level of the
+**code that decides what to route to**.
+
+**Standing caveat (unchanged, and now load-bearing).** This airtightness is on
+the routing *code*, not on the *live canonical receipt surface right now*. At the
+time of this addendum, `make orient` reports **Loop 1 NOT-LIVE** and the ROUTING
+TRUTH floor as **UNKNOWN** (latest served receipt is `provider='orchestrator'
+model=''`, fill 11.0%) — because the standing daemon, still running pre-merge
+code, keeps writing empty-model `orchestrator` receipts on top of this lane's
+frontier-served rows (last 50 canonical rows: 18 served-model, 32 empty, the
+empties newest). The lane's frontier receipts were real and served-truth when
+written; they were simply buried by the unpatched daemon's subsequent dispatches.
+Durable LIVE+PASS on the canonical surface is therefore **not** a code edit this
+lane can land — it requires the operator step the body of this report already
+names: **merge #590 (daemon adopts `DHARMA_SPINE_DISPATCH` + the frontier
+hierarchy) then restart the daemon on the patched code.** Until that, the routing
+mechanism is airtight and served-truth, but its *standing adoption* by the live
+daemon — and thus a continuously-LIVE orient panel — remains operator-gated.

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T10:49:47+09:00",
+  "generated_at": "2026-06-14T03:06:59+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -420,7 +420,7 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 3,
+        "passed": 4,
         "total": 5
       },
       "criteria": [
@@ -457,8 +457,8 @@
         {
           "id": "loop1_closure_receipt_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING"
+          "passed": true,
+          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
         },
         {
           "id": "campaign_retrospective_exists",
@@ -677,7 +677,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
+      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
       "criterion_id": null
     },
     {
