@@ -293,6 +293,12 @@ Per the user's mandate that "the swarm is working at the background to eke out e
 
 This is the asymmetric advantage TELOS has over every existing journaling or coaching tool: the HOLON has time. There is no quarterly engagement target driving it to produce profundity in week one. It can spend three months in ambient pattern recognition before it ever offers a Drishti bridge. The user becomes more articulate *because* the system is patient enough to let them.
 
+### 5.14 Morning Refinery scaffold
+
+The v0 user experience must not collapse into a generic AI journaling or self-help flow. The morning page is the raw source artifact for a private semantic refinery: categorical articulation, theme/idea nodes, PKM frontmatter, repo/wiki linking, research queues, venture-cell seeds, adversarial challenge, next-day prompts, and only then consent-gated promotion toward SAB or the wider lattice.
+
+Companion scaffold: `docs/vision_maps/TELOS_MORNING_REFINERY_V0.md`.
+
 ---
 
 ## 6. The lattice protocol — TELOS as planetary mycelium
