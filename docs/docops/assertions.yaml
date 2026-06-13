@@ -141,6 +141,7 @@
       "docs/state/_archive/**",
       "docs/research/**",
       "docs/reports/**",
+      "docs/bug-corral/**",
       "reports/**",
       "seams/**",
       "dharma_swarm/inter_agent/**",
