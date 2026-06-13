@@ -16,12 +16,19 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 # OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
 OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
+# Full >=Kimi-K2.6 open frontier served via the ollama-cloud gateway (verified
+# live in ollama.com/api/tags, 2026-06-14). Sub-floor variants (glm-5, deepseek
+# -v3.x / v4-flash, kimi-k2.5, minimax-m2.x) are deliberately excluded per the
+# MODEL_POWER_FLOOR rule in model_hierarchy.py.
 OLLAMA_CLOUD_FRONTIER_MODELS = (
-    "glm-5:cloud",
-    "deepseek-v3.2:cloud",
-    "kimi-k2.5:cloud",
-    "minimax-m2.7:cloud",
+    "deepseek-v4-pro:cloud",
+    "glm-5.1:cloud",
+    "kimi-k2.6:cloud",
+    "kimi-k2.7-code:cloud",
+    "minimax-m3:cloud",
     "qwen3-coder:480b-cloud",
+    "qwen3-coder-next:cloud",
+    "mistral-large-3:675b-cloud",
 )
 
 _LOCAL_BASE_URLS = {

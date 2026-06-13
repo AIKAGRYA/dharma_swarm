@@ -244,27 +244,44 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 # Default model per provider (used when request.model is empty).
 # Moved here from runtime_provider.py as the single source.
 
+# ── HARD POWER FLOOR (operator rule, 2026-06-14) ─────────────────────────────
+# NEVER route a model weaker than Kimi K2.6 (Artificial Analysis Intelligence
+# Index 53.9 / SWE-Bench-Pro 58.6%, Apr 2026). Every default below is at or
+# above that floor. BANISHED — do not add these or anything weaker, ever:
+#   llama-3.3-70b, llama-4-maverick, llama-3.1/3.2-*, nemotron-49b/70b/253b,
+#   kimi-k2.5 / k2-thinking (prior gen), deepseek-v3.x / v4-FLASH, glm-5 (use 5.1),
+#   minimax-m2.x (use m3), gemini-*-flash / 2.5 (use 3-pro), mistral-small/medium,
+#   qwen3-32b, gpt-oss, gemma, phi, granite, mixtral, codellama.
+# Anything pre-2.6 or below on benchmarks does not get mentioned or routed.
+MODEL_POWER_FLOOR = "moonshotai/kimi-k2.6"
+
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
-    ProviderType.GROQ: "qwen/qwen3-32b",
+    # Free tier — frontier only (>= Kimi K2.6)
+    # OLLAMA-CLOUD is the workhorse gateway: routes the whole open frontier —
+    # see OLLAMA_CLOUD_FRONTIER_MODELS in ollama_config.py for the full stable.
+    ProviderType.OLLAMA: "deepseek-v4-pro:cloud",
+    # NVIDIA NIM frontier (was llama-3.3-70b — sub-floor). Free-tier VERIFIED
+    # serving (2026-06-14): kimi-k2.6, minimaxai/minimax-m3, mistralai/mistral
+    # -large-3-675b-instruct-2512. (deepseek-v4-pro is catalogued but too large
+    # for free serverless — times out; reachable on paid only.)
+    ProviderType.NVIDIA_NIM: "moonshotai/kimi-k2.6",
+    ProviderType.GROQ: "moonshotai/kimi-k2-instruct",       # groq frontier (key dead)
     ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
+    ProviderType.SAMBANOVA: "DeepSeek-V4-Pro",
     ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-    # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
-    ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
-    # Paid tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
-    ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
-    ProviderType.CODEX: "gpt-5.4",
+    ProviderType.FIREWORKS: "accounts/fireworks/models/deepseek-v4-pro",
+    # Cheap tier — upgraded to floor
+    ProviderType.MISTRAL: "mistral-large-3-675b",          # was mistral-small (sub-floor)
+    ProviderType.GOOGLE_AI: "gemini-3-pro",                # was gemini-2.5-flash (sub-floor)
+    ProviderType.CHUTES: "deepseek-ai/DeepSeek-V4-Pro",    # was DeepSeek-R1 (old gen)
+    ProviderType.OPENROUTER_FREE: "z-ai/glm-5.1:free",     # was llama-3.3-70b (sub-floor)
+    # Paid / subscription tier — frontier
+    ProviderType.OPENROUTER: "moonshotai/kimi-k2.6",       # was kimi-k2.5 (sub-floor)
+    ProviderType.OPENAI: "gpt-5.5",                        # was gpt-5
+    ProviderType.ANTHROPIC: "claude-opus-4-8",             # was opus-4-6
+    ProviderType.CLAUDE_CODE: "claude-opus-4-8",           # was opus-4-6
+    ProviderType.CODEX: "gpt-5.5",                         # was gpt-5.4
 }
 
 
