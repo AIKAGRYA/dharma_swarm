@@ -2574,6 +2574,25 @@ class AgentRunner:
             except Exception:
                 logger.debug("Economic token tracking failed", exc_info=True)
 
+            # Expose the ACTUALLY-SERVED provider/model for the dispatch receipt.
+            # response.provider / response.model carry the post-fallback,
+            # post-race winning identity (RoutedProvider.complete_for_task stamps
+            # response.provider; race_providers returns the winner) — the same
+            # truth-bearing fields already used by the conversation log (2362-2363)
+            # and observability (2387-2388). run_task returns only the result
+            # string, so the orchestrator spine reads these by attribute (the
+            # sanctioned _last_usage precedent) to receipt the real brain rather
+            # than the static _config. Empty/None stays empty (no fabrication);
+            # the spine then falls back to _config.
+            try:
+                self._last_served_provider = (
+                    str(getattr(response, "provider", "") or "") if response else ""
+                )
+                self._last_served_model = (
+                    str(getattr(response, "model", "") or "") if response else ""
+                )
+            except Exception:
+                logger.debug("Served provider/model capture failed", exc_info=True)
             # Close outer task span (success)
             try:
                 _task_tracer.end(_task_span, success=True, latency_ms=completion_latency_ms)

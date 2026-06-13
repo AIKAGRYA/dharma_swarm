@@ -2219,11 +2219,17 @@ class Orchestrator:
         # completion text, so it cannot supply these; the config is the only
         # available dispatch-time source. Tolerant of a missing/partial config
         # (falls back to the empty-string EvidenceReceipt defaults).
+        # Dispatch-time fallback provider/model: the runner's static config
+        # (AgentRunner._config). This is only a FALLBACK — the actually-served
+        # identity (post-routing / post-fallback / post-race) is read from the
+        # runner AFTER run_task() below, because run_task mutates which provider
+        # actually answered. config.provider is a ProviderType (.value), config.model
+        # the model string.
         _cfg = getattr(runner, "_config", None)
         _prov = getattr(_cfg, "provider", None)
-        provider = getattr(_prov, "value", _prov) if _prov is not None else "orchestrator"
-        provider = str(provider) if provider else "orchestrator"
-        model = str(getattr(_cfg, "model", "") or "")
+        _cfg_provider = getattr(_prov, "value", _prov) if _prov is not None else ""
+        _cfg_provider = str(_cfg_provider) if _cfg_provider else ""
+        _cfg_model = str(getattr(_cfg, "model", "") or "")
         started = datetime.now(timezone.utc)
         captured: dict[str, Any] = {}
 
@@ -2243,6 +2249,19 @@ class Orchestrator:
                 captured["exc"] = exc
                 status, err_source, err_detail = "failed", "internal_error", str(exc)
             finished = datetime.now(timezone.utc)
+            # ACTUALLY-SERVED provider/model (robust under routing/fallback/race):
+            # AgentRunner stamps _last_served_provider/_last_served_model from the
+            # winning response/route_decision just before returning (the served
+            # brain is unknowable until then). Prefer served; fall back to the
+            # static config; finally to the 'orchestrator'/'' EvidenceReceipt
+            # defaults. Tolerant of a runner that never sets them (served stays
+            # empty -> config -> default).
+            _served_prov = getattr(runner, "_last_served_provider", None)
+            _served_model = getattr(runner, "_last_served_model", None)
+            provider = (
+                str(_served_prov) if _served_prov else (_cfg_provider or "orchestrator")
+            )
+            model = str(_served_model) if _served_model else _cfg_model
             # Surface token usage only when the runner's last-completion state
             # exposes it (no fabrication — None stays None when absent).
             _usage = getattr(runner, "_last_usage", None)
