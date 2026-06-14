@@ -59,9 +59,9 @@ export default function RootLayout({
           <ScanLines />
 
           {/* Layout shell: sidebar + main */}
-          <div className="flex min-h-screen">
+          <div className="flex min-h-screen overflow-x-hidden">
             <Sidebar />
-            <main className="ml-[260px] flex-1">
+            <main className="ml-[260px] min-w-0 w-[calc(100vw-260px)] max-w-[calc(100vw-260px)] flex-none overflow-x-hidden">
               {children}
             </main>
           </div>

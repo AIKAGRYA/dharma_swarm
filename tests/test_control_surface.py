@@ -786,6 +786,30 @@ class TestControlSurfaceAPI:
 
         assert resp.json()["data"]["memory_depth"] == "snapshot"
 
+    def test_active_tracks_returns_ten_slot_target_operating_model(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/active-tracks")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["source_errors"] == []
+        data = body["data"]
+        assert data["slot_count"] == len(data["slots"]) == 10
+        assert data["policy_slot_capacity"] == data["policy"]["max_active"]
+        if data["policy"]["max_active"] != 10:
+            assert any("differs from ACTIVE_TRACK.yaml max_active" in warning for warning in data["warnings"])
+        titles = {slot["title"] for slot in data["slots"]}
+        assert "Spine Runtime Truth" in titles
+        assert "A2A Lattice & Shared State" in titles
+        assert "Revenue & External Humans Served" in titles
+        assert "AgentOps Build Factory" in titles
+        assert "North Star & Coherence Governance" in titles
+        for slot in data["slots"]:
+            assert len(slot["layers"]) == 4
+            for layer in slot["layers"]:
+                assert "make onboard" in layer["handoff_prompt"]
+                assert "make hygiene" in layer["handoff_prompt"]
+                assert "/dashboard/cockpit is John's human command front door" in layer["handoff_prompt"]
+
     def test_row_by_id_returns_envelope(self) -> None:
         client = _control_surface_client()
         rows_resp = client.get("/api/control-surface/rows")
@@ -839,6 +863,14 @@ class TestDashboardControlSurfacePage:
         assert "OpsRunbookPanel" in text
         assert 'from "@/components/cockpit/OpsRunbookPanel"' in text
         assert "<OpsRunbookPanel rows={rows} selectedRow={selectedRow} />" in text
+
+    def test_control_surface_renders_active_track_portfolio_first(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "ActiveTrackPortfolioBoard" in text
+        assert 'from "@/components/cockpit/ActiveTrackPortfolioBoard"' in text
+        assert text.index("<ActiveTrackPortfolioBoard />") < text.index("<NeedsJohnQueue")
 
     def test_control_surface_renders_ds_goal_mission_cards_panel(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
@@ -904,16 +936,18 @@ class TestDashboardControlSurfacePage:
         assert 'label: "Cockpit"' in text
         assert 'href: "/dashboard/cockpit"' in text
 
-    def test_control_surface_in_manifest_nav(self) -> None:
+    def test_control_surface_stays_available_as_technical_route_not_nav_front_door(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
         manifest = load_active_surface_manifest(repo_root)
         nav_sections = manifest.get("dashboard_nav_sections", [])
         all_items: list[str] = []
         for section in nav_sections:
             all_items.extend(section.get("items", []))
-        assert "Control Surface" in all_items, (
-            "Control Surface not in manifest dashboard_nav_sections"
+        assert "Control Surface" not in all_items, (
+            "Control Surface should not compete with Cockpit as a second front door"
         )
+        surface_ids = [surface.get("id") for surface in manifest.get("dashboard_surfaces", [])]
+        assert "control_surface" in surface_ids
 
     def test_cockpit_in_manifest_nav(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent

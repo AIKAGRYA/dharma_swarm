@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type {
   A2ASendCardsPayload,
+  ActiveTrackPortfolioPayload,
   AgentOpsCardsPayload,
   ControlSurfaceEnvelope,
   ControlSurfaceRow,
@@ -173,6 +174,27 @@ export function useSemanticReceiptCards(model = "", verdict = "", limit = 12) {
   return {
     payload: data ?? null,
     cards: data?.cards ?? [],
+    isLoading,
+    error,
+    refetch,
+  };
+}
+
+export function useActiveTrackPortfolio() {
+  const { data, isLoading, error, refetch } = useQuery<ActiveTrackPortfolioPayload>({
+    queryKey: ["control-surface-active-tracks"],
+    queryFn: async () => {
+      const payload = await apiFetch<
+        ActiveTrackPortfolioPayload | ControlSurfaceEnvelope<ActiveTrackPortfolioPayload>
+      >("/api/control-surface/active-tracks");
+      return unwrapControlSurfaceEnvelope(payload);
+    },
+    refetchInterval: 30_000,
+  });
+
+  return {
+    portfolio: data ?? null,
+    slots: data?.slots ?? [],
     isLoading,
     error,
     refetch,

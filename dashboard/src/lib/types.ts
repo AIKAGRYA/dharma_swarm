@@ -663,6 +663,85 @@ export interface SemanticReceiptCardsPayload {
   cards: SemanticReceiptBoardCard[];
 }
 
+export interface ActiveTrackMovement {
+  kind: string;
+  id: string;
+  title: string;
+  detail: string;
+  at: string;
+  age: string;
+  actor: string;
+  source_ref: string;
+  pr_refs: string[];
+}
+
+export interface ActiveTrackEvidence {
+  kind: string;
+  label: string;
+  detail: string;
+  path: string;
+  at: string;
+  age: string;
+}
+
+export interface ActiveTrackProgress {
+  passed: number;
+  total: number;
+  percent: number;
+  shippable: boolean;
+}
+
+export interface ActiveTrackFreshness {
+  latest_at: string;
+  latest_age: string;
+  stale: boolean;
+  stale_reasons: string[];
+}
+
+export interface ActiveTrackLayer {
+  depth: number;
+  label: string;
+  summary: string;
+  items: string[];
+  movements: ActiveTrackMovement[];
+  evidence: ActiveTrackEvidence[];
+  handoff_prompt: string;
+}
+
+export interface ActiveTrackSlot {
+  slot: number;
+  id: string;
+  title: string;
+  theme: string;
+  status: string;
+  freshness: ActiveTrackFreshness;
+  progress: ActiveTrackProgress;
+  agents: string[];
+  linked_track_ids: string[];
+  subtracks: string[];
+  source_refs: string[];
+  last_movements: ActiveTrackMovement[];
+  layers: ActiveTrackLayer[];
+  action_menu: string[];
+}
+
+export interface ActiveTrackPortfolioPayload {
+  generated_at: string;
+  source: string;
+  slot_count: number;
+  policy_slot_capacity?: number;
+  occupied_slot_count: number;
+  declared_active_track_count: number;
+  policy: Record<string, unknown>;
+  warnings: string[];
+  slots: ActiveTrackSlot[];
+  unassigned_declared_tracks: Array<{
+    id: string;
+    name: string;
+    status: string;
+  }>;
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket events
 // ---------------------------------------------------------------------------

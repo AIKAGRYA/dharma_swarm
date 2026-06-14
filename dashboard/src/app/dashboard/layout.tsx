@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { OperatorMicrographics } from "@/components/layout/OperatorMicrographics";
 import { ChatPanel } from "@/components/chat/ChatPanel";
@@ -17,17 +18,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const { panelOpen, togglePanel, closePanel } = useChatWorkspace();
+  const cockpitRoute =
+    pathname === "/dashboard/cockpit" || pathname === "/dashboard/control-surface";
 
   return (
     <div className="flex min-h-screen flex-col">
       <KeyboardNav />
       <Header onToggleChat={() => togglePanel()} chatOpen={panelOpen} />
-      <div className="flex flex-1">
-        <div className={`flex-1 p-6 transition-all ${panelOpen ? "pr-3" : ""}`}>
-          <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-1">
+        <div className={`min-w-0 flex-1 overflow-x-hidden p-6 transition-all ${panelOpen ? "pr-3" : ""}`}>
+          <div className="flex min-w-0 flex-col gap-6">
             <BackendStatus />
-            <OperatorMicrographics />
+            {!cockpitRoute && <OperatorMicrographics />}
             {children}
           </div>
         </div>

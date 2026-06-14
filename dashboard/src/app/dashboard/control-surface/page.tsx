@@ -26,6 +26,7 @@ import { DsGoalMissionCardsPanel } from "@/components/cockpit/DsGoalMissionCards
 import { AgentOpsWorkPacketCardsPanel } from "@/components/cockpit/AgentOpsWorkPacketCardsPanel";
 import { A2ASendCardsPanel } from "@/components/cockpit/A2ASendCardsPanel";
 import { SemanticReceiptCardsPanel } from "@/components/cockpit/SemanticReceiptCardsPanel";
+import { ActiveTrackPortfolioBoard } from "@/components/cockpit/ActiveTrackPortfolioBoard";
 
 export default function OperatorCockpitPage() {
   const { rows, isLoading, error, refetch } = useControlSurfaceRows();
@@ -61,8 +62,10 @@ export default function OperatorCockpitPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
-      {/* Zone 1: Needs John Queue — always visible top bar */}
+    <div className="flex min-h-[calc(100vh-8rem)] min-w-0 max-w-full flex-col gap-3 overflow-x-hidden">
+      <ActiveTrackPortfolioBoard />
+
+      {/* Zone 1: Needs John Queue — supporting decision queue */}
       <NeedsJohnQueue
         rows={needsJohnRows}
         totalCount={summary?.human_decision_required_count ?? 0}

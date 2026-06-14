@@ -7,6 +7,7 @@ GET  /api/control-surface/ds-goal/cards   -> ds-goal ledgers as BoardStore cards
 GET  /api/control-surface/agentops/cards  -> AgentOps work packets as BoardStore cards (envelope)
 GET  /api/control-surface/a2a/cards       -> A2A receipts as BoardStore cards (envelope)
 GET  /api/control-surface/semantic-receipts/cards -> SemanticReceipt artifacts as BoardStore cards (envelope)
+GET  /api/control-surface/active-tracks   -> human cockpit active-track portfolio (envelope)
 POST /api/control-surface/rows/{id}/handoff-prompt -> agent handoff prompt
 GET  /api/control-surface/stream          -> SSE stream of updated rows
 
@@ -45,6 +46,7 @@ _DS_GOAL_CARD_LOADER: Any | None = None
 _AGENTOPS_CARD_LOADER: Any | None = None
 _A2A_SEND_CARD_LOADER: Any | None = None
 _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
+_ACTIVE_TRACK_PORTFOLIO_BUILDER: Any | None = None
 
 
 def _get_envelope_types() -> tuple[Any, Any, Any]:
@@ -125,6 +127,19 @@ def _get_semantic_receipt_card_loader():  # noqa: ANN202
 
                 _SEMANTIC_RECEIPT_CARD_LOADER = load_semantic_receipt_cards
     return _SEMANTIC_RECEIPT_CARD_LOADER
+
+
+def _get_active_track_portfolio_builder():  # noqa: ANN202
+    global _ACTIVE_TRACK_PORTFOLIO_BUILDER
+    if _ACTIVE_TRACK_PORTFOLIO_BUILDER is None:
+        with _IMPORT_LOCK:
+            if _ACTIVE_TRACK_PORTFOLIO_BUILDER is None:
+                from dharma_swarm.operator_core.active_track_portfolio import (
+                    build_active_track_portfolio,
+                )
+
+                _ACTIVE_TRACK_PORTFOLIO_BUILDER = build_active_track_portfolio
+    return _ACTIVE_TRACK_PORTFOLIO_BUILDER
 
 
 def _build_envelope(data: Any, source_errors: list[dict[str, str]] | None = None) -> dict[str, Any]:
@@ -387,6 +402,27 @@ def control_surface_semantic_receipt_cards(
                 "cards": [],
             },
             [{"source": "semantic_receipt_cards", "error": str(e)}],
+        )
+
+
+@router.get("/active-tracks")
+def control_surface_active_tracks() -> dict[str, Any]:
+    """Project the human operator portfolio for /dashboard/cockpit."""
+    try:
+        build_active_track_portfolio = _get_active_track_portfolio_builder()
+        return _build_envelope(build_active_track_portfolio(_REPO_ROOT))
+    except Exception as e:
+        logger.exception("control-surface/active-tracks failed")
+        return _build_envelope(
+            {
+                "slot_count": 0,
+                "canonical_slot_count": 0,
+                "occupied_slot_count": 0,
+                "declared_active_track_count": 0,
+                "warnings": ["active track portfolio projection failed"],
+                "slots": [],
+            },
+            [{"source": "active_tracks", "error": str(e)}],
         )
 
 

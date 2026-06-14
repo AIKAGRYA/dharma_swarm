@@ -61,6 +61,7 @@ def test_blocking_control_surface_handlers_run_in_fastapi_threadpool() -> None:
         control_surface.control_surface_ds_goal_cards,
         control_surface.control_surface_agentops_cards,
         control_surface.control_surface_a2a_cards,
+        control_surface.control_surface_active_tracks,
         control_surface.control_surface_handoff_prompt,
         control_surface.control_surface_row,
     ]
