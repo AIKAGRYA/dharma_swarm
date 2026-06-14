@@ -334,13 +334,13 @@ class TestDarwinExtendedFitness:
 class TestContextCompilerKnowledgeStore:
     """ContextCompiler receives KnowledgeStore via set_knowledge_store()."""
 
-    def test_set_knowledge_store(self):
+    def test_set_knowledge_store(self, tmp_db: Path):
         """set_knowledge_store attaches the store."""
         from dharma_swarm.context_compiler import ContextCompiler
         from dharma_swarm.memory_lattice import MemoryLattice
         from dharma_swarm.runtime_state import RuntimeStateStore
 
-        state = RuntimeStateStore()
+        state = RuntimeStateStore(tmp_db / "runtime.db")
         lattice = MemoryLattice()
         compiler = ContextCompiler(runtime_state=state, memory_lattice=lattice)
 

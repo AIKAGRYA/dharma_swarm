@@ -148,12 +148,26 @@ async def test_publish_requires_execution_identity_before_side_effect(tmp_path: 
 
 
 @pytest.mark.asyncio
-async def test_consume_message_ack_records_receipt_and_dispatches(tmp_path: Path) -> None:
+async def test_consume_message_ack_records_receipt_and_dispatches(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from dharma_swarm.a2a import a2a_bridge as bridge_mod
+
     runtime = RuntimeStateStore(tmp_path / "runtime.db")
     fake_js = _FakeJetStream()
     identity = _identity(run_id="run-consume", idempotency_key="idem-consume")
     server = A2AServer(runtime_state=runtime, persist=False, require_execution_identity=True)
     seen: list[str] = []
+    traversals = []
+    real_invoke = bridge_mod.invoke_agent
+
+    async def counting_invoke(*args, **kwargs):
+        receipt = await real_invoke(*args, **kwargs)
+        traversals.append(receipt)
+        return receipt
+
+    monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
 
     def handler(task: A2ATask) -> A2ATask:
         seen.append(task.id)
@@ -178,8 +192,15 @@ async def test_consume_message_ack_records_receipt_and_dispatches(tmp_path: Path
     assert message.acked == 1
     assert message.nacked == 0
     assert seen == ["a2a-consume"]
+    assert len(traversals) == 1
+    assert traversals[0].operation == "invoke_agent"
     ledger = await runtime.get_run_ledger(identity.run_id)
-    assert any(receipt.receipt_type == "nats_consume" and receipt.status == "ack_intent" for receipt in ledger["receipts"])
+    ack_intent = next(
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "nats_consume" and receipt.status == "ack_intent"
+    )
+    assert ack_intent.payload["spine_receipt_id"] == str(traversals[0].receipt_id)
     assert any(receipt.receipt_type == "nats_consume" and receipt.status == "ack" for receipt in ledger["receipts"])
 
 

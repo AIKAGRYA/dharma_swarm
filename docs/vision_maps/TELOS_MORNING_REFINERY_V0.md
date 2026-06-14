@@ -352,6 +352,27 @@ That is enough to prove the deep thing without pretending the whole lattice exis
 
 ## Prompt Contract
 
+## Six-Agent Articulation Council
+
+The richer `ARTICULATE_ESSENCE_EXTRACTOR_NODE` pass is seeded in:
+
+`docs/research/telos_ai/persona_agents/`
+
+The six default lenses are:
+
+1. ecological memory and place-held mind,
+2. articulation philosophy and semiotics,
+3. integral contemplative psychology,
+4. civilizational noosphere cartography,
+5. AI vector-space and worldmaking architecture,
+6. reality, venture, and receipt examination.
+
+These agents are not meant to roleplay as decorative characters. They are
+functional reading vectors. Each reads the source independently, grounds claims
+in source anchors, enriches the semantic field through its discipline, names its
+own failure modes, and leaves synthesis to a later node-builder plus
+contradiction pass.
+
 System role:
 
 ```text
@@ -438,4 +459,3 @@ It is not "AI journaling." It is a slow personal-to-civilizational semantic refi
 `morning page -> articulation -> private node -> theme/idea graph -> research -> venture seeds -> receipts -> consented lattice contribution`.
 
 That is the version worth building. The restraint is that v0 must prove the private node loop before it claims the global network.
-

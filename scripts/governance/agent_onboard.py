@@ -52,6 +52,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # (Previously a hidden insert inside render_manifest_health was load-bearing.)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+from dharma_swarm.operator_core.live_ops_census_contract import (
+    census_payload_freshness,
+    default_output_path,
+    validate_census_payload,
+)
+
 EVIDENCE_JSON = REPO_ROOT / "reports/governance/active_track_evidence.json"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 LIVE_OPS = REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md"
@@ -62,6 +68,7 @@ REALITY_DEBT_LEDGER = REPO_ROOT / "docs/governance/REALITY_DEBT_LEDGER.md"
 
 # Soft-warning thresholds. Beyond these, surface a note. Never a gate.
 LIVE_OPS_STALE_DAYS = 7
+LIVE_OPS_CENSUS_STALE_HOURS = 24
 SURFACE_MANIFEST_STALE_DAYS = 30
 KNOWN_DECAY_THRESHOLD_DAYS = 30
 EVIDENCE_STALE_MINUTES = 60
@@ -118,6 +125,22 @@ def _today() -> date:
 
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _iso_age_minutes(raw: str | None) -> float | None:
+    """Age of an ISO timestamp in minutes, or None if undatable."""
+    if not raw:
+        return None
+    text = raw.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        when = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return max(0.0, (datetime.now(tz=timezone.utc) - when).total_seconds() / 60.0)
 
 
 def _reality_debt_count() -> int:
@@ -467,6 +490,22 @@ def render_active_track(evidence: dict[str, Any] | None,
             edges = [f"{k}={t.get(k)}" for k in ("complements", "depends_on", "conflicts_with") if t.get(k)]
             if edges:
                 print(f"      {'  '.join(edges)}")
+            baseline = t.get("readiness_baseline") if isinstance(t.get("readiness_baseline"), dict) else {}
+            hardening = t.get("hardening_status") if isinstance(t.get("hardening_status"), dict) else {}
+            cap = t.get("readiness_score_cap") if isinstance(t.get("readiness_score_cap"), dict) else {}
+            if baseline or hardening:
+                bits: list[str] = []
+                if baseline:
+                    bits.append(f"baseline={baseline.get('score')}/{baseline.get('scale', 100)}")
+                if hardening:
+                    bits.append(f"current={hardening.get('current_score')}/{hardening.get('scale', 100)}")
+                    if cap:
+                        bits.append(f"cap={cap.get('cap_score')}/{cap.get('scale', 100)}")
+                    if hardening.get("evidence_ref"):
+                        bits.append(f"evidence={hardening.get('evidence_ref')}")
+                if baseline.get("claim_rejected"):
+                    bits.append(f"rejected={baseline.get('claim_rejected')}")
+                print(f"      readiness: {'; '.join(bits)}")
             for c in t.get("criteria", []):
                 mark = "✓" if c.get("passed") else "✗"
                 line = f"      {mark} [{c.get('kind')}] {c.get('id')}"
@@ -520,12 +559,367 @@ def render_live_ops() -> None:
             print("  NOTE: dashboard prose may lag reality. Trust git log + this command.")
 
 
+_DAEMON_SPINE_RUNTIME_PROOFS = {
+    "spine_enabled_self_report",
+    "daemon_default_receipt_proven",
+    "daemon_default_spine_receipt_proven",
+}
+
+
+def _live_ops_surface_proof_gaps(surface: dict[str, Any]) -> list[str]:
+    proof_gaps = surface.get("proof_gaps")
+    if isinstance(proof_gaps, list):
+        return [str(item) for item in proof_gaps if item]
+    surface_id = str(surface.get("surface_id") or surface.get("id") or "")
+    status = str(surface.get("status") or "")
+    raw = surface.get("raw") if isinstance(surface.get("raw"), dict) else {}
+    gaps: list[str] = []
+    if surface_id == "substrate.dharma_daemon" and status == "live":
+        dispatch_launch = raw.get("dispatch_launch")
+        launch_state = (
+            str(dispatch_launch.get("state") or "")
+            if isinstance(dispatch_launch, dict)
+            else ""
+        )
+        if launch_state != "spine_enabled_launch_spec":
+            gaps.append("daemon_launch_not_spine_enabled")
+        running_proof = str(raw.get("running_dispatch_proof") or "")
+        if running_proof not in _DAEMON_SPINE_RUNTIME_PROOFS:
+            gaps.append("daemon_dispatch_runtime_unproven")
+        receipt_head = (
+            raw.get("runtime_receipt_active_head")
+            if isinstance(raw.get("runtime_receipt_active_head"), dict)
+            else {}
+        )
+        if receipt_head:
+            dirty = (
+                receipt_head.get("active_head_side_effect_key_clean") is False
+                and any(
+                    int(row.get("total", 0)) > 0
+                    and int(row.get("missing_side_effect_key", 0)) > 0
+                    for row in receipt_head.get("windows", [])
+                    if isinstance(row, dict)
+                )
+            )
+            if dirty:
+                gaps.append("daemon_runtime_receipts_active_head_dirty")
+            if (
+                receipt_head.get("latest_fresh") is False
+                and int(receipt_head.get("runtime_receipts_total") or 0) > 0
+            ):
+                gaps.append("daemon_runtime_receipts_stale")
+    if surface_id == "dashboard.local" and status == "live":
+        dashboard_probe = raw.get("control_surface_rows_probe")
+        probe_state = (
+            str(dashboard_probe.get("state") or "")
+            if isinstance(dashboard_probe, dict)
+            else ""
+        )
+        if probe_state and probe_state not in {"ok", "not_checked"}:
+            gaps.append("dashboard_control_surface_rows_unproven")
+    return gaps
+
+
+def _runtime_receipt_head_line(head: dict[str, Any]) -> str:
+    if not head:
+        return ""
+    clean = head.get("active_head_side_effect_key_clean")
+    clean_text = "unknown" if clean is None else str(bool(clean)).lower()
+    fresh = head.get("latest_fresh")
+    fresh_text = "unknown" if fresh is None else str(bool(fresh)).lower()
+    age = head.get("latest_age_hours")
+    age_text = "unknown" if age is None else str(age)
+    max_age = head.get("latest_max_age_hours")
+    max_age_text = "unknown" if max_age is None else str(max_age)
+    latest = str(head.get("latest_created_at") or "unknown")
+    total = str(head.get("runtime_receipts_total") or 0)
+    window_parts: list[str] = []
+    for row in head.get("windows") or []:
+        if not isinstance(row, dict):
+            continue
+        window_parts.append(
+            f"{row.get('window_minutes')}m:"
+            f"{row.get('missing_side_effect_key')}/{row.get('total')}"
+        )
+    windows = ",".join(window_parts) if window_parts else "none"
+    return (
+        f"clean={clean_text}; fresh={fresh_text}; "
+        f"age_hours={age_text}; max_age_hours={max_age_text}; "
+        f"total={total}; latest={latest}; windows={windows}"
+    )
+
+
+def _field_gap_summary_text(coverage: dict[str, Any]) -> str:
+    summary = coverage.get("field_gap_summary")
+    if not isinstance(summary, dict):
+        return ""
+    total = int(summary.get("total_missing") or 0)
+    if total <= 0:
+        return ""
+    freshness = summary.get("by_freshness_class")
+    freshness_counts = freshness if isinstance(freshness, dict) else {}
+    parts = [f"total:{total}"]
+    for key in ("active_head_60m", "recent_historical_24h", "older_historical"):
+        count = int(freshness_counts.get(key) or 0)
+        if count > 0:
+            parts.append(f"{key}:{count}")
+    quarantine_count = int(summary.get("quarantine_candidate_missing") or 0)
+    if quarantine_count > 0:
+        parts.append(f"quarantine_candidate:{quarantine_count}")
+    return "; field_gap_summary=" + "|".join(parts)
+
+
+def _field_gap_actions_text(coverage: dict[str, Any]) -> str:
+    queue = [
+        item
+        for item in coverage.get("field_gap_action_queue") or []
+        if isinstance(item, dict)
+    ]
+    if not queue:
+        return ""
+    parts = []
+    for item in queue[:7]:
+        label = item.get("short_label") or item.get("action") or "unknown"
+        parts.append(f"{label}:{int(item.get('missing') or 0)}")
+    return "; field_gap_actions=" + "|".join(parts)
+
+
+def _compact_fresh_proof_status(status: Any) -> str:
+    status_text = str(status or "")
+    statuses = {
+        "fresh_scoped_proof_recorded": "fresh",
+        "pin_mitigation_proof_recorded_default_still_broken": (
+            "pin_proved_default_dirty"
+        ),
+        "candidate_policy_recorded_not_applied": "policy_candidate",
+        "fresh_proof_not_recorded": "missing",
+    }
+    return statuses.get(status_text, status_text)
+
+
+def _field_gap_proofs_text(coverage: dict[str, Any]) -> str:
+    queue = [
+        item
+        for item in coverage.get("field_gap_action_queue") or []
+        if isinstance(item, dict)
+    ]
+    if not queue:
+        return ""
+    parts = []
+    for item in queue[:7]:
+        fresh_proof = (
+            item.get("fresh_proof")
+            if isinstance(item.get("fresh_proof"), dict)
+            else {}
+        )
+        status = _compact_fresh_proof_status(fresh_proof.get("status"))
+        if not status:
+            continue
+        label = item.get("short_label") or item.get("action") or "unknown"
+        parts.append(f"{label}:{status}")
+    if not parts:
+        return ""
+    return "; field_gap_proofs=" + "|".join(parts)
+
+
+def _gate_70_to_75_text(coverage: dict[str, Any]) -> str:
+    components = [
+        item
+        for item in coverage.get("gate_70_to_75_components") or []
+        if isinstance(item, dict)
+    ]
+    if not components:
+        return ""
+    parts = []
+    for item in components[:5]:
+        label = item.get("short_label") or item.get("id") or "unknown"
+        status = item.get("status")
+        if not status:
+            status = "pass" if item.get("passed") else "fail"
+        parts.append(f"{label}:{status}")
+    return "; gate_70_75=" + "|".join(parts)
+
+
+def _runtime_provider_model_coverage_line(coverage: dict[str, Any]) -> str:
+    if not coverage:
+        return ""
+    latest_sample = str(coverage.get("latest_sample_size") or 0)
+    provider_model = str(coverage.get("latest_with_provider_model_payload") or 0)
+    provider_model_proof = str(coverage.get("latest_with_provider_model_provenance") or 0)
+    provider_model_accounted = str(
+        coverage.get("latest_with_provider_model_accounted") or 0
+    )
+    terminal_sample = str(coverage.get("latest_terminal_sample_size") or 0)
+    terminal_provider_model = str(
+        coverage.get("latest_terminal_with_provider_model_payload") or 0
+    )
+    terminal_provider_model_proof = str(
+        coverage.get("latest_terminal_with_provider_model_provenance") or 0
+    )
+    terminal_provider_model_accounted = str(
+        coverage.get("latest_terminal_with_provider_model_accounted") or 0
+    )
+    pending = str(coverage.get("latest_provider_model_pending_execution") or 0)
+    percent = coverage.get("latest_major_task_receipts_provider_model_percent")
+    percent_text = "unknown" if percent is None else str(percent)
+    proof_percent = coverage.get(
+        "latest_major_task_receipts_provider_model_provenance_percent"
+    )
+    proof_percent_text = "unknown" if proof_percent is None else str(proof_percent)
+    terminal_percent = coverage.get(
+        "latest_terminal_major_task_receipts_provider_model_percent"
+    )
+    terminal_percent_text = "unknown" if terminal_percent is None else str(terminal_percent)
+    terminal_proof_percent = coverage.get(
+        "latest_terminal_major_task_receipts_provider_model_provenance_percent"
+    )
+    terminal_proof_percent_text = (
+        "unknown" if terminal_proof_percent is None else str(terminal_proof_percent)
+    )
+    accounted_percent = coverage.get(
+        "latest_major_task_receipts_provider_model_accounted_percent"
+    )
+    accounted_percent_text = (
+        "unknown" if accounted_percent is None else str(accounted_percent)
+    )
+    terminal_accounted_percent = coverage.get(
+        "latest_terminal_major_task_receipts_provider_model_accounted_percent"
+    )
+    terminal_accounted_percent_text = (
+        "unknown"
+        if terminal_accounted_percent is None
+        else str(terminal_accounted_percent)
+    )
+    complete = coverage.get("provider_model_latest_complete")
+    complete_text = "unknown" if complete is None else str(bool(complete)).lower()
+    field_gap_groups = [
+        group
+        for group in coverage.get("field_gap_producer_groups") or []
+        if isinstance(group, dict)
+    ]
+    field_gap_text = ""
+    if field_gap_groups:
+        parts = []
+        for group in field_gap_groups[:3]:
+            freshness = group.get("freshness_class") or "unknown"
+            parts.append(
+                f"{group.get('gap_type')}/"
+                f"{group.get('receipt_type')}/"
+                f"{group.get('producer_source')}/"
+                f"{group.get('producer_failure_code')}"
+                f"={group.get('missing')}@{freshness}"
+            )
+        field_gap_text = "; field_gap_producers=" + "|".join(parts)
+    return (
+        f"latest={provider_model}/{latest_sample}; "
+        f"percent={percent_text}; proof={provider_model_proof}/{latest_sample}; "
+        f"proof_percent={proof_percent_text}; accounted={provider_model_accounted}/"
+        f"{latest_sample}; accounted_percent={accounted_percent_text}; "
+        f"terminal={terminal_provider_model}/"
+        f"{terminal_sample}; terminal_percent={terminal_percent_text}; "
+        f"terminal_proof={terminal_provider_model_proof}/{terminal_sample}; "
+        f"terminal_proof_percent={terminal_proof_percent_text}; "
+        f"terminal_accounted={terminal_provider_model_accounted}/{terminal_sample}; "
+        f"terminal_accounted_percent={terminal_accounted_percent_text}; "
+        f"pending={pending}; complete={complete_text}"
+        f"{field_gap_text}"
+        f"{_field_gap_summary_text(coverage)}"
+        f"{_field_gap_actions_text(coverage)}"
+        f"{_field_gap_proofs_text(coverage)}"
+        f"{_gate_70_to_75_text(coverage)}"
+    )
+
+
+def _ds_goal_wrapper_contract_line(surface: dict[str, Any]) -> str:
+    raw = surface.get("raw") if isinstance(surface.get("raw"), dict) else {}
+    contract = (
+        raw.get("installed_wrapper_contract")
+        if isinstance(raw.get("installed_wrapper_contract"), dict)
+        else {}
+    )
+    default_target = (
+        raw.get("default_wrapper_target")
+        if isinstance(raw.get("default_wrapper_target"), dict)
+        else {}
+    )
+    hardening = (
+        raw.get("target_sync_receipt_hardening")
+        if isinstance(raw.get("target_sync_receipt_hardening"), dict)
+        else {}
+    )
+    decision = (
+        raw.get("convergence_decision_packet")
+        if isinstance(raw.get("convergence_decision_packet"), dict)
+        else {}
+    )
+    preflight = (
+        raw.get("longrun_preflight_gate")
+        if isinstance(raw.get("longrun_preflight_gate"), dict)
+        else {}
+    )
+    if not raw:
+        return ""
+    sha = str(contract.get("wrapper_sha256") or "")
+    sha_label = sha[:12] if sha else "<missing>"
+    safe = str(raw.get("safe_current_checkout_invocation") or "")
+    safe_text = (
+        f"; safe={safe}"
+        if safe and raw.get("target_matches_current_repo") is False
+        else ""
+    )
+    decision_state = str(decision.get("approval_state") or "")
+    decision_text = f"; decision={decision_state}" if decision_state else ""
+    preflight_status = str(preflight.get("status") or "")
+    preflight_text = f"; preflight={preflight_status}" if preflight_status else ""
+    return (
+        f"target={raw.get('target_repo') or '<blank>'}; "
+        f"source={raw.get('target_resolution_source') or '<blank>'}; "
+        f"default={default_target.get('target_repo') or '<blank>'}; "
+        f"matches_current={str(raw.get('target_matches_current_repo')).lower()}; "
+        f"wrapper_sha256={sha_label}; "
+        f"pin={str(contract.get('dharma_swarm_repo_pin_supported')).lower()}; "
+        f"hardening={hardening.get('state') or '<unknown>'}"
+        f"{decision_text}"
+        f"{preflight_text}"
+        f"{safe_text}"
+    )
+
+
+def _live_ops_census_receipt_path() -> Path:
+    try:
+        return Path(default_output_path())
+    except Exception:
+        return Path.home() / ".dharma/ops/live_process_census.json"
+
+
+def _validate_live_ops_census_payload(payload: Any) -> list[str]:
+    try:
+        return [str(error) for error in validate_census_payload(payload)]
+    except Exception as exc:
+        return [f"unable to validate live ops census receipt: {exc}"]
+
+
+def _live_ops_census_freshness(payload: Any) -> dict[str, Any]:
+    try:
+        result = census_payload_freshness(
+            payload,
+            max_age_hours=LIVE_OPS_CENSUS_STALE_HOURS,
+        )
+        return result if isinstance(result, dict) else {}
+    except Exception as exc:
+        return {
+            "state": "unknown",
+            "age_minutes": None,
+            "evidence": f"unable to check live ops census freshness: {exc}",
+        }
+
+
 def render_live_ops_cockpit() -> None:
     section("LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL")
     runbook = REPO_ROOT / "docs/ops/LIVE_OPS_COCKPIT.md"
     census_script = REPO_ROOT / "scripts/runtime/live_ops_census.py"
     cockpit_page = REPO_ROOT / "dashboard/src/app/dashboard/cockpit/page.tsx"
-    receipt = Path.home() / ".dharma/ops/live_process_census.json"
+    receipt = _live_ops_census_receipt_path()
     nats_spec = REPO_ROOT / "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
     tmux_spec = REPO_ROOT / "docs/ops/TMUX_AGENT_SUBSTRATE.md"
 
@@ -537,9 +931,80 @@ def render_live_ops_cockpit() -> None:
     if receipt.exists():
         try:
             payload = json.loads(receipt.read_text(encoding="utf-8"))
+            validation_errors = _validate_live_ops_census_payload(payload)
+            if validation_errors:
+                print(f"  Receipt       : invalid {receipt}")
+                print(f"  Error         : {'; '.join(validation_errors)}")
+                print("  Refresh       : python3 scripts/runtime/live_ops_census.py --write")
+                print("  Authority     : read-only; shows commands/policies but executes nothing")
+                return
             summary = payload.get("summary", {})
+            generated_at = payload.get("generated_at") if isinstance(payload.get("generated_at"), str) else ""
+            freshness_info = _live_ops_census_freshness(payload)
+            age_min = freshness_info.get("age_minutes")
             print(f"  Receipt       : present {receipt}")
+            if generated_at:
+                if age_min is None:
+                    age_label = "unknown age"
+                    freshness = "stale"
+                elif freshness_info.get("state") == "stale":
+                    age_label = f"{age_min / 60:.1f}h old"
+                    freshness = "stale"
+                else:
+                    age_label = f"{age_min:.0f}m old"
+                    freshness = "fresh"
+                print(f"  Generated     : {generated_at} ({age_label}; {freshness})")
+                if freshness == "stale":
+                    print("  Refresh       : python3 scripts/runtime/live_ops_census.py --write")
+            else:
+                print("  Generated     : missing generated_at (stale)")
+                print("  Refresh       : python3 scripts/runtime/live_ops_census.py --write")
             print(f"  Surfaces      : {summary.get('total', '?')} total; status={summary.get('by_status', {})}")
+            surfaces = payload.get("surfaces") if isinstance(payload.get("surfaces"), list) else []
+            proof_gap_rows = [
+                (
+                    str(item.get("id") or item.get("surface_id") or "unknown"),
+                    _live_ops_surface_proof_gaps(item),
+                )
+                for item in surfaces
+                if isinstance(item, dict) and _live_ops_surface_proof_gaps(item)
+            ]
+            if proof_gap_rows:
+                rendered = "; ".join(
+                    f"{surface_id}={','.join(gaps)}"
+                    for surface_id, gaps in proof_gap_rows[:4]
+                )
+                extra = "" if len(proof_gap_rows) <= 4 else f"; +{len(proof_gap_rows) - 4} more"
+                print(f"  Proof gaps    : {len(proof_gap_rows)} surface(s): {rendered}{extra}")
+            daemon = next((item for item in surfaces if item.get("id") == "substrate.dharma_daemon"), {})
+            daemon_raw = daemon.get("raw") if isinstance(daemon.get("raw"), dict) else {}
+            dispatch_launch = daemon_raw.get("dispatch_launch") if isinstance(daemon_raw.get("dispatch_launch"), dict) else {}
+            if dispatch_launch:
+                print(
+                    "  Daemon spine  : "
+                    f"launch={dispatch_launch.get('state', 'unknown')}; "
+                    f"running={daemon_raw.get('running_dispatch_proof', 'unknown')}"
+                )
+            receipt_head = (
+                daemon_raw.get("runtime_receipt_active_head")
+                if isinstance(daemon_raw.get("runtime_receipt_active_head"), dict)
+                else {}
+            )
+            receipt_head_line = _runtime_receipt_head_line(receipt_head)
+            if receipt_head_line:
+                print(f"  Receipt head : {receipt_head_line}")
+            receipt_coverage = (
+                daemon_raw.get("runtime_receipt_coverage")
+                if isinstance(daemon_raw.get("runtime_receipt_coverage"), dict)
+                else {}
+            )
+            provider_model_line = _runtime_provider_model_coverage_line(receipt_coverage)
+            if provider_model_line:
+                print(f"  Provider/model: {provider_model_line}")
+            ds_goal = next((item for item in surfaces if item.get("id") == "cli.ds_goal"), {})
+            ds_goal_line = _ds_goal_wrapper_contract_line(ds_goal)
+            if ds_goal_line:
+                print(f"  ds-goal CLI  : {ds_goal_line}")
             print(f"  Operator gates: {summary.get('human_authority_required', '?')} require John")
             print(f"  VPS candidates: {summary.get('vps_candidates', '?')}")
         except (OSError, json.JSONDecodeError):
@@ -1510,9 +1975,10 @@ def main(argv: list[str] | None = None) -> int:
     if not prereqs_ok:
         print("  A track's prerequisites are failing — it is mis-declared. Fix the YAML.")
     if shippable_ids:
-        print(f"  Shippable now: {', '.join(shippable_ids)} — move each to closed_tracks")
-        print("  (the other active tracks keep running), then run")
-        print("  python3 scripts/governance/render_active_track_includes.py")
+        print(f"  Shippable now: {', '.join(shippable_ids)}")
+        print("  Operator lifecycle review required. Do NOT move an active track to")
+        print("  closed_tracks from this renderer, gate output, or WIP pressure alone.")
+        print("  Closure requires explicit operator authorization, like a PR merge.")
     if next_items:
         print("  Or continue an unshipped active track — next_items:")
         for item in next_items[:6]:

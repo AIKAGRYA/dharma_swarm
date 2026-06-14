@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Any, Protocol
 from uuid import uuid4
 
+from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.a2a_server import (
     A2AArtifact,
     A2AExtension,
@@ -298,7 +299,14 @@ class A2ANatsTransport:
 
         broker_acked = False
         try:
-            result = self.server.submit(task) if self.server is not None else task
+            spine_receipt_id = ""
+            if self.server is not None:
+                result, spine_receipt = await A2ABridge(
+                    server=self.server,
+                ).submit_via_spine(task)
+                spine_receipt_id = str(spine_receipt.receipt_id)
+            else:
+                result = task
             if result.status in {
                 A2ATaskStatus.FAILED,
                 A2ATaskStatus.REJECTED,
@@ -315,6 +323,7 @@ class A2ANatsTransport:
                     "action": "ack_intent",
                     "a2a_status": result.status.value,
                     "ack_contract": "consumer_ack_intent",
+                    "spine_receipt_id": spine_receipt_id,
                 },
             )
             await _ack(message)

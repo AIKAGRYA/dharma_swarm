@@ -1640,6 +1640,13 @@ class AgentRunner:
         self._lock = asyncio.Lock()
         self._background_tasks: set[asyncio.Task[Any]] = set()
         self._runtime_fields = build_runtime_field_registry_from_agent_config(config)
+        self.actual_served_provider = ""
+        self.actual_served_model = ""
+        self.provider_model_truth_source = ""
+        self.served_provider = ""
+        self.served_model = ""
+        self.provider_served = ""
+        self.model_served = ""
         # Letta-inspired self-managing memory (SQLite-backed)
         self._advanced_memory = advanced_memory
 
@@ -1670,6 +1677,43 @@ class AgentRunner:
     def runtime_fields(self) -> RuntimeFieldRegistry:
         """Expose runtime mutation targets for prompt/parameter evolution."""
         return self._runtime_fields
+
+    def _clear_served_route(self) -> None:
+        self.actual_served_provider = ""
+        self.actual_served_model = ""
+        self.provider_model_truth_source = ""
+        self.served_provider = ""
+        self.served_model = ""
+        self.provider_served = ""
+        self.model_served = ""
+
+    def _direct_provider_runtime_label(self) -> str:
+        if self._provider is None or _is_routed_provider(self._provider):
+            return ""
+        return str(getattr(self._provider, "runtime_provider_type", "") or "").strip()
+
+    def _record_served_route(self, response: LLMResponse | None) -> None:
+        self._clear_served_route()
+        if response is None:
+            return
+        provider = str(
+            getattr(response, "provider", "") or self._direct_provider_runtime_label()
+        ).strip()
+        model = str(getattr(response, "model", "") or "").strip()
+        if not provider or not model:
+            return
+        source = (
+            "agent_runner.llm_response"
+            if str(getattr(response, "provider", "") or "").strip()
+            else "agent_runner.runtime_provider_object"
+        )
+        self.actual_served_provider = provider
+        self.actual_served_model = model
+        self.provider_model_truth_source = source
+        self.served_provider = provider
+        self.served_model = model
+        self.provider_served = provider
+        self.model_served = model
 
     @property
     def advanced_memory(self) -> AgentMemoryManager | None:
@@ -2123,6 +2167,7 @@ class AgentRunner:
         active_inference_engine: Any | None = None
         active_inference_prediction: Any | None = None
         observed_quality_score: float | None = None
+        self._clear_served_route()
 
         _task_tracer = _jikoku_tracer()
         _task_span = _task_tracer.start(
@@ -2375,6 +2420,7 @@ class AgentRunner:
                 result_text=result,
                 quality_score_override=observed_quality_score,
             )
+            self._record_served_route(response)
 
             # ── Langfuse / local observability trace ──
             try:

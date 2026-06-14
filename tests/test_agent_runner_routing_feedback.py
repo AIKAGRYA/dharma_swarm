@@ -16,8 +16,9 @@ from dharma_swarm.provider_policy import ProviderRouteDecision
 
 
 class _RoutedProvider:
-    def __init__(self, *, content: str) -> None:
+    def __init__(self, *, content: str, response_provider: str = "") -> None:
         self._content = content
+        self._response_provider = response_provider
         self.calls: list[tuple[object, LLMRequest, list[ProviderType] | None]] = []
         self.feedback: list[dict[str, object]] = []
 
@@ -48,6 +49,7 @@ class _RoutedProvider:
             LLMResponse(
                 content=self._content,
                 model=request.model,
+                provider=self._response_provider,
                 usage={"total_tokens": 321},
             ),
         )
@@ -60,6 +62,7 @@ class _RoutedProvider:
 @pytest.mark.asyncio
 async def test_run_task_uses_routed_provider_and_records_feedback(fast_gate) -> None:
     provider = _RoutedProvider(content="Implemented fix in `module.py`.")
+    provider.runtime_provider_type = "openrouter"
     runner = AgentRunner(
         AgentConfig(
             name="router-agent",
@@ -89,6 +92,39 @@ async def test_run_task_uses_routed_provider_and_records_feedback(fast_gate) -> 
     assert feedback["model"] == "gpt-4.1"
     assert feedback["total_tokens"] == 321
     assert feedback["metadata"]["feedback_origin"] == "agent_runner"
+    assert runner.actual_served_provider == ""
+    assert runner.actual_served_model == ""
+
+
+@pytest.mark.asyncio
+async def test_run_task_records_routed_response_served_route(fast_gate) -> None:
+    provider = _RoutedProvider(
+        content="Implemented routed fix.",
+        response_provider="openrouter",
+    )
+    runner = AgentRunner(
+        AgentConfig(
+            name="router-agent",
+            role=AgentRole.CODER,
+            provider=ProviderType.OPENROUTER,
+            model="qwen3-coder-live",
+        ),
+        provider=provider,
+    )
+    await runner.start()
+
+    result = await runner.run_task(
+        Task(
+            id="task-route-served",
+            title="Implement module fix",
+            description="Apply patch and update the failing test.",
+        )
+    )
+
+    assert result == "Implemented routed fix."
+    assert runner.actual_served_provider == "openrouter"
+    assert runner.actual_served_model == "qwen3-coder-live"
+    assert runner.provider_model_truth_source == "agent_runner.llm_response"
 
 
 @pytest.mark.asyncio

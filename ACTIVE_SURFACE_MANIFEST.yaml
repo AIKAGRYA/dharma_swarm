@@ -97,7 +97,6 @@ dashboard_nav_sections:
     items:
       - Overview
       - Cockpit
-      - Control Surface
       - Command Post
       - Qwen Surgeon
       - Observatory
@@ -503,6 +502,43 @@ agents:
     wired_to: [control_surface, eval_harness, audit, lineage, evolution]
     priority: p0
     next_action: "Keep shadow-only: record receipts and recommend PRs without autonomous apply"
+
+  - id: cybernetics_codex
+    label: "Cybernetics Codex Steward"
+    module: dharma_swarm/cybernetics_codex.py
+    status: shadow
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [audit, control_surface, evolution, tasks]
+    priority: p0
+    authority: read_only_verifier
+    repo_home: docs/agents/cybernetics_codex
+    seed: docs/agents/cybernetics_codex/agent.seed.yaml
+    soul: docs/agents/cybernetics_codex/SOUL.md
+    context_engineering_desk: docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md
+    receipt_surface: reports/loop_closure/cybernetics_codex/**
+    charter: docs/ops/CYBERNETICS_CODEX.md
+    registration:
+      desk_script: scripts/governance/register_cybernetics_codex.py
+      external_registration: ~/.dharma/external_agents/cybernetics_codex/registration.json
+      living_agent: ~/.dharma/agents/cybernetics_codex/living_agent.json
+      a2a_card: ~/.dharma/a2a/cards/cybernetics-codex.json
+      nats_subject: dharma.a2a.cybernetics-codex
+      nats_runtime_status: declared_not_started
+    forbidden_actions:
+      - provider_secrets
+      - spend_or_live_external_accounts
+      - telos_gate_weakening
+      - archive_fitness_mutation
+      - autonomous_task_dispatch
+      - production_closure_claim_without_receipts
+    verifier_commands:
+      - make onboard
+      - make orient
+      - .venv/bin/dgc status
+      - .venv/bin/dgc loop-status
+      - python3 scripts/governance/cybernetics_codex_audit.py --json
+      - python3 scripts/governance/register_cybernetics_codex.py --dry-run
+    next_action: "Use as the adversarial closure ledger for Loop 1 Phase 1b and the downstream cascade"
 
 # ── Integrations ──────────────────────────────────────────────────
 # External services and APIs the system depends on.

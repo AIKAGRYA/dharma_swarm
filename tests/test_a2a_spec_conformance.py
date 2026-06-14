@@ -591,6 +591,51 @@ class TestGatewaySpecEndpoints:
         resp = http_client.get("/a2a/health")
         assert resp.status_code == 200
 
+    def test_gateway_submit_paths_route_through_spine(
+        self,
+        http_client: TestClient,
+        server: A2AServer,
+        monkeypatch,
+    ):
+        from dharma_swarm.a2a import a2a_bridge as bridge_mod
+
+        server.set_default_handler(lambda t: t)
+        traversals = []
+        real_invoke = bridge_mod.invoke_agent
+
+        async def counting_invoke(*args, **kwargs):
+            receipt = await real_invoke(*args, **kwargs)
+            traversals.append(receipt)
+            return receipt
+
+        monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
+
+        spec_resp = http_client.post(
+            "/tasks",
+            json={
+                "trace_id": "trace_gateway_spec_spine",
+                "messages": [{"content": "spec"}],
+            },
+            headers={"X-A2A-Key": "test-key"},
+        )
+        legacy_resp = http_client.post(
+            "/a2a/tasks",
+            json={
+                "trace_id": "trace_gateway_legacy_spine",
+                "messages": [{"content": "legacy"}],
+            },
+            headers={"X-A2A-Key": "test-key"},
+        )
+
+        assert spec_resp.status_code == 201
+        assert legacy_resp.status_code == 201
+        assert spec_resp.json()["metadata"]["spine_receipt_id"]
+        assert legacy_resp.json()["metadata"]["spine_receipt_id"]
+        assert [receipt.trace_id for receipt in traversals] == [
+            "trace_gateway_spec_spine",
+            "trace_gateway_legacy_spine",
+        ]
+
     def test_context_id_in_gateway_response(self, http_client: TestClient, server: A2AServer):
         server.set_default_handler(lambda t: t)
         resp = http_client.post("/tasks", json={

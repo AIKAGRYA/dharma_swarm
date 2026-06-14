@@ -2036,6 +2036,15 @@ class ModelRouter:
         return request.model_copy(update={"model": model_hint})
 
     @staticmethod
+    def _response_with_served_provider(
+        response: LLMResponse,
+        provider: ProviderType,
+    ) -> LLMResponse:
+        if str(response.provider or "").strip():
+            return response
+        return response.model_copy(update={"provider": provider.value})
+
+    @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
         body = response.content.strip().lower()
         if body.startswith("timeout:"):
@@ -2945,10 +2954,10 @@ class ModelRouter:
                     initial_model=planned_model,
                     response_model=response.model,
                 )
-                # Enrich response with provider info for trajectory capture
-                if not response.provider:
-                    response.provider = selected_provider.value
-                return (routed_decision, response)
+                return (
+                    routed_decision,
+                    self._response_with_served_provider(response, selected_provider),
+                )
             except Exception as exc:
                 latency_ms = (
                     (time.monotonic() - attempt_started) * 1000.0

@@ -8,6 +8,59 @@ from dharma_swarm.runtime_state import RuntimeStateStore
 from scripts.runtime import autonomy_spine
 
 
+def _pass_ds_goal_preflight() -> dict[str, object]:
+    return {
+        "schema_version": "dharma.ds_goal_longrun_preflight.v1",
+        "read_only": True,
+        "passed": True,
+        "longrun_start_allowed": True,
+        "status": "pass_explicit_audited_checkout_pin",
+        "reason": "test-pinned audited checkout",
+        "score_effect": "no_score_movement_preflight_only",
+        "audited_checkout": "/Users/dhyana/dharma_swarm",
+        "installed_wrapper_path": "/Users/dhyana/.dharma/bin/ds-goal",
+        "repo_pin": "/Users/dhyana/dharma_swarm",
+        "repo_pin_source": "DHARMA_SWARM_REPO",
+        "repo_pin_matches_audited_checkout": True,
+        "default_target_repo": "/Users/dhyana/dharma_swarm_main",
+        "default_target_resolution_source": (
+            "installed_wrapper_dharma_swarm_main_preference"
+        ),
+        "default_target_matches_audited_checkout": False,
+        "safe_current_checkout_invocation": (
+            "DHARMA_SWARM_REPO=/Users/dhyana/dharma_swarm "
+            "/Users/dhyana/.dharma/bin/ds-goal"
+        ),
+        "operator_convergence_required": True,
+        "current_mitigation": "use_DHARMA_SWARM_REPO_pin_for_each_invocation",
+        "forbidden_without_operator_approval": [
+            "edit_installed_wrapper",
+            "patch_default_target_checkout",
+            "start_repo_native_longrun_from_unpinned_ds_goal",
+            "declare_75_plus_from_pin_mitigation_only",
+        ],
+    }
+
+
+def _blocked_ds_goal_preflight() -> dict[str, object]:
+    payload = dict(_pass_ds_goal_preflight())
+    payload.update(
+        {
+            "passed": False,
+            "longrun_start_allowed": False,
+            "status": "blocked_unpinned_default_target",
+            "reason": (
+                "installed ds-goal default target does not match the audited "
+                "checkout"
+            ),
+            "repo_pin": "",
+            "repo_pin_source": "none",
+            "repo_pin_matches_audited_checkout": False,
+        }
+    )
+    return payload
+
+
 def test_init_writes_mission_task_and_receipt(tmp_path, capsys):
     state_root = tmp_path / "goals"
     code = autonomy_spine.main(
@@ -207,9 +260,83 @@ def test_run_dry_run_records_receipt_without_kernel_wake(tmp_path, capsys):
     assert not (kernel_store / "wake_ledger.jsonl").exists()
 
 
-def test_run_executes_bounded_ds_goal_tick_and_records_closeback(tmp_path, capsys):
+def test_run_blocks_unsafe_ds_goal_preflight_before_runtime_side_effects(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
     state_root = tmp_path / "goals"
     kernel_store = tmp_path / "kernel"
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_ds_goal_longrun_preflight_for_receipt",
+        _blocked_ds_goal_preflight,
+    )
+    assert autonomy_spine.main(
+        [
+            "init",
+            "--goal",
+            "Block unsafe unpinned ds-goal run",
+            "--mission-id",
+            "mission-preflight-block",
+            "--state-root",
+            str(state_root),
+            "--kernel-store",
+            str(kernel_store),
+        ]
+    ) == 0
+    capsys.readouterr()
+
+    code = autonomy_spine.main(
+        [
+            "run",
+            "--mission-id",
+            "mission-preflight-block",
+            "--state-root",
+            str(state_root),
+            "--kernel-store",
+            str(kernel_store),
+            "--max-wakes",
+            "1",
+            "--json",
+        ]
+    )
+
+    assert code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "preflight_blocked"
+    assert (
+        payload["ds_goal_longrun_preflight"]["status"]
+        == "blocked_unpinned_default_target"
+    )
+    assert payload["ds_goal_longrun_preflight"]["longrun_start_allowed"] is False
+    assert not (kernel_store / "wake_ledger.jsonl").exists()
+    assert not (state_root / ".runtime" / "runtime.db").exists()
+    receipts = [
+        json.loads(line)
+        for line in (
+            state_root / "mission-preflight-block" / "receipts.jsonl"
+        ).read_text(encoding="utf-8").splitlines()
+    ]
+    assert receipts[-1]["status"] == "preflight_blocked"
+    assert (
+        receipts[-1]["ds_goal_longrun_preflight"]["score_effect"]
+        == "no_score_movement_preflight_only"
+    )
+
+
+def test_run_executes_bounded_ds_goal_tick_and_records_closeback(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
+    state_root = tmp_path / "goals"
+    kernel_store = tmp_path / "kernel"
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_ds_goal_longrun_preflight_for_receipt",
+        _pass_ds_goal_preflight,
+    )
     assert autonomy_spine.main(
         [
             "init",
@@ -269,8 +396,53 @@ def test_run_executes_bounded_ds_goal_tick_and_records_closeback(tmp_path, capsy
         for receipt in runtime_receipts
         if receipt.receipt_id == payload["runtime_truth_ref"]["receipt_id"]
     )
+    major_receipts = [
+        receipt
+        for receipt in asyncio.run(
+            store.list_runtime_receipts(
+                run_id=payload["runtime_truth_ref"]["run_id"],
+                limit=50,
+            )
+        )
+        if receipt.receipt_type in {"task_claim", "delegation_run"}
+    ]
+    assert major_receipts
+    for receipt in major_receipts:
+        assert receipt.side_effect_key, receipt.receipt_id
+        assert receipt.payload["provider_execution"] is False
+        assert (
+            receipt.payload["provider_model_truth_source"]
+            == "runtime_control.no_provider_execution"
+        )
+        assert (
+            receipt.payload["no_provider_model_reason"]
+            == "living_agent_kernel_v1_no_provider_execution"
+        )
+        preflight = receipt.payload["ds_goal_longrun_preflight"]
+        assert preflight["schema_version"] == "dharma.ds_goal_longrun_preflight.v1"
+        assert preflight["read_only"] is True
+        assert preflight["status"] == "pass_explicit_audited_checkout_pin"
+        assert preflight["repo_pin_source"] == "DHARMA_SWARM_REPO"
+        assert preflight["score_effect"] == "no_score_movement_preflight_only"
+        idem = store.get_idempotency_record_sync(
+            receipt.idempotency_key,
+            receipt.side_effect_key,
+        )
+        assert idem is not None, receipt.receipt_id
+        assert idem.status == "completed"
+        assert idem.result_receipt_id == receipt.receipt_id
+
     evidence_ref = payload["runtime_truth_ref"]["spine_evidence_receipt_ref"]
     evidence = runtime_receipt.payload["spine_evidence_receipt"]
+    assert runtime_receipt.payload["provider_execution"] is False
+    assert (
+        runtime_receipt.payload["provider_model_truth_source"]
+        == "runtime_control.no_provider_execution"
+    )
+    assert (
+        runtime_receipt.payload["no_provider_model_reason"]
+        == "living_agent_kernel_v1_no_provider_execution"
+    )
     assert evidence_ref["operation"] == "ds_goal.kernel_wake"
     assert runtime_receipt.payload["spine_evidence_receipt_ref"] == evidence_ref
     assert evidence["receipt_id"] == evidence_ref["receipt_id"]
@@ -290,6 +462,11 @@ def test_run_executes_bounded_ds_goal_tick_and_records_closeback(tmp_path, capsy
 def test_run_runtime_warrant_denial_blocks_kernel_dispatch(tmp_path, capsys, monkeypatch):
     state_root = tmp_path / "goals"
     kernel_store = tmp_path / "kernel"
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_ds_goal_longrun_preflight_for_receipt",
+        _pass_ds_goal_preflight,
+    )
     assert autonomy_spine.main(
         [
             "init",
@@ -330,10 +507,19 @@ def test_run_runtime_warrant_denial_blocks_kernel_dispatch(tmp_path, capsys, mon
     assert not (kernel_store / "wake_ledger.jsonl").exists()
 
 
-def test_run_skips_kernel_dispatch_when_idempotency_claim_exists(tmp_path, capsys):
+def test_run_skips_kernel_dispatch_when_idempotency_claim_exists(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
     state_root = tmp_path / "goals"
     kernel_store = tmp_path / "kernel"
     mission_id = "mission-duplicate"
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_ds_goal_longrun_preflight_for_receipt",
+        _pass_ds_goal_preflight,
+    )
     assert autonomy_spine.main(
         [
             "init",

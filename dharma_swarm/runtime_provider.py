@@ -431,6 +431,21 @@ def resolve_runtime_provider_config(
     raise ValueError(f"Unsupported runtime provider: {provider.value}")
 
 
+def _attach_runtime_provider_metadata(provider: Any, config: RuntimeProviderConfig) -> Any:
+    try:
+        setattr(provider, "runtime_provider_type", config.provider.value)
+        setattr(provider, "runtime_default_model", config.default_model or "")
+    except Exception:
+        pass
+    return provider
+
+
+def _stamp_response_provider(response: LLMResponse, provider: ProviderType) -> LLMResponse:
+    if str(response.provider or "").strip():
+        return response
+    return response.model_copy(update={"provider": provider.value})
+
+
 def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
     """Instantiate a provider from centralized runtime config."""
 
@@ -458,31 +473,31 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         kwargs: dict[str, Any] = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return AnthropicProvider(**kwargs)
+        return _attach_runtime_provider_metadata(AnthropicProvider(**kwargs), config)
     if config.provider == ProviderType.OPENAI:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return OpenAIProvider(**kwargs)
+        return _attach_runtime_provider_metadata(OpenAIProvider(**kwargs), config)
     if config.provider == ProviderType.OPENROUTER:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return OpenRouterProvider(**kwargs)
+        return _attach_runtime_provider_metadata(OpenRouterProvider(**kwargs), config)
     if config.provider == ProviderType.OPENROUTER_FREE:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         if config.default_model is not None:
             kwargs["model"] = config.default_model
-        return OpenRouterFreeProvider(**kwargs)
+        return _attach_runtime_provider_metadata(OpenRouterFreeProvider(**kwargs), config)
     if config.provider == ProviderType.NVIDIA_NIM:
         kwargs = {"default_model": config.default_model or DEFAULT_NIM_MODEL}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         if config.base_url is not None:
             kwargs["base_url"] = config.base_url
-        return NVIDIANIMProvider(**kwargs)
+        return _attach_runtime_provider_metadata(NVIDIANIMProvider(**kwargs), config)
     if config.provider == ProviderType.OLLAMA:
         kwargs = {}
         if config.base_url is not None:
@@ -491,62 +506,62 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["model"] = config.default_model
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return OllamaProvider(**kwargs)
+        return _attach_runtime_provider_metadata(OllamaProvider(**kwargs), config)
     if config.provider == ProviderType.CLAUDE_CODE:
         kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
         if config.working_dir is not None:
             kwargs["working_dir"] = config.working_dir
-        return ClaudeCodeProvider(**kwargs)
+        return _attach_runtime_provider_metadata(ClaudeCodeProvider(**kwargs), config)
     if config.provider == ProviderType.CODEX:
         kwargs = {"timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS}
         if config.working_dir is not None:
             kwargs["working_dir"] = config.working_dir
-        return CodexProvider(**kwargs)
+        return _attach_runtime_provider_metadata(CodexProvider(**kwargs), config)
     if config.provider == ProviderType.GROQ:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return GroqProvider(**kwargs)
+        return _attach_runtime_provider_metadata(GroqProvider(**kwargs), config)
     if config.provider == ProviderType.CEREBRAS:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return CerebrasProvider(**kwargs)
+        return _attach_runtime_provider_metadata(CerebrasProvider(**kwargs), config)
     if config.provider == ProviderType.SILICONFLOW:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return SiliconFlowProvider(**kwargs)
+        return _attach_runtime_provider_metadata(SiliconFlowProvider(**kwargs), config)
     if config.provider == ProviderType.TOGETHER:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return TogetherProvider(**kwargs)
+        return _attach_runtime_provider_metadata(TogetherProvider(**kwargs), config)
     if config.provider == ProviderType.FIREWORKS:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return FireworksProvider(**kwargs)
+        return _attach_runtime_provider_metadata(FireworksProvider(**kwargs), config)
     if config.provider == ProviderType.GOOGLE_AI:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return GoogleAIProvider(**kwargs)
+        return _attach_runtime_provider_metadata(GoogleAIProvider(**kwargs), config)
     if config.provider == ProviderType.SAMBANOVA:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return SambaNovaProvider(**kwargs)
+        return _attach_runtime_provider_metadata(SambaNovaProvider(**kwargs), config)
     if config.provider == ProviderType.MISTRAL:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return MistralProvider(**kwargs)
+        return _attach_runtime_provider_metadata(MistralProvider(**kwargs), config)
     if config.provider == ProviderType.CHUTES:
         kwargs = {}
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
-        return ChutesProvider(**kwargs)
+        return _attach_runtime_provider_metadata(ChutesProvider(**kwargs), config)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
@@ -653,7 +668,7 @@ async def complete_via_preferred_runtime_providers(
                 )
             else:
                 response = await provider.complete(request)
-            return response, config
+            return _stamp_response_provider(response, config.provider), config
         except Exception as exc:
             last_exc = exc
         finally:

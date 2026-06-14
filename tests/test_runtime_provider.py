@@ -19,6 +19,7 @@ from dharma_swarm.runtime_provider import (
     RuntimeProviderConfig,
     complete_via_preferred_runtime_providers,
     create_default_provider_map,
+    create_runtime_provider,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
 )
@@ -239,6 +240,20 @@ def test_create_default_provider_map_includes_expected_runtime_providers() -> No
     assert ProviderType.OLLAMA in provider_map
 
 
+def test_create_runtime_provider_attaches_runtime_provider_metadata() -> None:
+    provider = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.NVIDIA_NIM,
+            available=True,
+            api_key="nim-key",
+            default_model="nim-model",
+        )
+    )
+
+    assert provider.runtime_provider_type == "nvidia_nim"
+    assert provider.runtime_default_model == "nim-model"
+
+
 def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openrouter(
     monkeypatch,
 ) -> None:
@@ -341,6 +356,7 @@ async def test_complete_via_preferred_runtime_providers_prefers_ollama_then_nim(
     )
 
     assert response.content == "nvidia_nim ok"
+    assert response.provider == "nvidia_nim"
     assert config.provider == ProviderType.NVIDIA_NIM
     assert calls == [
         ("ollama", "ollama-local"),

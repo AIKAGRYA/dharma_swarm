@@ -7,7 +7,10 @@ It is not a consumer product site. It is the browser control surface for
 
 ## Canonical stance
 
-- TUI is the primary operator cockpit.
+- `/dashboard/cockpit` is John's canonical human front door.
+- The cockpit renders the control-surface implementation; `/dashboard/control-surface`
+  is a technical alias, not a second operator front door.
+- TUI surfaces are companion operator shells, not the canonical human dashboard.
 - This dashboard is the canonical web operator surface.
 - `SwarmLens` remains a legacy/alternate web surface in
   `dharma_swarm/swarmlens_app.py`.
@@ -46,6 +49,7 @@ bash scripts/run_dashboard_ui.sh
 Open:
 
 - Dashboard: `http://localhost:3420/dashboard`
+- Human front door: `http://localhost:3420/dashboard/cockpit`
 - API docs: `http://localhost:8420/docs`
 
 The browser dashboard now defaults to same-origin API calls. In normal use, the

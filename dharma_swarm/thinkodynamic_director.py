@@ -48,6 +48,9 @@ from dharma_swarm.mission_contract import (
     save_mission_state,
 )
 from dharma_swarm.models import AgentRole, ProviderType, Task, TaskPriority, TaskStatus
+from dharma_swarm.spine.invoke import invoke_agent
+from dharma_swarm.spine.receipt import EvidenceReceipt
+from dharma_swarm.spine.routing import RoutingDecision
 from dharma_swarm.task_board import TaskBoard
 
 logger = logging.getLogger(__name__)
@@ -1358,6 +1361,121 @@ def _named_runner_timeout_seconds(timeout: int | float | None = None) -> float:
     if timeout is None:
         return 90.0
     return max(20.0, min(180.0, float(timeout)))
+
+
+def _runtime_value(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
+def _runner_provider_model(runner: Any) -> tuple[str, str]:
+    config = getattr(runner, "_config", None)
+    state = getattr(runner, "state", None)
+    provider = getattr(config, "provider", None) or getattr(state, "provider", "")
+    model = getattr(config, "model", None) or getattr(state, "model", "")
+    return _runtime_value(provider), _runtime_value(model)
+
+
+async def _run_named_swarm_runner_via_spine(
+    runner: Any,
+    task: Task,
+    *,
+    agent_name: str,
+    timeout_seconds: float,
+    context_id: str,
+    reason: str,
+    source: str,
+) -> Any:
+    state = getattr(runner, "state", None)
+    agent_id = str(
+        getattr(state, "id", "")
+        or getattr(runner, "agent_id", "")
+        or agent_name
+    )
+    provider, model = _runner_provider_model(runner)
+    metadata = dict(task.metadata or {})
+    trace_id = str(
+        metadata.get("trace_id")
+        or metadata.get("correlation_id")
+        or metadata.get("workflow_id")
+        or metadata.get("director_workflow_id")
+        or metadata.get("cycle_id")
+        or metadata.get("director_cycle_id")
+        or context_id
+        or task.id
+    )
+    span_id = str(metadata.get("run_id") or metadata.get("span_id") or "")
+    routing = RoutingDecision(
+        agent_id=agent_id,
+        provider=provider,
+        model=model,
+        reason=reason,
+        router_name="thinkodynamic_director",
+        context_id=context_id,
+        task_id=task.id,
+        attributes={"agent_name": agent_name, "source": source},
+    )
+    started = datetime.now(timezone.utc)
+    captured: dict[str, Any] = {"_task_obj": task}
+
+    async def _director_invoker(
+        task: dict[str, Any],
+        agent_id: str,
+        context_id: str,
+        routing: RoutingDecision,
+    ) -> EvidenceReceipt:
+        status, err_source, err_detail = "ok", "none", None
+        try:
+            captured["result"] = await asyncio.wait_for(
+                runner.run_task(captured["_task_obj"]),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError as exc:
+            captured["exc"] = exc
+            status, err_source, err_detail = "timeout", "timeout", "run_task timed out"
+        except Exception as exc:  # noqa: BLE001 - re-raised after receipt emission
+            captured["exc"] = exc
+            status, err_source, err_detail = "failed", "internal_error", str(exc)
+        finished = datetime.now(timezone.utc)
+        return EvidenceReceipt(
+            trace_id=trace_id,
+            span_id=span_id,
+            context_id=context_id,
+            task_id=task["id"],
+            agent_id=agent_id,
+            provider=provider or f"swarm:{agent_name}",
+            model=model,
+            operation="invoke_agent",
+            provider_attempted=True,
+            status=status,
+            error_source=err_source,
+            error_detail=err_detail,
+            started_at=started,
+            finished_at=finished,
+            latency_ms=int((finished - started).total_seconds() * 1000),
+            routing_decision_id=routing.decision_id,
+            attributes={
+                "router": "thinkodynamic_director",
+                "agent_name": agent_name,
+                "source": source,
+            },
+        )
+
+    receipt = await invoke_agent(
+        task={
+            "id": task.id,
+            "title": task.title,
+            "created_by": task.created_by,
+            "source": source,
+        },
+        agent_id=agent_id,
+        context_id=context_id,
+        routing=routing,
+        invoker=_director_invoker,
+    )
+    task.metadata["evidence_receipt_id"] = str(receipt.receipt_id)
+    if "exc" in captured:
+        raise captured["exc"]
+    return captured.get("result")
 
 
 def _allows_dynamic_delegations(result: Mapping[str, Any]) -> bool:
@@ -3010,9 +3128,14 @@ class ThinkodynamicDirector:
                 },
             )
             try:
-                content = await asyncio.wait_for(
-                    runner.run_task(council_task),
-                    timeout=_named_runner_timeout_seconds(90),
+                content = await _run_named_swarm_runner_via_spine(
+                    runner,
+                    council_task,
+                    agent_name=member.name,
+                    timeout_seconds=_named_runner_timeout_seconds(90),
+                    context_id=f"thinkodynamic-council:{workflow.workflow_id}",
+                    reason=f"director council review: {workflow.opportunity_title}",
+                    source="thinkodynamic_director_council",
                 )
                 return CouncilTurn(
                     agent_name=member.name,
@@ -3314,9 +3437,20 @@ class ThinkodynamicDirector:
             metadata["allow_provider_routing"] = False
         pinned_task = task.model_copy(update={"metadata": metadata})
         try:
-            output = await asyncio.wait_for(
-                runner.run_task(pinned_task),
-                timeout=_named_runner_timeout_seconds(timeout),
+            output = await _run_named_swarm_runner_via_spine(
+                runner,
+                pinned_task,
+                agent_name=agent_name,
+                timeout_seconds=_named_runner_timeout_seconds(timeout),
+                context_id=str(
+                    metadata.get("workflow_id")
+                    or metadata.get("director_workflow_id")
+                    or metadata.get("cycle_id")
+                    or metadata.get("director_cycle_id")
+                    or task.id
+                ),
+                reason=f"director named swarm execution: {task.title}",
+                source="thinkodynamic_director_named_runner",
             )
         except asyncio.TimeoutError as exc:
             raise RuntimeError(

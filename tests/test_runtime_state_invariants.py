@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 
+import dharma_swarm.runtime_state as runtime_state
 from dharma_swarm.opportunity_dispatcher import OPPORTUNITY_STAGES, OpportunityDispatcher
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, TaskClaim
+from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 
@@ -28,6 +30,14 @@ def _identity(
         session_id="session-spine-a",
         parent_run_id=parent_run_id,
     )
+
+
+def test_pytest_runtime_defaults_are_isolated_from_live_db(tmp_path: Path) -> None:
+    ledger = SessionLedger(session_id="test-isolated-defaults")
+
+    assert runtime_state.DEFAULT_RUNTIME_DB == tmp_path / "_runtime_state_isolated" / "runtime.db"
+    assert ledger.base_dir == tmp_path / "_runtime_state_isolated" / "ledgers"
+    assert ledger._runtime_state.db_path == runtime_state.DEFAULT_RUNTIME_DB
 
 
 @pytest.mark.asyncio
@@ -87,7 +97,14 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
             agent_id=identity.agent_id,
             status="claimed",
             session_id=identity.session_id,
-            metadata=identity.to_metadata(),
+            metadata={
+                **identity.to_metadata(),
+                "mission_id": "mission-spine-a",
+                "provider_execution": False,
+                "provider_model_applicability": "not_applicable",
+                "provider_model_truth_source": "runtime_control.no_provider_execution",
+                "no_provider_model_reason": "kernel_control_tick_no_provider_call",
+            },
         )
     )
     stored_run = store.create_delegation_run_sync(
@@ -98,11 +115,37 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
             status="running",
             session_id=identity.session_id,
             claim_id=identity.claim_id,
-            metadata=identity.to_metadata(),
+            current_artifact_id="artifact-spine-a",
+            metadata={
+                **identity.to_metadata(),
+                "mission_id": "mission-spine-a",
+                "provider_execution": False,
+                "provider_model_applicability": "not_applicable",
+                "provider_model_truth_source": "runtime_control.no_provider_execution",
+                "no_provider_model_reason": "kernel_control_tick_no_provider_call",
+            },
         )
     )
     ledger = await store.get_run_ledger(identity.run_id)
     receipt_types = {receipt.receipt_type for receipt in ledger["receipts"]}
+    claim_receipt = next(
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "task_claim"
+    )
+    delegation_receipt = next(
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "delegation_run"
+    )
+    claim_idem = store.get_idempotency_record_sync(
+        identity.idempotency_key,
+        claim_receipt.side_effect_key,
+    )
+    run_idem = store.get_idempotency_record_sync(
+        identity.idempotency_key,
+        delegation_receipt.side_effect_key,
+    )
 
     with sqlite3.connect(tmp_path / "runtime.db") as db:
         claim_trace = db.execute(
@@ -122,6 +165,112 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
     assert ledger["identity"].trace_id == identity.trace_id
     assert ledger["run"].run_id == identity.run_id
     assert receipt_types >= {"task_claim", "delegation_run", "child_spawned"}
+    assert claim_receipt.side_effect_key == f"task_claim:{identity.claim_id}:claimed"
+    assert claim_receipt.payload["mission_id"] == "mission-spine-a"
+    assert claim_receipt.payload["provider_execution"] is False
+    assert (
+        claim_receipt.payload["provider_model_truth_source"]
+        == "runtime_control.no_provider_execution"
+    )
+    assert (
+        claim_receipt.payload["no_provider_model_reason"]
+        == "kernel_control_tick_no_provider_call"
+    )
+    assert claim_idem is not None
+    assert claim_idem.status == "completed"
+    assert claim_idem.result_receipt_id == claim_receipt.receipt_id
+    assert delegation_receipt.side_effect_key == f"delegation_run:{identity.run_id}:running"
+    assert delegation_receipt.payload["mission_id"] == "mission-spine-a"
+    assert delegation_receipt.payload["artifact_refs"] == ["artifact_records:artifact-spine-a"]
+    assert delegation_receipt.payload["provider_execution"] is False
+    assert (
+        delegation_receipt.payload["provider_model_truth_source"]
+        == "runtime_control.no_provider_execution"
+    )
+    assert (
+        delegation_receipt.payload["no_provider_model_reason"]
+        == "kernel_control_tick_no_provider_call"
+    )
+    assert run_idem is not None
+    assert run_idem.status == "completed"
+    assert run_idem.result_receipt_id == delegation_receipt.receipt_id
+
+
+@pytest.mark.asyncio
+async def test_async_helpers_record_identity_trace_and_receipts(tmp_path: Path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+    identity = _identity(
+        run_id="run-async-spine-a",
+        claim_id="claim-async-spine-a",
+        parent_run_id="run-parent-async-spine-a",
+    )
+
+    stored_claim = await store.record_task_claim(
+        TaskClaim(
+            claim_id=identity.claim_id,
+            task_id=identity.task_id,
+            agent_id=identity.agent_id,
+            status="claimed",
+            session_id=identity.session_id,
+            metadata={
+                **identity.to_metadata(),
+                "mission_id": "mission-async-spine-a",
+            },
+        )
+    )
+    stored_run = await store.record_delegation_run(
+        DelegationRun(
+            run_id=identity.run_id,
+            task_id=identity.task_id,
+            assigned_to=identity.agent_id,
+            status="running",
+            session_id=identity.session_id,
+            claim_id=identity.claim_id,
+            current_artifact_id="artifact-async-spine-a",
+            metadata={
+                **identity.to_metadata(),
+                "mission_id": "mission-async-spine-a",
+            },
+        )
+    )
+    ledger = await store.get_run_ledger(identity.run_id)
+    receipt_types = {receipt.receipt_type for receipt in ledger["receipts"]}
+    claim_receipt = next(
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "task_claim"
+    )
+    delegation_receipt = next(
+        receipt
+        for receipt in ledger["receipts"]
+        if receipt.receipt_type == "delegation_run"
+    )
+    claim_idem = await store.get_idempotency_record(
+        identity.idempotency_key,
+        claim_receipt.side_effect_key,
+    )
+    run_idem = await store.get_idempotency_record(
+        identity.idempotency_key,
+        delegation_receipt.side_effect_key,
+    )
+
+    assert stored_claim.metadata["execution_identity"]["run_id"] == identity.run_id
+    assert stored_run.metadata["execution_identity"]["trace_id"] == identity.trace_id
+    assert ledger["identity"].run_id == identity.run_id
+    assert receipt_types >= {"task_claim", "delegation_run", "child_spawned"}
+    assert claim_receipt.side_effect_key == f"task_claim:{identity.claim_id}:claimed"
+    assert claim_receipt.payload["mission_id"] == "mission-async-spine-a"
+    assert claim_idem is not None
+    assert claim_idem.status == "completed"
+    assert claim_idem.result_receipt_id == claim_receipt.receipt_id
+    assert delegation_receipt.side_effect_key == f"delegation_run:{identity.run_id}:running"
+    assert delegation_receipt.payload["mission_id"] == "mission-async-spine-a"
+    assert delegation_receipt.payload["artifact_refs"] == [
+        "artifact_records:artifact-async-spine-a"
+    ]
+    assert run_idem is not None
+    assert run_idem.status == "completed"
+    assert run_idem.result_receipt_id == delegation_receipt.receipt_id
 
 
 @pytest.mark.asyncio

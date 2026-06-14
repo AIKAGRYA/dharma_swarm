@@ -35,7 +35,8 @@ Implement a **Control Surface Projector** that:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Operator Cockpit (Dashboard)                │
-│  dashboard/src/app/dashboard/control-surface/page.tsx            │
+│  Human front door: /dashboard/cockpit                            │
+│  Implementation: dashboard/src/app/dashboard/control-surface/page.tsx │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ GET /api/control-surface/{summary,rows,stream}
                       ▼
@@ -126,6 +127,7 @@ doc surfaces, integrations, feedback loops, agent subsystems, cron jobs.
 - `dharma_swarm/operator_core/control_surface.py` — projection engine
 - `dharma_swarm/operator_core/control_surface_models.py` — models + row contract
 - `api/routers/control_surface.py` — API router
-- `dashboard/src/app/dashboard/control-surface/page.tsx` — cockpit UI
+- `dashboard/src/app/dashboard/cockpit/page.tsx` — human front-door route
+- `dashboard/src/app/dashboard/control-surface/page.tsx` — cockpit UI implementation
 - `ACTIVE_SURFACE_MANIFEST.yaml` — declared intent
 - `tests/test_control_surface.py` — contract tests

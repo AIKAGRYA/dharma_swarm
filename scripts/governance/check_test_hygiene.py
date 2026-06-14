@@ -5,9 +5,9 @@ that without invasive CLI changes. These two rules are implemented as
 a small Python script instead.
 
 Rule 3 — `dharma.test-no-default-state`:
-    Tests must not call `RuntimeStateStore()` with no arguments. That
-    instantiation falls through to the canonical `~/.dharma/state/runtime.db`
-    — the operator's REAL DB. Tests must pass a tmp DB:
+    Tests must not call `RuntimeStateStore` without a non-None db_path. That
+    falls through to the canonical `~/.dharma/state/runtime.db` — the
+    operator's REAL DB. Tests must pass a tmp DB:
 
         store = RuntimeStateStore(db_path=tmp_path / "test.db")
 
@@ -24,16 +24,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-
-# Rule 3: bare RuntimeStateStore() with no args.
-# Match: `RuntimeStateStore()` not preceded by `class ` (the definition itself).
-RULE_3_PATTERN = re.compile(r"\bRuntimeStateStore\(\s*\)")
-RULE_3_DEFN = re.compile(r"\bclass\s+RuntimeStateStore\b")
 
 # Rule 5: subprocess invocation with "dgc" as the command.
 RULE_5_DGC_INVOKE = re.compile(
@@ -48,31 +44,47 @@ RULE_5_DGC_INVOKE = re.compile(
 )
 RULE_5_STATE_DIR = re.compile(r"--state[-_]dir")
 
-# Files that may legitimately call RuntimeStateStore() with no args.
-# Currently empty; the known offender (test_full_loop.py:343) needs a fix.
+# Files that may legitimately call RuntimeStateStore without an explicit db_path.
 RULE_3_ALLOWLIST: set[str] = set()
 RULE_5_ALLOWLIST: set[str] = set()
 
 
-def known_offender_3(path: Path) -> bool:
-    """`tests/test_full_loop.py:343` is the known offender as of 2026-04-26.
-    Until it's fixed in a separate micro-PR, this script reports it as
-    a *warning* rather than an error so Phase 4 lands without blocking."""
-    rel = str(path.relative_to(REPO_ROOT))
-    return rel == "tests/test_full_loop.py"
+def _is_runtime_state_store_call(node: ast.Call) -> bool:
+    if isinstance(node.func, ast.Name):
+        return node.func.id == "RuntimeStateStore"
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == "RuntimeStateStore"
+    return False
+
+
+def _is_none_literal(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and node.value is None
+
+
+def _runtime_store_missing_db_path(node: ast.Call) -> bool:
+    if not _is_runtime_state_store_call(node):
+        return False
+    if node.args:
+        return _is_none_literal(node.args[0])
+    for keyword in node.keywords:
+        if keyword.arg == "db_path":
+            return _is_none_literal(keyword.value)
+    return True
 
 
 def scan_rule_3(text: str, path: Path) -> list[tuple[int, str]]:
     """Return list of (line_no, line_text) for Rule 3 matches in this file."""
     findings: list[tuple[int, str]] = []
-    if RULE_3_DEFN.search(text):
-        # The file defines RuntimeStateStore; skip the class line itself.
-        pass
-    for i, line in enumerate(text.splitlines(), 1):
-        if RULE_3_DEFN.search(line):
-            continue
-        if RULE_3_PATTERN.search(line):
-            findings.append((i, line.rstrip()))
+    lines = text.splitlines()
+    try:
+        tree = ast.parse(text, filename=str(path))
+    except SyntaxError:
+        return findings
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _runtime_store_missing_db_path(node):
+            line_no = getattr(node, "lineno", 1)
+            line_text = lines[line_no - 1].rstrip() if 1 <= line_no <= len(lines) else ""
+            findings.append((line_no, line_text))
     return findings
 
 
@@ -103,7 +115,6 @@ def main() -> int:
     args = parser.parse_args()
 
     rule_3_errs: list[str] = []
-    rule_3_warns: list[str] = []
     rule_5_errs: list[str] = []
 
     for path in find_test_files():
@@ -117,10 +128,7 @@ def main() -> int:
             if rel in RULE_3_ALLOWLIST:
                 continue
             entry = f"  {rel}:{line_no}  {line_text.strip()}"
-            if known_offender_3(path):
-                rule_3_warns.append(entry)
-            else:
-                rule_3_errs.append(entry)
+            rule_3_errs.append(entry)
 
         for line_no, line_text in scan_rule_5(text, path):
             if rel in RULE_5_ALLOWLIST:
@@ -130,15 +138,9 @@ def main() -> int:
     print("Test hygiene gate results")
     print("-" * 60)
 
-    if rule_3_warns:
-        print()
-        print("Rule 3 (test-no-default-state) — KNOWN offenders (warn):")
-        for w in rule_3_warns:
-            print(w)
-
     if rule_3_errs:
         print()
-        print("Rule 3 (test-no-default-state) — NEW offenders (FAIL):")
+        print("Rule 3 (test-no-default-state) — FAIL:")
         for e in rule_3_errs:
             print(e)
 
@@ -148,7 +150,7 @@ def main() -> int:
         for e in rule_5_errs:
             print(e)
 
-    if not (rule_3_warns or rule_3_errs or rule_5_errs):
+    if not (rule_3_errs or rule_5_errs):
         print()
         print("No findings.")
 

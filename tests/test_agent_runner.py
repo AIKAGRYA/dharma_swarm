@@ -137,6 +137,66 @@ async def test_runner_injects_stigmergy_recall_into_prompt(
 
 
 @pytest.mark.asyncio
+async def test_runner_exposes_actual_served_route_from_llm_response(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="Implemented fix in `module.py`.",
+            model="qwen3-coder-live",
+            provider="openrouter",
+        )
+    )
+    runner = AgentRunner(
+        _with_state_dir(config, tmp_path),
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(Task(title="Implement module fix"))
+
+    assert result.startswith("Implemented fix")
+    assert runner.actual_served_provider == "openrouter"
+    assert runner.actual_served_model == "qwen3-coder-live"
+    assert runner.provider_model_truth_source == "agent_runner.llm_response"
+    assert runner.served_provider == "openrouter"
+    assert runner.served_model == "qwen3-coder-live"
+
+
+@pytest.mark.asyncio
+async def test_runner_exposes_direct_runtime_provider_label_when_response_provider_blank(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    provider = AsyncMock()
+    provider.runtime_provider_type = "nvidia_nim"
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="Implemented fix in `module.py`.",
+            model="llama-3.3-70b",
+        )
+    )
+    runner = AgentRunner(
+        _with_state_dir(config, tmp_path),
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(Task(title="Implement module fix"))
+
+    assert result.startswith("Implemented fix")
+    assert runner.actual_served_provider == "nvidia_nim"
+    assert runner.actual_served_model == "llama-3.3-70b"
+    assert runner.provider_model_truth_source == "agent_runner.runtime_provider_object"
+
+
+@pytest.mark.asyncio
 async def test_runner_records_telic_chain_with_stable_agent_id_and_cell_scope(
     config,
     fast_gate,

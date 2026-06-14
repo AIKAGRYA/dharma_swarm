@@ -19,6 +19,10 @@ import {
 } from "@tanstack/react-table";
 import { ArrowUpDown, RefreshCw, Columns } from "lucide-react";
 import type { ControlSurfaceRow, ControlSurfaceSummary } from "@/lib/types";
+import {
+  buildRuntimeEvidenceDigest,
+  type RuntimeEvidenceTone,
+} from "@/lib/controlSurfaceRuntimeEvidence";
 import { colors } from "@/lib/theme";
 
 interface SystemTruthMatrixProps {
@@ -69,6 +73,13 @@ const PRIORITY_COLORS: Record<string, string> = {
   p1: colors.kinpaku,
   p2: colors.sumi[600],
   backlog: colors.sumi[600],
+};
+
+const RUNTIME_EVIDENCE_COLORS: Record<RuntimeEvidenceTone, string> = {
+  ok: colors.rokusho,
+  warn: colors.kinpaku,
+  error: colors.bengara,
+  muted: colors.sumi[600],
 };
 
 type FilterKey =
@@ -207,6 +218,26 @@ const columns: ColumnDef<ControlSurfaceRow>[] = [
         {row.original.gap_codes.length > 0 ? row.original.gap_codes.join(", ") : "—"}
       </span>
     ),
+  },
+  {
+    id: "runtime_evidence",
+    header: "Runtime Proof",
+    size: 180,
+    cell: ({ row }) => {
+      const digest = buildRuntimeEvidenceDigest(row.original);
+      if (!digest) {
+        return <span className="text-sumi-600">—</span>;
+      }
+      return (
+        <span
+          className="block max-w-[180px] truncate text-[11px] font-medium"
+          style={{ color: RUNTIME_EVIDENCE_COLORS[digest.tone] }}
+          title={digest.detail}
+        >
+          {digest.label}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "next_action",

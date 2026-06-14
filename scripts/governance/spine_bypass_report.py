@@ -38,39 +38,8 @@ _SUBMIT_RE = re.compile(r"(?:_server|(?<!\w)server)\.submit\(")
 # intentionally inside an invoke_agent() invoker closure.
 _SPINE_ADOPTED: set[tuple[str, int]] = {
     # a2a_bridge.submit_via_spine() invoker closure — wraps through invoke_agent
-    ("dharma_swarm/a2a/a2a_bridge.py", 124),
+    ("dharma_swarm/a2a/a2a_bridge.py", 126),
 }
-
-# Known intentional migration-bypass sites (allowlist).
-# Each entry: (relative_path, line_number, reason).
-_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {
-    ("dharma_swarm/a2a/a2a_bridge.py", 307): (
-        "ingest_trishula_inbox — legacy TRISHULA inbound path, "
-        "migration target for Slice 2"
-    ),
-    ("dharma_swarm/a2a/node_gateway.py", 322): (
-        "submit_task_v1 — HTTP API endpoint, "
-        "migration target after A2A bridge default route"
-    ),
-    ("dharma_swarm/a2a/node_gateway.py", 432): (
-        "submit_task_legacy — legacy HTTP API endpoint, "
-        "migration target after A2A bridge default route"
-    ),
-    ("dharma_swarm/a2a/a2a_client.py", 361): (
-        "_dispatch_local — in-process delegation, "
-        "migration target after node_gateway"
-    ),
-    ("dharma_swarm/a2a/nats_transport.py", 301): (
-        "consume_message — NATS ingress handoff after transport-level "
-        "ExecutionIdentity, idempotency, and ack/nack receipts"
-    ),
-}
-
-# Known non-production lines (docstring examples, etc.)
-_NON_PRODUCTION: set[tuple[str, int]] = {
-    ("dharma_swarm/a2a/a2a_server.py", 259),  # docstring example
-}
-
 
 @dataclass
 class BypassEntry:
@@ -79,6 +48,33 @@ class BypassEntry:
     classification: str  # spine-adopted | intentional | unknown | non-production
     reason: str = ""
     code: str = ""
+    owner: str = ""
+    quarantine_status: str = ""
+    migration_target: str = ""
+    verification: str = ""
+
+
+@dataclass(frozen=True)
+class BypassQuarantine:
+    reason: str
+    owner: str
+    quarantine_status: str
+    migration_target: str
+    verification: str
+
+
+# Known intentional migration-bypass sites (allowlist).
+# Each entry: (relative_path, line_number, reason). Keep this literal dict so
+# ACTIVE_TRACK.yaml can prove completion only when the migration list drains to
+# exactly ``{}``.
+_INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}
+
+_BYPASS_QUARANTINE: dict[tuple[str, int], BypassQuarantine] = {}
+
+# Known non-production lines (docstring examples, etc.)
+_NON_PRODUCTION: set[tuple[str, int]] = {
+    ("dharma_swarm/a2a/a2a_server.py", 259),  # docstring example
+}
 
 
 def _scan_production_submits() -> list[BypassEntry]:
@@ -124,11 +120,16 @@ def _scan_production_submits() -> list[BypassEntry]:
                         code=code,
                     ))
                 elif key in _INTENTIONAL_BYPASS:
+                    quarantine = _BYPASS_QUARANTINE.get(key)
                     entries.append(BypassEntry(
                         file=rel, line=i,
                         classification="intentional",
                         reason=_INTENTIONAL_BYPASS[key],
                         code=code,
+                        owner=quarantine.owner if quarantine else "",
+                        quarantine_status=quarantine.quarantine_status if quarantine else "",
+                        migration_target=quarantine.migration_target if quarantine else "",
+                        verification=quarantine.verification if quarantine else "",
                     ))
                 else:
                     entries.append(BypassEntry(
@@ -158,10 +159,16 @@ def _print_table(entries: list[BypassEntry]) -> None:
     intentional = counts.get("intentional", 0)
     unknown = counts.get("unknown", 0)
     non_prod = counts.get("non-production", 0)
+    quarantined = sum(
+        1
+        for e in entries
+        if e.classification == "intentional" and e.quarantine_status == "quarantined"
+    )
 
     print(f"  Total .submit() sites in dharma_swarm/:  {total}")
     print(f"  Spine-adopted (via invoke_agent):         {adopted}")
     print(f"  Intentional migration bypass:             {intentional}")
+    print(f"  Quarantined with owner/verification:      {quarantined}")
     print(f"  Unknown / unclassified:                   {unknown}")
     print(f"  Non-production (docstring/example):       {non_prod}")
     print()
@@ -171,10 +178,13 @@ def _print_table(entries: list[BypassEntry]) -> None:
         return
 
     # Detail table
-    print(f"{'Classification':<18} {'File':<45} {'Line':>5}  {'Reason'}")
-    print("-" * 120)
+    print(f"{'Classification':<18} {'File':<45} {'Line':>5}  {'Owner':<36} {'Quarantine':<12} {'Reason'}")
+    print("-" * 170)
     for e in entries:
-        print(f"{e.classification:<18} {e.file:<45} {e.line:>5}  {e.reason}")
+        print(
+            f"{e.classification:<18} {e.file:<45} {e.line:>5}  "
+            f"{e.owner:<36} {e.quarantine_status:<12} {e.reason}"
+        )
 
     print()
     if unknown > 0:
@@ -186,7 +196,8 @@ def _print_table(entries: list[BypassEntry]) -> None:
     else:
         print(
             "✓  All .submit() sites classified. "
-            f"{intentional} intentional bypass(es) remain on the migration allowlist."
+            f"{intentional} intentional bypass(es) remain on the migration allowlist; "
+            f"{quarantined} carry owner and verification metadata."
         )
     print()
 
@@ -202,6 +213,10 @@ def _print_json(entries: list[BypassEntry]) -> None:
                 "classification": e.classification,
                 "reason": e.reason,
                 "code": e.code,
+                "owner": e.owner,
+                "quarantine_status": e.quarantine_status,
+                "migration_target": e.migration_target,
+                "verification": e.verification,
             }
             for e in entries
         ],
@@ -210,6 +225,11 @@ def _print_json(entries: list[BypassEntry]) -> None:
     counts: dict[str, int] = {}
     for e in entries:
         counts[e.classification] = counts.get(e.classification, 0) + 1
+    counts["quarantined_intentional"] = sum(
+        1
+        for e in entries
+        if e.classification == "intentional" and e.quarantine_status == "quarantined"
+    )
     data["summary"] = counts
     print(json.dumps(data, indent=2))
 

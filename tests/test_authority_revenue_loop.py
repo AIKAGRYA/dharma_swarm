@@ -54,6 +54,37 @@ class TestGovernanceGuards:
         )
         assert spec is not None
 
+    def test_test_hygiene_rule3_requires_explicit_runtime_db(self) -> None:
+        import importlib.util
+
+        script_path = (
+            Path(__file__).resolve().parents[1]
+            / "scripts"
+            / "governance"
+            / "check_test_hygiene.py"
+        )
+        spec = importlib.util.spec_from_file_location("check_test_hygiene", str(script_path))
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        unsafe = """
+RuntimeStateStore()
+RuntimeStateStore(None)
+RuntimeStateStore(db_path=None)
+RuntimeStateStore(include_memory_plane=False)
+"""
+        findings = module.scan_rule_3(unsafe, Path("sample.py"))
+        assert [line for line, _ in findings] == [2, 3, 4, 5]
+
+        safe = """
+RuntimeStateStore(tmp_path / "runtime.db")
+RuntimeStateStore(db_path=tmp_path / "runtime.db")
+runtime_state.RuntimeStateStore(tmp_path / "runtime.db")
+"""
+        assert module.scan_rule_3(safe, Path("sample.py")) == []
+
     def test_active_surface_manifest_exists(self) -> None:
         manifest = Path(__file__).resolve().parents[1] / "ACTIVE_SURFACE_MANIFEST.yaml"
         assert manifest.exists(), "ACTIVE_SURFACE_MANIFEST.yaml must exist"

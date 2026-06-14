@@ -15,13 +15,15 @@ TRISHULA and agents using A2A can coexist and communicate.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.a2a.agent_card import CardRegistry
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
@@ -62,7 +64,7 @@ class A2ABridge:
     def __init__(
         self,
         server: A2AServer,
-        registry: CardRegistry,
+        registry: CardRegistry | None = None,
         signal_bus: Any | None = None,
         trishula_outbox: Path | None = None,
     ) -> None:
@@ -206,6 +208,29 @@ class A2ABridge:
         result_task = self._server.get_task(task.id) or task
         return result_task, receipt
 
+    def _submit_via_spine_sync(self, task: A2ATask) -> tuple[A2ATask, EvidenceReceipt]:
+        """Run the async spine submit path from legacy synchronous callers."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(self.submit_via_spine(task))
+
+        result: dict[str, tuple[A2ATask, EvidenceReceipt]] = {}
+        error: dict[str, BaseException] = {}
+
+        def _runner() -> None:
+            try:
+                result["value"] = asyncio.run(self.submit_via_spine(task))
+            except BaseException as exc:
+                error["value"] = exc
+
+        thread = threading.Thread(target=_runner, name="a2a-spine-submit", daemon=True)
+        thread.start()
+        thread.join()
+        if error:
+            raise error["value"]
+        return result["value"]
+
     # -- TRISHULA -> A2A (inbound) ------------------------------------------
 
     def trishula_message_to_a2a_task(
@@ -304,13 +329,15 @@ class A2ABridge:
                     continue
 
                 task = self.trishula_message_to_a2a_task(data)
-                submitted = self._server.submit(task)
+                submitted, receipt = self._submit_via_spine_sync(task)
                 tasks.append(submitted)
                 self._emit_signal(SIGNAL_A2A_TASK_SUBMITTED, {
                     "task_id": submitted.id,
                     "from": submitted.from_agent,
                     "to": submitted.to_agent,
                     "source": "trishula",
+                    "spine_receipt_id": str(receipt.receipt_id),
+                    "spine_trace_id": receipt.trace_id,
                 })
             except Exception as exc:
                 logger.warning("Failed to ingest trishula message %s: %s", path.name, exc)

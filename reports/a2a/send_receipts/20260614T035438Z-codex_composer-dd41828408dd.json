@@ -1,0 +1,80 @@
+{
+  "ack_subject": "dharma.agent.codex_composer.inbox.ack.dd41828408dd",
+  "ack_tier": "PUBLISH_ACCEPTED",
+  "collaboration_claim": "publish_only",
+  "consumed": false,
+  "contact_evidence_tier": "PUBLISH_ACCEPTED",
+  "file": "/Users/dhyana/.dharma/a2a_bus/collab/convergence/LOCKSTEP_codex-goal-019ec1bc_20260614.md",
+  "live_contact_claim": false,
+  "nats": {
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": false,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "system_ca_store"
+  },
+  "operator_contact_note": "broker accepted the packet; this is not live collaboration by itself",
+  "packet_id": "dd41828408dd",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260614T035438Z-codex_composer-dd41828408dd.json",
+  "replied": false,
+  "reply_payload": null,
+  "reply_subject": "dharma.agent.codex_composer.inbox.reply.dd41828408dd",
+  "route": "agent-inbox",
+  "runtime_truth_ref": {
+    "claim_id": "claim_a2a_send_a723b7743623c916",
+    "correlation_id": "a2a_send:codex_composer:dd41828408dd",
+    "idempotency_inserted": true,
+    "idempotency_key": "idem_a2a_send:dharma.agent.codex_composer.inbox:dd41828408dd",
+    "receipt_id": "rr_run_a2a_send_a723b7743623c916_a2a_send_publish_acked",
+    "run_id": "run_a2a_send_a723b7743623c916",
+    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
+    "side_effect_key": "a2a_send.publish:dharma.agent.codex_composer.inbox:dd41828408dd",
+    "spine_evidence_receipt_ref": {
+      "operation": "a2a_send.publish",
+      "receipt_id": "bfb943b9-345e-423a-9d3f-d8228dcb1296",
+      "span_id": "run_a2a_send_a723b7743623c916",
+      "status": "ok",
+      "task_id": "a2a-send-dd41828408dd",
+      "trace_id": "trace_a2a_send_a723b7743623c916"
+    },
+    "task_id": "a2a-send-dd41828408dd",
+    "trace_id": "trace_a2a_send_a723b7743623c916"
+  },
+  "runtime_warrant_ref": {
+    "action": "publish",
+    "allowed_claims": [
+      "a2a_publish_attempt",
+      "broker_publish_attempt",
+      "publish_only",
+      "runtime_receipt_pending"
+    ],
+    "blocked_claims": [],
+    "idempotency_record_ref": "idempotency_records:idem_a2a_send:dharma.agent.codex_composer.inbox:dd41828408dd:a2a_send.publish:dharma.agent.codex_composer.inbox:dd41828408dd",
+    "receipt_id": "rr_run_a2a_send_a723b7743623c916_warrant_8b2bf427a6211c421e1458f9_granted",
+    "side_effect_key": "a2a_send.publish:dharma.agent.codex_composer.inbox:dd41828408dd",
+    "status": "granted",
+    "surface": "scripts/runtime/a2a_send.py",
+    "warrant_id": "warrant_8b2bf427a6211c421e1458f9"
+  },
+  "schema_version": "dharma.a2a.send_receipt.v1",
+  "seq": 8361,
+  "sha256": "8eb4b6b66a6a8327e050f77e230d1b8a885bfb2911420690362cad67eadaad40",
+  "spine_evidence_receipt_ref": {
+    "operation": "a2a_send.publish",
+    "receipt_id": "bfb943b9-345e-423a-9d3f-d8228dcb1296",
+    "span_id": "run_a2a_send_a723b7743623c916",
+    "status": "ok",
+    "task_id": "a2a-send-dd41828408dd",
+    "trace_id": "trace_a2a_send_a723b7743623c916"
+  },
+  "status": "PUBLISH_ACKED",
+  "stream": "DHARMA_FLEET",
+  "subject": "dharma.agent.codex_composer.inbox",
+  "target_uid": "codex_composer",
+  "timestamp": "2026-06-14T03:54:36Z",
+  "to": "codex_composer",
+  "transport_ack": "JETSTREAM_PUB_ACK"
+}

@@ -665,6 +665,61 @@ class Orchestrator:
             return {}
         return dict(task.metadata)
 
+    @staticmethod
+    def _first_route_text(*values: Any) -> str:
+        for value in values:
+            text = str(value or "").strip()
+            if text:
+                return text
+        return ""
+
+    @classmethod
+    def _runner_served_route_metadata(cls, runner: Any) -> dict[str, str]:
+        provider = cls._first_route_text(
+            getattr(runner, "actual_served_provider", ""),
+            getattr(runner, "served_provider", ""),
+            getattr(runner, "provider_served", ""),
+        )
+        model = cls._first_route_text(
+            getattr(runner, "actual_served_model", ""),
+            getattr(runner, "served_model", ""),
+            getattr(runner, "model_served", ""),
+        )
+        if not provider or not model:
+            return {}
+        source = cls._first_route_text(
+            getattr(runner, "provider_model_truth_source", ""),
+            getattr(runner, "route_truth_source", ""),
+            "orchestrator.runner_actual_served_route",
+        )
+        return {
+            "actual_served_provider": provider,
+            "served_provider": provider,
+            "provider_served": provider,
+            "actual_served_model": model,
+            "served_model": model,
+            "model_served": model,
+            "provider_model_truth_source": source,
+        }
+
+    @classmethod
+    def _stamp_runner_served_route(
+        cls,
+        runner: Any,
+        *,
+        task: Task,
+        td: TaskDispatch,
+    ) -> dict[str, str]:
+        route_metadata = cls._runner_served_route_metadata(runner)
+        if not route_metadata:
+            return {}
+        td.metadata.update(route_metadata)
+        task.metadata = {
+            **cls._task_meta(task),
+            **route_metadata,
+        }
+        return route_metadata
+
     def _resolve_timeout_seconds(self, task: Task | None, fallback: float) -> float:
         meta = self._task_meta(task)
         raw = (
@@ -770,6 +825,33 @@ class Orchestrator:
         td.timeout_seconds = self._resolve_timeout_seconds(task, td.timeout_seconds)
         claim_timeout_seconds = self._resolve_claim_timeout_seconds(task, td.timeout_seconds)
         claim_id = _new_id()
+        trace_id = str(td.metadata.get("trace_id") or meta.get("trace_id") or "").strip()
+        if not trace_id:
+            try:
+                from dharma_swarm.correlation_context import get_correlation
+
+                trace_id = str(get_correlation().trace_id or "").strip()
+            except Exception:
+                trace_id = ""
+        if not trace_id:
+            trace_id = f"trace_{_new_id()}"
+        correlation_id = str(
+            td.metadata.get("correlation_id")
+            or meta.get("correlation_id")
+            or trace_id
+        ).strip()
+        run_id = str(
+            td.metadata.get("runtime_run_id")
+            or td.metadata.get("run_id")
+            or meta.get("runtime_run_id")
+            or meta.get("run_id")
+            or self._runtime_lifecycle.ensure_runtime_run_id(td)
+        ).strip()
+        idempotency_key = str(
+            td.metadata.get("idempotency_key")
+            or meta.get("idempotency_key")
+            or f"idem_{run_id}"
+        ).strip()
         now_epoch = time.time()
         now_iso = datetime.now(timezone.utc).isoformat()
         claim = {
@@ -786,6 +868,11 @@ class Orchestrator:
             {
                 "retry_count": retry_count,
                 "max_retries": max_retries,
+                "trace_id": trace_id,
+                "correlation_id": correlation_id,
+                "runtime_run_id": run_id,
+                "run_id": run_id,
+                "idempotency_key": idempotency_key,
                 "last_claim": claim,
                 "active_claim": claim,
             }
@@ -795,6 +882,11 @@ class Orchestrator:
             meta["cell_id"] = cell_id
             td.metadata["cell_id"] = cell_id
         td.metadata["claim_id"] = claim_id
+        td.metadata["trace_id"] = trace_id
+        td.metadata["correlation_id"] = correlation_id
+        td.metadata["runtime_run_id"] = run_id
+        td.metadata["run_id"] = run_id
+        td.metadata["idempotency_key"] = idempotency_key
         td.metadata["claim_timeout_seconds"] = claim_timeout_seconds
         td.metadata["claim_expires_monotonic"] = time.monotonic() + claim_timeout_seconds
         td.metadata["retry_count"] = retry_count
@@ -1771,6 +1863,7 @@ class Orchestrator:
             status="failed",
             failure_code=failure_class,
             error=error,
+            require_identity=True,
         )
         await self._runtime_lifecycle.record_delegation_run(
             td,
@@ -1778,6 +1871,7 @@ class Orchestrator:
             status="failed",
             failure_code=failure_class,
             error=error,
+            require_identity=True,
         )
         meta.pop("active_claim", None)
         meta["last_error"] = error
@@ -2060,8 +2154,14 @@ class Orchestrator:
             td,
             task=task_for_gate,
             status="claimed",
+            require_identity=True,
         )
-        await self._runtime_lifecycle.record_delegation_run(td, task=task_for_gate, status="claimed")
+        await self._runtime_lifecycle.record_delegation_run(
+            td,
+            task=task_for_gate,
+            status="claimed",
+            require_identity=True,
+        )
         _pe_t2 = _adt.monotonic()
         if self._bus is not None:
             await self._bus.send(Message(
@@ -2149,6 +2249,7 @@ class Orchestrator:
                 td,
                 task=task,
                 status="running",
+                require_identity=True,
             )
             td.metadata["run_started_monotonic"] = time.monotonic()
             self._record_progress_event(
@@ -2347,6 +2448,7 @@ class Orchestrator:
                 td,
                 task=task,
                 status="running",
+                require_identity=True,
             )
             if os.environ.get("DHARMA_SPINE_DISPATCH") == "1":
                 # WS3: route execution through the Runtime Truth Spine's one
@@ -2395,6 +2497,7 @@ class Orchestrator:
                     source="honors_checkpoint",
                 )
                 return
+            self._stamp_runner_served_route(runner, task=task, td=td)
             success_meta = self._task_meta(task)
             success_meta.pop("active_claim", None)
             success_meta.pop("retry_not_before_epoch", None)
@@ -2427,12 +2530,14 @@ class Orchestrator:
                 td,
                 task=task,
                 status="completed",
+                require_identity=True,
             )
             await self._runtime_lifecycle.record_delegation_run(
                 td,
                 task=task,
                 status="completed",
                 result=result,
+                require_identity=True,
             )
 
             # Emit to signal_bus so organism heartbeat, evolution loop,

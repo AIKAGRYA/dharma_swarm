@@ -927,6 +927,129 @@ def _metadata_with_identity(
     }
 
 
+_PROVIDER_MODEL_RECEIPT_METADATA_KEYS = (
+    "actual_served_provider",
+    "served_provider",
+    "actual_provider",
+    "provider_served",
+    "actual_served_model",
+    "served_model",
+    "actual_model",
+    "model_served",
+    "selected_provider",
+    "provider_selected",
+    "provider",
+    "selected_model",
+    "model_selected",
+    "selected_model_hint",
+    "model",
+    "provider_model_truth_source",
+    "route_truth_source",
+    "provider_execution",
+    "provider_model_applicability",
+    "no_provider_model_reason",
+)
+_PROVIDER_MODEL_RECEIPT_CONTEXT_KEYS = (
+    "actual_served_provider",
+    "served_provider",
+    "actual_provider",
+    "provider_served",
+    "actual_served_model",
+    "served_model",
+    "actual_model",
+    "model_served",
+    "provider_model_truth_source",
+    "route_truth_source",
+    "provider_execution",
+    "provider_model_applicability",
+    "no_provider_model_reason",
+)
+
+
+def _provider_model_receipt_payload(metadata: dict[str, Any]) -> dict[str, Any]:
+    if not any(
+        key in metadata and metadata[key] not in ("", None, [], {})
+        for key in _PROVIDER_MODEL_RECEIPT_CONTEXT_KEYS
+    ):
+        return {}
+    return {
+        key: metadata[key]
+        for key in _PROVIDER_MODEL_RECEIPT_METADATA_KEYS
+        if key in metadata and metadata[key] not in ("", None, [], {})
+    }
+
+
+def _ds_goal_receipt_payload(metadata: dict[str, Any]) -> dict[str, Any]:
+    preflight = metadata.get("ds_goal_longrun_preflight")
+    if not isinstance(preflight, dict):
+        return {}
+    return {
+        "ds_goal_longrun_preflight": preflight,
+        "ds_goal_longrun_preflight_status": str(preflight.get("status") or ""),
+        "ds_goal_longrun_preflight_passed": preflight.get("passed") is True,
+        "ds_goal_default_target_repo": str(preflight.get("default_target_repo") or ""),
+    }
+
+
+def _task_claim_receipt_payload(claim: TaskClaim) -> dict[str, Any]:
+    metadata = dict(claim.metadata or {})
+    mission_id = str(
+        metadata.get("mission_id")
+        or metadata.get("missionId")
+        or metadata.get("mission")
+        or ""
+    )
+    mission = str(
+        metadata.get("mission")
+        or mission_id
+        or claim.session_id
+        or claim.task_id
+        or ""
+    )
+    return {
+        "claim_id": claim.claim_id,
+        "mission_id": mission_id,
+        "mission": mission,
+        "retry_count": int(claim.retry_count),
+        "receipt_status": claim.status,
+        **_provider_model_receipt_payload(metadata),
+        **_ds_goal_receipt_payload(metadata),
+    }
+
+
+def _delegation_run_receipt_payload(run: DelegationRun) -> dict[str, Any]:
+    metadata = dict(run.metadata or {})
+    mission_id = str(
+        metadata.get("mission_id")
+        or metadata.get("missionId")
+        or metadata.get("mission")
+        or ""
+    )
+    mission = str(
+        metadata.get("mission")
+        or mission_id
+        or run.session_id
+        or run.task_id
+        or ""
+    )
+    artifact_refs = []
+    current_artifact_id = str(run.current_artifact_id or "")
+    if current_artifact_id:
+        artifact_refs.append(f"artifact_records:{current_artifact_id}")
+    return {
+        "failure_code": run.failure_code,
+        "mission_id": mission_id,
+        "mission": mission,
+        "artifact_refs": artifact_refs,
+        "no_artifact_refs_reason": ""
+        if artifact_refs
+        else "delegation_run has no current_artifact_id",
+        "receipt_status": run.status,
+        **_provider_model_receipt_payload(metadata),
+        **_ds_goal_receipt_payload(metadata),
+    }
+
+
 def _require_identity_match(
     identity: ExecutionIdentity,
     *,
@@ -1445,7 +1568,52 @@ class RuntimeStateStore:
             events_scanned += self.index_ledger_session_sync(target)
         return sessions_scanned, events_scanned
 
-    async def record_task_claim(self, claim: TaskClaim) -> TaskClaim:
+    async def record_task_claim(
+        self,
+        claim: TaskClaim,
+        *,
+        emit_receipt: bool = True,
+    ) -> TaskClaim:
+        identity: ExecutionIdentity | None = None
+        receipt_id = ""
+        side_effect_key = ""
+        receipt_payload: dict[str, Any] = {}
+        inserted_idempotency = False
+        if emit_receipt:
+            try:
+                identity = _required_identity_from_metadata(
+                    claim.metadata,
+                    task_id=claim.task_id,
+                    agent_id=claim.agent_id,
+                    session_id=claim.session_id,
+                )
+            except MissingExecutionIdentity:
+                identity = None
+            if identity is not None:
+                _require_identity_match(
+                    identity,
+                    surface="record_task_claim",
+                    task_id=claim.task_id,
+                    claim_id=claim.claim_id,
+                    agent_id=claim.agent_id,
+                    session_id=claim.session_id,
+                )
+                claim = replace(
+                    claim,
+                    metadata=_metadata_with_identity(claim.metadata, identity),
+                )
+                await self.record_execution_identity(
+                    identity,
+                    source="runtime_state.record_task_claim",
+                )
+                side_effect_key = f"task_claim:{claim.claim_id}:{claim.status}"
+                receipt_id = f"rr_{identity.run_id}_{claim.status}_claim"
+                receipt_payload = _task_claim_receipt_payload(claim)
+                inserted_idempotency = await self.try_begin_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    metadata=receipt_payload,
+                )
         await self.init_db()
         corr = get_correlation()
         trace_id = _trace_from_metadata(claim.metadata) or corr.trace_id
@@ -1487,6 +1655,32 @@ class RuntimeStateStore:
                 ),
             )
             await db.commit()
+        if identity is not None:
+            await self.record_runtime_receipt(
+                RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type="task_claim",
+                    status=claim.status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    side_effect_key=side_effect_key,
+                    payload=receipt_payload,
+                )
+            )
+            if inserted_idempotency:
+                await self.complete_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    status="completed",
+                    result_receipt_id=receipt_id,
+                    metadata=receipt_payload,
+                )
         loaded = await self.get_task_claim(claim.claim_id)
         assert loaded is not None
         return loaded
@@ -1598,7 +1792,54 @@ class RuntimeStateStore:
         )
         return await self.record_task_claim(updated)
 
-    async def record_delegation_run(self, run: DelegationRun) -> DelegationRun:
+    async def record_delegation_run(
+        self,
+        run: DelegationRun,
+        *,
+        emit_receipt: bool = True,
+    ) -> DelegationRun:
+        identity: ExecutionIdentity | None = None
+        receipt_id = ""
+        side_effect_key = ""
+        receipt_payload: dict[str, Any] = {}
+        inserted_idempotency = False
+        if emit_receipt:
+            try:
+                identity = _required_identity_from_metadata(
+                    run.metadata,
+                    task_id=run.task_id,
+                    agent_id=run.assigned_to,
+                    session_id=run.session_id,
+                )
+            except MissingExecutionIdentity:
+                identity = None
+            if identity is not None:
+                _require_identity_match(
+                    identity,
+                    surface="record_delegation_run",
+                    task_id=run.task_id,
+                    claim_id=run.claim_id,
+                    run_id=run.run_id,
+                    agent_id=run.assigned_to,
+                    session_id=run.session_id,
+                )
+                run = replace(
+                    run,
+                    parent_run_id=run.parent_run_id or identity.parent_run_id,
+                    metadata=_metadata_with_identity(run.metadata, identity),
+                )
+                await self.record_execution_identity(
+                    identity,
+                    source="runtime_state.record_delegation_run",
+                )
+                side_effect_key = f"delegation_run:{identity.run_id}:{run.status}"
+                receipt_id = f"rr_{identity.run_id}_{run.status}_run"
+                receipt_payload = _delegation_run_receipt_payload(run)
+                inserted_idempotency = await self.try_begin_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    metadata=receipt_payload,
+                )
         await self.init_db()
         corr = get_correlation()
         trace_id = _trace_from_metadata(run.metadata) or corr.trace_id
@@ -1645,6 +1886,58 @@ class RuntimeStateStore:
                 ),
             )
             await db.commit()
+        if identity is not None:
+            await self.record_runtime_receipt(
+                RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type="delegation_run",
+                    status=run.status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    side_effect_key=side_effect_key,
+                    payload=receipt_payload,
+                )
+            )
+            if inserted_idempotency:
+                await self.complete_idempotent_side_effect(
+                    identity,
+                    side_effect_key,
+                    status="completed",
+                    result_receipt_id=receipt_id,
+                    metadata=receipt_payload,
+                )
+            if identity.parent_run_id and run.status in {"queued", "claimed", "running"}:
+                await self.record_receipt_for_identity(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_spawned",
+                    receipt_type="child_spawned",
+                    status=run.status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "assigned_to": identity.agent_id,
+                    },
+                )
+            if identity.parent_run_id and run.status in {"completed", "failed"}:
+                await self.record_receipt_for_identity(
+                    identity,
+                    receipt_id=f"rr_{identity.parent_run_id}_{identity.run_id}_child_completed_{run.status}",
+                    receipt_type="child_completed",
+                    status=run.status,
+                    side_effect_key=f"child:{identity.parent_run_id}:{identity.run_id}",
+                    payload={
+                        "child_run_id": identity.run_id,
+                        "parent_run_id": identity.parent_run_id,
+                        "failure_code": run.failure_code,
+                    },
+                )
         loaded = await self.get_delegation_run(run.run_id)
         assert loaded is not None
         return loaded
@@ -1744,6 +2037,19 @@ class RuntimeStateStore:
                 source="runtime_state.create_task_claim_sync",
             )
         trace_id = identity.trace_id if identity is not None else _trace_from_metadata(claim.metadata)
+        side_effect_key = ""
+        receipt_id = ""
+        receipt_payload: dict[str, Any] = {}
+        inserted_idempotency = False
+        if identity is not None:
+            side_effect_key = f"task_claim:{claim.claim_id}:{claim.status}"
+            receipt_id = f"rr_{identity.run_id}_{claim.status}_claim"
+            receipt_payload = _task_claim_receipt_payload(claim)
+            inserted_idempotency = self.try_begin_idempotent_side_effect_sync(
+                identity,
+                side_effect_key,
+                metadata=receipt_payload,
+            )
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -1783,13 +2089,31 @@ class RuntimeStateStore:
             )
             db.commit()
         if identity is not None:
-            self.record_receipt_for_identity_sync(
-                identity,
-                receipt_id=f"rr_{identity.run_id}_{claim.status}_claim",
-                receipt_type="task_claim",
-                status=claim.status,
-                payload={"claim_id": claim.claim_id},
+            self.record_runtime_receipt_sync(
+                RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type="task_claim",
+                    status=claim.status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    side_effect_key=side_effect_key,
+                    payload=receipt_payload,
+                )
             )
+            if inserted_idempotency:
+                self.complete_idempotent_side_effect_sync(
+                    identity,
+                    side_effect_key,
+                    status="completed",
+                    result_receipt_id=receipt_id,
+                    metadata=receipt_payload,
+                )
         return self.get_task_claim_sync(claim.claim_id) or claim
 
     def get_task_claim_sync(self, claim_id: str) -> TaskClaim | None:
@@ -1891,6 +2215,19 @@ class RuntimeStateStore:
                 source="runtime_state.create_delegation_run_sync",
             )
         trace_id = identity.trace_id if identity is not None else _trace_from_metadata(run.metadata)
+        side_effect_key = ""
+        receipt_id = ""
+        receipt_payload: dict[str, Any] = {}
+        inserted_idempotency = False
+        if identity is not None:
+            side_effect_key = f"delegation_run:{identity.run_id}:{run.status}"
+            receipt_id = f"rr_{identity.run_id}_{run.status}_run"
+            receipt_payload = _delegation_run_receipt_payload(run)
+            inserted_idempotency = self.try_begin_idempotent_side_effect_sync(
+                identity,
+                side_effect_key,
+                metadata=receipt_payload,
+            )
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
@@ -1935,13 +2272,31 @@ class RuntimeStateStore:
             )
             db.commit()
         if identity is not None:
-            self.record_receipt_for_identity_sync(
-                identity,
-                receipt_id=f"rr_{identity.run_id}_{run.status}_run",
-                receipt_type="delegation_run",
-                status=run.status,
-                payload={"failure_code": run.failure_code},
+            self.record_runtime_receipt_sync(
+                RuntimeReceipt(
+                    receipt_id=receipt_id,
+                    receipt_type="delegation_run",
+                    status=run.status,
+                    run_id=identity.run_id,
+                    task_id=identity.task_id,
+                    trace_id=identity.trace_id,
+                    correlation_id=identity.correlation_id,
+                    causation_id=identity.causation_id,
+                    parent_run_id=identity.parent_run_id,
+                    agent_id=identity.agent_id,
+                    idempotency_key=identity.idempotency_key,
+                    side_effect_key=side_effect_key,
+                    payload=receipt_payload,
+                )
             )
+            if inserted_idempotency:
+                self.complete_idempotent_side_effect_sync(
+                    identity,
+                    side_effect_key,
+                    status="completed",
+                    result_receipt_id=receipt_id,
+                    metadata=receipt_payload,
+                )
             if identity.parent_run_id and run.status in {"queued", "claimed", "running"}:
                 self.record_receipt_for_identity_sync(
                     identity,

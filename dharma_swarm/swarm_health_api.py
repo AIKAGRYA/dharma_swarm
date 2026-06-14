@@ -99,6 +99,17 @@ def _provider_status() -> dict:
     }
 
 
+def _runtime_dispatch_status() -> dict:
+    """Non-secret runtime dispatch mode for daemon/default proof."""
+    enabled = os.environ.get("DHARMA_SPINE_DISPATCH") == "1"
+    return {
+        "spine_dispatch_enabled": enabled,
+        "dispatch_mode": "spine" if enabled else "legacy",
+        "env_key_present": "DHARMA_SPINE_DISPATCH" in os.environ,
+        "source": "process_env_non_secret_boolean",
+    }
+
+
 def _telos_summary() -> dict:
     obj_path = _STATE_DIR / "telos" / "objectives.jsonl"
     if not obj_path.exists():
@@ -160,6 +171,7 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
                 "uptime": _uptime(),
                 "timestamp": _utc_now(),
                 "version": "dharma_swarm",
+                "runtime_dispatch": _runtime_dispatch_status(),
             })
             status = "200 OK"
 
@@ -170,6 +182,7 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
                 "loops": _loop_status(),
                 "evolution": _evolution_summary(),
                 "providers": _provider_status(),
+                "runtime_dispatch": _runtime_dispatch_status(),
                 "telos": _telos_summary(),
             }, indent=2)
             status = "200 OK"

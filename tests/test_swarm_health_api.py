@@ -7,6 +7,7 @@ Validates:
 - _read_lines: tail behavior
 - _loop_status: structure and status values
 - _provider_status: keys present
+- _runtime_dispatch_status: non-secret process dispatch mode
 - _telos_summary: no-data and with-data
 - _evolution_summary: no-data and with-data
 """
@@ -137,6 +138,40 @@ class TestProviderStatus:
         assert result["circuit_breakers"] == {"open": ["test"]}
         assert result["shadow_mode"] is True
         assert result["autonomy_level"] == 1
+
+
+# ---------------------------------------------------------------------------
+# _runtime_dispatch_status
+# ---------------------------------------------------------------------------
+
+
+class TestRuntimeDispatchStatus:
+    def test_reports_legacy_when_flag_absent(self, monkeypatch):
+        monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+
+        result = health_api._runtime_dispatch_status()
+
+        assert result == {
+            "spine_dispatch_enabled": False,
+            "dispatch_mode": "legacy",
+            "env_key_present": False,
+            "source": "process_env_non_secret_boolean",
+        }
+
+    def test_reports_spine_when_flag_enabled(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
+
+        result = health_api._runtime_dispatch_status()
+
+        assert result["spine_dispatch_enabled"] is True
+        assert result["dispatch_mode"] == "spine"
+        assert result["env_key_present"] is True
+        assert set(result) == {
+            "spine_dispatch_enabled",
+            "dispatch_mode",
+            "env_key_present",
+            "source",
+        }
 
 
 # ---------------------------------------------------------------------------

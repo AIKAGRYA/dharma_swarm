@@ -27,6 +27,30 @@ def _stub_td(agent="agent-1", task_id="t-123"):
     )
 
 
+def test_runner_served_route_metadata_requires_explicit_served_fields():
+    runner = types.SimpleNamespace(
+        _config=types.SimpleNamespace(provider="openrouter", model="qwen3-coder-live")
+    )
+
+    assert Orchestrator._runner_served_route_metadata(runner) == {}
+
+
+def test_runner_served_route_metadata_preserves_actual_served_fields_only():
+    runner = types.SimpleNamespace(
+        actual_served_provider="openrouter",
+        actual_served_model="qwen3-coder-live",
+        provider_model_truth_source="agent_runner.llm_response",
+    )
+
+    route = Orchestrator._runner_served_route_metadata(runner)
+
+    assert route["actual_served_provider"] == "openrouter"
+    assert route["actual_served_model"] == "qwen3-coder-live"
+    assert route["provider_model_truth_source"] == "agent_runner.llm_response"
+    assert "selected_provider" not in route
+    assert "selected_model" not in route
+
+
 def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
     calls = {"n": 0}
 

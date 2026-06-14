@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import sqlite3
 import time
 from datetime import datetime, timezone
 
@@ -1099,6 +1100,40 @@ async def test_dispatch_dropoff_requeues_once_when_runner_missing(tmp_path):
         task_id == "t-dropoff" and fields.get("status") == TaskStatus.PENDING
         for task_id, fields in board.updates
     )
+
+    runtime_db = tmp_path / "runtime.db"
+    with sqlite3.connect(runtime_db) as db:
+        rows = db.execute(
+            """
+            SELECT receipt_id, receipt_type, status, run_id, task_id,
+                   idempotency_key, side_effect_key
+            FROM runtime_receipts
+            WHERE task_id = ?
+              AND receipt_type IN ('task_claim', 'delegation_run')
+            ORDER BY created_at, receipt_type
+            """,
+            ("t-dropoff",),
+        ).fetchall()
+        assert rows
+        assert {row[1] for row in rows} == {"task_claim", "delegation_run"}
+        assert {row[2] for row in rows} >= {"claimed", "failed"}
+        assert all(row[3] for row in rows)
+        assert all(row[5] for row in rows)
+        assert all(row[6] for row in rows)
+        missing_idempotency = db.execute(
+            """
+            SELECT COUNT(*)
+            FROM runtime_receipts rr
+            LEFT JOIN idempotency_records ir
+              ON rr.idempotency_key = ir.idempotency_key
+             AND rr.side_effect_key = ir.side_effect_key
+            WHERE rr.task_id = ?
+              AND rr.receipt_type IN ('task_claim', 'delegation_run')
+              AND ir.idempotency_key IS NULL
+            """,
+            ("t-dropoff",),
+        ).fetchone()[0]
+        assert missing_idempotency == 0
 
 
 def test_prepare_claim_uses_explicit_room_metadata() -> None:

@@ -15,14 +15,12 @@ test("buildDashboardNavSections keeps the canonical operator deck contiguous nea
   const expectedLabels = [
     "Overview",
     "Cockpit",
-    "Control Surface",
     ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.label),
     "Conv. Log",
   ];
   const expectedHrefs = [
     "/dashboard",
     "/dashboard/cockpit",
-    "/dashboard/control-surface",
     ...CONTROL_PLANE_ROUTE_DECK.map((route) => route.href),
   ];
 

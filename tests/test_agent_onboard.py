@@ -186,6 +186,40 @@ def test_active_track_evidence_is_consumed_when_present():
     assert "ACTIVE PORTFOLIO" in result.stdout
 
 
+def test_active_track_readiness_line_renders_score_cap(capsys):
+    mod = _load_module()
+    evidence = {
+        "portfolio_summary": {"active": 1, "warn_active": 5, "max_active": 10},
+        "spine_coverage": {"substrate-nativeness": True},
+        "active_tracks": [
+            {
+                "id": "runtime-truth-spine-adoption-2026-06",
+                "status": "ACTIVE",
+                "serves": "substrate-nativeness",
+                "shippable": True,
+                "completion_progress": {"passed": 9, "total": 9},
+                "readiness_baseline": {"score": 54, "scale": 100},
+                "hardening_status": {
+                    "current_score": 70,
+                    "scale": 100,
+                    "evidence_ref": "reports/governance/runtime_spine_dispatch_mode_progress_2026-06-14.md",
+                },
+                "readiness_score_cap": {
+                    "cap_score": 70,
+                    "scale": 100,
+                    "within_cap": True,
+                },
+                "criteria": [],
+            }
+        ],
+    }
+
+    mod.render_active_track(evidence, {})
+
+    out = capsys.readouterr().out
+    assert "readiness: baseline=54/100; current=70/100; cap=70/100;" in out
+
+
 # ---------------------------------------------------------------------------
 # The onboarding command must not own any fact
 # ---------------------------------------------------------------------------
@@ -266,6 +300,221 @@ def test_runtime_truth_render_is_read_only(tmp_path, monkeypatch, capsys):
     assert any(row["surface_id"] == "runtime_state.store" for row in rows)
     assert all(row["is_authoritative"] is False for row in rows)
     assert all(row["is_projection"] is True for row in rows)
+
+
+def test_live_ops_cockpit_flags_stale_census(tmp_path, monkeypatch, capsys):
+    """A stale live-process census must not render as merely present."""
+    mod = _load_module()
+    state = tmp_path / "state"
+    receipt = state / "ops/live_process_census.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(
+        json.dumps({
+            "schema_version": "live_ops_census.v1",
+            "generated_at": "2000-01-01T00:00:00Z",
+            "summary": {
+                "total": 15,
+                "by_status": {"live": 1, "stopped": 14},
+                "human_authority_required": 4,
+                "vps_candidates": 1,
+            },
+            "surfaces": [
+                {
+                    "id": "substrate.dharma_daemon",
+                    "status": "live",
+                    "raw": {
+                        "dispatch_launch": {"state": "spine_enabled_launch_spec"},
+                        "running_dispatch_proof": "not_inspected_no_secret_env_dump",
+                        "runtime_receipt_active_head": {
+                            "active_head_side_effect_key_clean": False,
+                            "runtime_receipts_total": 7657,
+                            "latest_created_at": (
+                                "2026-06-13T22:29:48.795782+00:00"
+                            ),
+                            "latest_age_hours": 7.4,
+                            "latest_max_age_hours": 6.0,
+                            "latest_fresh": False,
+                            "windows": [
+                                {
+                                    "window_minutes": 5,
+                                    "total": 56,
+                                    "missing_side_effect_key": 56,
+                                },
+                                {
+                                    "window_minutes": 15,
+                                    "total": 60,
+                                    "missing_side_effect_key": 60,
+                                },
+                            ],
+                        },
+                        "runtime_receipt_coverage": {
+                            "latest_sample_size": 250,
+                            "latest_with_provider_model_payload": 0,
+                            "latest_major_task_receipts_provider_model_percent": 0.0,
+                            "provider_model_latest_complete": False,
+                            "field_gap_producer_groups": [
+                                {
+                                    "gap_type": "mission_payload",
+                                    "receipt_type": "delegation_run",
+                                    "producer_source": "orchestrator",
+                                    "producer_failure_code": "execution_error",
+                                    "missing": 7,
+                                    "freshness_class": "recent_historical_24h",
+                                }
+                            ],
+                            "field_gap_summary": {
+                                "total_missing": 7,
+                                "group_count": 1,
+                                "active_head_missing": 0,
+                                "recent_historical_missing": 7,
+                                "older_historical_missing": 0,
+                                "quarantine_candidate_missing": 7,
+                                "by_freshness_class": {"recent_historical_24h": 7},
+                            },
+                            "field_gap_action_queue": [
+                                {
+                                    "short_label": "orchestrator_error",
+                                    "action": (
+                                        "repair_or_quarantine_orchestrator_error_receipts"
+                                    ),
+                                    "missing": 7,
+                                    "priority": 3,
+                                    "fresh_proof": {
+                                        "status": "fresh_scoped_proof_recorded",
+                                    },
+                                }
+                            ],
+                            "gate_70_to_75_components": [
+                                {"short_label": "core", "status": "fail"},
+                                {"short_label": "idempotency", "status": "fail"},
+                                {"short_label": "mission", "status": "fail"},
+                                {"short_label": "artifact", "status": "fail"},
+                                {"short_label": "active_head", "status": "fail"},
+                            ],
+                        },
+                    },
+                },
+                {
+                    "id": "dashboard.local",
+                    "status": "live",
+                    "raw": {
+                        "control_surface_rows_probe": {
+                            "state": "timeout",
+                        },
+                    },
+                },
+                {
+                    "id": "cli.ds_goal",
+                    "status": "live",
+                    "proof_gaps": ["ds_goal_cli_target_repo_mismatch"],
+                    "raw": {
+                        "target_repo": "/Users/dhyana/dharma_swarm_main",
+                        "target_resolution_source": (
+                            "installed_wrapper_dharma_swarm_main_preference"
+                        ),
+                        "target_matches_current_repo": False,
+                        "safe_current_checkout_invocation": (
+                            "DHARMA_SWARM_REPO=/Users/dhyana/dharma_swarm "
+                            "/Users/dhyana/.dharma/bin/ds-goal"
+                        ),
+                        "default_wrapper_target": {
+                            "target_repo": "/Users/dhyana/dharma_swarm_main",
+                        },
+                        "installed_wrapper_contract": {
+                            "wrapper_sha256": "abc123def4567890",
+                            "dharma_swarm_repo_pin_supported": True,
+                        },
+                        "target_sync_receipt_hardening": {
+                            "state": "sync_receipt_side_effect_keys_missing",
+                        },
+                        "convergence_decision_packet": {
+                            "approval_state": "operator_approval_required",
+                        },
+                        "longrun_preflight_gate": {
+                            "status": "blocked_unpinned_default_target",
+                        },
+                    },
+                },
+            ],
+        }),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+
+    mod.render_live_ops_cockpit()
+    output = capsys.readouterr().out
+
+    assert "Receipt       : present" in output
+    assert "Generated     : 2000-01-01T00:00:00Z" in output
+    assert "; stale)" in output
+    assert (
+        "Daemon spine  : launch=spine_enabled_launch_spec; "
+        "running=not_inspected_no_secret_env_dump"
+    ) in output
+    assert (
+        "Receipt head : clean=false; fresh=false; age_hours=7.4; "
+        "max_age_hours=6.0; total=7657; "
+        "latest=2026-06-13T22:29:48.795782+00:00; "
+        "windows=5m:56/56,15m:60/60"
+    ) in output
+    assert (
+        "Provider/model: latest=0/250; percent=0.0; proof=0/250; "
+        "proof_percent=unknown; accounted=0/250; accounted_percent=unknown; "
+        "terminal=0/0; terminal_percent=unknown; "
+        "terminal_proof=0/0; terminal_proof_percent=unknown; "
+        "terminal_accounted=0/0; terminal_accounted_percent=unknown; "
+        "pending=0; complete=false; "
+        "field_gap_producers=mission_payload/delegation_run/orchestrator/"
+        "execution_error=7@recent_historical_24h; "
+        "field_gap_summary=total:7|recent_historical_24h:7|"
+        "quarantine_candidate:7; field_gap_actions=orchestrator_error:7; "
+        "field_gap_proofs=orchestrator_error:fresh; "
+        "gate_70_75=core:fail|idempotency:fail|mission:fail|artifact:fail|"
+        "active_head:fail"
+    ) in output
+    assert (
+        "ds-goal CLI  : target=/Users/dhyana/dharma_swarm_main; "
+        "source=installed_wrapper_dharma_swarm_main_preference; "
+        "default=/Users/dhyana/dharma_swarm_main; matches_current=false; "
+        "wrapper_sha256=abc123def456; pin=true; "
+        "hardening=sync_receipt_side_effect_keys_missing; "
+        "decision=operator_approval_required; "
+        "preflight=blocked_unpinned_default_target; "
+        "safe=DHARMA_SWARM_REPO=/Users/dhyana/dharma_swarm "
+        "/Users/dhyana/.dharma/bin/ds-goal"
+    ) in output
+    assert (
+        "Proof gaps    : 3 surface(s): "
+        "substrate.dharma_daemon=daemon_dispatch_runtime_unproven,"
+        "daemon_runtime_receipts_active_head_dirty,"
+        "daemon_runtime_receipts_stale; "
+        "dashboard.local=dashboard_control_surface_rows_unproven; "
+        "cli.ds_goal=ds_goal_cli_target_repo_mismatch"
+    ) in output
+    assert "Refresh       : python3 scripts/runtime/live_ops_census.py --write" in output
+
+
+def test_live_ops_cockpit_flags_schema_invalid_census(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    """A malformed live-process census must not render as zero clean surfaces."""
+    mod = _load_module()
+    state = tmp_path / "state"
+    receipt = state / "ops/live_process_census.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("DHARMA_STATE_DIR", str(state))
+
+    mod.render_live_ops_cockpit()
+    output = capsys.readouterr().out
+
+    assert f"Receipt       : invalid {receipt}" in output
+    assert "schema_version is missing" in output
+    assert "surfaces is missing or not a list" in output
+    assert "Refresh       : python3 scripts/runtime/live_ops_census.py --write" in output
+    assert "Surfaces      :" not in output
 
 
 # ---------------------------------------------------------------------------

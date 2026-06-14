@@ -17,6 +17,8 @@ sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 from check_track_status import (  # type: ignore  # noqa: E402
     normalize_portfolio,
     validate_portfolio_graph,
+    validate_readiness_score_caps,
+    readiness_score_cap,
     detect_dependency_cycle,
     _parse_minimal_yaml,
     Finding,
@@ -334,3 +336,95 @@ def test_track_policy_grace_enforced_default_is_false() -> None:
 def test_track_policy_grace_enforced_pass_through() -> None:
     p = _portfolio([_track("a")], policy={"min_active_grace_enforced": True})
     assert p["track_policy"]["min_active_grace_enforced"] is True
+
+
+# --- readiness score cap ----------------------------------------------------
+
+def _runtime_score_track(current_score: int, gates_passed: list[str]):
+    return _track(
+        "runtime-truth-spine-adoption-2026-06",
+        readiness_baseline={"score": 54, "scale": 100},
+        hardening_status={
+            "current_score": current_score,
+            "scale": 100,
+            "gates_passed": gates_passed,
+        },
+    )
+
+
+def test_readiness_score_cap_allows_current_score_at_declared_gate() -> None:
+    track = _runtime_score_track(
+        70,
+        [
+            "54_to_60: baseline visible in active governance",
+            "60_to_65: bypass list has no unknowns",
+            "65_to_70: dispatch strict gate passes",
+        ],
+    )
+
+    cap = readiness_score_cap(track)
+
+    assert cap is not None
+    assert cap["cap_score"] == 70
+    assert cap["current_score"] == 70
+    assert cap["within_cap"] is True
+
+
+def test_readiness_score_cap_blocks_current_score_above_declared_gate() -> None:
+    track = _runtime_score_track(
+        75,
+        [
+            "54_to_60: baseline visible in active governance",
+            "60_to_65: bypass list has no unknowns",
+            "65_to_70: dispatch strict gate passes",
+        ],
+    )
+    findings: list[Finding] = []
+
+    validate_readiness_score_caps([track], findings)
+
+    assert any(
+        f.severity == "ERROR"
+        and f.check == "score-cap:runtime-truth-spine-adoption-2026-06"
+        and "exceeds executable gate cap 70/100" in f.message
+        for f in findings
+    )
+
+
+def test_readiness_score_cap_ignores_scoped_post_gate_prose() -> None:
+    track = _runtime_score_track(
+        75,
+        [
+            "54_to_60: baseline visible in active governance",
+            "60_to_65: bypass list has no unknowns",
+            "65_to_70: dispatch strict gate passes",
+            (
+                "post_70_fresh_dropoff_field_gate: scoped proof mentions "
+                "the 70->75 receipt field gate but is not production readiness"
+            ),
+        ],
+    )
+
+    cap = readiness_score_cap(track)
+
+    assert cap is not None
+    assert cap["cap_score"] == 70
+    assert cap["within_cap"] is False
+
+
+def test_readiness_score_cap_advances_only_on_contiguous_gate_label() -> None:
+    track = _runtime_score_track(
+        75,
+        [
+            "54_to_60: baseline visible in active governance",
+            "60_to_65: bypass list has no unknowns",
+            "65_to_70: dispatch strict gate passes",
+            "70_to_75: strict receipt coverage gate passes",
+        ],
+    )
+
+    cap = readiness_score_cap(track)
+
+    assert cap is not None
+    assert cap["cap_score"] == 75
+    assert cap["within_cap"] is True

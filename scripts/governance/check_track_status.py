@@ -38,6 +38,7 @@ REPORTS_DIR = Path("reports/governance")
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
+SCORE_GATE_RE = re.compile(r"^\s*(\d+)_to_(\d+)\s*:")
 
 
 @dataclass
@@ -415,7 +416,8 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
     if n > policy["max_active"]:
         findings.append(Finding("ERROR", "wip-exceeded",
             f"{n} ACTIVE tracks exceed max_active={policy['max_active']}. "
-            "Close or merge a track before opening more."))
+            "Operator lifecycle decision required: explicitly stage, split, merge, "
+            "raise the cap, or close a track with PR-merge-level authorization."))
     elif n > policy["warn_active"]:
         findings.append(Finding("WARN", "wip-high",
             f"{n} ACTIVE tracks exceed warn_active={policy['warn_active']} — focus is spreading thin."))
@@ -475,6 +477,102 @@ def validate_portfolio_graph(p: dict[str, Any], findings: list[Finding]) -> None
                     "Declare conflicts_with or split the surfaces."))
             else:
                 owner[s] = t.get("id")
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        if isinstance(value, bool):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def readiness_score_cap(t: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the declared executable score cap for a track, when present.
+
+    Only score-gate labels that start a `gates_passed` entry, such as
+    `65_to_70: ...`, move the cap. Later prose like `post_70 ... 70->75 ...`
+    is deliberately ignored so scoped proof text cannot inflate readiness.
+    """
+    baseline = t.get("readiness_baseline")
+    hardening = t.get("hardening_status")
+    if not isinstance(baseline, dict) and not isinstance(hardening, dict):
+        return None
+    baseline = baseline if isinstance(baseline, dict) else {}
+    hardening = hardening if isinstance(hardening, dict) else {}
+    baseline_score = _int_or_none(baseline.get("score"))
+    current_score = _int_or_none(hardening.get("current_score"))
+    scale = _int_or_none(hardening.get("scale", baseline.get("scale", 100))) or 100
+    errors: list[str] = []
+    if baseline_score is None:
+        errors.append("readiness_baseline.score is missing or not an integer")
+    if current_score is None:
+        errors.append("hardening_status.current_score is missing or not an integer")
+
+    declared_gates: list[dict[str, int]] = []
+    for raw in hardening.get("gates_passed") or []:
+        if not isinstance(raw, str):
+            continue
+        match = SCORE_GATE_RE.match(raw)
+        if not match:
+            continue
+        source, target = int(match.group(1)), int(match.group(2))
+        declared_gates.append({"from": source, "to": target})
+
+    cap_score = baseline_score
+    reachable_gates: list[dict[str, int]] = []
+    if cap_score is not None:
+        remaining = declared_gates[:]
+        moved = True
+        while moved:
+            moved = False
+            for gate in remaining[:]:
+                if gate["from"] == cap_score and gate["to"] >= cap_score:
+                    cap_score = gate["to"]
+                    reachable_gates.append(gate)
+                    remaining.remove(gate)
+                    moved = True
+                    break
+
+    within_cap = (
+        not errors
+        and cap_score is not None
+        and current_score is not None
+        and current_score <= cap_score
+    )
+    return {
+        "baseline_score": baseline_score,
+        "current_score": current_score,
+        "cap_score": cap_score,
+        "scale": scale,
+        "within_cap": within_cap,
+        "declared_score_gates": declared_gates,
+        "reachable_score_gates": reachable_gates,
+        "errors": errors,
+    }
+
+
+def validate_readiness_score_caps(tracks: list[dict[str, Any]], findings: list[Finding]) -> None:
+    for t in tracks:
+        cap = readiness_score_cap(t)
+        if cap is None:
+            continue
+        tid = t.get("id")
+        for error in cap["errors"]:
+            findings.append(Finding("ERROR", f"score-cap:{tid}", f"[{tid}] {error}."))
+        if cap["errors"]:
+            continue
+        if not cap["within_cap"]:
+            findings.append(Finding(
+                "ERROR",
+                f"score-cap:{tid}",
+                f"[{tid}] hardening_status.current_score={cap['current_score']}/"
+                f"{cap['scale']} exceeds executable gate cap {cap['cap_score']}/"
+                f"{cap['scale']}. Add a contiguous score gate entry such as "
+                "`70_to_75: ...` only after the executable gate passes, or lower "
+                "current_score.",
+            ))
 
 
 def detect_dependency_cycle(tracks: list[dict[str, Any]], findings: list[Finding]) -> None:
@@ -579,6 +677,7 @@ def run(args: argparse.Namespace) -> int:
 
     # Portfolio-level graph invariants.
     validate_portfolio_graph(p, findings)
+    validate_readiness_score_caps(p["active_tracks"], findings)
     detect_dependency_cycle(p["active_tracks"], findings)
 
     prior_passed = _load_prior_passed()
@@ -621,7 +720,8 @@ def run(args: argparse.Namespace) -> int:
         if r["shippable"]:
             findings.append(Finding("INFO", f"track-shippable:{tid}",
                 f"[{tid}] all {r['total']} completion criteria pass — SHIPPABLE; "
-                "close it (and optionally open the next)."))
+                "operator lifecycle review required. Do not close an active track "
+                "solely from gate output."))
         elif r["completion"]:
             findings.append(Finding("INFO", f"track-in-progress:{tid}",
                 f"[{tid}] {r['passed']}/{r['total']} completion criteria pass."))
@@ -633,7 +733,7 @@ def run(args: argparse.Namespace) -> int:
 
 
 def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload = {
         "id": t.get("id"),
         "name": t.get("name"),
         "status": t.get("status"),
@@ -651,6 +751,13 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],
     }
+    for key in ("readiness_baseline", "hardening_status"):
+        if isinstance(t.get(key), dict):
+            payload[key] = t[key]
+    cap = readiness_score_cap(t)
+    if cap is not None:
+        payload["readiness_score_cap"] = cap
+    return payload
 
 
 def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
@@ -720,6 +827,14 @@ def emit_reports(findings: list[Finding], portfolio: dict[str, Any] | None,
                   f"depends_on: {tp['depends_on']} · conflicts_with: {tp['conflicts_with']}")
         md.append(f"- owned_surfaces: {tp['owned_surfaces']}")
         md.append(f"- moves_vital_signs: {tp['moves_vital_signs']}")
+        cap = tp.get("readiness_score_cap")
+        if cap:
+            state = "within cap" if cap.get("within_cap") else "OVER CAP"
+            md.append(
+                f"- readiness_score_cap: current={cap.get('current_score')}/"
+                f"{cap.get('scale')} · cap={cap.get('cap_score')}/"
+                f"{cap.get('scale')} · {state}"
+            )
         md.append("")
         for c in tp["criteria"]:
             mark = "✓" if c["passed"] else "✗"

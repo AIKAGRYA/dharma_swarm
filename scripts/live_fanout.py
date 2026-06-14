@@ -10,6 +10,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
+from dharma_swarm.spine.manual_runner import run_manual_agent_runner_via_spine
 from dharma_swarm.swarm import SwarmManager
 
 
@@ -54,13 +55,21 @@ async def main():
 
         async def run_one(agent_state, task):
             runner = await swarm._agent_pool.get(agent_state.id)
-            return await runner.run_task(task)
+            result, receipt = await run_manual_agent_runner_via_spine(
+                runner,
+                task,
+                surface="scripts/live_fanout.py",
+                agent_name=agent_state.name,
+            )
+            return result, receipt
 
-        results = await asyncio.gather(
+        run_results = await asyncio.gather(
             run_one(agents[0], tasks[0]),
             run_one(agents[1], tasks[1]),
             run_one(agents[2], tasks[2]),
         )
+        results = [item[0] for item in run_results]
+        receipts = [item[1] for item in run_results]
 
         elapsed = time.monotonic() - t0
         print(f"\n--- All 3 completed in {elapsed:.1f}s ---\n")
@@ -68,6 +77,9 @@ async def main():
         for agent, task, result in zip(agents, tasks, results):
             print(f"[{agent.name}] {task.title}:")
             print(f"  {result.strip()}\n")
+        print("EvidenceReceipts:")
+        for receipt in receipts:
+            print(f"  {receipt.receipt_id}")
 
         # Store results in memory
         await swarm.remember(f"Fan-out test completed: 3 tasks in {elapsed:.1f}s")

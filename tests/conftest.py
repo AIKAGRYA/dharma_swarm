@@ -56,6 +56,21 @@ def _isolate_dgc_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_runtime_state_default(tmp_path, monkeypatch):
+    """Redirect default runtime.db writes away from the operator's live DB.
+
+    Some tests construct high-level objects such as Orchestrator without an
+    explicit RuntimeStateStore. Those paths eventually fall through to
+    runtime_state.DEFAULT_RUNTIME_DB, so keep that default per-test.
+    """
+    runtime_root = tmp_path / "_runtime_state_isolated"
+    runtime_db = runtime_root / "runtime.db"
+    monkeypatch.setenv("DHARMA_RUNTIME_DB", str(runtime_db))
+    monkeypatch.setenv("DGC_LEDGER_DIR", str(runtime_root / "ledgers"))
+    monkeypatch.setattr("dharma_swarm.runtime_state.DEFAULT_RUNTIME_DB", runtime_db)
+
+
+@pytest.fixture(autouse=True)
 def _isolate_stigmergy(tmp_path, monkeypatch):
     """Redirect StigmergyStore to a tmpdir so tests never pollute ~/.dharma/stigmergy/marks.jsonl."""
     test_base = tmp_path / "_stigmergy_isolated"

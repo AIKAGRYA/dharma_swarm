@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
+import dharma_swarm.thinkodynamic_director as director_mod
 from dharma_swarm.engine.conversation_memory import ConversationMemoryStore
 from dharma_swarm.model_hierarchy import default_model
 from dharma_swarm.models import AgentRole, AgentState, AgentStatus, ProviderType, TaskStatus
@@ -402,6 +403,71 @@ async def test_deliberate_council_writes_heuristic_dialogue_without_swarm(
     assert "Director Council Dialogue" in dialogue
     assert "codex-primus" in dialogue
     assert "opus-primus" in dialogue
+
+
+@pytest.mark.asyncio
+async def test_query_council_member_uses_spine_for_named_runner(
+    director: ThinkodynamicDirector,
+    monkeypatch,
+) -> None:
+    class _Runner:
+        async def run_task(self, task):
+            return "council says ship the narrow proof"
+
+    traversals = []
+
+    async def _counting_invoke(task, agent_id, context_id, routing, *, invoker):
+        receipt = await invoker(
+            task=task,
+            agent_id=agent_id,
+            context_id=context_id,
+            routing=routing,
+        )
+        traversals.append((task, agent_id, context_id, routing, receipt))
+        return receipt
+
+    async def _fake_find_swarm_runner(name: str):
+        return _Runner()
+
+    monkeypatch.setattr(director_mod, "invoke_agent", _counting_invoke)
+    director._find_swarm_runner = _fake_find_swarm_runner  # type: ignore[assignment]
+
+    member = DirectorMindSpec(
+        name="codex-primus",
+        role="meta",
+        provider="openai",
+        model="codex-test",
+        backend="codex-cli",
+        purpose="meta",
+    )
+    workflow = WorkflowPlan(
+        cycle_id="council-spine",
+        workflow_id="wf-council-spine",
+        opportunity_id="opp-council-spine",
+        opportunity_title="Spine council lane",
+        theme="autonomy",
+        thesis="Council runners should traverse the spine.",
+        why_now="Direct runtime paths need receipts.",
+        expected_duration_min=5,
+        tasks=[],
+    )
+
+    turn = await director._query_council_member(
+        member,
+        workflow,
+        vision_result={"vision_text": "Keep moving."},
+        sense_result={"opportunities": []},
+    )
+
+    assert turn.success is True
+    assert turn.content == "council says ship the narrow proof"
+    assert len(traversals) == 1
+    _, agent_id, context_id, routing, receipt = traversals[0]
+    assert agent_id == "codex-primus"
+    assert context_id == "thinkodynamic-council:wf-council-spine"
+    assert routing.router_name == "thinkodynamic_director"
+    assert receipt.operation == "invoke_agent"
+    assert receipt.attributes["source"] == "thinkodynamic_director_council"
 
 
 @pytest.mark.asyncio
@@ -887,6 +953,7 @@ async def test_execute_pending_tasks_suppresses_untrusted_fallback_delegations(
 @pytest.mark.asyncio
 async def test_execute_pending_tasks_prefers_named_swarm_agent(
     director: ThinkodynamicDirector,
+    monkeypatch,
 ) -> None:
     await director.init()
 
@@ -944,6 +1011,19 @@ async def test_execute_pending_tasks_prefers_named_swarm_agent(
 
     runner = _FakeRunner()
     director._swarm_agent_pool = _FakePool(runner)
+    traversals = []
+
+    async def _counting_invoke(task, agent_id, context_id, routing, *, invoker):
+        receipt = await invoker(
+            task=task,
+            agent_id=agent_id,
+            context_id=context_id,
+            routing=routing,
+        )
+        traversals.append((task, agent_id, context_id, routing, receipt))
+        return receipt
+
+    monkeypatch.setattr(director_mod, "invoke_agent", _counting_invoke)
 
     async def _unexpected_spawn(*args, **kwargs):
         raise AssertionError("spawn_agent should not be used when a named runner is available")
@@ -957,6 +1037,14 @@ async def test_execute_pending_tasks_prefers_named_swarm_agent(
     assert results[0]["agent_name"] == "codex-primus"
     assert runner.last_task is not None
     assert runner.last_task.metadata["available_provider_types"] == [ProviderType.CODEX.value]
+    assert len(traversals) == 1
+    _, agent_id, context_id, routing, receipt = traversals[0]
+    assert agent_id == "agent-codex-1"
+    assert context_id == "wf-named-agent"
+    assert routing.router_name == "thinkodynamic_director"
+    assert receipt.operation == "invoke_agent"
+    assert receipt.attributes["source"] == "thinkodynamic_director_named_runner"
+    assert runner.last_task.metadata["evidence_receipt_id"] == str(receipt.receipt_id)
 
 
 @pytest.mark.asyncio

@@ -14,20 +14,23 @@ evidence into `/dashboard/cockpit`.
 
 Read in this order:
 
-1. `make onboard`
-2. `docs/governance/ACTIVE_TRACK.yaml`
-3. `ACTIVE_SURFACE_MANIFEST.yaml`
-4. `docs/state/LIVE_OPS_DASHBOARD.md`
-5. `docs/state/BROKEN_REGISTER.md`
-6. `docs/governance/SOVEREIGN_MANIFEST.md`
-7. `docs/governance/ANTI_SLOP_RULES.md`
-8. `docs/governance/CANONICAL_DOC_STACK.md`
-9. `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`
-10. `docs/ops/TMUX_AGENT_SUBSTRATE.md`
+1. `/dashboard/cockpit`
+2. `make onboard`
+3. `docs/governance/ACTIVE_TRACK.yaml`
+4. `ACTIVE_SURFACE_MANIFEST.yaml`
+5. `docs/state/LIVE_OPS_DASHBOARD.md`
+6. `docs/state/BROKEN_REGISTER.md`
+7. `docs/governance/SOVEREIGN_MANIFEST.md`
+8. `docs/governance/ANTI_SLOP_RULES.md`
+9. `docs/governance/CANONICAL_DOC_STACK.md`
+10. `docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md`
+11. `docs/ops/TMUX_AGENT_SUBSTRATE.md`
 
-`make onboard` is the front door. The files above own intent, declared
-surfaces, operating state, known breaks, doctrine, anti-duplication rules,
-transport boundaries, and terminal-persistence boundaries.
+`/dashboard/cockpit` is the human front door. `make onboard` is the agent
+intake door: it renders the same authority stack for agents, but it is not the
+operator UI. The files above own intent, declared surfaces, operating state,
+known breaks, doctrine, anti-duplication rules, transport boundaries, and
+terminal-persistence boundaries.
 
 ## Census Receipt
 

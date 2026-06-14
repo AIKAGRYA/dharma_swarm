@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -76,6 +76,8 @@ help:
 	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
+	@echo "  make ds-goal-longrun-preflight-check Block unpinned repo-owned ds-goal longrun workflow commands"
+	@echo "  make cybernetics-codex-audit Render read-only cybernetic loop closure ledger"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
@@ -337,12 +339,15 @@ memory-kernel-full-power-preflight:
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
 
+ds-goal-longrun-preflight-check:
+	$(PYTHON) scripts/governance/ds_goal_longrun_preflight_report.py --strict
+
 # spine-check is composed into uplift-guards via
 # scripts/uplift_guards/check_spine_ownership.py (PR A.5 governance
 # convergence). It is intentionally NOT a separate governance-all
 # dependency — running it once via uplift-guards is enough. The standalone
 # `make spine-check` target stays as an operator-convenience alias only.
-governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity
+governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget ds-goal-longrun-preflight-check docops-integrity
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
@@ -351,6 +356,9 @@ agent-build-closeout:
 	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
 	$(MAKE) governance-all
 	@printf "\nAgent build closeout complete. Hygiene audit receipt: /tmp/dharma-hygiene-audit.txt\n"
+
+cybernetics-codex-audit:
+	$(REPO_PYTHON) scripts/governance/cybernetics_codex_audit.py
 
 spine-check:
 	$(PYTHON) -m scripts.uplift_guards.check_spine_ownership

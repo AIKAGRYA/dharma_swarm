@@ -32,10 +32,12 @@ Usage::
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import httpx
 
+from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.agent_card import AgentCard, CardRegistry
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
@@ -344,7 +346,7 @@ class A2AClient:
         context_id: str = "",
     ) -> DelegationResult:
         """Dispatch to local A2AServer (in-process)."""
-        trace_id = _current_trace_id()
+        trace_id = _current_trace_id() or f"trc_{uuid.uuid4().hex[:16]}"
         task = A2ATask(
             from_agent=from_agent,
             to_agent=card.name,
@@ -358,7 +360,13 @@ class A2AClient:
             "Local delegation to %s: capability=%s, message=%s...",
             card.name, capability, message[:80],
         )
-        result_task = self._server.submit(task)
+        bridge = A2ABridge(server=self._server, registry=self._registry)
+        result_task, receipt = bridge._submit_via_spine_sync(task)
+        result_task.metadata = {
+            **dict(result_task.metadata or {}),
+            "spine_receipt_id": str(receipt.receipt_id),
+            "spine_trace_id": receipt.trace_id,
+        }
         # Auto-release chain entry when task reaches terminal state
         if result_task.is_terminal():
             self.notify_terminal(context_id, from_agent, card.name, capability)

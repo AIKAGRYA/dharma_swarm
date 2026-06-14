@@ -14,7 +14,7 @@ consumes the same hygiene layer through `docs/ops/PR_REVIEW_CONTROL.md`.
 |---|---|---|---|---|
 | 1 | `dharma.no-unauthorized-dharma-write` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active (advisory) |
 | 2 | `dharma.no-new-substrate` | `.semgrep/dharma-anti-slop.yml` | WARNING | Active |
-| 3 | `dharma.test-no-default-state` | `scripts/governance/check_test_hygiene.py` (Semgrep auto-excludes `tests/`) | warn-only locally, hard fail on PR for NEW offenders | Active |
+| 3 | `dharma.test-no-default-state` | `scripts/governance/check_test_hygiene.py` (Semgrep auto-excludes `tests/`) | hard fail locally and on PR (`--warn-only` available for audit) | Active |
 | 4 | `dharma.scripts-no-git-add-all` | `.semgrep/dharma-anti-slop.yml` | ERROR | Active — 1 known violation in `dharma_swarm/build_engine.py:269` |
 | 5 | `dharma.tests-no-dgc-subprocess` | `scripts/governance/check_test_hygiene.py` (Semgrep auto-excludes `tests/`) | hard fail on PR | Active |
 | 6 | `dharma.providers-canonical` | `.semgrep/dharma-anti-slop.yml` | WARNING (→ ERROR after offender fix) | Active |
@@ -70,9 +70,10 @@ rule severity from WARNING to ERROR (or, for Rule 4 already at ERROR,
 remove the inline allowlist).
 
 - **Rule 3 (`test-no-default-state`)**:
-  `tests/test_full_loop.py:343` — `state = RuntimeStateStore()` without
-  `db_path=tmp_path / "test.db"`. Auto-allowlisted in
-  `scripts/governance/check_test_hygiene.py::known_offender_3()`.
+  resolved on 2026-06-14 by passing an explicit temp runtime DB in
+  `tests/test_full_loop.py`; there is no remaining known-offender allowlist.
+  The scanner parses calls with `ast` and fails missing/`None` `db_path`
+  variants, not only the exact `RuntimeStateStore()` spelling.
 - **Rule 4 (`scripts-no-git-add-all`)**:
   `dharma_swarm/build_engine.py:269` — `subprocess.run(["git","add","-A"],
   cwd=project_path, ...)` inside `_git_commit()` for the build engine's

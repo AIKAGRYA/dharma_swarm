@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import re
 import sys
 from datetime import UTC, datetime, timedelta
@@ -24,6 +25,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dharma_swarm.operator_core.living_agent_kernel import KernelRunStore, LivingAgentKernel  # noqa: E402
+from dharma_swarm.operator_core.ds_goal_wrapper_contract import wrapper_longrun_preflight_gate  # noqa: E402
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash, utc_now  # noqa: E402
 from dharma_swarm.board.adapters.ds_goal_adapter import load_ds_goal_cards  # noqa: E402
 from dharma_swarm.runtime_state import (  # noqa: E402
@@ -375,11 +377,25 @@ def _runtime_operation_hash_for_ds_goal(mission_id: str, task_id: str) -> str:
     )
 
 
+def _ds_goal_longrun_preflight_for_receipt() -> dict[str, Any]:
+    env_pin = str(os.environ.get("DHARMA_SWARM_REPO") or "").strip()
+    repo_pin = Path(env_pin).expanduser() if env_pin else None
+    repo_pin_source = "DHARMA_SWARM_REPO" if env_pin else "none"
+    return wrapper_longrun_preflight_gate(
+        home=Path.home(),
+        audited_repo=ROOT,
+        wrapper=Path.home() / ".dharma" / "bin" / "ds-goal",
+        repo_pin=repo_pin,
+        repo_pin_source=repo_pin_source,
+    )
+
+
 def _begin_runtime_truth_for_dispatch(
     *,
     args: argparse.Namespace,
     task: dict[str, Any],
     wake_id: str,
+    ds_goal_preflight: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     task_id = str(task.get("task_id") or task.get("id") or "")
@@ -411,6 +427,13 @@ def _begin_runtime_truth_for_dispatch(
         "agent_id": identity.agent_id,
         "session_id": identity.session_id,
         "operation_hash": _runtime_operation_hash_for_ds_goal(mission_id, task_id),
+        "provider_execution": False,
+        "provider_model_applicability": "not_applicable",
+        "provider_model_truth_source": "runtime_control.no_provider_execution",
+        "no_provider_model_reason": "living_agent_kernel_v1_no_provider_execution",
+        "ds_goal_longrun_preflight": ds_goal_preflight
+        if ds_goal_preflight is not None
+        else _ds_goal_longrun_preflight_for_receipt(),
     }
     store = RuntimeStateStore(_runtime_db_path(args))
     store.record_execution_identity_sync(identity, source="ds_goal.autonomy_spine", metadata=metadata)
@@ -744,11 +767,36 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         return 0
 
+    ds_goal_preflight = _ds_goal_longrun_preflight_for_receipt()
+    if ds_goal_preflight.get("longrun_start_allowed") is not True:
+        receipt = _append_receipt(
+            mission_dir,
+            {
+                **receipt_base,
+                "status": "preflight_blocked",
+                "ds_goal_longrun_preflight": ds_goal_preflight,
+                "reason": str(ds_goal_preflight.get("reason") or ""),
+            },
+        )
+        _print(
+            {
+                "status": "preflight_blocked",
+                "mission_id": args.mission_id,
+                "task_id": receipt_base["task_id"],
+                "mission_dir": str(mission_dir),
+                "receipt_hash": receipt["record_hash"],
+                "ds_goal_longrun_preflight": ds_goal_preflight,
+            },
+            as_json=args.json,
+        )
+        return 2
+
     wake_id = f"dsgoal-{args.mission_id}-{uuid4().hex[:8]}"
     runtime_dispatch = _begin_runtime_truth_for_dispatch(
         args=args,
         task=task,
         wake_id=wake_id,
+        ds_goal_preflight=ds_goal_preflight,
     )
     if not runtime_dispatch["idempotency_inserted"]:
         receipt = _append_receipt(

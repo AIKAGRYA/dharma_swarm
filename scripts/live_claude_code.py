@@ -18,6 +18,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
+from dharma_swarm.spine.manual_runner import run_manual_agent_runner_via_spine
 from dharma_swarm.swarm import SwarmManager
 
 
@@ -61,11 +62,18 @@ async def main(role: str, thread: str | None):
         # Execute
         runner = await swarm._agent_pool.get(agent.id)
         print(f"--- Executing via claude -p (timeout 5min)... ---")
-        result = await runner.run_task(task)
+        result, receipt = await run_manual_agent_runner_via_spine(
+            runner,
+            task,
+            surface="scripts/live_claude_code.py",
+            agent_name=agent.name,
+            timeout_seconds=300.0,
+        )
 
         print("\n========== AGENT OUTPUT ==========")
         print(result)
         print("===================================\n")
+        print(f"EvidenceReceipt: {receipt.receipt_id}")
 
         print(f"Tasks completed: {runner.state.tasks_completed}")
         print(f"Agent status: {runner.state.status.value}")

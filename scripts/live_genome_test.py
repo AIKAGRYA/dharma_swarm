@@ -9,6 +9,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dharma_swarm.models import AgentRole, ProviderType
+from dharma_swarm.spine.manual_runner import run_manual_agent_runner_via_spine
 from dharma_swarm.swarm import SwarmManager
 
 
@@ -48,11 +49,17 @@ async def main():
 
         runner = await swarm._agent_pool.get(agent.id)
         print("Calling LLM with v7 rules + surgeon briefing + mechanistic thread...\n")
-        result = await runner.run_task(task)
+        result, receipt = await run_manual_agent_runner_via_spine(
+            runner,
+            task,
+            surface="scripts/live_genome_test.py",
+            agent_name=agent.name,
+        )
 
         print("========== SURGEON RESPONSE ==========")
         print(result)
         print("=======================================\n")
+        print(f"EvidenceReceipt: {receipt.receipt_id}")
 
         # Now test a cartographer on the phenomenological thread
         agent2 = await swarm.spawn_agent(
@@ -74,11 +81,17 @@ async def main():
 
         runner2 = await swarm._agent_pool.get(agent2.id)
         print("Calling LLM with v7 rules + cartographer briefing + phenomenological thread...\n")
-        result2 = await runner2.run_task(task2)
+        result2, receipt2 = await run_manual_agent_runner_via_spine(
+            runner2,
+            task2,
+            surface="scripts/live_genome_test.py",
+            agent_name=agent2.name,
+        )
 
         print("======= CARTOGRAPHER RESPONSE =========")
         print(result2)
         print("========================================\n")
+        print(f"EvidenceReceipt: {receipt2.receipt_id}")
 
         # Check thread rotation
         swarm.rotate_thread()

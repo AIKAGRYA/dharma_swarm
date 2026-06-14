@@ -66,6 +66,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
     A2AServer,
@@ -119,6 +120,20 @@ def init_gateway(
     _started_at = datetime.now(timezone.utc).isoformat()
     _load_allowed_keys()
     logger.info("Node gateway initialized: node_id=%s", node_id)
+
+
+async def _submit_task_via_spine(task: A2ATask) -> A2ATask:
+    """Submit through the A2A spine adapter while preserving gateway responses."""
+    if _server is None or _registry is None:
+        raise HTTPException(status_code=503, detail="Gateway not initialized")
+    bridge = A2ABridge(server=_server, registry=_registry)
+    result, receipt = await bridge.submit_via_spine(task)
+    result.metadata = {
+        **dict(result.metadata or {}),
+        "spine_receipt_id": str(receipt.receipt_id),
+        "spine_trace_id": receipt.trace_id,
+    }
+    return result
 
 
 def _load_allowed_keys() -> None:
@@ -191,16 +206,32 @@ def _task_to_dict(task: A2ATask) -> dict[str, Any]:
 
 
 def _strip_internal_fields(obj: Any) -> None:
-    """Recursively remove internal fields (prefixed with _) from dicts."""
+    """Recursively remove internal fields and normalize JSON primitives."""
     if isinstance(obj, dict):
         for key in list(obj.keys()):
             if key.startswith("_"):
                 del obj[key]
             else:
-                _strip_internal_fields(obj[key])
+                obj[key] = _json_safe_value(obj[key])
     elif isinstance(obj, list):
-        for item in obj:
-            _strip_internal_fields(item)
+        for idx, item in enumerate(obj):
+            obj[idx] = _json_safe_value(item)
+
+
+def _json_safe_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        _strip_internal_fields(value)
+        return value
+    if isinstance(value, list):
+        _strip_internal_fields(value)
+        return value
+    if isinstance(value, tuple):
+        return [_json_safe_value(item) for item in value]
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return value
 
 
 def _utc_now() -> str:
@@ -240,7 +271,7 @@ def _parse_task_from_body(body: dict[str, Any]) -> A2ATask:
         to_agent=body.get("to_agent", ""),
         capability=body.get("capability", ""),
         context_id=body.get("context_id", ""),
-        trace_id=body.get("trace_id", ""),
+        trace_id=body.get("trace_id", "") or f"trc_{uuid.uuid4().hex[:16]}",
         history=messages,
         metadata=metadata,
     )
@@ -319,7 +350,7 @@ async def submit_task_v1(request: Request) -> JSONResponse:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = _server.submit(task)
+    result = await _submit_task_via_spine(task)
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,
@@ -429,7 +460,7 @@ async def submit_task_legacy(request: Request) -> JSONResponse:
         raise HTTPException(status_code=503, detail="Gateway not initialized")
     body = await request.json()
     task = _parse_task_from_body(body)
-    result = _server.submit(task)
+    result = await _submit_task_via_spine(task)
     return JSONResponse(
         content=_task_to_dict(result),
         status_code=201 if result.status != A2ATaskStatus.FAILED else 422,

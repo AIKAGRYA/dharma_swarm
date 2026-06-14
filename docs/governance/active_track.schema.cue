@@ -77,7 +77,7 @@
 #TrackPolicy: {
 	model?:                        string
 	min_active:                    int & >=1            // floor; default 1 in checker
-	max_active:                    int & >=1 & <=10     // ceiling — focus protection
+	max_active:                    int & >=1 & <=11     // ceiling — focus protection
 	warn_active:                   int & >=1
 	min_active_grace_days?:        int & >=0
 	allow_active_active_conflict?: bool

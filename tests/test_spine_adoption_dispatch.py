@@ -10,11 +10,13 @@ Proves four invariants:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
-from dharma_swarm.a2a.agent_card import CardRegistry
+from dharma_swarm.a2a.agent_card import AgentCapability, AgentCard, CardRegistry
+from dharma_swarm.a2a.a2a_client import A2AClient
 from dharma_swarm.a2a.a2a_server import (
     A2AMessage,
     A2AServer,
@@ -241,6 +243,96 @@ async def test_a2a_bridge_receipt_links_routing_decision(
     assert receipt.attributes["a2a_task_id"]
 
 
+def test_trishula_inbox_ingest_routes_through_spine(
+    registry: CardRegistry,
+    tmp_path: Path,
+    monkeypatch,
+):
+    """TRISHULA inbound files use submit_via_spine, not direct server.submit."""
+    from dharma_swarm.a2a import a2a_bridge as bridge_mod
+
+    traversals: list[EvidenceReceipt] = []
+    real_invoke = bridge_mod.invoke_agent
+
+    async def counting_invoke(*args, **kwargs):
+        receipt = await real_invoke(*args, **kwargs)
+        traversals.append(receipt)
+        return receipt
+
+    monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
+    bridge, _ = _make_bridge(registry)
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "msg1.json").write_text(
+        json.dumps(
+            {
+                "from": "agni",
+                "to": "coder",
+                "type": "task",
+                "subject": "Review",
+                "body": "Check this patch",
+                "trace_id": "trace_trishula_spine",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    tasks = bridge.ingest_trishula_inbox(inbox_path=inbox)
+
+    assert len(tasks) == 1
+    assert tasks[0].status == A2ATaskStatus.COMPLETED
+    assert len(traversals) == 1
+    assert traversals[0].operation == "invoke_agent"
+    assert traversals[0].trace_id == "trace_trishula_spine"
+
+
+def test_a2a_client_local_dispatch_routes_through_spine(
+    registry: CardRegistry,
+    monkeypatch,
+):
+    from dharma_swarm.a2a import a2a_bridge as bridge_mod
+
+    traversals: list[EvidenceReceipt] = []
+    real_invoke = bridge_mod.invoke_agent
+
+    async def counting_invoke(*args, **kwargs):
+        receipt = await real_invoke(*args, **kwargs)
+        traversals.append(receipt)
+        return receipt
+
+    monkeypatch.setattr(bridge_mod, "invoke_agent", counting_invoke)
+    server = A2AServer()
+
+    def handler(task: A2ATask) -> A2ATask:
+        task.result = "done"
+        task.status = A2ATaskStatus.COMPLETED
+        return task
+
+    server.register_handler("code_review", handler)
+    registry.register(
+        AgentCard(
+            name="local-reviewer",
+            role="reviewer",
+            status="idle",
+            capabilities=[AgentCapability("code_review", "Review code")],
+        )
+    )
+    client = A2AClient(registry=registry, server=server, default_from="orchestrator")
+
+    result = client.delegate_to(
+        "local-reviewer",
+        "Review this patch",
+        capability="code_review",
+    )
+
+    assert result.success
+    assert result.task is not None
+    assert result.task.metadata["spine_receipt_id"]
+    assert len(traversals) == 1
+    assert traversals[0].operation == "invoke_agent"
+    assert traversals[0].trace_id.startswith("trc_")
+
+
 # ---------------------------------------------------------------------------
 # 7. Bypass report script is importable and classifies correctly
 # ---------------------------------------------------------------------------
@@ -353,3 +445,40 @@ def test_no_dropoff_sources_remain():
         "Stale allowlist entries (declared but no matching site found): "
         + ", ".join(f"{f}:{ln}" for f, ln in sorted(stale))
     )
+
+
+def test_intentional_bypasses_are_quarantined_with_owner_and_verifier():
+    """Intentional bypasses are not vague exceptions.
+
+    Each remaining allowlist entry must name the owning track, quarantine
+    status, migration target, and verification hook so the runtime-spine score
+    can move only on executable evidence.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "spine_bypass_report",
+        Path(__file__).resolve().parents[1]
+        / "scripts"
+        / "governance"
+        / "spine_bypass_report.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    assert set(mod._BYPASS_QUARANTINE) == set(mod._INTENTIONAL_BYPASS)
+
+    entries = [
+        entry
+        for entry in mod._scan_production_submits()
+        if entry.classification == "intentional"
+    ]
+    if not mod._INTENTIONAL_BYPASS:
+        assert entries == []
+        return
+
+    for entry in entries:
+        assert entry.owner, f"{entry.file}:{entry.line} missing owner"
+        assert entry.quarantine_status == "quarantined"
+        assert entry.migration_target, f"{entry.file}:{entry.line} missing migration target"
+        assert entry.verification, f"{entry.file}:{entry.line} missing verification"
