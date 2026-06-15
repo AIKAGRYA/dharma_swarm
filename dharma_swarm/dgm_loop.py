@@ -390,6 +390,7 @@ class DGMLoop:
                 shadow=self._shadow_mode,
                 timeout=timeout,
                 context=full_context,
+                parent_id=result.parent_id,
             )
 
             result.proposals_submitted = evo_result.proposals_submitted
