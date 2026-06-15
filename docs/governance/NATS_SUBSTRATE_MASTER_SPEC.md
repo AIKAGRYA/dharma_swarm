@@ -209,6 +209,68 @@ The CLI prints:
 Without NATS ack proof the command exits non-zero and prints `NATS_UNAVAILABLE`
 or `NATS_ACK_UNVERIFIED`.
 
+### Operator A2A Send Fallback
+
+`scripts/runtime/a2a_send.py` may use the installed `nats` CLI as a governed
+fallback when `nats-py` is unavailable in the active Python environment. This
+fallback still publishes to the same NATS/JetStream subject and writes the same
+receipt schema. It must not use filesystem mirrors as a substitute success
+signal.
+
+The sender keeps `--route a2a` as a compatibility path for
+`dharma.a2a.<agent>`. For hot-contact work against a stable internal inbox, use
+`--route agent-inbox`, which publishes to
+`dharma.agent.<agent_uid>.inbox` and records `route` plus `target_uid` in the
+receipt. Known aliases may resolve display handles such as `hermes` to stable
+UIDs such as `hermes-m5`; callers may pass `--agent-uid` for explicit routing.
+
+The CLI fallback can prove at most `PUBLISH_ACCEPTED`. It cannot claim
+`HANDLER_ACKED` or `DOMAIN_RECEIPTED`, because it does not own the target
+handler's ack/reply path. Operator hot contact still requires the stronger
+tiers above.
+
+### Agent Inbox Delivery Bridge
+
+`scripts/runtime/a2a_inbox_bridge.py` is the governed delivery-handler bridge
+for `dharma.agent.<agent_uid>.inbox` pull durables. It drains an explicit
+stream/consumer pair, persists the envelope into the target filesystem inbox,
+publishes the envelope `ack_subject`, and only then broker-acks the pulled
+message.
+
+This bridge can produce a delivery `HANDLER_ACKED` receipt for the inbox path.
+It is not a semantic peer reply and must not claim that the target model read,
+understood, co-signed, or answered the packet. Semantic collaboration still
+requires the target agent to publish the `reply_subject` or emit a typed domain
+receipt.
+
+### Target-Owned Domain Reply Worker
+
+`scripts/runtime/a2a_domain_reply_worker.py` is the governed bridge from a
+target-owned reply artifact to the recorded A2A `reply_subject`. It does not
+generate peer replies. It validates that the artifact lives under the target
+agent outbox, names the target agent as its actor, matches the original
+`packet_id`, and emits a typed `dharma.a2a.domain_receipt.v1` payload only after
+that validation passes.
+
+This worker can publish the payload that later allows
+`scripts/runtime/a2a_reply_capture.py` to record `DOMAIN_RECEIPTED`. Failed
+artifact validation, missing NATS client, or publish failure must remain
+`NO_CONTACT` / non-semantic evidence. Codex, Fable, Hermes, Devin, and other
+agents must not use this worker to launder a Codex-authored file into a fake
+peer reply.
+
+### Reply Capture Receipts
+
+`scripts/runtime/a2a_reply_capture.py` verifies asynchronous replies after the
+sender process has exited. It reads the `reply_subject` from an A2A send
+receipt, checks the NATS/JetStream stream for a payload on that subject, and
+writes a reply-capture receipt under `reports/a2a/reply_receipts/`.
+
+No reply is recorded as `NO_REPLY`; it must not be treated as peer agreement.
+An untyped reply-subject payload is `REPLY_CAPTURED` and proves only that a
+payload appeared on the reply subject. `DOMAIN_RECEIPTED` requires a typed
+Dharma reply/domain receipt schema such as `dharma.a2a.domain_receipt.v1`.
+
 ## JetStream KV And Object Store
 
 JetStream KV may own ephemeral fleet presence, last heartbeat, lease pointers,

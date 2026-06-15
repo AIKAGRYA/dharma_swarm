@@ -438,6 +438,10 @@ def test_runtime_truth_projector_reads_runtime_db_without_writing(tmp_path: Path
     assert latest.mission_id == "mission-1"
     assert latest.receipt_refs == ("runtime_receipts:receipt-1",)
     assert latest.artifact_refs == ("artifact_records:artifact-1:artifacts/run-1/result.md",)
+    assert "idempotency_records:idem-1:a2a.submit" in latest.source_refs
+    assert latest.metadata["idempotency_record_ref"] == "idempotency_records:idem-1:a2a.submit"
+    assert latest.metadata["idempotency_result_receipt_ref"] == "runtime_receipts:receipt-1"
+    assert "idempotency_record" not in latest.missing_machine_fields
     assert latest.heartbeat_state is RuntimeTruthState.RUNNING_BY_HEARTBEAT
     assert latest.progress_state is RuntimeTruthState.PROGRESSING_BY_ARTIFACT
     assert latest.completion_state is RuntimeTruthState.COMPLETED_BY_RECEIPT

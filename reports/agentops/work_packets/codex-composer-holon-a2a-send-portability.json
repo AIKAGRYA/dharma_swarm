@@ -1,0 +1,41 @@
+{
+  "id": "codex-composer-holon-a2a-send-portability",
+  "base_ref": "HEAD",
+  "branch": "chore/codex-holon-a2a-send-portability",
+  "worktree": "/Users/dhyana/promotion_worktrees/codex_holon_a2a_send_portability",
+  "intent": "Make the operator A2A send path portable for Codex Composer peer-holon packets: when nats-py is absent, either fail with a clearer receipt or use a governed NATS CLI fallback that records the same ack-tier schema. Do not create a second bus or weaken NATS_SUBSTRATE_MASTER_SPEC.",
+  "allowed_files": [
+    "scripts/runtime/a2a_send.py",
+    "tests/test_a2a_send.py",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "ACTIVE_TRACK.yaml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/spine/**",
+    "api/**",
+    "dashboard/**"
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "a2a-send-tests",
+      "command": "python3 -m pytest -q tests/test_a2a_send.py"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(a2a): make peer-holon sender receipt-portable"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

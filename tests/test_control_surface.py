@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import dharma_swarm.operator_core.control_surface as control_surface
+import dharma_swarm.operator_core.control_surface_memory as control_surface_memory_module
 from dharma_swarm.operator_core.control_surface import (
     COHERENCE_STATES,
     AgentHandoffPrompt,
@@ -629,6 +630,25 @@ class TestMemoryKernelOperatorRows:
         assert report["persistence"] == "projected_not_persisted"
         assert report["hard_failure_count"] >= 1
 
+    def test_snapshot_depth_defers_deep_memory_kernel_probe(
+        self,
+        tmp_repo: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fail_deep_probe(_repo_root: Path):  # noqa: ANN202
+            raise AssertionError("snapshot projection must not run deep MemoryKernel probe")
+
+        monkeypatch.setattr(control_surface_memory_module, "_kernel_projection", fail_deep_probe)
+
+        rows = memory_kernel_control_rows(tmp_repo, depth="snapshot")
+        readiness = [row for row in rows if row.id == "memory.readiness"][0]
+        census = [row for row in rows if row.id == "memory.census"][0]
+
+        assert readiness.raw["projection_mode"] == "snapshot_deep_probe_deferred"
+        assert readiness.raw["deep_probe_deferred"] is True
+        assert "memory_deep_probe_deferred" in readiness.gap_codes
+        assert census.raw["schema_version"] == "memory_kernel_control_snapshot.v1"
+
 
 # ---------------------------------------------------------------------------
 # Go receipt lane adapter
@@ -748,6 +768,24 @@ class TestControlSurfaceAPI:
         assert isinstance(memory_row["source_refs"][0], dict)
         assert "path" in memory_row["source_refs"][0]
 
+    def test_rows_default_to_snapshot_memory_depth(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/rows")
+        assert resp.status_code == 200
+        rows = resp.json()["data"]
+        readiness = [row for row in rows if row["id"] == "memory.readiness"][0]
+
+        assert readiness["raw"]["projection_mode"] == "snapshot_deep_probe_deferred"
+        assert readiness["raw"]["deep_probe_deferred"] is True
+        assert "memory_deep_probe_deferred" in readiness["gap_codes"]
+
+    def test_summary_reports_snapshot_memory_depth(self) -> None:
+        client = _control_surface_client()
+        resp = client.get("/api/control-surface/summary")
+        assert resp.status_code == 200
+
+        assert resp.json()["data"]["memory_depth"] == "snapshot"
+
     def test_row_by_id_returns_envelope(self) -> None:
         client = _control_surface_client()
         rows_resp = client.get("/api/control-surface/rows")
@@ -801,6 +839,30 @@ class TestDashboardControlSurfacePage:
         assert "OpsRunbookPanel" in text
         assert 'from "@/components/cockpit/OpsRunbookPanel"' in text
         assert "<OpsRunbookPanel rows={rows} selectedRow={selectedRow} />" in text
+
+    def test_control_surface_renders_ds_goal_mission_cards_panel(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "DsGoalMissionCardsPanel" in text
+        assert 'from "@/components/cockpit/DsGoalMissionCardsPanel"' in text
+        assert "<DsGoalMissionCardsPanel />" in text
+
+    def test_control_surface_renders_agentops_work_packet_cards_panel(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "AgentOpsWorkPacketCardsPanel" in text
+        assert 'from "@/components/cockpit/AgentOpsWorkPacketCardsPanel"' in text
+        assert "<AgentOpsWorkPacketCardsPanel />" in text
+
+    def test_control_surface_renders_a2a_send_cards_panel(self) -> None:
+        repo_root = Path(__file__).resolve().parent.parent
+        page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "control-surface" / "page.tsx"
+        text = page.read_text(encoding="utf-8")
+        assert "A2ASendCardsPanel" in text
+        assert 'from "@/components/cockpit/A2ASendCardsPanel"' in text
+        assert "<A2ASendCardsPanel />" in text
 
     def test_control_surface_page_does_not_import_shell_control(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent

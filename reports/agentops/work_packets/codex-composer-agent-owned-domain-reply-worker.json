@@ -1,0 +1,87 @@
+{
+  "id": "codex-composer-agent-owned-domain-reply-worker",
+  "title": "Build target-owned A2A domain reply worker",
+  "status": "planned",
+  "created_at": "2026-06-11T08:38:11Z",
+  "created_by": "codex_composer",
+  "base_ref": "HEAD",
+  "branch": "chore/a2a-agent-owned-domain-reply-worker",
+  "worktree": "/Users/dhyana/promotion_worktrees/a2a_agent_owned_domain_reply_worker",
+  "intent": "Close the post-handler A2A semantic-reply gap without fake peer authorship. The current system proves Hermes M5 handler delivery through the inbox bridge and proves NO_REPLY through reply capture. Build or specify the smallest target-owned mechanism that can emit a typed dharma.a2a.domain_receipt.v1 payload to the sender's recorded reply_subject, so scripts/runtime/a2a_reply_capture.py can honestly record DOMAIN_RECEIPTED when a real target runtime participates.",
+  "allowed_files": [
+    "scripts/runtime/a2a_reply_capture.py",
+    "scripts/runtime/a2a_inbox_bridge.py",
+    "scripts/runtime/a2a_send.py",
+    "scripts/runtime/a2a_domain_reply_worker.py",
+    "tests/test_a2a_reply_capture.py",
+    "tests/test_a2a_inbox_bridge.py",
+    "tests/test_a2a_send.py",
+    "tests/test_a2a_domain_reply_worker.py",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "docs/ops/TMUX_AGENT_SUBSTRATE.md",
+    "reports/a2a/**",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "ACTIVE_TRACK.yaml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/spine/**",
+    ".env",
+    "**/*secret*",
+    "**/*token*",
+    "**/*key*"
+  ],
+  "facts": {
+    "stream": "DHARMA_FLEET",
+    "primary_target": "hermes-m5",
+    "primary_consumer": "hermes_inbox",
+    "primary_inbox_subject": "dharma.agent.hermes-m5.inbox",
+    "live_handler_packet_id": "35b2bfe0cd9a",
+    "live_handler_send_receipt": "reports/a2a/send_receipts/20260611T082450Z-hermes-35b2bfe0cd9a.json",
+    "live_handler_bridge_receipt": "reports/a2a/inbox_bridge_receipts/20260611T082442Z-hermes-m5-35b2bfe0cd9a.json",
+    "live_reply_capture_receipt": "reports/a2a/reply_receipts/20260611T083232Z-hermes-35b2bfe0cd9a.json",
+    "current_highest_contact_tier": "HANDLER_ACKED",
+    "current_reply_tier": "NO_REPLY",
+    "required_reply_schema": "dharma.a2a.domain_receipt.v1"
+  },
+  "acceptance": [
+    "No Codex-authored file or payload is represented as a Hermes, Fable, Devin, or other peer semantic reply.",
+    "The design requires target-owned handling before a reply can be treated as semantic collaboration.",
+    "A typed domain receipt payload uses schema_version dharma.a2a.domain_receipt.v1 or another schema accepted by scripts/runtime/a2a_reply_capture.py as a domain receipt.",
+    "scripts/runtime/a2a_reply_capture.py records DOMAIN_RECEIPTED only after reading a payload from the recorded reply_subject.",
+    "If no target runtime is available, the run records NO_REPLY or a command-proven blocker instead of claiming success.",
+    "The NATS substrate contract names the ownership boundary between delivery-handler ack and semantic/domain reply.",
+    "Focused tests cover no-reply, untyped reply, and typed domain receipt classification."
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "reply-capture-tests",
+      "command": "pytest -q tests/test_a2a_reply_capture.py"
+    },
+    {
+      "name": "a2a-send-and-bridge-tests",
+      "command": "pytest -q tests/test_a2a_send.py tests/test_a2a_inbox_bridge.py"
+    },
+    {
+      "name": "nats-substrate-contract",
+      "command": "make nats-substrate-contract"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "feat(a2a): add target-owned domain reply worker"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

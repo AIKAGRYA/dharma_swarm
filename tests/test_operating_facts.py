@@ -186,6 +186,86 @@ def test_operating_fact_bundle_reads_all_organs_without_mutating(tmp_path: Path)
     assert bundle.revenue[0].keywords == ("wedge", "pricing")
 
 
+def test_agentops_green_report_requires_runtime_truth_refs_to_be_bound(tmp_path: Path) -> None:
+    agentops_root = tmp_path / "agentops"
+    report_path = agentops_root / "job-green" / "20260505" / "report.json"
+    _write_json(
+        report_path,
+        {
+            "job_id": "job-green",
+            "status": "passed",
+            "branch": "chore/green",
+            "worktree": "/tmp/green",
+            "gates": [{"name": "pytest", "passed": True, "exit_code": 0}],
+            "scope": {"passed": True, "changed_files": ["docs/a.md"], "violations": []},
+            "approval": {"before_commit": False, "before_merge": False},
+        },
+    )
+
+    runs = load_agentops_run_facts(agentops_root)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(agentops=tuple(runs)))}
+
+    assert states["agentops"].coherence_state == "partial"
+    assert "lacks runtime truth refs" in states["agentops"].open_gap
+
+    _write_json(
+        report_path,
+        {
+            "job_id": "job-green",
+            "status": "passed",
+            "branch": "chore/green",
+            "worktree": "/tmp/green",
+            "gates": [{"name": "pytest", "passed": True, "exit_code": 0}],
+            "scope": {"passed": True, "changed_files": ["docs/a.md"], "violations": []},
+            "approval": {"before_commit": False, "before_merge": False},
+            "runtime_truth_summary": {
+                "jobs_with_refs": 1,
+                "jobs_without_refs": 0,
+                "ref_keys": ["trace_id", "receipt_refs"],
+            },
+        },
+    )
+
+    runs = load_agentops_run_facts(agentops_root)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(agentops=tuple(runs)))}
+
+    assert states["agentops"].coherence_state == "partial"
+    assert "lacks runtime truth refs" in states["agentops"].open_gap
+
+    _write_json(
+        report_path,
+        {
+            "job_id": "job-green",
+            "status": "passed",
+            "branch": "chore/green",
+            "worktree": "/tmp/green",
+            "gates": [{"name": "pytest", "passed": True, "exit_code": 0}],
+            "scope": {"passed": True, "changed_files": ["docs/a.md"], "violations": []},
+            "approval": {"before_commit": False, "before_merge": False},
+            "runtime_truth_summary": {
+                "jobs_with_refs": 1,
+                "jobs_without_refs": 0,
+                "ref_keys": ["trace_id", "receipt_refs"],
+            },
+            "runtime_truth_refs": [
+                {
+                    "job_id": "job-green",
+                    "refs": {
+                        "trace_id": "trace-green",
+                        "receipt_refs": ["runtime_receipts:rr-green"],
+                    },
+                }
+            ],
+        },
+    )
+
+    runs = load_agentops_run_facts(agentops_root)
+    states = {fact.name: fact for fact in organ_state_facts(OperatingFactBundle(agentops=tuple(runs)))}
+
+    assert states["agentops"].coherence_state == "bound"
+    assert "runtime_receipts:rr-green" in states["agentops"].evidence_refs
+
+
 def test_kaizen_review_state_requires_runtime_truth_refs_to_be_bound(tmp_path: Path) -> None:
     kaizen_root = tmp_path / "kaizen"
     review_path = kaizen_root / "latest" / "kaizen_review.json"

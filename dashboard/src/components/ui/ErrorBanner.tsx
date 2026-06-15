@@ -5,7 +5,7 @@ import { AlertTriangle, RefreshCw, X, WifiOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { controlPlaneOfflineMessage } from "@/lib/controlPlaneShell";
 import { cn } from "@/lib/utils";
-import { apiPath } from "@/lib/api";
+import { backendLivenessPath } from "@/lib/api";
 
 interface ErrorBannerProps {
   /** Override the error message */
@@ -88,7 +88,7 @@ export function BackendStatus() {
 
   const checkHealth = useCallback(async () => {
     try {
-      const res = await fetch(apiPath("/api/health"), {
+      const res = await fetch(backendLivenessPath(), {
         method: "GET",
         signal: AbortSignal.timeout(5000),
       });

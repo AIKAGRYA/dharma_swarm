@@ -1,0 +1,65 @@
+{
+  "id": "codex-composer-agent-inbox-hot-contact-route",
+  "base_ref": "HEAD",
+  "branch": "chore/codex-agent-inbox-hot-contact-route",
+  "worktree": "/Users/dhyana/promotion_worktrees/codex_agent_inbox_hot_contact_route",
+  "intent": "Route operator peer-holon packets through the spec-canonical NATS hot-contact path when a stable agent inbox exists. The current sender can publish to dharma.a2a.<agent>, but the observed Hermes durable consumer filters dharma.agent.hermes-m5.inbox. Add a narrow, receipt-backed route or bridge that can prove durable consumer visibility and eventually handler/domain receipts without treating filesystem mirrors as live contact.",
+  "allowed_files": [
+    "scripts/runtime/a2a_send.py",
+    "tests/test_a2a_send.py",
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
+    "reports/agentops/**"
+  ],
+  "forbidden_files": [
+    "ACTIVE_TRACK.yaml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "dharma_swarm/runtime_state.py",
+    "dharma_swarm/orchestrator.py",
+    "dharma_swarm/operator_core/**",
+    "dharma_swarm/spine/**",
+    "api/**",
+    "dashboard/**"
+  ],
+  "facts": {
+    "stream": "DHARMA_FLEET",
+    "stream_subjects": ["dharma.>"],
+    "observed_consumer": "hermes_inbox",
+    "observed_consumer_filter": "dharma.agent.hermes-m5.inbox",
+    "current_sender_subject_pattern": "dharma.a2a.<agent>",
+    "latest_publish_only_receipts": [
+      "reports/a2a/send_receipts/20260611T075533Z-fable_5_cursor-e269c7ca86be.json",
+      "reports/a2a/send_receipts/20260611T075558Z-hermes-m5-410b8033ebab.json",
+      "reports/a2a/send_receipts/20260611T075558Z-devin-162d4825b1cb.json",
+      "reports/a2a/send_receipts/20260611T075558Z-fable_composer-3f8f5c489beb.json"
+    ]
+  },
+  "acceptance": [
+    "Operator can choose a spec-canonical agent inbox route without breaking the existing dharma.a2a.<agent> compatibility route.",
+    "Receipts name whether evidence is PUBLISH_ACCEPTED, DELIVERED_TO_CONSUMER, HANDLER_ACKED, or DOMAIN_RECEIPTED.",
+    "No filesystem mirror is treated as live-contact proof.",
+    "If only publish acceptance is reached, the receipt remains live_contact_claim=false.",
+    "A live command against hermes-m5 proves either handler/domain ack or a command-proven next blocker."
+  ],
+  "gates": [
+    {
+      "name": "diff-check",
+      "command": "git diff --check"
+    },
+    {
+      "name": "a2a-send-tests",
+      "command": "pytest -q tests/test_a2a_send.py"
+    },
+    {
+      "name": "nats-substrate-contract",
+      "command": "make nats-substrate-contract"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "fix(a2a): route operator packets through agent inbox hot-contact path"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

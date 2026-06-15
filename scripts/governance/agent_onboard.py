@@ -58,6 +58,8 @@ LIVE_OPS = REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
 SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
 TRUST_GATE_JSON = REPO_ROOT / "reports/governance/trust_gate_status.json"
+SWARM_GENOME = REPO_ROOT / "docs/governance/SWARM_GENOME.md"
+REALITY_DEBT_LEDGER = REPO_ROOT / "docs/governance/REALITY_DEBT_LEDGER.md"
 
 # Soft-warning thresholds. Beyond these, surface a note. Never a gate.
 LIVE_OPS_STALE_DAYS = 7
@@ -117,6 +119,23 @@ def _today() -> date:
 
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _reality_debt_count() -> int:
+    if not REALITY_DEBT_LEDGER.exists():
+        return 0
+    rows = 0
+    for line in REALITY_DEBT_LEDGER.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        lowered = stripped.lower()
+        if "claim" in lowered and "current custody" in lowered:
+            continue
+        if set(stripped.replace("|", "").strip()) <= {"-", ":"}:
+            continue
+        rows += 1
+    return rows
 
 
 def _doc_staleness(doc_rel: str) -> tuple[int, str]:
@@ -1025,6 +1044,8 @@ def render_runtime_truth(
         f"latest_receipt={summary.get('latest_receipt') or 'none'}; "
         f"run_id={summary.get('run_id') or 'missing'}; "
         f"task_id={summary.get('task_id') or 'missing'}; "
+        f"mission_id={summary.get('mission_id') or 'missing'}; "
+        f"artifact_refs={len(summary.get('artifact_refs') or [])}; "
         f"heartbeat={summary.get('heartbeat') or 'unknown'}; "
         f"progress={summary.get('progress') or 'unknown'}; "
         f"completion={summary.get('completion') or 'unknown'}; "
@@ -1291,6 +1312,8 @@ def render_enforcement_and_depth() -> None:
     print("     scan & baseline     : scripts/governance/vibe_code_scan.sh")
     print("                           reports/governance/vibe_code_baseline_2026-06-07.txt")
     print("  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md")
+    print("  First-token map        : docs/governance/SWARM_GENOME.md")
+    print(f"  Reality debt           : docs/governance/REALITY_DEBT_LEDGER.md ({_reality_debt_count()} guarded claims)")
     print("  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/")
     print("  Coherence Delta        : docs/governance/COHERENCE_DELTA.md")
     print("  Daily/work loops       : docs/governance/AGENTOPS.md, KAIZENOPS.md, DAILY_OPERATING_BRIEF.md")
