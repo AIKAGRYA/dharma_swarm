@@ -1,0 +1,93 @@
+{
+  "id": "codex-workhorse-semantic-review-a2a-gate",
+  "title": "Codex workhorse semantic review of A2A domain-reply gate",
+  "status": "done",
+  "created_at": "2026-06-11T09:21:07Z",
+  "updated_at": "2026-06-11T09:23:22Z",
+  "created_by": "codex_composer",
+  "claimed_by": "codex_workhorse_semantic_reviewer",
+  "completed_at": "2026-06-11T09:23:22Z",
+  "base_ref": "HEAD",
+  "branch": "holon/spine-v1",
+  "worktree": "/Users/dhyana/dharma_swarm_main",
+  "intent": "Run a bounded separate Codex workhorse review of the current A2A domain-reply and semantic-peer gate. The workhorse may author only its own semantic review artifact and must not claim to be Hermes, Fable, Devin, or any other peer.",
+  "allowed_files": [
+    "reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json",
+    "reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
+    "reports/agentops/work_packets/codex-workhorse-semantic-review-a2a-gate.json",
+    "reports/agentops/workhorse_prompts/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md"
+  ],
+  "forbidden_files": [
+    "ACTIVE_TRACK.yaml",
+    "ACTIVE_SURFACE_MANIFEST.yaml",
+    "api/**",
+    "dashboard/**",
+    "dharma_swarm/**",
+    "scripts/**",
+    "docs/**",
+    ".env",
+    "**/*secret*",
+    "**/*token*",
+    "**/*key*"
+  ],
+  "facts": {
+    "domain_receipt_capture": "reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
+    "domain_receipt_publish": "reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
+    "domain_artifact": "/Users/dhyana/.dharma/a2a_bus/outboxes/hermes-m5/3a0e3081da8a-domain-reply.json",
+    "semantic_reply_claim": false,
+    "peer_model_processed_claim": false,
+    "next_gate": "real peer/model semantic reply or verified workhorse artifact"
+  },
+  "output_artifacts": [
+    {
+      "kind": "agentops_semantic_review",
+      "uri": "reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json",
+      "summary": "Codex workhorse semantic review artifact; not a Hermes/Fable/Devin reply.",
+      "created_at": "2026-06-11T09:23:22Z",
+      "semantic_reply_claim": true,
+      "peer_model_processed_claim": true,
+      "not_claimed_agents": [
+        "hermes-m5",
+        "fable_5_cursor",
+        "fable_composer",
+        "devin"
+      ]
+    },
+    {
+      "kind": "agentops_semantic_review_markdown",
+      "uri": "reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
+      "summary": "Human-readable companion for Codex workhorse semantic review.",
+      "created_at": "2026-06-11T09:23:22Z"
+    }
+  ],
+  "acceptance": [
+    "A separate Codex workhorse process writes reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json.",
+    "The artifact has agent_uid=codex_workhorse_semantic_reviewer and reviewed_by_model=true.",
+    "The artifact sets semantic_reply_claim=true only for its own Codex workhorse review, not for Hermes, Fable, Devin, or the non-semantic domain receipt.",
+    "The artifact cites inspected files and receipts.",
+    "The artifact gives a sharp disagreement, missing evidence, highest-leverage next build, and verifier commands.",
+    "No source code, docs, dashboard, API, runtime, or script files are modified by the workhorse."
+  ],
+  "gates": [
+    {
+      "name": "artifact-exists",
+      "command": "python3 -c \"from pathlib import Path; assert Path('reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json').is_file()\""
+    },
+    {
+      "name": "artifact-json-shape",
+      "command": "python3 -m json.tool reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json"
+    },
+    {
+      "name": "a2a-card-tests",
+      "command": "pytest -q tests/test_agentops_board_adapter.py tests/test_control_surface_agentops_cards.py"
+    }
+  ],
+  "commit": {
+    "allowed": false,
+    "message": "reports(agentops): add codex workhorse semantic review"
+  },
+  "approval": {
+    "before_commit": true,
+    "before_merge": true
+  }
+}

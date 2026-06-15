@@ -1,0 +1,18 @@
+{
+  "agent_uid": "qwen_siliconflow",
+  "created_at": "2026-06-11T10:26:38.306403+00:00",
+  "error": "AuthenticationError: Error code: 401 - Api key is invalid",
+  "extracted_recommendations": [],
+  "latency_ms": 1708.8,
+  "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+  "peer_model_processed_claim": false,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/open-model-council-a2a-missing-systems-20260611T102326Z.md",
+  "prompt_sha256": "a47987ffedbd20934aacfd05d50421ae1d3f48ba860f860c5d73b06b74eca415",
+  "provider": "siliconflow",
+  "requested_model": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+  "response": "",
+  "response_sha256": "",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": false,
+  "status": "error"
+}

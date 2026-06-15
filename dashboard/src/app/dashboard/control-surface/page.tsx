@@ -22,6 +22,10 @@ import { SystemTruthMatrix } from "@/components/cockpit/SystemTruthMatrix";
 import { EvidenceDrawer } from "@/components/cockpit/EvidenceDrawer";
 import { RuntimeRail } from "@/components/cockpit/RuntimeRail";
 import { OpsRunbookPanel } from "@/components/cockpit/OpsRunbookPanel";
+import { DsGoalMissionCardsPanel } from "@/components/cockpit/DsGoalMissionCardsPanel";
+import { AgentOpsWorkPacketCardsPanel } from "@/components/cockpit/AgentOpsWorkPacketCardsPanel";
+import { A2ASendCardsPanel } from "@/components/cockpit/A2ASendCardsPanel";
+import { SemanticReceiptCardsPanel } from "@/components/cockpit/SemanticReceiptCardsPanel";
 
 export default function OperatorCockpitPage() {
   const { rows, isLoading, error, refetch } = useControlSurfaceRows();
@@ -68,6 +72,10 @@ export default function OperatorCockpitPage() {
       />
 
       <OpsRunbookPanel rows={rows} selectedRow={selectedRow} />
+      <DsGoalMissionCardsPanel />
+      <AgentOpsWorkPacketCardsPanel />
+      <A2ASendCardsPanel />
+      <SemanticReceiptCardsPanel />
 
       {/* Zones 2-5: Split layout */}
       <div className="flex flex-1 gap-0 overflow-hidden rounded-xl border border-sumi-700/30">

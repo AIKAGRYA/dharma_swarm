@@ -1,0 +1,52 @@
+{
+  "schema_version": "dharma.agentops.semantic_review.v1",
+  "created_at": "2026-06-11T09:23:22Z",
+  "agent_uid": "codex_workhorse_semantic_reviewer",
+  "reviewed_by_model": true,
+  "semantic_reply_claim": true,
+  "peer_model_processed_claim": true,
+  "not_claimed_agents": [
+    "hermes-m5",
+    "fable_5_cursor",
+    "fable_composer",
+    "devin"
+  ],
+  "review_target": "a2a_semantic_peer_gate",
+  "verdict": "reviewed",
+  "summary": "The A2A gate is correctly distinguishing mechanical DOMAIN_RECEIPTED proof from true semantic peer/model processing. The Hermes M5 path proves delivery, target-dock artifact publication, NATS publish acknowledgement, and reply capture, but the inspected receipts explicitly keep semantic_reply_claim=false and peer_model_processed_claim=false. The runtime scripts also preserve that distinction: generated target-dock artifacts default both claims to false, the domain reply worker copies the artifact's explicit flags into the domain receipt, and reply capture treats typed domain receipts as DOMAIN_RECEIPTED while deriving semantic_reply_claim only from the payload flags. This Codex workhorse artifact is a separate semantic review and must not be read as Hermes, Fable, Devin, or Claude semantic participation.",
+  "sharpest_disagreement": "The current evidence should not be called semantic peer collaboration. target_owned_artifact_claim=true and DOMAIN_RECEIPTED are useful transport/domain ownership signals, but the actual Hermes M5 artifact was authored by a filesystem delivery handler and says it is not a Hermes model semantic reply. The semantic-peer gate remains open for Hermes/Fable/Devin until a target-owned model or workhorse runtime produces content with semantic_reply_claim=true or peer_model_processed_claim=true and supporting evidence.",
+  "missing_evidence": [
+    "A target-owned Hermes/Fable/Devin or approved peer-workhorse artifact whose content demonstrates actual model semantic processing and explicitly sets semantic_reply_claim=true or peer_model_processed_claim=true.",
+    "Independent proof of peer runtime authorship beyond filesystem delivery handling, such as a causal AgentOps/A2A receipt chain tying the semantic artifact to the processing runtime identity.",
+    "A captured semantic reply or typed domain receipt that includes substantive critique, blocker, decision, or next-build analysis rather than only receipt/delivery metadata.",
+    "Operator-facing board/control-surface proof that the missing semantic-peer gate is visible with owner, missing evidence, receipt refs, and verifier commands."
+  ],
+  "highest_leverage_next_build": "Build or activate one approved peer/workhorse semantic reply runner that consumes an AgentOps work packet through the existing A2A/ds-goal/BoardStore surfaces, performs real model review, writes a target-owned semantic artifact with semantic flags true only when actual model output exists, and publishes/captures it through the existing domain receipt path without creating a second bus or memory authority.",
+  "recommended_verifier_commands": [
+    "python3 -m json.tool reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json",
+    "python3 -c \"import json; d=json.load(open('reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json')); assert d['agent_uid']=='codex_workhorse_semantic_reviewer'; assert d['semantic_reply_claim'] is True; assert d['peer_model_processed_claim'] is True; assert 'hermes-m5' in d['not_claimed_agents']\"",
+    "python3 -c \"import json; d=json.load(open('reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json')); assert d['status']=='DOMAIN_RECEIPTED'; assert d['semantic_reply_claim'] is False; assert d['reply_payload']['peer_model_processed_claim'] is False\"",
+    "python3 -c \"import json; d=json.load(open('reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json')); assert d['domain_receipt_claim'] is True; assert d['semantic_reply_claim'] is False; assert d['domain_receipt_payload']['semantic_reply_claim'] is False\"",
+    "pytest -q tests/test_a2a_domain_reply_artifact.py tests/test_a2a_domain_reply_worker.py tests/test_a2a_reply_capture.py",
+    "pytest -q tests/test_agentops_board_adapter.py tests/test_control_surface_agentops_cards.py",
+    "git diff --check"
+  ],
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/a2a_bus/collab/convergence/MEGA_PROMPT_CODEX_COMPOSER_SEMANTIC_PEER_KANBAN_V5_20260611T091643Z.md",
+    "/Users/dhyana/.dharma/a2a_bus/collab/convergence/RUN_RECEIPT_a2a_domain_receipt_nonsemantic_proof_20260611T091643Z.md",
+    "reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
+    "reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
+    "scripts/runtime/a2a_domain_reply_artifact.py:67",
+    "scripts/runtime/a2a_domain_reply_artifact.py:83",
+    "scripts/runtime/a2a_domain_reply_artifact.py:95",
+    "scripts/runtime/a2a_domain_reply_worker.py:202",
+    "scripts/runtime/a2a_domain_reply_worker.py:207",
+    "scripts/runtime/a2a_domain_reply_worker.py:257",
+    "scripts/runtime/a2a_domain_reply_worker.py:288",
+    "scripts/runtime/a2a_reply_capture.py:185",
+    "scripts/runtime/a2a_reply_capture.py:186",
+    "scripts/runtime/a2a_reply_capture.py:212",
+    "reports/agentops/work_packets/codex-workhorse-semantic-review-a2a-gate.json"
+  ],
+  "semantic_boundary": "This is a Codex workhorse semantic review only; it is not a Hermes/Fable/Devin semantic reply."
+}

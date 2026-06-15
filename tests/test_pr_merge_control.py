@@ -121,6 +121,12 @@ def test_risk_from_files_flags_hot_paths():
     assert "dharma_swarm/telos_gates.py" in result["hot_paths"]
 
 
+def test_required_reviewers_can_be_explicitly_none():
+    args = argparse.Namespace(required_reviewers="none")
+
+    assert prc.required_reviewer_agents(args) == []
+
+
 def test_claude_review_env_scrubs_anthropic_api_key_by_default():
     command, env = prc.review_command_and_env(
         "claude",
@@ -569,6 +575,39 @@ def test_mike_merge_authority_runs_gh_when_gate_clean():
     assert receipt["required_reviewers"] == ["copilot", "claude", "devin"]
 
 
+def test_mike_merge_authority_matches_head_commit_when_present():
+    seen = {}
+
+    def runner(command, timeout, check):
+        seen["command"] = command
+        return prc.CommandResult(0, "armed\n", "")
+
+    prc.run_mike_merge_authority(
+        pr_number=12,
+        gate={
+            "decision": "MERGE_CANDIDATE",
+            "packet_dir": "/tmp/packet",
+            "required_reviewers": [],
+            "head_sha": "abc123",
+        },
+        method="squash",
+        auto=True,
+        runner=runner,
+    )
+
+    assert seen["command"] == [
+        "gh",
+        "pr",
+        "merge",
+        "12",
+        "--auto",
+        "--squash",
+        "--delete-branch",
+        "--match-head-commit",
+        "abc123",
+    ]
+
+
 def test_render_github_comment_states_conditional_merge_boundary():
     packet = {
         "pr": {"number": 12},
@@ -816,6 +855,50 @@ def test_gate_accepts_dynamic_required_reviewer_quorum(tmp_path, monkeypatch):
 
     assert gate["decision"] == "MERGE_CANDIDATE"
     assert gate["required_reviewers"] == ["copilot", "claude", "devin"]
+
+
+def test_gate_accepts_explicit_no_reviewer_quorum_for_docs_low_policy(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    body = """
+- Organ touched: `docs/governance/PR_QUALITY_GATES.md`
+- Declared-vs-actual gap closed: docs-low automation can prove no reviewer quorum.
+- Proof that re-reads the map: merge gate test covers required_reviewers=none.
+- New drift introduced: no broad bypass; this must be explicitly passed.
+"""
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "body": body,
+            "headRefOid": "abc123",
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="none",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["required_reviewers"] == []
+    assert gate["head_sha"] == "abc123"
 
 
 def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatch):
