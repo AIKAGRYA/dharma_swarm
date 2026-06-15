@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
 import inspect
+import json
 import logging
 import re
 import shlex
@@ -136,6 +137,44 @@ class Proposal(BaseModel):
             if char in v:
                 raise ValueError(f"Component contains invalid filesystem character '{char}'")
         return v
+
+
+# WS4: Self-modification change types — the set of Proposal.change_type values
+# that mutate the running codebase/agent and therefore MUST NOT be allowed to
+# flow through to apply on a mere REVIEW (Tier-C advisory) decision. Derived
+# from the real change_type literals produced across the codebase (see
+# `grep change_type= dharma_swarm/`). Tier-C REVIEW on any of these is treated
+# as a hard REJECT (see DarwinEngine.gate_check) — a self-mod proposal must
+# earn an explicit ALLOW, never slip through on an advisory.
+SELF_MOD_TYPES: frozenset[str] = frozenset({
+    "mutation",
+    "crossover",
+    "ablation",
+    "optimization",
+    "refactor",
+    "fix",
+    "bugfix",
+    "feature",
+    "auto_evolution",
+    "consolidation_correction",
+    "route_retrospective",
+    "overnight_advance",
+    "stigmergy_inspired",
+    "runtime_field_trial",
+    "sealed_packet",
+    "shakti_escalation",
+    "retro_finding",
+    "hypothesis_test",
+})
+
+
+def _is_self_mod(change_type: str | None) -> bool:
+    """Return True if a proposal's change_type denotes a self-modification.
+
+    Comparison is case-insensitive and whitespace-trimmed so that minor
+    formatting variation in producers does not let a self-mod slip the net.
+    """
+    return (change_type or "").strip().lower() in SELF_MOD_TYPES
 
 
 def _paths_from_unified_diff(diff_text: str) -> list[str]:
@@ -1394,6 +1433,36 @@ class DarwinEngine:
 
     # -- gate checking -------------------------------------------------------
 
+    @staticmethod
+    def _log_self_mod_review_block(proposal: "Proposal", result: Any) -> None:
+        """WS4: witness a self-mod proposal rejected on a REVIEW decision.
+
+        Appended to ``~/.dharma/witness/`` as a daily JSONL line so the
+        enforcement is auditable. Failures are silently swallowed —
+        witnessing must never block the gate path.
+        """
+        try:
+            from dharma_swarm.telos_gates import WITNESS_DIR
+
+            now = _utc_now()
+            WITNESS_DIR.mkdir(parents=True, exist_ok=True)
+            log_file = WITNESS_DIR / f"witness_{now.strftime('%Y%m%d')}.jsonl"
+            entry = json.dumps({
+                "ts": now.isoformat(),
+                "phase": "evolution.gate_check",
+                "outcome": "SELF_MOD_REVIEW_BLOCKED",
+                "proposal_id": proposal.id,
+                "change_type": proposal.change_type,
+                "component": proposal.component,
+                "decision": getattr(result.decision, "value", str(result.decision)),
+                "reason": (result.reason or "")[:500],
+                "gate": getattr(result, "gate", ""),
+            })
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            logger.debug("Self-mod review-block witness write failed", exc_info=True)
+
     async def gate_check(self, proposal: Proposal) -> Proposal:
         """Run dharmic safety gates against a proposal.
 
@@ -1471,6 +1540,13 @@ class DarwinEngine:
                     )
                 )
 
+            # WS4: A self-mod proposal must earn an explicit ALLOW. A BLOCK
+            # rejects (as before); a REVIEW (Tier-C advisory) on a self-mod
+            # change_type is ALSO a hard reject — it must NOT flow through to
+            # GATED -> applied. Non-self-mod REVIEW keeps the prior behaviour
+            # (GATED). This closes the REVIEW->GATED->applied bypass for the
+            # change types in SELF_MOD_TYPES.
+            self_mod = _is_self_mod(proposal.change_type)
             if result.decision == GateDecision.BLOCK:
                 proposal.status = EvolutionStatus.REJECTED
                 logger.warning(
@@ -1478,6 +1554,16 @@ class DarwinEngine:
                     proposal.id,
                     result.reason,
                 )
+            elif result.decision == GateDecision.REVIEW and self_mod:
+                proposal.status = EvolutionStatus.REJECTED
+                logger.warning(
+                    "Proposal %s REJECTED: REVIEW on self-mod change_type=%r "
+                    "is not allowed to apply: %s",
+                    proposal.id,
+                    proposal.change_type,
+                    result.reason,
+                )
+                self._log_self_mod_review_block(proposal, result)
             else:
                 proposal.status = EvolutionStatus.GATED
                 logger.info(
