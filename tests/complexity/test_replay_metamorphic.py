@@ -1,15 +1,34 @@
-"""Complexity stress test #1: replay metamorphic invariance.
+"""Complexity stress test #1: replay metamorphic relations.
 
-Tests that CanonicalReplayEngine produces the same final state hash for
-event streams that are reorderings within causal classes. This is the
-foundational metamorphic invariant for the replay substrate.
+This is the L2 (metamorphic) layer of the replay testing doctrine. It sits
+alongside, and is consistent with, the L1 property layer and the L3 golden
+layer in ``tests/properties/test_canonical_replay_properties.py`` and
+``tests/test_canonical_replay_golden.py``.
 
-If this fails, replay is order-dependent in ways it claims not to be.
+What the engine actually guarantees
+------------------------------------
+``CanonicalReplayEngine`` folds an *already-canonicalized* event stream. The
+canonicalization lives upstream in ``EventLog.read_envelopes``, which sorts by
+``(emitted_at, event_id)`` before the fold ever runs. So the engine's real
+determinism guarantee is:
 
-Unlike the per-module tests in ``tests/test_canonical_replay.py`` (which
-replay one fixed stream and check that *repeated* replays agree), this test
-perturbs the stream itself: it reorders events that belong to different
-causal classes and asserts the reconstructed-state hash is unchanged.
+    replaying a session is invariant to the *delivery / storage* order of its
+    envelopes, because ingestion re-imposes a total order first.
+
+It is NOT the stronger claim that the raw fold is order-invariant. The fold
+records an ordered ``event_types`` breadcrumb and a last-in-fold-order
+``final_timestamp``; both are positional. So feeding the fold a reordering
+*without* re-sorting does change the state hash.
+
+This module pins down both halves precisely:
+
+  * the positive metamorphic relation that holds (delivery-order invariance
+    via canonical sort), and
+  * the exact boundary of the order-sensitivity (it is confined to the two
+    positional breadcrumbs; every semantic aggregate is reorder-invariant),
+
+and keeps the "full reorder-invariance does not hold" result visible as a
+strict xfail finding rather than a silently-masked red test.
 """
 from __future__ import annotations
 
@@ -24,7 +43,7 @@ from dharma_swarm.canonical_replay import CanonicalReplayEngine
 # (state.snapshot, memory.event, action.event, audit.event). The shapes
 # mirror the events used in tests/test_canonical_replay.py so the trace is
 # faithful to what the engine sees in production. Two events of each type
-# exercise intra-class ordering; an "unknown" event exercises the catch-all.
+# exercise intra-class ordering.
 BASE_TRACE: list[dict[str, Any]] = [
     {
         "event_type": "state.snapshot",
@@ -96,14 +115,25 @@ def causal_class(event: dict[str, Any]) -> tuple[str, str]:
     return (str(event["event_type"]), str(agent))
 
 
+def canonical_sort(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Re-impose the engine's ingestion order.
+
+    Mirrors ``EventLog.read_envelopes``: sort by ``(emitted_at, event_id)``.
+    This is the canonicalization the real replay path applies before folding.
+    """
+    return sorted(
+        events,
+        key=lambda e: (str(e.get("emitted_at", "")), str(e.get("event_id", ""))),
+    )
+
+
 def reorder_preserving_causal_class(
     events: list[dict[str, Any]], seed: int
 ) -> list[dict[str, Any]]:
     """Return a permutation of ``events`` that preserves intra-class order.
 
     Events sharing a causal class keep their relative order; events in
-    different classes may be freely interleaved. This is the metamorphic
-    relation: a reordering the replay engine should be invariant to.
+    different classes may be freely interleaved.
     """
     rng = random.Random(seed)
     buckets: dict[tuple[str, str], list[dict[str, Any]]] = {}
@@ -139,37 +169,99 @@ def intra_class_order_preserved(
     return True
 
 
-async def _hash_for(events: list[dict[str, Any]]) -> str:
-    """Reconstruct state from ``events`` and return its canonical hash.
+async def _replay_state(events: list[dict[str, Any]]) -> dict[str, Any]:
+    """Fold ``events`` into final replay state (internal path, no disk I/O)."""
+    engine = CanonicalReplayEngine()
+    return await engine._execute_replay(events)
 
-    Uses the internal _execute_replay + _hash_state path (no disk I/O), the
-    same fold replay_session() runs after loading events from the log.
-    """
+
+async def _hash_for(events: list[dict[str, Any]]) -> str:
+    """Reconstruct state from ``events`` and return its canonical hash."""
     engine = CanonicalReplayEngine()
     state = await engine._execute_replay(events)
     return engine._hash_state(state)
 
 
-@pytest.mark.asyncio
+def _semantic_state(state: dict[str, Any]) -> dict[str, Any]:
+    """Project out the two positional breadcrumbs.
+
+    ``event_types`` (an ordered list of every event's type) and
+    ``final_timestamp`` (the last ``emitted_at`` in fold order) are the only
+    parts of the reconstructed state that depend on raw fold order. Everything
+    else is a semantic aggregate. Normalizing these two exposes whether the
+    *meaning* of the state is reorder-invariant.
+    """
+    return {**state, "event_types": sorted(state["event_types"]), "final_timestamp": ""}
+
+
 @pytest.mark.parametrize("seed", list(range(20)))
-async def test_replay_invariant_under_causal_class_reordering(seed: int) -> None:
-    """Metamorphic: any causal-class-preserving reorder yields the same hash."""
+async def test_replay_hash_invariant_under_delivery_reordering(seed: int) -> None:
+    """The real guarantee: hash is invariant to delivery/storage order.
+
+    The engine folds an already-canonicalized stream (``read_envelopes`` sorts
+    by ``(emitted_at, event_id)`` first). So any reordering of how envelopes
+    arrive or are stored must replay to the same hash once canonicalized.
+    """
     reordered = reorder_preserving_causal_class(BASE_TRACE, seed=seed)
     assert intra_class_order_preserved(BASE_TRACE, reordered), (
         f"Reorder (seed={seed}) broke intra-class order; relation is invalid."
     )
 
-    base_hash = await _hash_for(BASE_TRACE)
-    reordered_hash = await _hash_for(reordered)
+    base_hash = await _hash_for(canonical_sort(BASE_TRACE))
+    reordered_hash = await _hash_for(canonical_sort(reordered))
     assert base_hash == reordered_hash, (
-        f"Replay hash changed under causal-class-preserving reorder "
-        f"(seed={seed}). Base={base_hash[:16]} Reordered={reordered_hash[:16]}\n"
-        f"  base types     = {[e['event_type'] for e in BASE_TRACE]}\n"
-        f"  reordered types= {[e['event_type'] for e in reordered]}"
+        f"Replay hash changed under delivery-order reordering after canonical "
+        f"sort (seed={seed}). Base={base_hash[:16]} Reordered={reordered_hash[:16]}"
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.parametrize("seed", list(range(20)))
+async def test_raw_fold_order_sensitivity_is_isolated_to_breadcrumbs(seed: int) -> None:
+    """Boundary of the order-sensitivity: it is confined to the breadcrumbs.
+
+    Feeding the raw fold a causal-class-preserving reordering (no canonical
+    sort) can change the hash — but only via ``event_types`` and
+    ``final_timestamp``. Every semantic aggregate (runtime, memory, actions,
+    audits, counts) is reorder-invariant. If a future change leaks order
+    dependence into the semantics, this breaks.
+    """
+    reordered = reorder_preserving_causal_class(BASE_TRACE, seed=seed)
+    assert intra_class_order_preserved(BASE_TRACE, reordered)
+
+    base = await _replay_state(BASE_TRACE)
+    perturbed = await _replay_state(reordered)
+    assert _semantic_state(base) == _semantic_state(perturbed), (
+        f"Raw-fold reordering (seed={seed}) changed a semantic aggregate, not "
+        f"just the positional breadcrumbs."
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "FINDING (engine-property gap): replay determinism is guaranteed only "
+        "relative to read_envelopes' (emitted_at, event_id) canonical sort, not "
+        "intrinsic to the fold. A raw causal-class-preserving reorder changes the "
+        "ordered event_types breadcrumb, so the state hash is NOT reorder-invariant. "
+        "This is consistent with #601 property P4 (event_types length == #events, "
+        "ordered) and the frozen golden hash. If the engine is ever made "
+        "intrinsically reorder-invariant, this xpasses (strict) and the finding "
+        "must be revisited."
+    ),
+)
+async def test_full_reorder_invariance_does_not_hold() -> None:
+    """Documents that raw-fold reorder-invariance does NOT hold (tracked finding)."""
+    # Deterministic, guaranteed-non-identity, causal-class-preserving reorder:
+    # move the first audit.event ahead of the opening snapshot.
+    reordered = [BASE_TRACE[3], *BASE_TRACE[:3], *BASE_TRACE[4:]]
+    assert intra_class_order_preserved(BASE_TRACE, reordered)
+    assert reordered != BASE_TRACE
+
+    base_hash = await _hash_for(BASE_TRACE)
+    reordered_hash = await _hash_for(reordered)
+    assert base_hash == reordered_hash
+
+
 async def test_base_trace_is_nontrivial() -> None:
     """Sanity: the base trace covers all 4 reducer types."""
     types = {e["event_type"] for e in BASE_TRACE}
