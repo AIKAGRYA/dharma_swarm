@@ -132,6 +132,19 @@ class FitnessScore(BaseModel):
         return sum(getattr(self, k, 0.0) * v for k, v in w.items())
 
 
+# Statuses emitted by DarwinEngine.archive_result for evaluated proposals.
+# Rows written before the honest-status change all say "applied"; rows after
+# it say what actually happened. Selection/analytics treat all of these as
+# fitness-bearing so honest recording does not change selection behavior.
+FITNESS_BEARING_STATUSES: tuple[str, ...] = (
+    "applied",
+    "evaluated",
+    "shadow",
+    "gated",
+    "rolled_back",
+)
+
+
 class ArchiveEntry(BaseModel):
     """Single evolution attempt stored in the archive."""
 
@@ -148,6 +161,7 @@ class ArchiveEntry(BaseModel):
 
     # Code changes
     diff: str = ""
+    shadow_diff: str = ""  # diff retained when shadow mode strips `diff`
     commit_hash: Optional[str] = None
 
     # Evaluation
@@ -407,7 +421,9 @@ class EvolutionArchive:
         """Change MAP-Elites granularity and rebuild from current applied entries."""
         self.grid = MAPElitesGrid(n_bins=n_bins)
         applied_entries = [
-            entry for entry in self._entries.values() if entry.status == "applied"
+            entry
+            for entry in self._entries.values()
+            if entry.status in FITNESS_BEARING_STATUSES
         ]
         self.grid.rebuild(applied_entries)
 
@@ -463,7 +479,7 @@ class EvolutionArchive:
         entries = list(self._entries.values())
         if component:
             entries = [e for e in entries if e.component == component]
-        entries = [e for e in entries if e.status == "applied"]
+        entries = [e for e in entries if e.status in FITNESS_BEARING_STATUSES]
         entries.sort(
             key=lambda e: e.fitness.weighted(weights=weights),
             reverse=True,
@@ -533,7 +549,7 @@ class EvolutionArchive:
         entries = list(self._entries.values())
         if len(entries) < min_age_entries:
             return 0
-        applied = [e for e in entries if e.status == "applied"]
+        applied = [e for e in entries if e.status in FITNESS_BEARING_STATUSES]
         if not applied:
             return 0
         fitness_values = sorted(e.fitness.weighted() for e in applied)
@@ -547,7 +563,7 @@ class EvolutionArchive:
         old_entries = entries_by_time[:-min_age_entries] if len(entries_by_time) > min_age_entries else []
         composted = 0
         for e in old_entries:
-            if (e.status in ("applied", "proposed") and e.fitness.weighted() < threshold and e.id not in has_children):
+            if (e.status in FITNESS_BEARING_STATUSES + ("proposed",) and e.fitness.weighted() < threshold and e.id not in has_children):
                 e.status = "composted"
                 composted += 1
         if composted > 0:
@@ -563,7 +579,7 @@ class EvolutionArchive:
         entries = list(self._entries.values())
         if component:
             entries = [e for e in entries if e.component == component]
-        entries = [e for e in entries if e.status == "applied"]
+        entries = [e for e in entries if e.status in FITNESS_BEARING_STATUSES]
         entries.sort(key=lambda e: e.timestamp)
         return [
             (e.timestamp, e.fitness.weighted(weights=weights))
@@ -623,7 +639,7 @@ class EvolutionArchive:
             by_status[e.status] = by_status.get(e.status, 0) + 1
             if e.component:
                 by_component[e.component] = by_component.get(e.component, 0) + 1
-        applied = [e for e in entries if e.status == "applied"]
+        applied = [e for e in entries if e.status in FITNESS_BEARING_STATUSES]
         avg_fitness = (
             sum(e.fitness.weighted() for e in applied) / len(applied)
             if applied
