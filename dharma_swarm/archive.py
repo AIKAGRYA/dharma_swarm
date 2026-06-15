@@ -166,6 +166,8 @@ class ArchiveEntry(BaseModel):
     agent_id: str = ""
     model: str = ""
     tokens_used: int = 0
+    daemon_version: str = ""
+    daemon_version_stamp: dict[str, Any] = Field(default_factory=dict)
 
     # Status
     status: str = "proposed"
@@ -372,6 +374,18 @@ class EvolutionArchive:
         Returns:
             The entry id.
         """
+        if not entry.daemon_version:
+            try:
+                from dharma_swarm.versioning.daemon_version import version_stamp
+
+                stamp = version_stamp()
+                build_id = str(stamp.get("build_id") or "")
+                if build_id:
+                    entry.daemon_version = build_id
+                    entry.daemon_version_stamp = stamp
+            except Exception:
+                pass
+
         # Get parent's merkle root if this has a parent
         if entry.parent_id:
             parent = self._entries.get(entry.parent_id)

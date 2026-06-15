@@ -912,6 +912,23 @@ def _live_ops_census_freshness(payload: Any) -> dict[str, Any]:
             "age_minutes": None,
             "evidence": f"unable to check live ops census freshness: {exc}",
         }
+def render_runtime_provenance() -> None:
+    section("RUNTIME PROVENANCE — what code the live daemons actually execute")
+    script = REPO_ROOT / "scripts" / "runtime" / "runtime_provenance.py"
+    if not script.exists():
+        print("  MISSING — scripts/runtime/runtime_provenance.py not found")
+        return
+    try:
+        out = subprocess.run(
+            [sys.executable, str(script)],
+            capture_output=True, text=True, timeout=30,
+        )
+        print(out.stdout.rstrip() or "  (no output)")
+        if out.returncode != 0:
+            print("  WARNING: provenance check exited nonzero")
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        print(f"  UNAVAILABLE — {type(exc).__name__}: {exc}")
+    print("  Rule: a fix is not live until the executing worktree contains it.")
 
 
 def render_live_ops_cockpit() -> None:
@@ -1937,6 +1954,7 @@ def main(argv: list[str] | None = None) -> int:
     render_active_track(evidence, track)
     lanes = render_parallel_work_lanes()
     render_live_ops()
+    render_runtime_provenance()
     render_live_ops_cockpit()
     if args.fast:
         section("SURFACE MANIFEST HEALTH (skipped — --fast)")

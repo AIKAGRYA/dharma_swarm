@@ -991,6 +991,24 @@ def _ds_goal_receipt_payload(metadata: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _metadata_with_daemon_version(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    """Stamp runtime rows with the build executing the write path."""
+    stamped = dict(metadata or {})
+    if stamped.get("daemon_version"):
+        return stamped
+    try:
+        from dharma_swarm.versioning.daemon_version import version_stamp
+
+        stamp = version_stamp()
+    except Exception:
+        return stamped
+    build_id = str(stamp.get("build_id") or "")
+    if build_id:
+        stamped["daemon_version"] = build_id
+        stamped["daemon_version_stamp"] = stamp
+    return stamped
+
+
 def _task_claim_receipt_payload(claim: TaskClaim) -> dict[str, Any]:
     metadata = dict(claim.metadata or {})
     mission_id = str(
@@ -1798,6 +1816,7 @@ class RuntimeStateStore:
         *,
         emit_receipt: bool = True,
     ) -> DelegationRun:
+        run = replace(run, metadata=_metadata_with_daemon_version(run.metadata))
         identity: ExecutionIdentity | None = None
         receipt_id = ""
         side_effect_key = ""
@@ -2178,6 +2197,7 @@ class RuntimeStateStore:
         Canonical callers must provide a full ExecutionIdentity in metadata.
         Legacy callers may opt into the temporary compatibility path explicitly.
         """
+        run = replace(run, metadata=_metadata_with_daemon_version(run.metadata))
         try:
             identity = _required_identity_from_metadata(
                 run.metadata,

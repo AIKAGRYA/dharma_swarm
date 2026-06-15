@@ -29,12 +29,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.versioning.daemon_version import version_stamp
 
 logger = logging.getLogger(__name__)
 
 _PORT = int(os.environ.get("DHARMA_API_PORT", "7433"))
 _STATE_DIR = dharma_state_dir("DHARMA_STATE_DIR")
 _START_TIME = time.monotonic()
+_VERSION_STAMP = version_stamp()
 
 
 def _uptime() -> str:
@@ -110,6 +112,17 @@ def _runtime_dispatch_status() -> dict:
     }
 
 
+def _liveness_payload() -> dict:
+    """Cheap liveness payload: no filesystem reads, no collector calls."""
+    return {
+        "status": "ok",
+        "uptime": _uptime(),
+        "timestamp": _utc_now(),
+        **_VERSION_STAMP,
+        "runtime_dispatch": _runtime_dispatch_status(),
+    }
+
+
 def _telos_summary() -> dict:
     obj_path = _STATE_DIR / "telos" / "objectives.jsonl"
     if not obj_path.exists():
@@ -156,6 +169,43 @@ def _evolution_summary() -> dict:
         return {"status": "error", "detail": str(exc)}
 
 
+def _metrics_payload() -> dict:
+    return {
+        "uptime": _uptime(),
+        "timestamp": _utc_now(),
+        "loops": _loop_status(),
+        "evolution": _evolution_summary(),
+        "providers": _provider_status(),
+        "runtime_dispatch": _runtime_dispatch_status(),
+        "telos": _telos_summary(),
+    }
+
+
+def _readiness_payload() -> dict:
+    return {"status": "ok", **_metrics_payload()}
+
+
+async def _degradable_json(
+    payload_factory,
+    *,
+    timeout: float = 2.0,
+    indent: int | None = 2,
+) -> tuple[str, str]:
+    try:
+        payload = await asyncio.wait_for(
+            asyncio.to_thread(payload_factory),
+            timeout=timeout,
+        )
+        return json.dumps(payload, indent=indent), "200 OK"
+    except Exception as exc:
+        payload = {
+            "status": "degraded",
+            "timestamp": _utc_now(),
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+        return json.dumps(payload), "503 Service Unavailable"
+
+
 async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
     """Handle one HTTP request — minimal HTTP/1.1 server without dependencies."""
     try:
@@ -166,26 +216,14 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
         path = path_qs.split("?")[0]
 
         if path == "/health" or path == "/":
-            body = json.dumps({
-                "status": "ok",
-                "uptime": _uptime(),
-                "timestamp": _utc_now(),
-                "version": "dharma_swarm",
-                "runtime_dispatch": _runtime_dispatch_status(),
-            })
+            body = json.dumps(_liveness_payload())
             status = "200 OK"
 
+        elif path == "/ready":
+            body, status = await _degradable_json(_readiness_payload)
+
         elif path == "/metrics":
-            body = json.dumps({
-                "uptime": _uptime(),
-                "timestamp": _utc_now(),
-                "loops": _loop_status(),
-                "evolution": _evolution_summary(),
-                "providers": _provider_status(),
-                "runtime_dispatch": _runtime_dispatch_status(),
-                "telos": _telos_summary(),
-            }, indent=2)
-            status = "200 OK"
+            body, status = await _degradable_json(_metrics_payload)
 
         elif path == "/loops":
             body = json.dumps(_loop_status(), indent=2)

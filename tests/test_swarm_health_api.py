@@ -175,6 +175,70 @@ class TestRuntimeDispatchStatus:
 
 
 # ---------------------------------------------------------------------------
+# versioned liveness/readiness
+# ---------------------------------------------------------------------------
+
+
+class _FakeReader:
+    def __init__(self, payload: bytes):
+        self.payload = payload
+
+    async def read(self, _limit: int) -> bytes:
+        return self.payload
+
+
+class _FakeWriter:
+    def __init__(self):
+        self.data = b""
+
+    def write(self, data: bytes) -> None:
+        self.data += data
+
+    async def drain(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+class TestVersionedHealthSurface:
+    def test_liveness_payload_carries_build_identity(self):
+        result = health_api._liveness_payload()
+
+        assert result["status"] == "ok"
+        assert result["build_id"]
+        assert result["daemon_version"]
+        assert result["git_sha"]
+        assert "version" not in result
+
+    @pytest.mark.asyncio
+    async def test_degradable_json_reports_failure_status(self):
+        def boom():
+            raise RuntimeError("collector stalled")
+
+        body, status = await health_api._degradable_json(boom)
+        payload = json.loads(body)
+
+        assert status == "503 Service Unavailable"
+        assert payload["status"] == "degraded"
+        assert "collector stalled" in payload["detail"]
+
+    @pytest.mark.asyncio
+    async def test_metrics_handler_preserves_degraded_status(self, monkeypatch):
+        def boom():
+            raise RuntimeError("collector stalled")
+
+        monkeypatch.setattr(health_api, "_metrics_payload", boom)
+        reader = _FakeReader(b"GET /metrics HTTP/1.1\r\nHost: local\r\n\r\n")
+        writer = _FakeWriter()
+
+        await health_api._handle(reader, writer)
+
+        assert b"HTTP/1.1 503 Service Unavailable" in writer.data
+        assert b'"status": "degraded"' in writer.data
+
+
+# ---------------------------------------------------------------------------
 # _telos_summary
 # ---------------------------------------------------------------------------
 

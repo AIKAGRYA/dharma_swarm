@@ -454,15 +454,15 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **745** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **401 (53.8%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,811** | wc -l across dharma_swarm Python modules |
-| Test files | **712** | find tests -name "*.py" -type f |
-| Test functions | **11,720 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **748** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **401 (53.6%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **311,436** | wc -l across dharma_swarm Python modules |
+| Test files | **719** | find tests -name "*.py" -type f |
+| Test functions | **11,755 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1046** | find . -name "*.md" -type f |
-| Markdown total lines | **251,772** | wc -l across all .md |
+| Markdown files | **1047** | find . -name "*.md" -type f |
+| Markdown total lines | **251,960** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |

@@ -1,0 +1,26 @@
+# Single-host soak harness for the dharma_swarm daemon. NO Kubernetes.
+# The container is disposable; the archive lives in a named volume so it
+# persists across version swaps. BUILD_ID is the canonical receipt identity;
+# BUILD_TAG is the Docker-safe projection because Docker tags cannot use "+".
+#   BUILD_ID=0.1.0+<sha> BUILD_TAG=0.1.0_<sha> docker compose -f deploy/daemon/compose.daemon.yml up -d
+services:
+  daemon:
+    build:
+      context: ../..
+      dockerfile: deploy/daemon/Dockerfile
+      args:
+        BUILD_ID: ${BUILD_ID:-unknown}
+        BUILD_SHA: ${BUILD_SHA:-unknown}
+    image: dharma-daemon:${BUILD_TAG:-unknown}
+    restart: unless-stopped
+    ports:
+      - "7433:7433"
+    environment:
+      DHARMA_BUILD_SHA: ${BUILD_SHA:-unknown}
+      DHARMA_API_PORT: "7433"
+      DHARMA_STATE_DIR: /state
+    volumes:
+      - dharma_state:/state
+
+volumes:
+  dharma_state:

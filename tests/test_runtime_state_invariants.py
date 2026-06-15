@@ -81,6 +81,11 @@ async def test_sync_legacy_helpers_fail_closed_without_identity_unless_flagged(
     ledger = await store.get_run_ledger(run.run_id)
 
     assert legacy_run.metadata["legacy_no_identity_allowed"] is True
+    assert legacy_run.metadata["daemon_version"]
+    assert (
+        legacy_run.metadata["daemon_version"]
+        == legacy_run.metadata["daemon_version_stamp"]["build_id"]
+    )
     assert ledger["identity"] is None
     assert ledger["receipts"] == []
 
@@ -159,6 +164,11 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
 
     assert stored_claim.metadata["execution_identity"]["run_id"] == identity.run_id
     assert stored_run.metadata["execution_identity"]["trace_id"] == identity.trace_id
+    assert stored_run.metadata["daemon_version"]
+    assert (
+        stored_run.metadata["daemon_version"]
+        == stored_run.metadata["daemon_version_stamp"]["build_id"]
+    )
     assert claim_trace == identity.trace_id
     assert run_trace == identity.trace_id
     assert ledger["identity"].run_id == identity.run_id
@@ -256,6 +266,11 @@ async def test_async_helpers_record_identity_trace_and_receipts(tmp_path: Path) 
 
     assert stored_claim.metadata["execution_identity"]["run_id"] == identity.run_id
     assert stored_run.metadata["execution_identity"]["trace_id"] == identity.trace_id
+    assert stored_run.metadata["daemon_version"]
+    assert (
+        stored_run.metadata["daemon_version"]
+        == stored_run.metadata["daemon_version_stamp"]["build_id"]
+    )
     assert ledger["identity"].run_id == identity.run_id
     assert receipt_types >= {"task_claim", "delegation_run", "child_spawned"}
     assert claim_receipt.side_effect_key == f"task_claim:{identity.claim_id}:claimed"

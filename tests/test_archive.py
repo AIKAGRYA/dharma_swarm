@@ -79,6 +79,17 @@ def test_entry_defaults():
     assert e.parent_id is None
     assert e.gates_passed == []
     assert e.tokens_used == 0
+    assert e.daemon_version == ""
+
+
+@pytest.mark.asyncio
+async def test_add_entry_stamps_daemon_version(archive):
+    e = ArchiveEntry(component="daemon-versioned.py")
+
+    await archive.add_entry(e)
+
+    assert e.daemon_version
+    assert e.daemon_version == e.daemon_version_stamp["build_id"]
 
 
 def test_entry_json_roundtrip():
