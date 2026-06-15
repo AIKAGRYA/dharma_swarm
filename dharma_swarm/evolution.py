@@ -104,6 +104,7 @@ class Proposal(BaseModel):
     requirement_refs: list[str] = Field(default_factory=list)
     think_notes: str = ""
     diff: str = ""
+    shadow_diff: str = ""  # original diff retained when shadow mode strips `diff`
     status: EvolutionStatus = EvolutionStatus.PENDING
     predicted_fitness: float = 0.0
     actual_fitness: Optional[FitnessScore] = None
@@ -1425,6 +1426,19 @@ class DarwinEngine:
 
             proposal.gate_decision = result.decision.value
             proposal.gate_reason = result.reason
+            # Record per-gate verdicts so archive_result can report real
+            # gate outcomes instead of a fabricated "ALL".
+            proposal.metadata = {
+                **(proposal.metadata or {}),
+                "gate_results": {
+                    name: (
+                        getattr(verdict[0], "value", str(verdict[0]))
+                        if isinstance(verdict, (tuple, list)) and verdict
+                        else str(verdict)
+                    )
+                    for name, verdict in result.gate_results.items()
+                },
+            }
             proposal.reflection_attempts = outcome.attempts
             proposal.reflection_suggestions = list(outcome.suggestions)
             if outcome.reflection.strip():
@@ -1708,6 +1722,56 @@ class DarwinEngine:
 
     # -- archiving -----------------------------------------------------------
 
+    @staticmethod
+    def _derive_archive_status(proposal: Proposal) -> str:
+        """Derive an honest archive status from what the proposal records.
+
+        "applied" only when a diff apply actually happened and stuck;
+        "rolled_back" when an apply happened but was reverted;
+        "gated" when the gates blocked it; "shadow" when there was no
+        diff to apply (shadow mode strips diffs); "evaluated" otherwise.
+        """
+        if (
+            proposal.gate_decision == GateDecision.BLOCK.value
+            or proposal.status == EvolutionStatus.REJECTED
+        ):
+            return "gated"
+        if not proposal.diff.strip():
+            return "shadow"
+        rolled_back = proposal.test_results.get("rolled_back")
+        if rolled_back is None:
+            trial = proposal.test_results.get("runtime_field_trial")
+            if isinstance(trial, dict):
+                rolled_back = trial.get("rolled_back")
+        if rolled_back is True:
+            return "rolled_back"
+        if rolled_back is False:
+            return "applied"
+        return "evaluated"
+
+    @staticmethod
+    def _derive_gate_record(proposal: Proposal) -> tuple[list[str], list[str]]:
+        """Derive (gates_passed, gates_failed) from real gate results.
+
+        Uses per-gate verdicts recorded by ``gate_check`` when present;
+        otherwise falls back to the decision label. Never fabricates "ALL".
+        """
+        raw = (proposal.metadata or {}).get("gate_results")
+        if isinstance(raw, dict) and raw:
+            passed: list[str] = []
+            failed: list[str] = []
+            for name, verdict in raw.items():
+                if str(verdict) == GateResult.FAIL.value:
+                    failed.append(name)
+                else:
+                    passed.append(name)
+            return passed, failed
+        if proposal.gate_decision == GateDecision.BLOCK.value:
+            return [], [proposal.gate_reason or "unknown"]
+        if proposal.gate_decision:
+            return [proposal.gate_decision.upper()], []
+        return [], []
+
     async def archive_result(self, proposal: Proposal) -> str:
         """Store an evaluated proposal in the evolution archive.
 
@@ -1751,6 +1815,7 @@ class DarwinEngine:
                 weighted_fitness,
             )
 
+            gates_passed, gates_failed = self._derive_gate_record(proposal)
             entry = ArchiveEntry(
                 component=proposal.component,
                 change_type=proposal.change_type,
@@ -1758,6 +1823,7 @@ class DarwinEngine:
                 spec_ref=proposal.spec_ref,
                 requirement_refs=list(proposal.requirement_refs),
                 diff=proposal.diff,
+                shadow_diff=proposal.shadow_diff,
                 parent_id=proposal.parent_id,
                 fitness=fitness,
                 test_results=test_results,
@@ -1765,17 +1831,9 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
-                gates_passed=(
-                    ["ALL"]
-                    if proposal.gate_decision != GateDecision.BLOCK.value
-                    else []
-                ),
-                gates_failed=(
-                    [proposal.gate_reason or "unknown"]
-                    if proposal.gate_decision == GateDecision.BLOCK.value
-                    else []
-                ),
+                status=self._derive_archive_status(proposal),
+                gates_passed=gates_passed,
+                gates_failed=gates_failed,
             )
 
             # GAIA ecological fitness (non-fatal): blend ecological awareness
@@ -3084,6 +3142,7 @@ class DarwinEngine:
         context: str = "",
         router: Any | None = None,
         shadow: bool = False,
+        parent_id: str | None = None,
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> CycleResult:
         """Autonomous evolution: LLM proposes improvements, engine evaluates them.
@@ -3109,6 +3168,8 @@ class DarwinEngine:
             context: Extra context to guide the LLM (focus areas, recent errors).
             router: Optional ModelRouter for multi-model roster selection.
             shadow: If True, do not apply diffs — evaluate proposals in dry-run mode.
+            parent_id: Optional archive entry id these proposals evolve from
+                (recorded on each proposal so lineage reaches the archive).
             on_progress: Optional callback ``(event_name, data)`` for real-time UX.
 
         Returns:
@@ -3193,10 +3254,15 @@ class DarwinEngine:
             logger.info("No proposals generated — nothing to evolve")
             return CycleResult(proposals_submitted=0)
 
+        if parent_id:
+            for p in proposals:
+                p.parent_id = p.parent_id or parent_id
+
         if shadow:
             # Shadow mode: gate and evaluate without applying diffs
             logger.info("Shadow mode: evaluating %d proposals (no diffs applied)", len(proposals))
             for p in proposals:
+                p.shadow_diff = p.diff  # Retain original diff for the archive
                 p.diff = ""  # Strip diffs so sandbox doesn't apply them
             result = await self.run_cycle(proposals)
         else:
