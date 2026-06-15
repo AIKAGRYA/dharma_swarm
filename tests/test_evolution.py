@@ -919,7 +919,9 @@ async def test_archive_result_stores_entry(engine):
     stored = await engine.archive.get_entry(entry_id)
     assert stored is not None
     assert stored.component == "module.py"
-    assert stored.status == "applied"
+    # No diff apply ran on this path — honest status is "evaluated",
+    # not "applied" (which is reserved for diffs that actually landed).
+    assert stored.status == "evaluated"
     assert stored.fitness.correctness == pytest.approx(0.8)
     assert stored.promotion_state == "candidate"
     assert stored.evidence_tier == "unvalidated"
