@@ -1,12 +1,13 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
 PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
+PYTEST ?= pytest
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
 VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 GO ?= go
@@ -47,6 +48,7 @@ help:
 	@echo "  make precommit-run Run pre-commit on all files"
 	@echo "  make governance-baseline Capture scanner baselines"
 	@echo "  make test-contracts Run governance contract tests"
+	@echo "  make nats-substrate-contract Verify NATS substrate contract wiring"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
@@ -221,6 +223,18 @@ test-contracts:
 		tests/test_runtime_contract_adapters.py \
 		--tb=line
 
+nats-substrate-contract:
+	$(REPO_PYTHON) scripts/governance/check_nats_substrate_contract.py
+	$(PYTEST) -q \
+		tests/test_nats_live_contact.py \
+		tests/test_nats_transport.py \
+		tests/test_a2a_send.py \
+		tests/test_a2a_inbox_bridge.py \
+		tests/test_a2a_inbox_bridge_tmux_scripts.py \
+		tests/test_a2a_domain_reply_worker.py \
+		tests/test_a2a_reply_capture.py \
+		--tb=line
+
 uplift-guards:
 	python3 scripts/uplift_guards/run_pre_commit.py
 
@@ -328,7 +342,7 @@ operator-prod-smoke:
 # convergence). It is intentionally NOT a separate governance-all
 # dependency — running it once via uplift-guards is enough. The standalone
 # `make spine-check` target stays as an operator-convenience alias only.
-governance-all: semgrep gitleaks test-hygiene test-contracts uplift-guards module-budget docops-integrity
+governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"

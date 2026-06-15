@@ -308,6 +308,19 @@ class OntologyHub:
             version=row["version"],
         )
 
+    def _try_row_to_obj(self, row: sqlite3.Row) -> OntologyObj | None:
+        """Deserialize an object row, quarantining malformed persisted JSON."""
+        try:
+            return self._row_to_obj(row)
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            logger.warning(
+                "Skipping malformed ontology object row id=%s type=%s field=properties error=%s",
+                row["id"],
+                row["type_name"],
+                exc,
+            )
+            return None
+
     def _row_to_link(self, row: sqlite3.Row) -> Link:
         """Deserialize a database row into a Link."""
         return Link(
@@ -346,7 +359,7 @@ class OntologyHub:
         ).fetchone()
         if row is None:
             return None
-        return self._row_to_obj(row)
+        return self._try_row_to_obj(row)
 
     def load_objects_by_type(
         self, type_name: str, limit: int = 100
@@ -356,7 +369,8 @@ class OntologyHub:
             "SELECT * FROM objects WHERE type_name = ? ORDER BY created_at DESC LIMIT ?",
             (type_name, limit),
         ).fetchall()
-        return [self._row_to_obj(r) for r in rows]
+        objects = [self._try_row_to_obj(r) for r in rows]
+        return [obj for obj in objects if obj is not None]
 
     def load_links(
         self,
@@ -457,7 +471,8 @@ class OntologyHub:
             logger.warning("FTS5 search failed for query %r: %s", query, exc)
             return []
 
-        return [self._row_to_obj(r) for r in rows]
+        objects = [self._try_row_to_obj(r) for r in rows]
+        return [obj for obj in objects if obj is not None]
 
     # ------------------------------------------------------------------
     # Aggregate queries
@@ -544,8 +559,12 @@ class OntologyHub:
 
         # Load objects
         rows = self._conn.execute("SELECT * FROM objects").fetchall()
+        skipped_objects = 0
         for row in rows:
-            obj = self._row_to_obj(row)
+            obj = self._try_row_to_obj(row)
+            if obj is None:
+                skipped_objects += 1
+                continue
             registry._objects[obj.id] = obj
             obj_count += 1
 
@@ -567,6 +586,7 @@ class OntologyHub:
 
         return {
             "objects_loaded": obj_count,
+            "objects_skipped": skipped_objects,
             "links_loaded": link_count,
             "actions_loaded": action_count,
         }

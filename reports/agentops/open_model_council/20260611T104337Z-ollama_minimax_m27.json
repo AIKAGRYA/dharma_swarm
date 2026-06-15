@@ -1,0 +1,18 @@
+{
+  "agent_uid": "ollama_minimax_m27",
+  "created_at": "2026-06-11T10:44:06.680944+00:00",
+  "error": "",
+  "extracted_recommendations": [],
+  "latency_ms": 6625.3,
+  "model": "minimax-m2.7",
+  "peer_model_processed_claim": true,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/qwen-deepseek-semantic-receipt-council-20260611T104000Z.md",
+  "prompt_sha256": "2ca7d7b7983c84b11dc48ccee0d94d0a8b594a0b50f3ed7cf2708a3443bfee1e",
+  "provider": "ollama",
+  "requested_model": "minimax-m2.7:cloud",
+  "response": "I'll inspect the repo first before rendering judgment.",
+  "response_sha256": "f9f6e1ac681b73d70f45fb403a28cadc754ba08b62ce22387aed0a95f6e5e44b",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": true,
+  "status": "ok"
+}

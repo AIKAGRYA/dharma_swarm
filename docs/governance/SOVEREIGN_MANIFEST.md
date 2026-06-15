@@ -164,20 +164,18 @@ Invariant that must hold throughout:
 - Do not commit provider API keys or any credentials.
 - Do not create a new truth store, receipt system, or state owner; extend loop_supervisor and existing owners.
 
-### Truth Graph Platform v1 — repo context + receipted A2A presence
+### Orientation Graph — whole-system view served on token one
 
-**Track id:** `truth-graph-platform-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-12 (TTL 21 days)
-**Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: orientation-graph-2026-06
-**Owns surfaces:** scripts/governance/orientation_graph.py, scripts/governance/truth_graph_nats_e2e_demo.py, scripts/governance/run_truth_graph_nats_e2e_demo.sh, tests/test_orientation_graph.py, tests/test_truth_graph_repo_context.py, dharma_swarm/a2a/task_receipt.py, dharma_swarm/a2a/agent_presence.py, tests/test_a2a_gate.py, tests/test_agent_registry_presence.py, reports/orientation/**
-**Moves vital signs:** quality_gates, tool_coverage, memory_persistence
+**Track id:** `orientation-graph-2026-06` · **Status:** ACTIVE · **Owner:** @devin
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/governance/orientation_graph.py, tests/test_orientation_graph.py
+**Moves vital signs:** quality_gates
 
-Operator directive 2026-06-12: move dharma_swarm toward a single truth
-graph that every agent reads, with an advanced A2A layer and fast
-coordination across many registered agents. This track absorbs the
-completed orientation graph and turns it into one generated repo context
-artifact plus receipts-only A2A gate helpers and agent heartbeat
-projection.
+Operator directive 2026-06-11: any agent must see the whole system at
+once — identity (why), organs, active tracks, canon custody, liveness,
+and the broken register — in ~10 seconds, not by grepping prose. This
+track delivers that as a single read-only orientation view.
 
 The track creates NO new truth store and NO authority surface. It
 projects from the existing owners only: foundations/THE_ORGANISM.md
@@ -185,32 +183,28 @@ and docs/vision_maps/NORTH_STAR.md (identity),
 docs/governance/VENTURE_CELL_PORTFOLIO.yaml (organs),
 docs/governance/ACTIVE_TRACK.yaml (tracks),
 docs/docops/assertions.yaml canonical_guard.registered + the worktree
-(custody), ~/.dharma/ops/parallel_lane_map.json (lanes),
-~/.dharma/a2a_bus/agents.json and ~/.dharma/agents/* (agent presence),
-the live ops census receipt (liveness), ~/.dharma/ops/deploy_receipt.json
-(body state), A2A bus receipt roots, and docs/state/BROKEN_REGISTER.md
-(broken).
+(custody), the live ops census receipt (liveness), and
+docs/state/BROKEN_REGISTER.md (broken).
 
 Doctrine line that must hold (same as the reconciliation lane's):
   Read models project truth from owners; they do not become authority.
 
-A2A ingress must reject unstructured essays where this track owns the
-boundary. The schema is deliberately plain:
-claim, evidence, verdict, next_action, files_changed.
+The one-section identity hook added to agent_onboard.py (a surface the
+reconciliation lane owns) was done under explicit operator instruction
+2026-06-11, is read-only pointers, and does not touch that lane's
+runtime-truth rendering or non-goals.
 
 **Next items:**
 
-- [code] (blocker) Run make orient and commit generated repo_context artifacts.
-- [test] (blocker) Run live local NATS CLI demo twice and verify repo_context renders the receipt path.
+- [code] Graph-shaped queries (organ -> tracks -> surfaces -> liveness edges) over the same owners, still read-only.
+- [test] Measure time-to-orientation for a fresh agent (target <10s) and record the receipt.
 
 **Non-goals:**
 
 - Do not create a new daemon, database, vector store, event log, or truth store.
-- Do not mutate live A2A registry owners from this repo track.
-- Do not duplicate make onboard's state rendering; repo_context is a generated projection.
+- Do not mutate owner files; the view writes nothing.
+- Do not duplicate make onboard's state rendering; this is the why/shape layer, onboard remains the state layer.
 - Do not touch operator_core/** or runtime_state.py.
-- Do not touch scripts/runtime/a2a_send.py or scripts/runtime/autonomy_spine.py.
-- Do not claim full future NATS spec compliance from the CLI demo alone.
 
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 
@@ -247,9 +241,9 @@ to main through the normal review path before it is called shipped.
 
 **Recently closed tracks:**
 
-- `orientation-graph-2026-06` — Orientation Graph — whole-system view served on token one (SHIPPED, closed 2026-06-12)
 - `runtime-truth-spine-2026-06` — Runtime Truth Spine — one invariant, one invocation path, one receipt (SHIPPED, closed 2026-06-04)
 - `trace-identity-coverage-2026-05` — Trace Identity Coverage — native propagation and soft coverage findings (SUPERSEDED, closed 2026-05-28)
+- `trace-attractor-causal-spine-2026-05` — Trace Attractor Causal Spine — operator-visible trace packets (SHIPPED, closed 2026-05-21)
 
 For machine-readable status, see [`reports/governance/active_track_evidence.md`](../../reports/governance/active_track_evidence.md) (generated by `scripts/governance/check_track_status.py`).
 
@@ -301,23 +295,23 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-12 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **722** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **399 (55.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **296,520** | wc -l across dharma_swarm Python modules |
-| Test files | **676** | find tests -name "*.py" -type f |
-| Test functions | **11,305 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **741** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **399 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **305,811** | wc -l across dharma_swarm Python modules |
+| Test files | **705** | find tests -name "*.py" -type f |
+| Test functions | **11,518 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **988** | find . -name "*.md" -type f |
-| Markdown total lines | **234,759** | wc -l across all .md |
+| Markdown files | **1012** | find . -name "*.md" -type f |
+| Markdown total lines | **239,255** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **21 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
+| Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
 | Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |

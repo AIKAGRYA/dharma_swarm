@@ -1,0 +1,18 @@
+{
+  "agent_uid": "qwen_openrouter_free",
+  "created_at": "2026-06-11T10:28:36.303403+00:00",
+  "error": "TimeoutError: ",
+  "extracted_recommendations": [],
+  "latency_ms": 120001.5,
+  "model": "qwen/qwen3-coder:free",
+  "peer_model_processed_claim": false,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/open-model-council-a2a-missing-systems-20260611T102326Z.md",
+  "prompt_sha256": "a47987ffedbd20934aacfd05d50421ae1d3f48ba860f860c5d73b06b74eca415",
+  "provider": "openrouter_free",
+  "requested_model": "qwen/qwen3-coder:free",
+  "response": "",
+  "response_sha256": "",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": false,
+  "status": "error"
+}

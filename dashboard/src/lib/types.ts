@@ -563,6 +563,104 @@ export interface ControlSurfaceSummary {
   p1_count: number;
   generated_at: string;
   sources_consulted: string[];
+  memory_depth?: string;
+}
+
+export interface ControlSurfaceSourceError {
+  source: string;
+  error: string;
+}
+
+export interface ControlSurfaceEnvelope<T> {
+  schema_version: string;
+  request_id: string;
+  generated_at: string;
+  source_errors: ControlSurfaceSourceError[];
+  data: T;
+}
+
+export interface BoardReceiptRef {
+  receipt_id: string;
+  kind: string;
+  store: string;
+  uri: string;
+  checksum: string;
+  created_at: string;
+  summary: string;
+}
+
+export interface BoardAcceptanceCriterion {
+  id: string;
+  text: string;
+  kind: string;
+  required: boolean;
+  verifier: string;
+  evidence_ref: string;
+}
+
+export interface BoardRenderHints {
+  view_priority: number;
+  color_key: string;
+  icon_key: string;
+  column_hint: string;
+  lane_hint: string;
+  thread_hint: string;
+  map_node_kind: string;
+}
+
+export interface BoardCard {
+  id: string;
+  parent_objective: string | null;
+  title: string;
+  body: string;
+  status: string;
+  assignee_kind: string;
+  capability_required: string[];
+  acceptance_criteria: BoardAcceptanceCriterion[];
+  receipt_refs: BoardReceiptRef[];
+  arjuna_weight: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  source_surface: string;
+  render_hints: BoardRenderHints;
+}
+
+export type DsGoalBoardCard = BoardCard;
+export type AgentOpsBoardCard = BoardCard;
+export type A2ASendBoardCard = BoardCard;
+export type SemanticReceiptBoardCard = BoardCard;
+
+export interface DsGoalCardsPayload {
+  state_root: string;
+  mission_id: string | null;
+  card_count: number;
+  cards: DsGoalBoardCard[];
+}
+
+export interface AgentOpsCardsPayload {
+  work_packet_root: string;
+  packet_id: string | null;
+  card_count: number;
+  cards: AgentOpsBoardCard[];
+}
+
+export interface A2ASendCardsPayload {
+  receipt_root: string;
+  bridge_receipt_root?: string;
+  domain_reply_receipt_root?: string;
+  reply_receipt_root?: string;
+  target: string | null;
+  card_count: number;
+  cards: A2ASendBoardCard[];
+}
+
+export interface SemanticReceiptCardsPayload {
+  receipt_root: string;
+  model: string | null;
+  verdict: string | null;
+  card_count: number;
+  cards: SemanticReceiptBoardCard[];
 }
 
 // ---------------------------------------------------------------------------

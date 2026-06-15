@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-SPEC_PATH = Path("docs/specs/GO_IDEA_SPARK_INGEST_SPINE_MASTER_BUILD.md")
+SPEC_PATH = Path("docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md")
 
 
 @dataclass(frozen=True)

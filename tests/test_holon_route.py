@@ -88,7 +88,9 @@ def test_holon_chat_surfaces_provider_error(client, monkeypatch):
     r = client.post("/holon/opus_composer/chat", json={"message": "hi"})
     assert r.status_code == 200
     assert "partial " in r.text          # partial content still streamed
-    assert "error" in r.text and "exploded" in r.text  # error surfaced, not a 500
+    assert "error" in r.text             # error surfaced, not a 500
+    assert "provider error" in r.text
+    assert "exploded" not in r.text      # raw provider details stay server-side
 
 
 def test_holon_chat_logs_conversation(client, monkeypatch):
