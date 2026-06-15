@@ -23,8 +23,8 @@ must pass these gates before merge:
 | 8 | PR collision detect | `pr-collision-detect.yml` | Warning comment (non-blocking) |
 | 9 | Intent PR limit | `bot-pr-limit.yml` | Hard-fail when an automation lane (headRef pattern) has more open PRs than its declared limit |
 | 10 | Stale PR lifecycle | `stale-pr.yml` | Warning label at 11 days (bot) / 27 days (human); auto-close at 14 / 30 |
-| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older duplicates of `[automated]`-titled PRs, keeping the newest |
-| 12 | Automerge lane | `automerge.yml` | On `automerge`/`bot-pr` label + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
+| 11 | Duplicate automated PR dedupe | `pr-dedupe.yml` | Auto-closes older trusted same-repo duplicates of `[automated]`/`[auto]` PRs, keeping the newest |
+| 12 | Automerge lane | `automerge.yml` | Auto-enrolls bot/automated PRs; on opt-in + all checks green + no changes-requested, dispatches MMM with `merge_when_clean` |
 
 ### Local pre-flight
 
@@ -107,6 +107,12 @@ Human PRs on non-lane branches are unaffected. To add a new automation lane,
 add a `case` arm to the `Resolve intent from headRef` step and a row to this
 table in the same PR.
 
+The spine-adoption refresher has used several branch prefixes
+(`chore/governance/...`, `chore/auto-spine-adoption...`, and
+`ops/spine-adoption-metric...`). The throttle matches the intent token anywhere
+in the headRef so renamed refresher branches cannot evade the one-open-PR
+limit.
+
 ### Rule: Deduplication by intent
 
 The `pr-collision-detect.yml` workflow detects duplicate PRs by:
@@ -121,14 +127,22 @@ linking to the successor.
 
 ### Duplicate Automated PR Dedupe (`pr-dedupe.yml`)
 
-The collision detector only warns. The `pr-dedupe.yml` workflow **acts**: it
-groups open non-draft PRs by normalized title and, for any group of 2+ PRs
-whose title carries an automation marker (`[automated]` or `[auto]`), closes
-all but the newest PR (highest number), comments a governance explanation,
-and deletes the orphaned branches. It runs on PR open/reopen, every 6 hours
-on a schedule, and on `workflow_dispatch` (with a `dry_run` input). PRs
-without an automation marker in the title are never touched, and nothing is
-ever merged by this lane.
+The collision detector only warns. The `pr-dedupe.yml` workflow **acts**, but
+title markers are not trusted by themselves because this workflow runs under
+`pull_request_target` with write permissions. It groups open PRs by normalized
+title only when all of these are true:
+
+1. The title carries an automation marker (`[automated]` or `[auto]`).
+2. The PR head is in the same repository.
+3. The PR has a trusted automation signal: bot author, trusted automation head
+   prefix, or maintainer-applied `bot-pr` / `automerge` label.
+
+For any trusted group of 2+ PRs, it closes all but the newest PR (highest
+number), comments a governance explanation, and deletes the orphaned branches.
+It runs on PR open/reopen, every 6 hours on a schedule, and on
+`workflow_dispatch` (with a `dry_run` input). PRs without an automation marker
+or trusted same-repo automation signal are never touched, and nothing is ever
+merged by this lane.
 
 ---
 
@@ -146,8 +160,13 @@ Trigger surface: label added, ready-for-review, `check_suite` completion,
 review submitted/dismissed, plus an hourly sweep. When **all** status checks
 are green/completed, the PR is not a draft, and no review requests changes,
 the lane dispatches the existing Merge Master Mike router
-(`codex-mention-router.yml`) with `merge_when_clean: true` — once per head
-SHA (a marker comment prevents re-dispatch).
+(`codex-mention-router.yml`) with `merge_when_clean: true`.
+
+Dispatch markers are keyed to a readiness fingerprint, not just the head SHA:
+head SHA, review decision, status-check count, comment count, and review count.
+If Mike blocks because reviewer receipts, threads, or checks were not yet
+present, later review/comment/check changes can dispatch again for the same
+head SHA.
 
 Nothing is weakened: Mike still runs his full deterministic gate
 (fourfold-warrant, coherence-delta, CI rollup, unresolved review threads,
@@ -176,12 +195,14 @@ enabled without stranding required checks:
 
 - **Tree-shaped gates** (`tests`, `docops`, `test-hygiene`, `manifest-check`,
   `semgrep`, `gitleaks`, `codeql`, `active-track`) run **fully** on the
-  queued batch — this is the point of the queue.
+  queued batch -- this is the point of the queue.
+- **Batch-aware comparison gates** (`module-budget`) compare the merge-group
+  base/head SHAs on `merge_group`, so Rule 10 still evaluates the queued batch.
 - **PR-shaped gates** (`coherence-delta`, `fourfold-warrant`, `commit-lint`,
-  `structure`, `module-budget`) need PR context (body, base/head SHAs) that
-  a `merge_group` event does not carry. They already passed on the PR run
-  before the PR could be queued, so their jobs skip on `merge_group`
-  (skipped = satisfied for required checks).
+  `structure`) need PR context (body or PR-specific file list) that a
+  `merge_group` event does not carry. They already passed on the PR run before
+  the PR could be queued, so their jobs skip on `merge_group` (skipped =
+  satisfied for required checks).
 
 One-time repository settings (operator action, cannot be done from the repo):
 

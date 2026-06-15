@@ -1,0 +1,24 @@
+{
+  "agent_uid": "deepseek_v4_pro_direct",
+  "created_at": "2026-06-11T10:44:37.140038+00:00",
+  "error": "",
+  "extracted_recommendations": [
+    "The *SemanticReceipt v1* schema is a necessary primitive, but the highest\u2011value four\u2011hour build is not just the schema \u2013 it is a **minimal model\u2011critic runtime** that populates a typed receipt from a real agent message, validates it, stores it, and exposes it back into the shared truth substrate (RuntimeStateStore/BoardStore). Without that runtime, we are only renaming a vague promise with a type definition, and will still lack the observable \u201csemantic feedback\u201d that the council is demanding.",
+    "GLM\u2019s critique that the repo must stop asking for vague semantic collaboration is spot on. A typed `SemanticReceiptArtifact` (or better, a fully\u2011specified `SemanticReceipt` record) anchored to a single concrete workflow \u2013 e.g., an agent receiving a goal update and producing a structured comprehension signal \u2013 finally gives A2A evidence a shape that downstream reasoning can inspect deterministically. The distinction already made between publish ack, domain receipt, and semantic reply will collapse into noise without this typed artifact.",
+    "The emerging conclusion from Qwen/DeepSeek is too narrow in its \u201cmust include the model critic runner\u201d framing. It assumes the runner is an internal step that only populates and validates a receipt. But **the runner must also act as a hardened, cost\u2011aware boundary** that can fall back to a lightweight local model (or even a rule\u2011based parser) when paid lanes fail, and must emit structured error receipts that the swarm can reason about. Simply saying \u201cthe build must include the runner\u201d understates the adversarial reality: free/cheap lanes are unreliable, and the receipt schema must degrade grac",
+    "Missing Harness Capability",
+    "Submit a domain\u2011contextualised prompt (e.g., a received A2A message + `ds-goal` extract) to an **actual model** (open\u2011weight or paid),"
+  ],
+  "latency_ms": 29016.1,
+  "model": "deepseek-v4-pro",
+  "peer_model_processed_claim": true,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/qwen-deepseek-semantic-receipt-council-20260611T104000Z.md",
+  "prompt_sha256": "2ca7d7b7983c84b11dc48ccee0d94d0a8b594a0b50f3ed7cf2708a3443bfee1e",
+  "provider": "deepseek",
+  "requested_model": "deepseek-v4-pro",
+  "response": "1. Verdict\nThe *SemanticReceipt v1* schema is a necessary primitive, but the highest\u2011value four\u2011hour build is not just the schema \u2013 it is a **minimal model\u2011critic runtime** that populates a typed receipt from a real agent message, validates it, stores it, and exposes it back into the shared truth substrate (RuntimeStateStore/BoardStore). Without that runtime, we are only renaming a vague promise with a type definition, and will still lack the observable \u201csemantic feedback\u201d that the council is demanding.\n\n2. Strongest Agreement\nGLM\u2019s critique that the repo must stop asking for vague semantic collaboration is spot on. A typed `SemanticReceiptArtifact` (or better, a fully\u2011specified `SemanticReceipt` record) anchored to a single concrete workflow \u2013 e.g., an agent receiving a goal update and producing a structured comprehension signal \u2013 finally gives A2A evidence a shape that downstream reasoning can inspect deterministically. The distinction already made between publish ack, domain receipt, and semantic reply will collapse into noise without this typed artifact.\n\n3. Strongest Disagreement\nThe emerging conclusion from Qwen/DeepSeek is too narrow in its \u201cmust include the model critic runner\u201d framing. It assumes the runner is an internal step that only populates and validates a receipt. But **the runner must also act as a hardened, cost\u2011aware boundary** that can fall back to a lightweight local model (or even a rule\u2011based parser) when paid lanes fail, and must emit structured error receipts that the swarm can reason about. Simply saying \u201cthe build must include the runner\u201d understates the adversarial reality: free/cheap lanes are unreliable, and the receipt schema must degrade gracefully. So the runner is not just a validator; it is a **semantic feedback amplifier that is explicitly designed for model fragility**.\n\n4. Missing Harness Capability\nThere is no harness that can:\n- Submit a domain\u2011contextualised prompt (e.g., a received A2A message + `ds-goal` extract) to an **actual model** (open\u2011weight or paid),\n- Parse a structured `",
+  "response_sha256": "d00a326792f5c3f36921da3a9b59fdcd976ad51f26ee1f796fcdb94776d2ddc0",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": true,
+  "status": "ok"
+}

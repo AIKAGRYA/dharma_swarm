@@ -125,9 +125,14 @@ async def lifespan(app: FastAPI):
         _state.pop("swarm_init_task", None)
     except TimeoutError:
         logger.warning(
-            "Swarm init exceeded %.1fs; continuing API startup while warmup finishes in background",
+            "Swarm init exceeded %.1fs; cancelling warmup to keep dashboard API responsive",
             init_timeout,
         )
+        if swarm_init_task is not None and not swarm_init_task.done():
+            swarm_init_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await swarm_init_task
+        _state.pop("swarm_init_task", None)
     except Exception as e:
         logger.warning("Swarm init partial: %s", e)
 

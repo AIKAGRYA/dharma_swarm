@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  backendLivenessPath,
   fetchHeatmap,
   fetchImpact,
   fetchProvenance,
@@ -60,6 +61,13 @@ test("typed dashboard fetch unwraps backend ApiResponse envelopes", async () => 
   } finally {
     stub.restore();
   }
+});
+
+test("backend connectivity banner uses lightweight liveness route", () => {
+  assert.equal(
+    backendLivenessPath(),
+    "http://127.0.0.1:8420/api/verify/health",
+  );
 });
 
 test("fetchImpact targets the lineage impact route for one artifact", async () => {
