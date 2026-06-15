@@ -1,0 +1,137 @@
+{
+  "generated_at": "2026-06-15T16:58:07.150001+00:00",
+  "counts": {
+    "GREEN": 11,
+    "RED": 0,
+    "BLOCKED": 2
+  },
+  "one_wire_enforcement": {
+    "verdict": "GREEN",
+    "reason": "One Wire ENFORCED: guard rejects internal writes, admits external-countersigned; production archive has 11515 internal fitness rows quarantined (0 externally countersigned, 0 counted toward archive fitness); Guardian authority_granted=False (quorum_met=False, N=3/5 M=1/3)"
+  },
+  "loops": [
+    {
+      "loop": 1,
+      "verdict": "GREEN",
+      "reason": "7 completed run(s) with real-provider receipt (e.g. provider=google_ai model=gemini-2.5-flash input_tokens=8 run_id=run_3dab1e00b6c04c82)",
+      "real_data": true,
+      "scoped_env": {
+        "LC_RUNTIME_DB": "/tmp/lc_loop1_scoped.db"
+      }
+    },
+    {
+      "loop": 2,
+      "verdict": "GREEN",
+      "reason": "heartbeat_cycle receipt cycle=1 regime=stable gnani=PROCEED sensed 3 real-provider completion(s) (e.g. run_id=run_cdb9f45f2e224f77); sense->interpret->constrain->act->adapt on real data, archive untouched",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP2_STATE_DIR": "/tmp/lc_loop2_state"
+      }
+    },
+    {
+      "loop": 3,
+      "verdict": "GREEN",
+      "reason": "evolution cycle SENSED real Loop-1 completion run_id=run_c5607c63d7144f98, INTERPRETed FitnessScore (weighted=0.6596), CONSTRAINed via telos (safety=1.0), ACTed archive_entry=0f1a90ad71e844a1, ADAPT receipt referenced it. One Wire: quarantined 11515/11515 internal-fitness entries to loop3_one_wire_quarantine.jsonl; 0 counted toward closure; guard refuses internal writes and admits only external-countersigned writes",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP3_STATE_DIR": "/tmp/lc_loop3_state",
+        "LC_ARCHIVE_JSONL": "/tmp/lc_archive.jsonl"
+      }
+    },
+    {
+      "loop": 4,
+      "verdict": "GREEN",
+      "reason": "19 knowledge unit(s) consolidated from 4 REAL Loop-1 agent output(s) joined by provenance run_id (e.g. run=run_27ba2df3ac624eb9 provider=ollama model=deepseek-v3.2); adapt edge fired (CONSOLIDATION_CYCLE: 19 props + 5 prescs); One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP4_RUNTIME_DB": "/tmp/lc_loop4_runtime.db",
+        "LC_LOOP4_KNOWLEDGE_DB": "/tmp/lc_loop4_knowledge.db",
+        "LC_LOOP4_DIR": "/tmp/lc_loop4"
+      }
+    },
+    {
+      "loop": 5,
+      "verdict": "GREEN",
+      "reason": "S4->S3 closed on real data: 5 real BLOCKED gate-checks -> gate_pressure(external_strict, reason='5/5 gate checks blocked today.') -> S3 consumer flipped internal_yolo->external_strict. One Wire intact.",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP5_HOME": "/tmp/lc_loop5_home"
+      }
+    },
+    {
+      "loop": 6,
+      "verdict": "GREEN",
+      "reason": "7 witness finding(s) audited REAL agent actions joined to real-provider Loop-1 receipts (e.g. run=run_3dab1e00b6c04c82 provider=google_ai model=gemini-2.5-flash); adapt edge fired (witness_fitness_signal=1.0); One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db",
+        "LC_WITNESS_DIR": "/tmp/lc_loop6_witness"
+      }
+    },
+    {
+      "loop": 7,
+      "verdict": "GREEN",
+      "reason": "4 REAL trajectory(ies) scored by ThinkodynamicScorer and joined to real-provider Loop-1 receipts (e.g. run=run_3dab1e00b6c04c82 provider=google_ai model=gemini-2.5-flash composite=0.19); UCB1 cycle extracted 3 pattern(s) (top=strategy-reply-with-exactly-one-word:-a); dataset=4 sample(s); adapt fed strategy back into prompt; One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db",
+        "LC_LOOP7_DIR": "/tmp/lc_loop7"
+      }
+    },
+    {
+      "loop": 8,
+      "verdict": "GREEN",
+      "reason": "recognition self-model synthesized on REAL data: anchored to Loop-1 run=run_3dab1e00b6c04c82 (provider=google_ai model=gemini-2.5-flash input_tokens=8); 3 genuine cascade eigenform run(s) fed the sense layer; RecognitionEngine built a 316-char seed referencing the cascade signal; ouroboros eigenform fixpoint reached (quality=0.752, mimicry=1.000, F(S)=S); 1 immutable snapshot(s); seed feeds agent context tier 8; One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db",
+        "LC_LOOP8_DIR": "/tmp/lc_loop8"
+      }
+    },
+    {
+      "loop": 9,
+      "verdict": "GREEN",
+      "reason": "real conductor wake closed all 5 transitions: witness tokens=29 (owner surface), act receipt provider=google_ai model=gemini-2.5-flash input_tokens=26 side_effect_key=google_ai:gemini-2.5-flash:in26:out3:94c5ce07",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP9_STATE_DIR": "/tmp/lc_loop9_state",
+        "LC_RUNTIME_DB": "/tmp/lc_loop9_scoped.db"
+      }
+    },
+    {
+      "loop": 10,
+      "verdict": "GREEN",
+      "reason": "real context-agent cycle closed all 5 transitions: sense/interpret on /tmp/lc_loop10_state_1781542099 (health=0.967), constrain armed the act (bloated note), ACT real-provider distill provider=ollama model=glm-5 input_tokens=2384 -> owner-surface artifact researcher_distilled.md; adapt edge fired (stigmergy mark + CONTEXT_HEALTH signal + freshness write, side_effect_key=ollama:glm-5:in2384:out301:4d9b6fb3); One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP10_STATE_DIR": "/tmp/lc_loop10_state_1781542099",
+        "LC_RUNTIME_DB": "/tmp/lc_loop10_scoped_1781542099.db",
+        "LC_LOOP10_DIR": "/tmp/lc_loop10_1781542099"
+      }
+    },
+    {
+      "loop": 11,
+      "verdict": "GREEN",
+      "reason": "child 'loop11_replication_specialist_g1_20260615' materialized through the REAL G1->S->G2->M pipeline (gate_decision=REVIEW, not BLOCK) triggered by 6 REAL Loop-1 run(s); witness stages ['G1_PASS', 'G2_PASS', 'M_MATERIALIZED', 'S_PASS'] all fired; child in roster; One Wire intact",
+      "real_data": true,
+      "scoped_env": {
+        "LC_LOOP11_RUNTIME_DB": "/tmp/lc_loop11_runtime.db",
+        "LC_LOOP11_STATE_DIR": "/tmp/lc_loop11_state"
+      }
+    },
+    {
+      "loop": 12,
+      "verdict": "BLOCKED",
+      "reason": "One Wire quorum UNMET (correct, do NOT simulate): N=3/5 confirmed external acted receipts (need 2 more); M=1/3 distinct domains (need 2 more; have ['external_code_contribution']); eligible_to_set_archive_fitness=false; fitness_authority_granted=false",
+      "real_data": false,
+      "scoped_env": {}
+    },
+    {
+      "loop": 13,
+      "verdict": "BLOCKED",
+      "reason": "Free-evolution archive-fitness authority NOT granted \u2014 gated on external acted receipts (correct, do NOT simulate): N=3/5 confirmed external acted receipts (need 2 more); M=1/3 distinct domains (need 2 more; have ['external_code_contribution']); eligible_to_set_archive_fitness=false; fitness_authority_granted=false",
+      "real_data": false,
+      "scoped_env": {}
+    }
+  ]
+}

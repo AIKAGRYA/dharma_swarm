@@ -1,0 +1,22 @@
+{
+  "loop": 6,
+  "name": "Witness Auditor",
+  "verdict": "GREEN",
+  "real_data": true,
+  "verifier_cmd": "LC_LOOP1_DB=/tmp/lc_loop6_loop1.db LC_WITNESS_DIR=/tmp/lc_loop6_witness python3 scripts/governance/closure/check_loop_6.py",
+  "driver_cmd": "DHARMA_SPINE_DISPATCH=1 LC_SCOPED_DB=/tmp/lc_loop6_loop1.db python3 scripts/governance/closure/drive_loop_1.py; LC_LOOP1_DB=/tmp/lc_loop6_loop1.db LC_WITNESS_DIR=/tmp/lc_loop6_witness python3 scripts/governance/closure/drive_loop_6.py",
+  "findings_count": 4,
+  "joined_to_real_loop1": true,
+  "providers": [
+    "google_ai/gemini-2.5-flash",
+    "ollama/glm-5",
+    "ollama/deepseek-v3.2"
+  ],
+  "adapt_edge": "WITNESS_AUDIT fitness signal=1.0",
+  "one_wire": "intact (internal signal only, no archive.jsonl write)",
+  "findings_sha256": "5477fafcb826486f96e4d7306bc25931bc978c8e95a3e88663465cc430dbcfb6",
+  "negative_tests": [
+    "broken-join->RED",
+    "forged-side_effect_key->RED"
+  ]
+}

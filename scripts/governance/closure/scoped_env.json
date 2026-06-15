@@ -1,0 +1,16 @@
+{
+  "_doc": "Per-loop scoped env for run_all.py. Each loop's closure check runs in its own subprocess with these env vars so a fresh agent can replay the GREEN verdict from the real-data artifacts driven on 2026-06-16. Loop 1 reads the production snapshot at LC_RUNTIME_DB by default and is RED there; to see Loop 1 GREEN on the real free-provider dispatch, point LC_RUNTIME_DB at /tmp/lc_loop1_scoped.db (overridden per-loop below). Re-create any missing artifact by running the matching drive_loop_N.py with DHARMA_SPINE_DISPATCH=1 and these same env vars.",
+  "1":  {"LC_RUNTIME_DB": "/tmp/lc_loop1_scoped.db"},
+  "2":  {"LC_LOOP2_STATE_DIR": "/tmp/lc_loop2_state"},
+  "3":  {"LC_LOOP3_STATE_DIR": "/tmp/lc_loop3_state", "LC_ARCHIVE_JSONL": "/tmp/lc_archive.jsonl"},
+  "4":  {"LC_LOOP4_RUNTIME_DB": "/tmp/lc_loop4_runtime.db", "LC_LOOP4_KNOWLEDGE_DB": "/tmp/lc_loop4_knowledge.db", "LC_LOOP4_DIR": "/tmp/lc_loop4"},
+  "5":  {"LC_LOOP5_HOME": "/tmp/lc_loop5_home"},
+  "6":  {"LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db", "LC_WITNESS_DIR": "/tmp/lc_loop6_witness"},
+  "7":  {"LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db", "LC_LOOP7_DIR": "/tmp/lc_loop7"},
+  "8":  {"LC_LOOP1_DB": "/tmp/lc_loop1_scoped.db", "LC_LOOP8_DIR": "/tmp/lc_loop8"},
+  "9":  {"LC_LOOP9_STATE_DIR": "/tmp/lc_loop9_state", "LC_RUNTIME_DB": "/tmp/lc_loop9_scoped.db"},
+  "10": {"LC_LOOP10_STATE_DIR": "/tmp/lc_loop10_state_1781542099", "LC_RUNTIME_DB": "/tmp/lc_loop10_scoped_1781542099.db", "LC_LOOP10_DIR": "/tmp/lc_loop10_1781542099"},
+  "11": {"LC_LOOP11_RUNTIME_DB": "/tmp/lc_loop11_runtime.db", "LC_LOOP11_STATE_DIR": "/tmp/lc_loop11_state"},
+  "12": {},
+  "13": {}
+}
