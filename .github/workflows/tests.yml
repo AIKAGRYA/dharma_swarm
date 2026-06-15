@@ -74,13 +74,20 @@ jobs:
           DHARMA_EVOLUTION_SHADOW: "1"
           DGC_AUTONOMY_LEVEL: "0"
         run: |
-          python -m pytest tests/ -q --tb=short \
-            -x \
+          # DIAGNOSTIC (throwaway branch): pipefail + no -x to enumerate the full
+          # honest-CI failure set after Stage-0. Do not merge this workflow change.
+          set -o pipefail
+          set +e
+          python -m pytest tests/ -q --tb=line \
             --timeout=30 \
             -m "not slow and not docker and not network" \
             2>&1 | tee pytest_output.txt
-          # Surface pass/fail counts
-          tail -3 pytest_output.txt
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "=== FAILED node ids ==="
+          grep -E "^FAILED " pytest_output.txt || true
+          tail -5 pytest_output.txt
+          exit "$status"
 
       - name: Upload test results
         if: always()
