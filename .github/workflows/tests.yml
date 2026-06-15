@@ -81,15 +81,15 @@ jobs:
           # failure before re-exiting with pytest's real status.
           set -o pipefail
           set +e
-          python -m pytest tests/ -q --tb=short \
-            -x \
+          python -m pytest tests/ -q --tb=line -rf \
             --timeout=30 \
             -m "not slow and not docker and not network" \
             2>&1 | tee pytest_output.txt
           status=${PIPESTATUS[0]}
           set -e
-          # Surface pass/fail counts even on failure.
-          tail -3 pytest_output.txt
+          # DIAGNOSTIC (temporary): -x removed and -rf added to enumerate the
+          # full genuine-failure set under honest CI. Revert to -x before merge.
+          tail -80 pytest_output.txt
           exit "$status"
 
       - name: Upload test results
