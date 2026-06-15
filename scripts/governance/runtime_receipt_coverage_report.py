@@ -234,10 +234,19 @@ FIELD_GAP_ACTION_PROOF_EVIDENCE: dict[str, dict[str, Any]] = {
 }
 
 
+def _sql_regexp_fullmatch(pattern: Any, value: Any) -> int:
+    """REGEXP UDF using ``re.fullmatch`` so SQL fixture detection matches
+    ``_identifier_shape`` exactly (same anchored semantics, no partial hits)."""
+    if value is None:
+        return 0
+    return 1 if re.fullmatch(str(pattern), str(value)) else 0
+
+
 def _connect_readonly(db_path: Path) -> sqlite3.Connection:
     uri = f"{db_path.expanduser().resolve().as_uri()}?mode=ro"
     db = sqlite3.connect(uri, uri=True)
     db.row_factory = sqlite3.Row
+    db.create_function("REGEXP", 2, _sql_regexp_fullmatch)
     return db
 
 
@@ -295,12 +304,36 @@ def _metadata_hints(*payloads: dict[str, Any]) -> dict[str, Any]:
     return hints
 
 
-def _identifier_shape(agent_id: str | None, task_id: str | None) -> str:
+# Single source of truth for the fixture-shaped detection rule. The Python
+# predicate, the SQL exclusion clause, and the operator-acceptance validation
+# all derive from these so the rule can never drift between them.
+FIXTURE_AGENT_PATTERN = r"a\d+"
+FIXTURE_TASK_PATTERN = r"t\d+"
+FIXTURE_TASK_LITERAL = "t-ready"
+
+
+def _is_fixture_shaped(agent_id: str | None, task_id: str | None) -> bool:
     agent = str(agent_id or "")
     task = str(task_id or "")
-    fixture_agent = bool(re.fullmatch(r"a\d+", agent))
-    fixture_task = bool(re.fullmatch(r"t\d+", task)) or task == "t-ready"
-    if fixture_agent or fixture_task:
+    fixture_agent = bool(re.fullmatch(FIXTURE_AGENT_PATTERN, agent))
+    fixture_task = (
+        bool(re.fullmatch(FIXTURE_TASK_PATTERN, task)) or task == FIXTURE_TASK_LITERAL
+    )
+    return fixture_agent or fixture_task
+
+
+def _fixture_sql_clause(agent_col: str, task_col: str) -> str:
+    """SQL predicate equivalent to ``_is_fixture_shaped``. Relies on the
+    REGEXP UDF registered in ``_connect_readonly`` (``re.fullmatch`` semantics)."""
+    return (
+        f"({agent_col} REGEXP '{FIXTURE_AGENT_PATTERN}'"
+        f" OR {task_col} REGEXP '{FIXTURE_TASK_PATTERN}'"
+        f" OR {task_col} = '{FIXTURE_TASK_LITERAL}')"
+    )
+
+
+def _identifier_shape(agent_id: str | None, task_id: str | None) -> str:
+    if _is_fixture_shaped(agent_id, task_id):
         return "fixture_shaped"
     return "ordinary"
 
@@ -1122,29 +1155,112 @@ def _test_runtime_db_isolation_evidence() -> dict[str, Any]:
     return evidence
 
 
+FIXTURE_QUARANTINE_ACCEPTANCE_PATH = (
+    "docs/governance/FIXTURE_QUARANTINE_ACCEPTANCE.md"
+)
+
+
+def _fixture_quarantine_acceptance_evidence() -> dict[str, Any]:
+    """Load the operator's recorded quarantine acceptance for the
+    ``test_fixtures`` owner surface.
+
+    Acceptance is only ``recorded`` when the committed artifact exists, marks
+    ``accepted: yes`` for ``owner_surface: test_fixtures``, restates the live
+    detection rule (so the rule cannot drift here without the code agreeing),
+    and acknowledges both required preconditions (active-head-clean and
+    test/runtime DB isolation). The detection-rule check compares against the
+    live ``_identifier_shape`` constants, not a frozen string.
+    """
+    path = _REPO_ROOT / FIXTURE_QUARANTINE_ACCEPTANCE_PATH
+    evidence: dict[str, Any] = {
+        "path": FIXTURE_QUARANTINE_ACCEPTANCE_PATH,
+        "present": path.exists(),
+        "accepted": False,
+        "owner_surface_matches": False,
+        "detection_rule_matches": False,
+        "active_head_precondition_ack": False,
+        "isolation_precondition_ack": False,
+        "operator": "",
+        "accepted_on": "",
+        "recorded": False,
+    }
+    if not path.exists():
+        return evidence
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return evidence
+    lowered = text.lower()
+    evidence["accepted"] = "accepted: yes" in lowered
+    evidence["owner_surface_matches"] = "owner_surface: test_fixtures" in lowered
+    required_rule_lines = (
+        f"agent_id fullmatch `{FIXTURE_AGENT_PATTERN}`".lower(),
+        f"task_id fullmatch `{FIXTURE_TASK_PATTERN}`".lower(),
+        f"task_id equals `{FIXTURE_TASK_LITERAL}`".lower(),
+    )
+    evidence["detection_rule_matches"] = all(
+        line in lowered for line in required_rule_lines
+    )
+    evidence["active_head_precondition_ack"] = "active_head_missing == 0" in lowered
+    evidence["isolation_precondition_ack"] = (
+        "test_runtime_db_isolation enforced" in lowered
+    )
+    operator_match = re.search(r"(?im)^-\s*operator:\s*(.+?)\s*$", text)
+    accepted_on_match = re.search(r"(?im)^-\s*accepted_on:\s*(.+?)\s*$", text)
+    evidence["operator"] = operator_match.group(1).strip() if operator_match else ""
+    evidence["accepted_on"] = (
+        accepted_on_match.group(1).strip() if accepted_on_match else ""
+    )
+    evidence["recorded"] = bool(
+        evidence["accepted"]
+        and evidence["owner_surface_matches"]
+        and evidence["detection_rule_matches"]
+        and evidence["active_head_precondition_ack"]
+        and evidence["isolation_precondition_ack"]
+    )
+    return evidence
+
+
 def _fixture_quarantine_policy(groups: list[dict[str, Any]]) -> dict[str, Any]:
     fixture_groups = [
         group for group in groups if str(group.get("identifier_shape") or "") == "fixture_shaped"
     ]
     candidate_missing = sum(int(group.get("missing") or 0) for group in fixture_groups)
     isolation = _test_runtime_db_isolation_evidence()
+    acceptance = _fixture_quarantine_acceptance_evidence()
     policy = _field_gap_action_policy("quarantine_fixture_debt_or_exclude_from_production_gate")
     summary = _field_gap_group_summary(fixture_groups)
     active_head_missing = int(summary.get("active_head_missing") or 0)
+
+    isolation_enforced = bool(isolation.get("enforced"))
+    acceptance_recorded = bool(acceptance.get("recorded"))
+    preconditions_met = bool(
+        candidate_missing > 0
+        and active_head_missing == 0
+        and isolation_enforced
+        and acceptance_recorded
+    )
+
     blockers: list[str] = []
     if candidate_missing > 0:
-        blockers.append("fixture-shaped debt is only a candidate and is not excluded")
-        blockers.append("explicit operator quarantine acceptance is not recorded")
-    if active_head_missing > 0:
-        blockers.append("fixture-shaped rows appear in active-head windows")
-    if candidate_missing > 0 and not bool(isolation.get("enforced")):
-        blockers.append("test runtime DB isolation evidence is incomplete")
-    status = "no_fixture_candidates"
-    if candidate_missing > 0:
+        if not acceptance_recorded:
+            blockers.append("explicit operator quarantine acceptance is not recorded")
+        if active_head_missing > 0:
+            blockers.append("fixture-shaped rows appear in active-head windows")
+        if not isolation_enforced:
+            blockers.append("test runtime DB isolation evidence is incomplete")
+
+    if candidate_missing <= 0:
+        status = "no_fixture_candidates"
+    elif preconditions_met:
+        status = "applied_to_score_gate"
+    else:
         status = "candidate_not_applied"
+
     return {
         "status": status,
-        "applies_to_score_gate": False,
+        "applies_to_score_gate": preconditions_met,
+        "fixtures_excluded": candidate_missing if preconditions_met else 0,
         "candidate_missing": candidate_missing,
         "candidate_group_count": len(fixture_groups),
         "active_head_missing": active_head_missing,
@@ -1154,12 +1270,13 @@ def _fixture_quarantine_policy(groups: list[dict[str, Any]]) -> dict[str, Any]:
         "by_gap_type": summary.get("by_gap_type", {}),
         "top_group": fixture_groups[0] if fixture_groups else {},
         "test_runtime_db_isolation": isolation,
+        "operator_acceptance": acceptance,
         "eligible_after_operator_decision": bool(
             candidate_missing > 0
             and active_head_missing == 0
-            and bool(isolation.get("enforced"))
+            and isolation_enforced
         ),
-        "operator_decision_required": candidate_missing > 0,
+        "operator_decision_required": candidate_missing > 0 and not acceptance_recorded,
         "owner_surface": policy["owner_surface"],
         "required_evidence": policy["required_evidence"],
         "blockers": blockers,
@@ -1998,6 +2115,58 @@ def build_report(
             ).fetchone()[0]
         )
 
+        # Fixture-excluded (real-only) denominators. These are only fed into
+        # the score gate when the fixture-quarantine policy's preconditions
+        # hold (active-head clean + isolation enforced + operator acceptance).
+        # They never exclude a non-fixture (32-hex-id) row: the exclusion
+        # clause is the exact SQL equivalent of ``_is_fixture_shaped``.
+        _fix_clause = _fixture_sql_clause("agent_id", "task_id")
+        _fix_clause_rr = _fixture_sql_clause("rr.agent_id", "rr.task_id")
+        major_total_nonfixture = _count(
+            db,
+            "runtime_receipts",
+            f"{major_filter} AND NOT {_fix_clause}",
+            major_params,
+        )
+        major_with_idempotency_fields_nonfixture = _count(
+            db,
+            "runtime_receipts",
+            f"{major_filter} AND idempotency_key != '' AND side_effect_key != ''"
+            f" AND NOT {_fix_clause}",
+            major_params,
+        )
+        major_with_matching_idempotency_nonfixture = int(
+            db.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM runtime_receipts rr
+                JOIN idempotency_records ir
+                  ON rr.idempotency_key = ir.idempotency_key
+                 AND rr.side_effect_key = ir.side_effect_key
+                WHERE {rr_major_filter}
+                  AND rr.idempotency_key != ''
+                  AND rr.side_effect_key != ''
+                  AND NOT {_fix_clause_rr}
+                """,
+                rr_major_params,
+            ).fetchone()[0]
+        )
+        major_with_artifact_record_nonfixture = int(
+            db.execute(
+                f"""
+                SELECT COUNT(DISTINCT rr.receipt_id)
+                FROM runtime_receipts rr
+                JOIN artifact_records ar
+                  ON (rr.run_id != '' AND rr.run_id = ar.run_id)
+                  OR (rr.task_id != '' AND rr.task_id = ar.task_id)
+                WHERE {rr_major_filter}
+                  AND NOT {_fix_clause_rr}
+                """,
+                rr_major_params,
+            ).fetchone()[0]
+        )
+        fixtures_excluded_major_total = major_total - major_total_nonfixture
+
         type_status = [
             dict(row)
             for row in db.execute(
@@ -2033,6 +2202,10 @@ def build_report(
         latest_major_with_mission = 0
         latest_major_with_artifact_payload = 0
         latest_major_with_explicit_no_artifact = 0
+        latest_major_nonfixture_total = 0
+        latest_major_nonfixture_with_mission = 0
+        latest_major_nonfixture_with_artifact_payload = 0
+        latest_major_nonfixture_with_explicit_no_artifact = 0
         latest_major_with_provider = 0
         latest_major_with_model = 0
         latest_major_with_provider_model = 0
@@ -2096,11 +2269,20 @@ def build_report(
             if not is_terminal:
                 latest_provider_model_pending_execution += 1
             latest_payload_parse_errors += int(bool(payload.get("_parse_error")))
-            latest_major_with_mission += int(_payload_has_mission(payload))
-            latest_major_with_artifact_payload += int(_payload_has_artifact_ref(payload))
-            latest_major_with_explicit_no_artifact += int(
+            _row_is_fixture = _is_fixture_shaped(row.get("agent_id"), row.get("task_id"))
+            _row_has_mission = int(_payload_has_mission(payload))
+            _row_has_artifact = int(_payload_has_artifact_ref(payload))
+            _row_no_artifact = int(
                 _payload_has_explicit_absence(payload, "artifact_refs")
             )
+            latest_major_with_mission += _row_has_mission
+            latest_major_with_artifact_payload += _row_has_artifact
+            latest_major_with_explicit_no_artifact += _row_no_artifact
+            if not _row_is_fixture:
+                latest_major_nonfixture_total += 1
+                latest_major_nonfixture_with_mission += _row_has_mission
+                latest_major_nonfixture_with_artifact_payload += _row_has_artifact
+                latest_major_nonfixture_with_explicit_no_artifact += _row_no_artifact
             has_provider = _payload_has_provider(payload)
             has_model = _payload_has_model(payload)
             latest_major_with_provider += int(has_provider)
@@ -2295,18 +2477,57 @@ def build_report(
             params=major_params,
         )
 
-        idempotency_match_ok = (
-            major_total > 0
-            and major_with_idempotency_fields == major_total
-            and major_with_matching_idempotency == major_total
+        # Select gate denominators. When the fixture-quarantine policy's
+        # preconditions hold (active-head clean + isolation enforced +
+        # operator acceptance), fixture-shaped rows are excluded from the
+        # mission/artifact/idempotency denominators. Otherwise the full
+        # denominators stand. Non-fixture rows are never excluded.
+        exclude_fixtures = bool(
+            fixture_quarantine_policy.get("applies_to_score_gate")
         )
-        mission_ok = major_total > 0 and latest_major_with_mission == len(latest_major)
+        if exclude_fixtures:
+            gate_major_total = major_total_nonfixture
+            gate_major_with_idempotency_fields = (
+                major_with_idempotency_fields_nonfixture
+            )
+            gate_major_with_matching_idempotency = (
+                major_with_matching_idempotency_nonfixture
+            )
+            gate_major_with_artifact_record = major_with_artifact_record_nonfixture
+            gate_latest_major_count = latest_major_nonfixture_total
+            gate_latest_major_with_mission = latest_major_nonfixture_with_mission
+            gate_latest_artifact_or_no_artifact = (
+                latest_major_nonfixture_with_artifact_payload
+                + latest_major_nonfixture_with_explicit_no_artifact
+            )
+            fixtures_excluded = fixtures_excluded_major_total
+        else:
+            gate_major_total = major_total
+            gate_major_with_idempotency_fields = major_with_idempotency_fields
+            gate_major_with_matching_idempotency = major_with_matching_idempotency
+            gate_major_with_artifact_record = major_with_artifact_record
+            gate_latest_major_count = len(latest_major)
+            gate_latest_major_with_mission = latest_major_with_mission
+            gate_latest_artifact_or_no_artifact = (
+                latest_major_with_artifact_payload
+                + latest_major_with_explicit_no_artifact
+            )
+            fixtures_excluded = 0
+
+        idempotency_match_ok = (
+            gate_major_total > 0
+            and gate_major_with_idempotency_fields == gate_major_total
+            and gate_major_with_matching_idempotency == gate_major_total
+        )
+        mission_ok = (
+            gate_major_total > 0
+            and gate_latest_major_with_mission == gate_latest_major_count
+        )
         artifact_ok = (
-            major_total > 0
+            gate_major_total > 0
             and (
-                major_with_artifact_record == major_total
-                or latest_major_with_artifact_payload + latest_major_with_explicit_no_artifact
-                == len(latest_major)
+                gate_major_with_artifact_record == gate_major_total
+                or gate_latest_artifact_or_no_artifact == gate_latest_major_count
             )
         )
         provider_model_ok = (
@@ -2362,8 +2583,10 @@ def build_report(
                     "idempotency_records"
                 ),
                 evidence=(
-                    f"matching_idempotency={major_with_matching_idempotency}/"
-                    f"{major_total}; fields={major_with_idempotency_fields}/{major_total}"
+                    f"matching_idempotency={gate_major_with_matching_idempotency}/"
+                    f"{gate_major_total}; "
+                    f"fields={gate_major_with_idempotency_fields}/{gate_major_total}; "
+                    f"fixtures_excluded={fixtures_excluded}"
                 ),
                 blocker=(
                     "major task receipts do not all join to idempotency_records"
@@ -2375,7 +2598,10 @@ def build_report(
                 passed=mission_ok,
                 scope="score_gate",
                 required="latest major task receipts carry mission_id-like payloads",
-                evidence=f"latest_mission={latest_major_with_mission}/{len(latest_major)}",
+                evidence=(
+                    f"latest_mission={gate_latest_major_with_mission}/"
+                    f"{gate_latest_major_count}; fixtures_excluded={fixtures_excluded}"
+                ),
                 blocker=(
                     "latest major task receipts do not all carry mission_id-like payloads"
                 ),
@@ -2390,9 +2616,10 @@ def build_report(
                     "carry artifact evidence / explicit no-artifact reasons"
                 ),
                 evidence=(
-                    f"artifact_record={major_with_artifact_record}/{major_total}; "
-                    f"latest_artifact_or_no_artifact={latest_artifact_or_no_artifact}/"
-                    f"{len(latest_major)}"
+                    f"artifact_record={gate_major_with_artifact_record}/"
+                    f"{gate_major_total}; "
+                    f"latest_artifact_or_no_artifact={gate_latest_artifact_or_no_artifact}/"
+                    f"{gate_latest_major_count}; fixtures_excluded={fixtures_excluded}"
                 ),
                 blocker=(
                     "major task receipts do not all join to artifact_records or "
@@ -2581,6 +2808,8 @@ def build_report(
             ),
             active_head_side_effect_key_clean=active_head_side_effect_key_gate["passed"],
             score_gate_70_to_75=score_gate_70_to_75,
+            score_gate_fixture_exclusion_applied=exclude_fixtures,
+            score_gate_fixtures_excluded=fixtures_excluded,
             gate_70_to_75_components=gate_70_to_75_components,
         )
         blockers = []
@@ -3010,6 +3239,16 @@ def _print_text(report: dict[str, Any]) -> None:
             "  "
             f"test_isolation_enforced={str(isolation.get('enforced')).lower()} "
             f"path={isolation.get('path')}"
+        )
+        acceptance = fixture_quarantine.get("operator_acceptance") or {}
+        print(
+            "  "
+            f"operator_acceptance_recorded="
+            f"{str(acceptance.get('recorded')).lower()} "
+            f"operator={acceptance.get('operator') or '<none>'} "
+            f"accepted_on={acceptance.get('accepted_on') or '<none>'} "
+            f"fixtures_excluded={fixture_quarantine.get('fixtures_excluded')} "
+            f"acceptance_path={acceptance.get('path')}"
         )
         blockers = [
             str(item) for item in fixture_quarantine.get("blockers") or [] if str(item)

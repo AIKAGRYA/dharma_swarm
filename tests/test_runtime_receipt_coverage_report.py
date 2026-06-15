@@ -626,29 +626,129 @@ def test_receipt_coverage_report_keeps_fixture_quarantine_candidate_out_of_score
     report = mod.build_report(db_path)
     policy = report["major_task_receipts"]["fixture_quarantine_policy"]
 
-    assert report["summary"]["score_gate_70_to_75"] is False
-    assert policy["status"] == "candidate_not_applied"
-    assert policy["applies_to_score_gate"] is False
+    # With the committed operator acceptance recorded AND the preconditions
+    # met (active-head clean + test/runtime DB isolation enforced), the policy
+    # applies: fixture-shaped rows are excluded from the score-gate
+    # mission/artifact/idempotency denominators. The real clean anchor is the
+    # only non-fixture row, so those three components now pass on real data.
+    assert policy["status"] == "applied_to_score_gate"
+    assert policy["applies_to_score_gate"] is True
+    assert policy["fixtures_excluded"] == 3
     assert policy["candidate_missing"] == 3
     assert policy["candidate_group_count"] == 3
     assert policy["active_head_missing"] == 0
     assert policy["recent_historical_missing"] == 3
     assert policy["eligible_after_operator_decision"] is True
-    assert policy["operator_decision_required"] is True
+    assert policy["operator_decision_required"] is False
     assert policy["owner_surface"] == "test_fixtures"
     assert policy["test_runtime_db_isolation"]["enforced"] is True
-    assert "fixture-shaped debt is only a candidate and is not excluded" in policy["blockers"]
+    assert policy["operator_acceptance"]["recorded"] is True
+    assert policy["operator_acceptance"]["detection_rule_matches"] is True
+    assert policy["blockers"] == []
+
+    gate_components = {
+        item["short_label"]: item
+        for item in report["summary"]["gate_70_to_75_components"]
+    }
+    assert gate_components["idempotency"]["status"] == "pass"
+    assert gate_components["mission"]["status"] == "pass"
+    assert gate_components["artifact"]["status"] == "pass"
+    assert "fixtures_excluded=1" in gate_components["idempotency"]["evidence"]
+
+    # The gate as a whole still fails here: core field coverage scans ALL
+    # receipts (it is not fixture-scoped by design), and the fixture row has
+    # empty idempotency/side_effect keys. Quarantine never hides that.
+    assert gate_components["core"]["status"] == "fail"
+    assert report["summary"]["score_gate_70_to_75"] is False
+    assert report["summary"]["score_gate_fixture_exclusion_applied"] is True
+    assert report["summary"]["score_gate_fixtures_excluded"] == 1
 
     queue = report["major_task_receipts"]["field_gap_action_queue"]
     assert [item["short_label"] for item in queue] == ["fixture_quarantine"]
-    assert queue[0]["score_effect"] == "no_score_change_until_required_evidence_passes"
 
     mod._print_text(report)
     output = capsys.readouterr().out
     assert "Fixture quarantine policy:" in output
-    assert "applies_to_score_gate=false" in output
+    assert "applies_to_score_gate=true" in output
     assert "test_isolation_enforced=true" in output
-    assert "fresh_proof=status=candidate_policy_recorded_not_applied" in output
+    assert "operator_acceptance_recorded=true" in output
+
+
+def test_receipt_coverage_report_keeps_fixture_candidate_out_without_acceptance(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
+    """Without recorded operator acceptance the fixture exclusion must NOT
+    apply, even when active-head is clean and isolation is enforced."""
+    mod = _load_report_module()
+    # Point the acceptance loader at a path that does not exist so acceptance
+    # is treated as not recorded (the operator decision is the gating event).
+    monkeypatch.setattr(
+        mod,
+        "FIXTURE_QUARANTINE_ACCEPTANCE_PATH",
+        "docs/governance/_NONEXISTENT_FIXTURE_ACCEPTANCE.md",
+    )
+    db_path = tmp_path / "runtime.db"
+    _init_db(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs"
+            " (run_id, session_id, task_id, assigned_to, status,"
+            " failure_code, metadata_json, started_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "run-fixture-gap",
+                "sess-fixture-gap",
+                "t-ready",
+                "a1",
+                "failed",
+                "dispatch_dropoff",
+                '{"source":"orchestrator","topology":"fan_out"}',
+                "2026-06-14T00:00:00+00:00",
+            ),
+        )
+        db.execute(
+            "INSERT INTO runtime_receipts"
+            " (receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, agent_id, idempotency_key, side_effect_key,"
+            " status, payload_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "rr-fixture-gap",
+                "delegation_run",
+                "run-fixture-gap",
+                "t-ready",
+                "trace-fixture-gap",
+                "corr-fixture-gap",
+                "a1",
+                "",
+                "",
+                "failed",
+                "{}",
+                "2026-06-14T00:00:00+00:00",
+            ),
+        )
+
+    report = mod.build_report(db_path)
+    policy = report["major_task_receipts"]["fixture_quarantine_policy"]
+
+    assert report["summary"]["score_gate_70_to_75"] is False
+    assert policy["status"] == "candidate_not_applied"
+    assert policy["applies_to_score_gate"] is False
+    assert policy["fixtures_excluded"] == 0
+    assert policy["operator_decision_required"] is True
+    assert policy["operator_acceptance"]["recorded"] is False
+    assert (
+        "explicit operator quarantine acceptance is not recorded"
+        in policy["blockers"]
+    )
+    assert report["summary"]["score_gate_fixture_exclusion_applied"] is False
+
+    mod._print_text(report)
+    output = capsys.readouterr().out
+    assert "applies_to_score_gate=false" in output
+    assert "operator_acceptance_recorded=false" in output
 
 
 def test_receipt_coverage_report_assigns_claim_timeout_owner_action(tmp_path):
@@ -1676,7 +1776,7 @@ def test_receipt_coverage_report_fails_missing_idempotency_and_payload_fields(tm
     assert gate_components["active_head"]["status"] == "fail"
     assert "side_effect_key:2" in gate_components["core"]["evidence"]
     assert gate_components["idempotency"]["evidence"] == (
-        "matching_idempotency=0/1; fields=0/1"
+        "matching_idempotency=0/1; fields=0/1; fixtures_excluded=0"
     )
     assert gate_components["active_head"]["scope"] == "strict_runtime_blocker"
     assert "major task receipts do not all join to idempotency_records" in report["summary"]["blockers"]
