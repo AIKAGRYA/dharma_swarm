@@ -264,6 +264,19 @@ def test_dispatch_mode_report_includes_live_census_source_gaps(tmp_path, monkeyp
         encoding="utf-8",
     )
     monkeypatch.setattr(mod, "_census_receipt_path", lambda: receipt)
+    # Freeze freshness so the hardcoded generated_at cannot rot by wall-clock:
+    # without this the >24h-old timestamp short-circuits to receipt_stale before
+    # proof-gap surfaces are evaluated. We assert proof-gap behaviour, not freshness.
+    monkeypatch.setattr(
+        mod,
+        "_live_census_freshness",
+        lambda payload: {
+            "state": "fresh",
+            "age_minutes": 0.0,
+            "max_age_hours": 24.0,
+            "evidence": "live ops census receipt generated_at is fresh",
+        },
+    )
 
     report = mod.build_report(env={})
 
