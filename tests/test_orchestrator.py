@@ -688,6 +688,62 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_fan_out_success_delegation_run_receipt_carries_mission_id(tmp_path):
+    """Regression: a fan-out SUCCESS delegation_run receipt must carry a
+    non-empty payload.mission_id so the runtime receipt coverage gate's
+    mission check (_payload_has_mission) passes.
+
+    The task here sets NO mission_id in its metadata. Before the fix the
+    orchestrator never seeded one, so the lifecycle resolved mission_id to ""
+    and ~982 completed delegation_run receipts failed the gate. The fix seeds
+    mission_id in Orchestrator._prepare_claim (task-id-derived fallback when no
+    explicit mission/goal id is in scope), so every receipt this dispatch emits
+    inherits it.
+    """
+    board = MockTaskBoard()
+    board.tasks = [
+        Task(id="t-mission", title="Mission-bearing task", description="safe")
+    ]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(result="mission ok"))
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_mission",
+    )
+
+    await orch.route_next()
+    for _ in range(50):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+    store = orch._runtime_lifecycle._runtime_state_store()
+    assert store is not None
+    with sqlite3.connect(store.db_path) as db:
+        rows = db.execute(
+            "SELECT payload_json FROM runtime_receipts"
+            " WHERE receipt_type = 'delegation_run' AND status = 'completed'"
+            " AND task_id = ?",
+            ("t-mission",),
+        ).fetchall()
+
+    assert rows, "expected a completed delegation_run receipt for the fanned-out task"
+    for (payload_json,) in rows:
+        payload = json.loads(payload_json)
+        mission_id = str(payload.get("mission_id") or "").strip()
+        assert mission_id, f"completed delegation_run receipt missing mission_id: {payload}"
+        # The genuine task-id-derived fallback when no explicit mission is set.
+        assert mission_id == "mission_t-mission"
+
+
+@pytest.mark.asyncio
 async def test_orchestrator_fail_closes_when_honors_checkpoint_missing(tmp_path):
     board = MockTaskBoard()
     board.tasks = [

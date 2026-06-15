@@ -852,6 +852,25 @@ class Orchestrator:
             or meta.get("idempotency_key")
             or f"idem_{run_id}"
         ).strip()
+        # Mission id: thread the genuine mission/goal identifier so every
+        # delegation_run / task_claim receipt this dispatch emits (claimed,
+        # running, completed, failed) carries a non-empty payload.mission_id
+        # for the runtime receipt coverage gate. Prefer an explicit mission/
+        # goal id from dispatch or task metadata; fall back to genuine lineage
+        # (parent_run_id); finally derive a stable id from the real task id
+        # (mirrors the writer's own `mission = mission_id or task_id` fallback
+        # in runtime_state._delegation_run_receipt_payload). No fabricated id.
+        mission_id = str(
+            td.metadata.get("mission_id")
+            or td.metadata.get("missionId")
+            or td.metadata.get("mission")
+            or meta.get("mission_id")
+            or meta.get("missionId")
+            or meta.get("mission")
+            or td.metadata.get("parent_run_id")
+            or meta.get("parent_run_id")
+            or f"mission_{td.task_id}"
+        ).strip()
         now_epoch = time.time()
         now_iso = datetime.now(timezone.utc).isoformat()
         claim = {
@@ -873,6 +892,7 @@ class Orchestrator:
                 "runtime_run_id": run_id,
                 "run_id": run_id,
                 "idempotency_key": idempotency_key,
+                "mission_id": mission_id,
                 "last_claim": claim,
                 "active_claim": claim,
             }
@@ -887,6 +907,7 @@ class Orchestrator:
         td.metadata["runtime_run_id"] = run_id
         td.metadata["run_id"] = run_id
         td.metadata["idempotency_key"] = idempotency_key
+        td.metadata["mission_id"] = mission_id
         td.metadata["claim_timeout_seconds"] = claim_timeout_seconds
         td.metadata["claim_expires_monotonic"] = time.monotonic() + claim_timeout_seconds
         td.metadata["retry_count"] = retry_count
