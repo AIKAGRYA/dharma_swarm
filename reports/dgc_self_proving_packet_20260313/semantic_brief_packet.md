@@ -1,5 +1,5 @@
 # Semantic Brief Packet
-- Graph: `reports/dgc_self_proving_packet_20260313/semantic_graph.json`
+- Graph: `reports/dgc_self_proving_packet_20260313/semantic_graph.json` → moved to release [`evidence-snapshot-20260313`](https://github.com/AmitabhainArunachala/dharma_swarm/releases/tag/evidence-snapshot-20260313) (see [`semantic_graph.POINTER.md`](semantic_graph.POINTER.md))
 - Project root: `.`
 - Semantic briefs: `3`
 - Execution briefs: `3`
