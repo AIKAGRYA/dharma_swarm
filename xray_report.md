@@ -1,104 +1,120 @@
-# Repo X-Ray: dharma_swarm
-*Generated 2026-04-04T09:23:56 UTC*
+# DHARMA SWARM Repo X-Ray
 
-## Overview
-- **Path**: `/home/user/workspace/dharma_swarm`
-- **Files analyzed**: 1231
-- **Total lines**: 417,937 (353,018 non-blank)
-- **Languages**: python: 1121 files (391,000 lines) | docs: 524 files (0 lines) | typescript: 108 files (26,868 lines) | config: 101 files (0 lines) | javascript: 2 files (69 lines)
+- Repo root: `/home/user/workspace/dharma_swarm`
+- Python modules: `739`
+- Python test files: `702`
+- Ops scripts (`.py` + `.sh` under `scripts/`): `251`
+- Markdown docs under `docs/`: `566`
+- Workflows: `22`
 
-## Architecture
-### Top Modules
-- **dharma_swarm**: 498 files, 216,846 lines, 1342 classes, 7001 functions — Contains 0 classes, 0 functions
-- **tests**: 493 files, 136,490 lines, 1612 classes, 10195 functions — Contains 0 classes, 6 functions
-- **dashboard**: 109 files, 26,792 lines, 0 classes, 0 functions
-- **scripts**: 66 files, 20,712 lines, 20 classes, 439 functions — Contains 1 classes, 42 functions
-- **api**: 23 files, 7,200 lines, 64 classes, 230 functions — Contains 0 classes, 0 functions
-- **tools**: 16 files, 4,716 lines, 22 classes, 148 functions — Contains 2 classes, 14 functions
-- **experiments**: 16 files, 3,154 lines, 23 classes, 111 functions — Contains 2 classes, 8 functions
-- **(root)**: 4 files, 1,235 lines, 0 classes, 19 functions — Contains 0 classes, 5 functions
-- **analysis**: 1 files, 442 lines, 0 classes, 9 functions — Contains 0 classes, 9 functions
-- **hooks**: 1 files, 183 lines, 0 classes, 2 functions — Contains 0 classes, 2 functions
-- **reports**: 1 files, 145 lines, 0 classes, 0 functions
-- **spinouts**: 2 files, 12 lines, 0 classes, 1 functions — Contains 0 classes, 0 functions
-- **benchmarks**: 1 files, 10 lines, 0 classes, 0 functions — Contains 0 classes, 0 functions
+## Workflows
 
-### Module Connections
-- `(root)` → `dharma_swarm`
-- `analysis` → `dharma_swarm`
-- `api` → `dharma_swarm`
-- `benchmarks` → `dharma_swarm`
-- `dharma_swarm` → `api`
-- `scripts` → `dharma_swarm`
-- `tests` → `dharma_swarm`
-- `tests` → `api`
-- `tests` → `tools`
+- `.github/workflows/active-track.yml`
+- `.github/workflows/automerge.yml`
+- `.github/workflows/bot-pr-limit.yml`
+- `.github/workflows/codeql.yml`
+- `.github/workflows/codex-mention-router.yml`
+- `.github/workflows/coherence-delta.yml`
+- `.github/workflows/commit-lint.yml`
+- `.github/workflows/docops-autorefresh.yml`
+- `.github/workflows/docops.yml`
+- `.github/workflows/fourfold-warrant.yml`
+- `.github/workflows/gitleaks.yml`
+- `.github/workflows/manifest-check.yml`
+- `.github/workflows/merge-master-mike-backlog.yml`
+- `.github/workflows/module-budget.yml`
+- `.github/workflows/pr-ci-health.yml`
+- `.github/workflows/pr-collision-detect.yml`
+- `.github/workflows/pr-dedupe.yml`
+- `.github/workflows/semgrep.yml`
+- `.github/workflows/stale-pr.yml`
+- `.github/workflows/structure.yml`
+- `.github/workflows/test-hygiene.yml`
+- `.github/workflows/tests.yml`
 
-## Code Quality Signals
-**Overall Grade: C** (score: 0.59)
+## Language Mix
 
-- **Test ratio**: 72% (516 test files)
-- **Docstring coverage**: 42%
-- **Naming conventions**: 100%
-- **Type annotation rate**: 86%
-- **Avg complexity per file**: 47.5
+- `.py`: `1699` files
+- `.md`: `1011` files
+- `.json`: `465` files
+- `.sh`: `105` files
+- `.tsx`: `94` files
+- `.yaml`: `82` files
+- `.ts`: `79` files
+- `.yml`: `30` files
+- `.go`: `20` files
+- `<no_ext>`: `15` files
+- `.txt`: `8` files
+- `.log`: `7` files
+- `.plist`: `6` files
+- `.svg`: `6` files
+- `.toml`: `5` files
 
-## Complexity Hotspots
-Functions with the highest cyclomatic complexity:
+## Largest Python Files
 
-- `execute_single_step` in `scripts/allout_autopilot.py:698` — complexity=95, 304 lines
-- `execute_single_step` in `scripts/strange_loop.py:1007` — complexity=95, 304 lines
-- `tick` in `dharma_swarm/swarm.py:1999` — complexity=88, 355 lines
-- `analyze_repo` in `dharma_swarm/xray.py:424` — complexity=87, 312 lines
-- `run_task` in `dharma_swarm/agent_runner.py:1789` — complexity=85, 596 lines
-- `check` in `dharma_swarm/telos_gates.py:382` — complexity=85, 328 lines
-- `_handle_command` in `dharma_swarm/tui_legacy.py:809` — complexity=78, 278 lines
-- `_dispatch_async` in `dharma_swarm/tui/app.py:1972` — complexity=77, 349 lines
-- `resolve_runtime_provider_config` in `dharma_swarm/runtime_provider.py:153` — complexity=76, 261 lines
-- `run_backtest` in `dharma_swarm/ginko_backtest.py:430` — complexity=72, 376 lines
+- `dharma_swarm/thinkodynamic_director.py`: `5186` lines, `108` defs, `11` classes, `37` imports
+- `dharma_swarm/telos_substrate.py`: `4512` lines, `8` defs, `1` classes, `14` imports
+- `dharma_swarm/runtime_state.py`: `3797` lines, `143` defs, `13` classes, `14` imports
+- `dharma_swarm/evolution.py`: `3465` lines, `77` defs, `7` classes, `62` imports
+- `dharma_swarm/agent_runner.py`: `3367` lines, `107` defs, `5` classes, `81` imports
+- `dharma_swarm/swarm.py`: `3227` lines, `90` defs, `3` classes, `110` imports
+- `dharma_swarm/providers.py`: `3046` lines, `143` defs, `20` classes, `45` imports
+- `dharma_swarm/orchestrator.py`: `2923` lines, `86` defs, `5` classes, `55` imports
+- `dharma_swarm/operator_core/living_agent_kernel.py`: `2921` lines, `113` defs, `25` classes, `16` imports
+- `dharma_swarm/tui/app.py`: `2520` lines, `86` defs, `1` classes, `60` imports
+- `dharma_swarm/ontology.py`: `2424` lines, `49` defs, `15` classes, `16` imports
+- `dharma_swarm/orchestrate_live.py`: `2292` lines, `39` defs, `0` classes, `97` imports
+- `dharma_swarm/dgc_cli.py`: `2286` lines, `5` defs, `1` classes, `78` imports
+- `dharma_swarm/terminal_bridge.py`: `2268` lines, `86` defs, `1` classes, `33` imports
+- `dharma_swarm/operator_bridge.py`: `1819` lines, `60` defs, `3` classes, `17` imports
+- `dharma_swarm/tui_legacy.py`: `1795` lines, `70` defs, `2` classes, `38` imports
+- `dharma_swarm/context.py`: `1469` lines, `42` defs, `1` classes, `22` imports
+- `dharma_swarm/autonomous_agent.py`: `1465` lines, `41` defs, `4` classes, `28` imports
+- `dharma_swarm/evaluation_registry.py`: `1431` lines, `27` defs, `2` classes, `14` imports
+- `dharma_swarm/doctor.py`: `1342` lines, `34` defs, `1` classes, `29` imports
 
-## Largest Files
-- `dharma_swarm/thinkodynamic_director.py` — 4,757 lines (complexity=786)
-- `dharma_swarm/telos_substrate.py` — 4,324 lines (complexity=50)
-- `dharma_swarm/evolution.py` — 2,888 lines (complexity=340)
-- `dharma_swarm/agent_runner.py` — 2,711 lines (complexity=499)
-- `dharma_swarm/swarm.py` — 2,691 lines (complexity=449)
-- `dharma_swarm/providers.py` — 2,676 lines (complexity=481)
-- `dharma_swarm/tui/app.py` — 2,254 lines (complexity=511)
+## Most Imported Local Modules
 
-## External Dependencies
-217 external packages: `./ChatInterface, ./ChatOverlay, ./HealthBadge, ./api, ./controlPlanePageMeta.ts, ./controlPlaneRouteDeck.js, ./controlPlaneShell.ts, ./controlPlaneSurfaces.ts, ./dashboardNav.ts, ./dashboardPath.js, ./providers, ./runtimeControlPlane.ts, ./runtimeOperatorHandbook.ts, ./types, ./types.ts, ./useVizEvents, ./useVizSnapshot, @/components/chat/ChatInterface, @/components/chat/ChatOverlayWrapper, @/components/chat/ChatPanel`
-*...and 197 more*
+- `dharma_swarm.models`: `180` inbound local imports
+- `dharma_swarm.daemon_config`: `110` inbound local imports
+- `dharma_swarm.runtime_state`: `43` inbound local imports
+- `dharma_swarm.stigmergy`: `39` inbound local imports
+- `dharma_swarm.signal_bus`: `31` inbound local imports
+- `dharma_swarm.telos_gates`: `29` inbound local imports
+- `dharma_swarm.archive`: `28` inbound local imports
+- `dharma_swarm.model_hierarchy`: `25` inbound local imports
+- `dharma_swarm.api_keys`: `23` inbound local imports
+- `dharma_swarm.terminal_commands._helpers`: `23` inbound local imports
+- `dharma_swarm.correlation_context`: `22` inbound local imports
+- `dharma_swarm.semantic_gravity`: `22` inbound local imports
+- `dharma_swarm.runtime_provider`: `21` inbound local imports
+- `dharma_swarm.evolution`: `20` inbound local imports
+- `dharma_swarm.context`: `19` inbound local imports
+- `dharma_swarm.metrics`: `18` inbound local imports
+- `dharma_swarm.spine.identity`: `17` inbound local imports
+- `dharma_swarm.memory_kernel.atoms`: `17` inbound local imports
+- `dharma_swarm.dharma_kernel`: `16` inbound local imports
+- `dharma_swarm.dharma_corpus`: `15` inbound local imports
 
-## Internal Coupling
-Files with the most internal imports:
+## Highest Outbound Local Importers
 
-- `dharma_swarm/swarm.py` imports 55 internal modules
-- `dharma_swarm/agent_runner.py` imports 35 internal modules
-- `dharma_swarm/orchestrate_live.py` imports 33 internal modules
-- `dharma_swarm/evolution.py` imports 30 internal modules
-- `dharma_swarm/organism.py` imports 20 internal modules
-- `api/main.py` imports 18 internal modules
-- `scripts/system_integration_probe.py` imports 18 internal modules
-
-## Risk Flags
-- 🟡 **size**: Large file (767 lines). Consider splitting. (`api/chat_tools.py`)
-- 🟡 **size**: Large file (1245 lines). Consider splitting. (`api/module_truth.py`)
-- 🟡 **size**: Large file (1207 lines). Consider splitting. (`api/routers/chat.py`)
-- 🟡 **size**: Large file (1085 lines). Consider splitting. (`dashboard/src/app/dashboard/agents/[id]/page.tsx`)
-- 🟡 **size**: Large file (557 lines). Consider splitting. (`dashboard/src/app/dashboard/claude/page.tsx`)
-- 🟡 **size**: Large file (1794 lines). Consider splitting. (`dashboard/src/app/dashboard/glm5/page.tsx`)
-- 🟡 **size**: Large file (584 lines). Consider splitting. (`dashboard/src/app/dashboard/modules/page.tsx`)
-- 🟡 **size**: Large file (751 lines). Consider splitting. (`dashboard/src/app/dashboard/observatory/page.tsx`)
-- 🟡 **size**: Large file (2209 lines). Consider splitting. (`dashboard/src/app/dashboard/qwen35/page.tsx`)
-- 🟡 **size**: Large file (560 lines). Consider splitting. (`dashboard/src/app/dashboard/synthesizer/page.tsx`)
-- 🟡 **size**: Large file (1214 lines). Consider splitting. (`dashboard/src/components/chat/CommandPostWorkspace.tsx`)
-- 🟡 **size**: Large file (523 lines). Consider splitting. (`dashboard/src/hooks/useChat.ts`)
-- 🟡 **size**: Large file (1093 lines). Consider splitting. (`dashboard/src/lib/controlPlaneShell.test.ts`)
-- 🟡 **size**: Large file (578 lines). Consider splitting. (`dashboard/src/lib/controlPlaneShell.ts`)
-- 🟡 **size**: Large file (821 lines). Consider splitting. (`dashboard/src/lib/controlPlaneSurfaces.test.ts`)
-
-## Recommended Next Steps
-1. Improve documentation. Add docstrings to public functions and classes.
-2. Refactor `execute_single_step` in `scripts/allout_autopilot.py` (complexity=95). Extract helper functions.
-3. Split large files: api/chat_tools.py, api/module_truth.py, api/routers/chat.py (767+ lines each).
+- `dharma_swarm.swarm`: `92` outbound local imports
+- `dharma_swarm.orchestrate_live`: `69` outbound local imports
+- `dharma_swarm.agent_runner`: `65` outbound local imports
+- `dharma_swarm.dgc_cli`: `54` outbound local imports
+- `dharma_swarm.evolution`: `43` outbound local imports
+- `dharma_swarm.orchestrator`: `34` outbound local imports
+- `dharma_swarm.cron_runner`: `26` outbound local imports
+- `dharma_swarm.organism`: `25` outbound local imports
+- `dharma_swarm.tui.app`: `22` outbound local imports
+- `dharma_swarm.autonomous_agent`: `18` outbound local imports
+- `dharma_swarm.thinkodynamic_director`: `18` outbound local imports
+- `dharma_swarm.ecc_eval_harness`: `17` outbound local imports
+- `dharma_swarm.tui_legacy`: `16` outbound local imports
+- `dharma_swarm.providers`: `15` outbound local imports
+- `dharma_swarm.terminal_bridge`: `15` outbound local imports
+- `dharma_swarm.terminal_commands.semantic`: `15` outbound local imports
+- `dharma_swarm.pulse`: `14` outbound local imports
+- `dharma_swarm.bridge_coordinator`: `13` outbound local imports
+- `dharma_swarm.persistent_agent`: `13` outbound local imports
+- `dharma_swarm.ginko_orchestrator`: `13` outbound local imports
