@@ -113,10 +113,19 @@ _THINK_NOTES_REVIEW = (
 
 
 def _safe_proposal(**kw) -> Proposal:
-    """Create a safe proposal that will pass all gates."""
+    """Create a safe proposal that will pass all gates.
+
+    WS4: uses a non-self-mod change_type ("observation") so the proposal can
+    flow through to GATED/archive even when the gates return a Tier-C REVIEW
+    advisory (e.g. the ANEKANTA "epistemological diversity" advisory that fires
+    in the unit-test environment). Under WS4, a self-mod change_type on a
+    REVIEW decision is a hard REJECT; that enforcement is covered by the
+    dedicated self-mod gate tests. Tests that specifically need a self-mod
+    change_type pass it explicitly via kwargs.
+    """
     defaults = {
         "component": "module.py",
-        "change_type": "mutation",
+        "change_type": "observation",
         "description": (
             "Improve activation mechanism with consciousness witness "
             "and ecosystem resilience feedback"
@@ -142,10 +151,16 @@ def _harmful_proposal(**kw) -> Proposal:
 
 
 def _review_proposal(**kw) -> Proposal:
-    """Create a proposal that triggers a Tier C review advisory."""
+    """Create a proposal that triggers a Tier C review advisory.
+
+    WS4: uses a non-self-mod change_type ("observation") so this fixture
+    exercises the REVIEW-advisory -> GATED path. A self-mod change_type
+    (e.g. "mutation") on a REVIEW decision is now a hard REJECT (WS4), which
+    is covered separately by the self-mod enforcement tests.
+    """
     defaults = {
         "component": "ops.py",
-        "change_type": "mutation",
+        "change_type": "observation",
         "description": "force override the configuration",
         "diff": "",
         "think_notes": _THINK_NOTES_REVIEW,
@@ -662,9 +677,33 @@ async def test_gate_check_harmful_proposal(engine):
 async def test_gate_check_review_proposal(engine):
     p = _review_proposal()
     result = await engine.gate_check(p)
-    # "force" triggers VYAVASTHIT (Tier C) -> REVIEW, not BLOCK
+    # "force" triggers VYAVASTHIT (Tier C) -> REVIEW, not BLOCK.
+    # _review_proposal uses a non-self-mod change_type, so REVIEW -> GATED.
     assert result.status == EvolutionStatus.GATED
     assert result.gate_decision == GateDecision.REVIEW.value
+
+
+async def test_gate_check_self_mod_review_is_rejected(engine):
+    """WS4: a self-mod change_type on a REVIEW decision must HARD REJECT.
+
+    The same advisory that yields GATED for a non-self-mod proposal must
+    block a self-modification proposal — it may not flow through to apply.
+    """
+    p = _review_proposal(change_type="mutation")
+    result = await engine.gate_check(p)
+    assert result.gate_decision == GateDecision.REVIEW.value
+    assert result.status == EvolutionStatus.REJECTED
+
+
+async def test_gate_check_self_mod_review_rejected_for_all_types(engine):
+    """WS4: every change_type in SELF_MOD_TYPES rejects on REVIEW."""
+    from dharma_swarm.evolution import SELF_MOD_TYPES
+
+    for change_type in sorted(SELF_MOD_TYPES):
+        p = _review_proposal(change_type=change_type)
+        result = await engine.gate_check(p)
+        assert result.gate_decision == GateDecision.REVIEW.value, change_type
+        assert result.status == EvolutionStatus.REJECTED, change_type
 
 
 async def test_gate_check_logs_trace(engine):
@@ -2142,9 +2181,12 @@ async def test_cycle_result_reflection_fields_default():
 @pytest.mark.asyncio
 async def test_think_gate_reroutes_empty_notes(engine):
     """TEST 5: Empty think_notes trigger reflective reroute instead of dead stop."""
+    # WS4: non-self-mod change_type so a post-reroute REVIEW advisory still
+    # reaches GATED; this test targets the reroute mechanism, not self-mod
+    # enforcement (covered by the dedicated self-mod gate tests).
     p = Proposal(
         component="empty.py",
-        change_type="mutation",
+        change_type="observation",
         description="some change",
         think_notes="",
     )
@@ -2157,9 +2199,10 @@ async def test_think_gate_reroutes_empty_notes(engine):
 @pytest.mark.asyncio
 async def test_think_gate_reroutes_short_notes(engine):
     """Very short think_notes (< 10 chars) trigger reflective reroute."""
+    # WS4: non-self-mod change_type (see test_think_gate_reroutes_empty_notes).
     p = Proposal(
         component="short.py",
-        change_type="mutation",
+        change_type="observation",
         description="some change",
         think_notes="ok",
     )
