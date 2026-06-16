@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 import hashlib
 import inspect
+import json
 import logging
 import re
 import shlex
@@ -104,6 +105,7 @@ class Proposal(BaseModel):
     requirement_refs: list[str] = Field(default_factory=list)
     think_notes: str = ""
     diff: str = ""
+    shadow_diff: str = ""  # original diff retained when shadow mode strips `diff`
     status: EvolutionStatus = EvolutionStatus.PENDING
     predicted_fitness: float = 0.0
     actual_fitness: Optional[FitnessScore] = None
@@ -135,6 +137,44 @@ class Proposal(BaseModel):
             if char in v:
                 raise ValueError(f"Component contains invalid filesystem character '{char}'")
         return v
+
+
+# WS4: Self-modification change types — the set of Proposal.change_type values
+# that mutate the running codebase/agent and therefore MUST NOT be allowed to
+# flow through to apply on a mere REVIEW (Tier-C advisory) decision. Derived
+# from the real change_type literals produced across the codebase (see
+# `grep change_type= dharma_swarm/`). Tier-C REVIEW on any of these is treated
+# as a hard REJECT (see DarwinEngine.gate_check) — a self-mod proposal must
+# earn an explicit ALLOW, never slip through on an advisory.
+SELF_MOD_TYPES: frozenset[str] = frozenset({
+    "mutation",
+    "crossover",
+    "ablation",
+    "optimization",
+    "refactor",
+    "fix",
+    "bugfix",
+    "feature",
+    "auto_evolution",
+    "consolidation_correction",
+    "route_retrospective",
+    "overnight_advance",
+    "stigmergy_inspired",
+    "runtime_field_trial",
+    "sealed_packet",
+    "shakti_escalation",
+    "retro_finding",
+    "hypothesis_test",
+})
+
+
+def _is_self_mod(change_type: str | None) -> bool:
+    """Return True if a proposal's change_type denotes a self-modification.
+
+    Comparison is case-insensitive and whitespace-trimmed so that minor
+    formatting variation in producers does not let a self-mod slip the net.
+    """
+    return (change_type or "").strip().lower() in SELF_MOD_TYPES
 
 
 def _paths_from_unified_diff(diff_text: str) -> list[str]:
@@ -1393,6 +1433,36 @@ class DarwinEngine:
 
     # -- gate checking -------------------------------------------------------
 
+    @staticmethod
+    def _log_self_mod_review_block(proposal: "Proposal", result: Any) -> None:
+        """WS4: witness a self-mod proposal rejected on a REVIEW decision.
+
+        Appended to ``~/.dharma/witness/`` as a daily JSONL line so the
+        enforcement is auditable. Failures are silently swallowed —
+        witnessing must never block the gate path.
+        """
+        try:
+            from dharma_swarm.telos_gates import WITNESS_DIR
+
+            now = _utc_now()
+            WITNESS_DIR.mkdir(parents=True, exist_ok=True)
+            log_file = WITNESS_DIR / f"witness_{now.strftime('%Y%m%d')}.jsonl"
+            entry = json.dumps({
+                "ts": now.isoformat(),
+                "phase": "evolution.gate_check",
+                "outcome": "SELF_MOD_REVIEW_BLOCKED",
+                "proposal_id": proposal.id,
+                "change_type": proposal.change_type,
+                "component": proposal.component,
+                "decision": getattr(result.decision, "value", str(result.decision)),
+                "reason": (result.reason or "")[:500],
+                "gate": getattr(result, "gate", ""),
+            })
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(entry + "\n")
+        except Exception:
+            logger.debug("Self-mod review-block witness write failed", exc_info=True)
+
     async def gate_check(self, proposal: Proposal) -> Proposal:
         """Run dharmic safety gates against a proposal.
 
@@ -1425,6 +1495,19 @@ class DarwinEngine:
 
             proposal.gate_decision = result.decision.value
             proposal.gate_reason = result.reason
+            # Record per-gate verdicts so archive_result can report real
+            # gate outcomes instead of a fabricated "ALL".
+            proposal.metadata = {
+                **(proposal.metadata or {}),
+                "gate_results": {
+                    name: (
+                        getattr(verdict[0], "value", str(verdict[0]))
+                        if isinstance(verdict, (tuple, list)) and verdict
+                        else str(verdict)
+                    )
+                    for name, verdict in result.gate_results.items()
+                },
+            }
             proposal.reflection_attempts = outcome.attempts
             proposal.reflection_suggestions = list(outcome.suggestions)
             if outcome.reflection.strip():
@@ -1457,6 +1540,13 @@ class DarwinEngine:
                     )
                 )
 
+            # WS4: A self-mod proposal must earn an explicit ALLOW. A BLOCK
+            # rejects (as before); a REVIEW (Tier-C advisory) on a self-mod
+            # change_type is ALSO a hard reject — it must NOT flow through to
+            # GATED -> applied. Non-self-mod REVIEW keeps the prior behaviour
+            # (GATED). This closes the REVIEW->GATED->applied bypass for the
+            # change types in SELF_MOD_TYPES.
+            self_mod = _is_self_mod(proposal.change_type)
             if result.decision == GateDecision.BLOCK:
                 proposal.status = EvolutionStatus.REJECTED
                 logger.warning(
@@ -1464,6 +1554,16 @@ class DarwinEngine:
                     proposal.id,
                     result.reason,
                 )
+            elif result.decision == GateDecision.REVIEW and self_mod:
+                proposal.status = EvolutionStatus.REJECTED
+                logger.warning(
+                    "Proposal %s REJECTED: REVIEW on self-mod change_type=%r "
+                    "is not allowed to apply: %s",
+                    proposal.id,
+                    proposal.change_type,
+                    result.reason,
+                )
+                self._log_self_mod_review_block(proposal, result)
             else:
                 proposal.status = EvolutionStatus.GATED
                 logger.info(
@@ -1708,6 +1808,56 @@ class DarwinEngine:
 
     # -- archiving -----------------------------------------------------------
 
+    @staticmethod
+    def _derive_archive_status(proposal: Proposal) -> str:
+        """Derive an honest archive status from what the proposal records.
+
+        "applied" only when a diff apply actually happened and stuck;
+        "rolled_back" when an apply happened but was reverted;
+        "gated" when the gates blocked it; "shadow" when there was no
+        diff to apply (shadow mode strips diffs); "evaluated" otherwise.
+        """
+        if (
+            proposal.gate_decision == GateDecision.BLOCK.value
+            or proposal.status == EvolutionStatus.REJECTED
+        ):
+            return "gated"
+        if not proposal.diff.strip():
+            return "shadow"
+        rolled_back = proposal.test_results.get("rolled_back")
+        if rolled_back is None:
+            trial = proposal.test_results.get("runtime_field_trial")
+            if isinstance(trial, dict):
+                rolled_back = trial.get("rolled_back")
+        if rolled_back is True:
+            return "rolled_back"
+        if rolled_back is False:
+            return "applied"
+        return "evaluated"
+
+    @staticmethod
+    def _derive_gate_record(proposal: Proposal) -> tuple[list[str], list[str]]:
+        """Derive (gates_passed, gates_failed) from real gate results.
+
+        Uses per-gate verdicts recorded by ``gate_check`` when present;
+        otherwise falls back to the decision label. Never fabricates "ALL".
+        """
+        raw = (proposal.metadata or {}).get("gate_results")
+        if isinstance(raw, dict) and raw:
+            passed: list[str] = []
+            failed: list[str] = []
+            for name, verdict in raw.items():
+                if str(verdict) == GateResult.FAIL.value:
+                    failed.append(name)
+                else:
+                    passed.append(name)
+            return passed, failed
+        if proposal.gate_decision == GateDecision.BLOCK.value:
+            return [], [proposal.gate_reason or "unknown"]
+        if proposal.gate_decision:
+            return [proposal.gate_decision.upper()], []
+        return [], []
+
     async def archive_result(self, proposal: Proposal) -> str:
         """Store an evaluated proposal in the evolution archive.
 
@@ -1751,6 +1901,7 @@ class DarwinEngine:
                 weighted_fitness,
             )
 
+            gates_passed, gates_failed = self._derive_gate_record(proposal)
             entry = ArchiveEntry(
                 component=proposal.component,
                 change_type=proposal.change_type,
@@ -1758,6 +1909,7 @@ class DarwinEngine:
                 spec_ref=proposal.spec_ref,
                 requirement_refs=list(proposal.requirement_refs),
                 diff=proposal.diff,
+                shadow_diff=proposal.shadow_diff,
                 parent_id=proposal.parent_id,
                 fitness=fitness,
                 test_results=test_results,
@@ -1765,17 +1917,9 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
-                gates_passed=(
-                    ["ALL"]
-                    if proposal.gate_decision != GateDecision.BLOCK.value
-                    else []
-                ),
-                gates_failed=(
-                    [proposal.gate_reason or "unknown"]
-                    if proposal.gate_decision == GateDecision.BLOCK.value
-                    else []
-                ),
+                status=self._derive_archive_status(proposal),
+                gates_passed=gates_passed,
+                gates_failed=gates_failed,
             )
 
             # GAIA ecological fitness (non-fatal): blend ecological awareness
@@ -3084,6 +3228,7 @@ class DarwinEngine:
         context: str = "",
         router: Any | None = None,
         shadow: bool = False,
+        parent_id: str | None = None,
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> CycleResult:
         """Autonomous evolution: LLM proposes improvements, engine evaluates them.
@@ -3109,6 +3254,8 @@ class DarwinEngine:
             context: Extra context to guide the LLM (focus areas, recent errors).
             router: Optional ModelRouter for multi-model roster selection.
             shadow: If True, do not apply diffs — evaluate proposals in dry-run mode.
+            parent_id: Optional archive entry id these proposals evolve from
+                (recorded on each proposal so lineage reaches the archive).
             on_progress: Optional callback ``(event_name, data)`` for real-time UX.
 
         Returns:
@@ -3193,10 +3340,15 @@ class DarwinEngine:
             logger.info("No proposals generated — nothing to evolve")
             return CycleResult(proposals_submitted=0)
 
+        if parent_id:
+            for p in proposals:
+                p.parent_id = p.parent_id or parent_id
+
         if shadow:
             # Shadow mode: gate and evaluate without applying diffs
             logger.info("Shadow mode: evaluating %d proposals (no diffs applied)", len(proposals))
             for p in proposals:
+                p.shadow_diff = p.diff  # Retain original diff for the archive
                 p.diff = ""  # Strip diffs so sandbox doesn't apply them
             result = await self.run_cycle(proposals)
         else:

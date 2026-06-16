@@ -57,9 +57,12 @@ class TestPalacePopulation:
 class TestDynamicCrewScaling:
     """Test crew scaling recommendations."""
 
-    def test_no_scaling_when_healthy(self):
+    def test_no_scaling_when_healthy(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        # Isolated state dir keeps the heartbeats genuinely healthy (identity
+        # sub-metrics default to 0.5); reading the ambient ~/.dharma can leave
+        # coherence at the health threshold and spuriously trigger scaling.
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         # Run several healthy heartbeats
         for _ in range(5):

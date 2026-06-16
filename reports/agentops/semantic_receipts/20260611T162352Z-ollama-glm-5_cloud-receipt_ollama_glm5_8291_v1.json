@@ -1,0 +1,82 @@
+{
+  "acceptance_gates": [
+    {
+      "description": "Unit test must confirm that a JSON payload missing required fields or containing invalid 'not_claimed_agents' entries fails validation.",
+      "gate_id": "schema_validation_unit_test"
+    },
+    {
+      "description": "Integration test must show the runner accepting a mock model response, generating a valid SemanticReceipt, and successfully committing it to the BoardStore control surface.",
+      "gate_id": "runner_integration_test"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 0.98,
+  "correlation_id": "codex-semantic-receipt-runner-v7-20260611T160525Z",
+  "created_at": "2026-06-11T16:23:52Z",
+  "critic_agent_id": "ollama:glm-5:cloud",
+  "evidence_refs": [
+    "Prompt: Known current evidence",
+    "Prompt: Constraint",
+    "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": true,
+  "missing_context": [],
+  "model_call_latency_ms": 49095,
+  "model_identity": {
+    "model": "glm-5:cloud",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "glm-5:cloud",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "model",
+      "prompt_eval_count",
+      "response",
+      "thinking",
+      "total_duration"
+    ]
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "38389a0a61b7a0070e3a30507c2bd55bdab12cc587e651430338a13808e6bbef",
+  "raw_response_sha256": "84f6cc3c8b24be987d21c3054d3e21ce34e8607278e50fe22832c2b8454f343d",
+  "receipt_id": "receipt_ollama_glm5_8291_v1",
+  "recommendations": [
+    {
+      "description": "Implement only 'semantic_receipt.py' for schema/validation and 'model_critic_runner.py' for execution. Inject existing RuntimeStateStore and BoardStore dependencies; do not invent new storage mechanisms.",
+      "step": "Narrowest Implementation"
+    },
+    {
+      "description": "Add explicit validation logic in the receipt constructor that throws a SchemaValidationError if the authoring model UID matches any entry in the hardcoded 'not_claimed_agents' list.",
+      "step": "Identity Enforcement"
+    },
+    {
+      "description": "Codex must avoid creating a separate database or message bus for receipts. All artifacts must flow through the established A2A/domain reply channels.",
+      "step": "Avoidance"
+    }
+  ],
+  "reply_to": "semantic-receipt-runner-v7-goal",
+  "review_target": "semantic-receipt-runner-v7-goal",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The proposal to build SemanticReceipt v1 and the model critic runner is validated. The strongest risk involves incorrect integration with AgentOps or BoardStore, potentially creating 'dark' artifacts that bypass the control surface. The implementation must narrowly focus on the receipt schema and runner logic while rigorously enforcing 'not_claimed_agents' validation to prevent identity spoofing.",
+  "understood_request": true,
+  "verdict": "approve"
+}

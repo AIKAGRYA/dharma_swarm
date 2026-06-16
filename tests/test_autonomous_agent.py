@@ -18,6 +18,7 @@ from dharma_swarm.autonomous_agent import (
     AgentResult,
     AutonomousAgent,
     _DANGEROUS_PATTERNS,
+    _identity_from_registered_holon,
     cli_wake,
 )
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
@@ -78,6 +79,72 @@ class TestAgentIdentity:
         b = AgentIdentity(name="b", role="x", system_prompt="y")
         a.allowed_tools.append("custom")
         assert "custom" not in b.allowed_tools
+
+    def test_registered_holon_identity_uses_active_prompt(self, tmp_path):
+        agent_dir = tmp_path / "registered_agent"
+        (agent_dir / "prompt_variants").mkdir(parents=True)
+        (agent_dir / "identity.json").write_text(
+            json.dumps(
+                {
+                    "model": "gpt-5.5",
+                    "provider": "codex",
+                    "role": "lead_orchestrator",
+                    "storage_root": str(agent_dir),
+                    "system_prompt": "fallback prompt",
+                }
+            ),
+            encoding="utf-8",
+        )
+        (agent_dir / "prompt_variants" / "active.txt").write_text(
+            "REAL REGISTERED SOUL",
+            encoding="utf-8",
+        )
+
+        ident = _identity_from_registered_holon(
+            "registered_agent",
+            agents_root=tmp_path,
+        )
+
+        assert ident is not None
+        assert ident.name == "registered_agent"
+        assert ident.role == "lead_orchestrator"
+        assert ident.model == "gpt-5.5"
+        assert ident.provider == "codex"
+        assert ident.system_prompt == "REAL REGISTERED SOUL"
+        assert ident.allowed_tools == []
+        assert ident.working_directory == str(agent_dir)
+
+    def test_unregistered_holon_identity_returns_none(self, tmp_path):
+        assert _identity_from_registered_holon("missing", agents_root=tmp_path) is None
+
+    def test_generic_stub_still_available_for_unregistered_name(self):
+        agent_name = "not_registered_anywhere"
+        ident = _identity_from_registered_holon(
+            agent_name,
+            agents_root=Path("/tmp/nope"),
+        )
+        assert ident is None
+        stub = AgentIdentity(
+            name=agent_name,
+            role="general",
+            system_prompt=f"You are {agent_name}, an autonomous agent in dharma_swarm.",
+        )
+        prompt = AutonomousAgent(stub)._build_system_prompt("", [])
+        assert f"You are {agent_name}, an autonomous agent in dharma_swarm." in prompt
+
+    def test_real_registered_composer_souls_compose_into_prompt(self):
+        cases = [
+            ("fable_composer", "This file is not documentation about a seat"),
+            ("codex_composer", "TaskClaim versus ExecutionLease boundary"),
+        ]
+        for name, fragment in cases:
+            identity_path = Path.home() / ".dharma" / "agents" / name / "identity.json"
+            if not identity_path.exists():
+                pytest.skip(f"{name} not registered on this machine")
+            ident = _identity_from_registered_holon(name)
+            assert ident is not None
+            prompt = AutonomousAgent(ident)._build_system_prompt("", [])
+            assert fragment in prompt
 
 
 # ---------------------------------------------------------------------------

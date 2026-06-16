@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-04",
+  "verified_at": "2026-06-12",
   "ttl_days": 14,
   "assertions": [
     {
@@ -171,6 +171,9 @@
         "docs/governance/hygiene/AUDIT_PROMPT.md",
         "docs/governance/VIBE_CODE_HYGIENE.md",
         "docs/governance/BUILD_SESSION_ENTRYPOINT.md",
+        "docs/governance/SWARM_GENOME.md",
+        "docs/governance/REALITY_DEBT_LEDGER.md",
+        "docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
         "docs/governance/COHERENCE_DELTA.md",
         "docs/ops/PR_REVIEW_CONTROL.md",
         "docs/governance/INTEGRATION_LANDING_ORDER.md",
@@ -254,7 +257,8 @@
       "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
       "docs/ops/LIVE_OPS_COCKPIT.md",
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
-      "docs/ops/TMUX_AGENT_SUBSTRATE.md"
+      "docs/ops/TMUX_AGENT_SUBSTRATE.md",
+      "spec-forge/living-agent-kernel/MASTER_SPEC.md"
     ]
   },
   "auto_sections": {

@@ -1,0 +1,52 @@
+{
+  "ack_tiers": [
+    "request_sent",
+    "broker_reply_received",
+    "receipt_schema_verified"
+  ],
+  "broker_round_trip": true,
+  "exchange_id": "truth-graph-nats-e2e-v1",
+  "idempotency": "single deterministic report path overwritten on rerun",
+  "request": {
+    "agent": "codex_composer",
+    "claim": "Codex sent a receipted A2A NATS request.",
+    "evidence": [
+      {
+        "kind": "command",
+        "value": "stdlib NATS protocol request/reply over nats://127.0.0.1:4222",
+        "verdict": "verified"
+      }
+    ],
+    "exchange_id": "truth-graph-nats-e2e-v1",
+    "files_changed": [
+      "reports/orientation/nats_e2e_receipt.json"
+    ],
+    "next_action": "Render reports/orientation/repo_context.json and verify this receipt appears in the tail.",
+    "schema": "dharma_a2a_task_receipt.v1",
+    "verdict": "verified"
+  },
+  "response": {
+    "agent": "fable_composer",
+    "claim": "Fable replied with a receipted A2A NATS response.",
+    "evidence": [
+      {
+        "kind": "command",
+        "value": "stdlib NATS protocol request/reply over nats://127.0.0.1:4222",
+        "verdict": "verified"
+      }
+    ],
+    "exchange_id": "truth-graph-nats-e2e-v1",
+    "files_changed": [
+      "reports/orientation/nats_e2e_receipt.json"
+    ],
+    "next_action": "Render reports/orientation/repo_context.json and verify this receipt appears in the tail.",
+    "schema": "dharma_a2a_task_receipt.v1",
+    "verdict": "verified"
+  },
+  "schema": "dharma_truth_graph_nats_e2e_receipt.v1",
+  "server": "nats://127.0.0.1:4222",
+  "stray_reply_filter": "enabled; ignores non-matching replies until expected exchange_id",
+  "subject": "dharma.a2a.truth_graph_platform.e2e_receipt",
+  "subject_scope": "dedicated truth-graph proof subject; does not consume live agent inbox subjects",
+  "transport": "stdlib NATS protocol sockets"
+}

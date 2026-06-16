@@ -46,6 +46,11 @@ GRANDFATHERED: dict[str, int] = {
     # 2026-06-12: landed at 1251 (evidence-only alpha membrane);
     # decomposition issue #581 (split planned with Phase-2 capital wiring).
     "dharma_swarm/capital_lab/alpha_evidence.py": 1251,
+    # 2026-06-12: PR #585 rescue batch — decomposition issue #587.
+    "dharma_swarm/context_compiler.py": 1017,
+    "dharma_swarm/operator_core/control_surface_memory.py": 1240,
+    "dharma_swarm/operator_core/living_agent_kernel.py": 2921,
+    "dharma_swarm/operator_core/runtime_truth.py": 1008,
 }
 
 LINE_BUDGET = 1000  # New modules: hard limit.

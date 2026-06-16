@@ -1,0 +1,20 @@
+{
+  "agent_uid": "gemini_google_ai",
+  "created_at": "2026-06-11T10:26:41.973138+00:00",
+  "error": "",
+  "extracted_recommendations": [
+    "Verdict:** The goal is correctly aimed at the seam of establishing reliable semantic replies from external peers. The focus on making collaboration *visible* through existing surfaces is a pragmatic"
+  ],
+  "latency_ms": 5364.1,
+  "model": "gemini-2.5-flash",
+  "peer_model_processed_claim": true,
+  "prompt_path": "/Users/dhyana/dharma_swarm_main/reports/agentops/workhorse_prompts/open-model-council-a2a-missing-systems-20260611T102326Z.md",
+  "prompt_sha256": "a47987ffedbd20934aacfd05d50421ae1d3f48ba860f860c5d73b06b74eca415",
+  "provider": "google_ai",
+  "requested_model": "gemini-2.5-flash",
+  "response": "**Verdict:** The goal is correctly aimed at the seam of establishing reliable semantic replies from external peers. The focus on making collaboration *visible* through existing surfaces is a pragmatic",
+  "response_sha256": "3e4bcaba454c341c76ffd1ed1b5c8e07136e7c77b2705bccd85af3d2b6c5206b",
+  "schema_version": "dharma.open_model_council_artifact.v1",
+  "semantic_reply_claim": true,
+  "status": "ok"
+}

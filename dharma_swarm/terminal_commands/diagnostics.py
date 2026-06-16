@@ -140,7 +140,6 @@ def cmd_invariants() -> None:
     """
     from dharma_swarm.invariants import snapshot
     import numpy as np
-    from pathlib import Path
     import json
 
     state_dir = dharma_state_dir()
@@ -458,7 +457,6 @@ def cmd_pulse() -> None:
 
 def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
     """Run one canonical organism pulse (9 stages)."""
-    import asyncio
 
     async def _run():
         from dharma_swarm.organism_pulse import run_pulse

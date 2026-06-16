@@ -3,6 +3,7 @@ name: docops-integrity
 on:
   pull_request:
     branches: [main, "promote/**", "governance/**"]
+  merge_group:
   schedule:
     # Weekly freshness check for docs/docops/assertions.yaml ttl_days.
     - cron: "37 12 * * 1"
@@ -37,7 +38,12 @@ jobs:
           set -euo pipefail
           mkdir -p reports/docops
 
-          args=(--report-json reports/docops/check.json)
+          # Generated counts (SOVEREIGN_MANIFEST assertions + AUTO_INVENTORY
+          # auto-sections) are advisory here: PRs no longer hand-commit them,
+          # and docops-reconcile-main.yml regenerates them on push:main. Every
+          # other DocOps check (path guards, canonical guard, TTL staleness,
+          # auto-section config, doc review) stays strict.
+          args=(--report-json reports/docops/check.json --counts-advisory)
           if [ -n "${GITHUB_BASE_REF:-}" ]; then
             git fetch origin "${GITHUB_BASE_REF}" --depth=1
             args+=(--changed-from "origin/${GITHUB_BASE_REF}")

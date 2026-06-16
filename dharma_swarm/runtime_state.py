@@ -316,6 +316,7 @@ RUNTIME_RECEIPT_TYPES = frozenset(
         "message_consumed",
         "identity_mapping",
         "idempotency_consumed",
+        "runtime_warrant",
         "ontology_action_requested",
         "ontology_action_applied",
         "child_spawned",
@@ -381,16 +382,24 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
 
 
+# Wait up to this long for a competing writer to release the write lock before
+# raising "database is locked". WAL lets readers and a writer coexist, but two
+# writers still serialize; without a busy timeout the loser fails instantly.
+_BUSY_TIMEOUT_MS = 5_000
+
+
 def _apply_connection_pragmas_sync(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
     db.execute("PRAGMA synchronous=NORMAL")
+    db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
 
 
 async def _apply_connection_pragmas_async(db: aiosqlite.Connection) -> None:
     await db.execute("PRAGMA journal_mode=WAL")
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA synchronous=NORMAL")
+    await db.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
 
 
 def ensure_runtime_state_schema_sync(
