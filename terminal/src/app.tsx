@@ -23,6 +23,7 @@ import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
 import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
+import {NavigatorStrip} from "./components/NavigatorStrip.tsx";
 import {SessionsPane} from "./components/SessionsPane.tsx";
 import {ShellHeader} from "./components/ShellHeader.tsx";
 import {Sidebar} from "./components/Sidebar.tsx";
@@ -3376,6 +3377,7 @@ export function App(): React.ReactElement {
           </Box>
         </Box>
         <Box flexGrow={1} />
+        <NavigatorStrip lines={[]} width={terminalWidth} />
       </Box>
     );
   }
