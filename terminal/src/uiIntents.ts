@@ -149,6 +149,91 @@ export function matchUiIntent(
   return null;
 }
 
+// ── Agent-action channel (Navigator "aliveness") ──────────────────────────
+// The chat agent (Opus) drives the Helm by emitting directives in its reply:
+//   ⟦helm:VERB ARG⟧
+// The TS parses them, executes the mapped UI action (the agent REQUESTS, the
+// reducer EXECUTES — authority never leaves the TS), strips the sentinel from
+// the displayed text, and narrates. Only VIEW/toggle verbs are honored;
+// operator-gated actions (approvals, evolution) are never driveable here.
+const HELM_DIRECTIVE_RE = /⟦\s*helm:\s*([a-zA-Z]+)(?:\s+([^⟧]*?))?\s*⟧/g;
+
+export type HelmDirective = {verb: string; arg: string; raw: string};
+
+export function parseHelmDirectives(text: string): HelmDirective[] {
+  const out: HelmDirective[] = [];
+  for (const match of text.matchAll(HELM_DIRECTIVE_RE)) {
+    out.push({verb: (match[1] ?? "").toLowerCase(), arg: (match[2] ?? "").trim(), raw: match[0]});
+  }
+  return out;
+}
+
+// Strip every ⟦helm:…⟧ token (even unknown verbs) so a leaked sentinel never
+// reaches the operator's transcript, then tidy the whitespace it leaves behind.
+export function stripHelmDirectives(text: string): string {
+  return text
+    .replace(HELM_DIRECTIVE_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Map a directive to the SAME UiIntent the operator's own plain language would
+// produce — so agent-driven and self-driven moves share one execution path.
+// Returns null for an unknown/unsafe verb (the caller narrates the miss).
+export function helmDirectiveToIntent(
+  directive: HelmDirective,
+  panes: PaneRef[],
+  routeTargets: RouteTarget[],
+): UiIntent | null {
+  const verb = directive.verb;
+  const arg = normalize(directive.arg);
+  if (verb === "zen" || verb === "cockpit" || verb === "scroll") {
+    return {kind: "layout", mode: verb};
+  }
+  if (verb === "dock") {
+    return {kind: "rail", on: true};
+  }
+  if (verb === "undock") {
+    return {kind: "rail", on: false};
+  }
+  if (verb === "open" || verb === "show" || verb === "pane" || verb === "go") {
+    if (!arg) return null;
+    for (const pane of panes) {
+      if (normalize(pane.title) === arg || normalize(pane.id) === arg) {
+        return {kind: "pane", tabId: pane.id, title: pane.title};
+      }
+    }
+    for (const pane of panes) {
+      const title = normalize(pane.title);
+      if (title && (arg.includes(title) || title.includes(arg))) {
+        return {kind: "pane", tabId: pane.id, title: pane.title};
+      }
+    }
+    return null;
+  }
+  if (verb === "model" || verb === "route") {
+    if (!arg) return null;
+    const tokens = arg.split(" ").filter((token) => token.length > 1 || /\d/.test(token));
+    let best: {target: RouteTarget; score: number} | null = null;
+    for (const target of routeTargets) {
+      const haystack = normalize(
+        `${target.alias} ${target.label} ${target.provider} ${target.model} ${target.provider}:${target.model}`,
+      ).replace(/[-_]/g, " ");
+      let score = 0;
+      for (const token of tokens) {
+        if (haystack.includes(token)) score += token.length;
+      }
+      if (score > 0 && (!best || score > best.score)) {
+        best = {target, score};
+      }
+    }
+    return best && best.score >= 3 ? {kind: "model", target: best.target} : null;
+  }
+  return null;
+}
+
 // Unknown slash commands stay in the conversation with a gentle suggestion
 // instead of detonating into the Control pane (gauntlet finding: /hlep yanked
 // a zen user into cockpit). Small edit-distance, registered names only.

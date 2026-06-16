@@ -31,7 +31,7 @@ import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
 import {TabBar} from "./components/TabBar.tsx";
 import {TranscriptPane} from "./components/TranscriptPane.tsx";
-import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiIntents.ts";
+import {closestCommand, helmDirectiveToIntent, matchUiIntent, parseHelmDirectives, tourLines, type HelmDirective, type UiIntent} from "./uiIntents.ts";
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
@@ -1589,6 +1589,58 @@ function enrichSparseCommandResultEvent(
   };
 }
 
+// Execute an agent-emitted ⟦helm:…⟧ directive: the same reducer dispatches as
+// the operator's own plain language, but narration goes to the rail head-band
+// (the agent already narrated in its reply text) — never a duplicate respond.
+// The agent REQUESTS; this is the single point where the TS reducer EXECUTES.
+// Only VIEW/toggle verbs resolve; operator-gated actions never reach here.
+function executeAgentDirective(
+  directive: HelmDirective,
+  state: AppState,
+  dispatch: React.Dispatch<AppAction>,
+  bridge: DharmaBridge,
+): void {
+  const panes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
+  const intent = helmDirectiveToIntent(directive, panes, selectableRouteTargets(state.routePolicy));
+  if (!intent) {
+    dispatch({type: "navigator.narrate", line: `couldn't act on "${directive.verb} ${directive.arg}".`});
+    return;
+  }
+  if (intent.kind === "layout") {
+    dispatch({type: "layout.mode.set", mode: intent.mode});
+    dispatch({type: "navigator.narrate", line: `switched to the ${intent.mode} view`});
+    dispatch({type: "status.set", value: `navigator -> ${intent.mode}`});
+    return;
+  }
+  if (intent.kind === "pane") {
+    dispatch({type: "tab.activate", tabId: intent.tabId});
+    dispatch({type: "navigator.narrate", line: `opened ${intent.title}`});
+    dispatch({type: "status.set", value: `navigator -> ${intent.title}`});
+    return;
+  }
+  if (intent.kind === "rail") {
+    const on = intent.on === "toggle" ? !state.uiMode.railVisible : intent.on;
+    if (on && state.uiMode.layoutMode !== "cockpit") {
+      dispatch({type: "layout.mode.set", mode: "cockpit"});
+    }
+    dispatch({type: "rail.set", visible: on});
+    dispatch({type: "navigator.narrate", line: on ? "docked the chat rail" : "undocked the rail"});
+    return;
+  }
+  if (intent.kind === "model") {
+    if (state.bridgeStatus === "connected") {
+      bridge.send("action.run", {
+        action_type: "model.set",
+        provider: intent.target.provider,
+        model: intent.target.model,
+        strategy: state.routePolicy.strategy,
+      });
+    }
+    dispatch({type: "navigator.narrate", line: `switching route to ${intent.target.provider}:${intent.target.model}`});
+    return;
+  }
+}
+
 export function createBridgeEventHandler({
   dispatch,
   getState,
@@ -1641,6 +1693,20 @@ export function createBridgeEventHandler({
     const canonicalEvents = canonicalEventsFromBridgeEvent(typed);
     if (canonicalEvents.length > 0) {
       apply([{type: "execution.events.ingest", events: canonicalEvents}]);
+    }
+    // Agent-action channel: the chat agent drives the Helm by emitting
+    // ⟦helm:…⟧ directives in its reply. Parse them off the completed assistant
+    // text and execute each (the sentinel itself is stripped from the display).
+    const assistantText =
+      eventType === "text_complete"
+        ? String(typed.content ?? "")
+        : eventType === "assistant"
+          ? String(typed.message ?? "")
+          : "";
+    if (assistantText.includes("⟦")) {
+      for (const directive of parseHelmDirectives(assistantText)) {
+        executeAgentDirective(directive, state, dispatch, bridge);
+      }
     }
     if (eventType !== "bridge.error" && eventType !== "error") {
       malformedBridgeEvents = 0;

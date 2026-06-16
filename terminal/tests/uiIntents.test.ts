@@ -1,6 +1,6 @@
 import {describe, expect, test} from "bun:test";
 
-import {closestCommand, matchUiIntent, tourLines} from "../src/uiIntents";
+import {closestCommand, helmDirectiveToIntent, matchUiIntent, parseHelmDirectives, stripHelmDirectives, tourLines} from "../src/uiIntents";
 import {reduceApp} from "../src/state";
 import {initialState} from "../src/state";
 import type {RouteTarget} from "../src/types";
@@ -109,6 +109,32 @@ describe("F-066 natural-language UI intents", () => {
     expect(lines).toContain("zen");
     expect(lines).toContain("cockpit");
     expect(lines).toContain("F2");
+  });
+
+  test("agent channel: parse + strip ⟦helm:…⟧ directives", () => {
+    const reply = "Opening the Agents pane so you can see the routes. ⟦helm:open agents⟧ Say \"go zen\" to come back.";
+    const directives = parseHelmDirectives(reply);
+    expect(directives).toHaveLength(1);
+    expect(directives[0]).toMatchObject({verb: "open", arg: "agents"});
+    // The sentinel never reaches the operator's transcript.
+    const visible = stripHelmDirectives(reply);
+    expect(visible).not.toContain("⟦");
+    expect(visible).toContain("Opening the Agents pane");
+    // Multiple directives + a face change parse in order.
+    const multi = parseHelmDirectives("⟦helm:cockpit⟧ then ⟦helm:dock⟧");
+    expect(multi.map((d) => d.verb)).toEqual(["cockpit", "dock"]);
+  });
+
+  test("agent channel: directives map to the same intents as plain language", () => {
+    expect(helmDirectiveToIntent({verb: "open", arg: "runtime", raw: ""}, PANES, TARGETS)).toEqual({kind: "pane", tabId: "runtime", title: "Runtime"});
+    expect(helmDirectiveToIntent({verb: "cockpit", arg: "", raw: ""}, PANES, TARGETS)).toEqual({kind: "layout", mode: "cockpit"});
+    expect(helmDirectiveToIntent({verb: "dock", arg: "", raw: ""}, PANES, TARGETS)).toEqual({kind: "rail", on: true});
+    expect(helmDirectiveToIntent({verb: "undock", arg: "", raw: ""}, PANES, TARGETS)).toEqual({kind: "rail", on: false});
+    expect(helmDirectiveToIntent({verb: "model", arg: "opus", raw: ""}, PANES, TARGETS)).toMatchObject({kind: "model"});
+    // Unknown/unsafe verbs resolve to null (the caller narrates the miss);
+    // operator-gated actions are never expressible as a view verb.
+    expect(helmDirectiveToIntent({verb: "approve", arg: "", raw: ""}, PANES, TARGETS)).toBeNull();
+    expect(helmDirectiveToIntent({verb: "open", arg: "nonexistent", raw: ""}, PANES, TARGETS)).toBeNull();
   });
 });
 

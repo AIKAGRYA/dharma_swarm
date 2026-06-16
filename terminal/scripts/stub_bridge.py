@@ -105,6 +105,16 @@ def main():
                     emit({"type": "assistant", "request_id": request_id, "message": ASSISTANT_TEXT})
                 emit(stream_envelope("session_end", request_id, success=True, error_code=None, error_message=None))
                 continue
+            if scenario == "navigator":
+                # The agent narrates, then emits a ⟦helm:…⟧ directive the TS must
+                # execute (switch to Agents) and strip from the display.
+                emit(stream_envelope(
+                    "text_complete", request_id,
+                    content="Opening the Agents pane so you can see the live routes. ⟦helm:open agents⟧ Say \"go zen\" to come back.",
+                    content_index=0, role="assistant",
+                ))
+                emit(stream_envelope("session_end", request_id, success=True, error_code=None, error_message=None))
+                continue
             emit(stream_envelope("thinking_complete", request_id, content="weighing the reply", is_redacted=False))
             emit(stream_envelope(
                 "tool_call_complete", request_id,

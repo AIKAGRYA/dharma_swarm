@@ -1,4 +1,5 @@
 import type {ActivityEntry, ActivityPhase, CanonicalExecutionEvent, PaneKind, TranscriptLine} from "./types";
+import {stripHelmDirectives} from "./uiIntents";
 import {
   permissionDecisionFromEvent,
   permissionOutcomeFromEvent,
@@ -748,8 +749,13 @@ export function projectChatTraceLines(events: CanonicalExecutionEvent[], options
     projected.push(line("user", `> ${turn.prompt}`));
 
     if (turn.assistant) {
-      for (const responseLine of turn.assistant.split("\n")) {
-        projected.push(line("assistant", responseLine, turn.assistantTimestamp));
+      // Strip any ⟦helm:…⟧ agent-directives so they never reach the operator's
+      // transcript — the directive is executed + narrated separately in app.tsx.
+      const visible = stripHelmDirectives(turn.assistant);
+      if (visible) {
+        for (const responseLine of visible.split("\n")) {
+          projected.push(line("assistant", responseLine, turn.assistantTimestamp));
+        }
       }
     } else if (turn.endedWithoutResponse) {
       projected.push(line("error", "✖ no response — turn ended without output", turn.steps.at(-1)?.timestamp));
