@@ -705,6 +705,21 @@ function projectChatTurns(events: CanonicalExecutionEvent[]): ChatTurn[] {
   return turns.slice(-CHAT_TURN_RETENTION);
 }
 
+// The model that actually answered the most recent chat turn — the display
+// source of truth so the status line names whichever model really ran. Operator
+// live-grade 2026-06-16: the labels were "crazy" (status said codex:gpt-5.4, the
+// trace said llama-3.3-70b). The trace route is the truth; surface it.
+export function latestChatTurnRoute(events: CanonicalExecutionEvent[]): string | undefined {
+  const turns = projectChatTurns(events);
+  for (let index = turns.length - 1; index >= 0; index -= 1) {
+    const route = turns[index]?.route?.trim();
+    if (route) {
+      return scrubRawIdentifiers(route);
+    }
+  }
+  return undefined;
+}
+
 // FACE-1 zen-pure: one quiet line per turn — waiting is "… thinking · <route>"
 // (no step counts, no glyph flicker), completion is "✓ <n>s · <route> · ^T details".
 function turnSummaryText(turn: ChatTurn, route: string, expanded: boolean): string {

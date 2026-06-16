@@ -2,6 +2,7 @@ import {describe, expect, test} from "bun:test";
 
 import {
   canonicalEventsFromBridgeEvent,
+  latestChatTurnRoute,
   mergeExecutionEvents,
   projectActivityEntries,
   projectChatTraceLines,
@@ -156,6 +157,27 @@ describe("canonicalEventsFromBridgeEvent", () => {
 
     const recollapsed = projectChatTraceLines(events, {expanded: false});
     expect(recollapsed.some((line) => line.text.includes("routing the greeting"))).toBe(false);
+  });
+
+  test("F-174 display truth: latestChatTurnRoute names whichever model actually answered, not the static default", () => {
+    // No turns yet → undefined (the caller falls back to the configured route).
+    expect(latestChatTurnRoute([])).toBeUndefined();
+
+    const events = [
+      userPromptExecutionEvent("what model are you?", "2026-06-16T10:00:00Z"),
+      ...canonicalEventsFromBridgeEvent({
+        type: "session.ack",
+        session_id: "9f86d081884c7d659a2feaa0c55ad015",
+        provider: "claude",
+        model: "claude-opus-4-8",
+        request_id: "3",
+        created_at: "2026-06-16T10:00:01Z",
+      }),
+      ...canonicalEventsFromBridgeEvent({type: "text_complete", content: "I'm Claude.", created_at: "2026-06-16T10:00:02Z"}),
+    ];
+    // The status line must read claude:claude-opus-4-8 — the real route — even
+    // though defaultRoutePolicy() is still codex:gpt-5.4.
+    expect(latestChatTurnRoute(events)).toBe("claude:claude-opus-4-8");
   });
 
   test("F-173: assistant bridge event renders its message as the turn's response in the chat transcript", () => {

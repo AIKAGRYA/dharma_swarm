@@ -3,7 +3,7 @@ import {Box, Text, useApp, useInput, useStdin} from "ink";
 
 import {DharmaBridge, type BridgeEvent} from "./bridge.ts";
 import {ActivityPane, activityRowCount} from "./components/ActivityPane.tsx";
-import {canonicalEventsFromBridgeEvent, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
+import {canonicalEventsFromBridgeEvent, latestChatTurnRoute, localCommandResultExecutionEvent, localStatusExecutionEvent, queuedPromptExecutionEvent, userPromptExecutionEvent} from "./executionLog.ts";
 import {
   loadSupervisorRepoPreview,
   loadStoredState,
@@ -2472,6 +2472,9 @@ export function App(): React.ReactElement {
   const modelChoices = selectableRouteTargets(state.routePolicy);
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
   const transcriptMeta = transcriptMetaForTab(activeTab);
+  // Display source of truth: name whichever model actually answered the latest
+  // turn, falling back to the configured route before any turn has run.
+  const liveRouteLabel = latestChatTurnRoute(state.executionEventLog) ?? routeLabel(state.routePolicy);
   const operatorSummaryItems = buildOperatorSummaryItems(state);
   const activeScrollOffset = Math.min(
     state.paneScrollOffsets[activeTab?.id ?? ""] ?? 0,
@@ -3347,7 +3350,7 @@ export function App(): React.ReactElement {
     // "sidebar ->") must never churn the zen frame.
     const zenStatus = [
       "zen",
-      routeLabel(state.routePolicy),
+      liveRouteLabel,
       state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
       "F2 cockpit · /tour",
     ].join("  ·  ");
@@ -3403,7 +3406,7 @@ export function App(): React.ReactElement {
     const scrollMeasure = Math.min(terminalWidth, 84);
     const scrollStatus = scrollStatusLine({
       drawerOpen: scrollDrawerOpen,
-      routeLabel: routeLabel(state.routePolicy),
+      routeLabel: liveRouteLabel,
       bridgeStatus: state.bridgeStatus,
       routeState: state.routePolicy.routeState,
       strategy: state.routePolicy.strategy,

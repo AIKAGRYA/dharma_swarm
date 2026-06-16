@@ -54,7 +54,6 @@ from dharma_swarm.operator_core import (
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
 from dharma_swarm.provider_matrix import build_default_matrix_targets
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
-from dharma_swarm.model_hierarchy import DEFAULT_MODELS as HIERARCHY_DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
 from dharma_swarm import api_keys
 from dharma_swarm.tui import model_routing
@@ -1034,9 +1033,12 @@ class TerminalBridge:
             lanes.append((provider_id, model_id, options, note))
 
         openrouter_ready = api_keys.provider_available("openrouter")
-        free_model = HIERARCHY_DEFAULT_MODELS.get(ProviderType.OPENROUTER_FREE, "")
-        if requested_provider == "openrouter" and openrouter_ready:
-            add("openrouter", requested_model or free_model, {}, "configured route")
+        # Model power floor (Kimi K2.6): the OPENROUTER_FREE default on this branch
+        # is a sub-floor model. NEVER auto-route chat to it — it routed junk and a
+        # weak model hallucinated its own identity (operator live-grade, 2026-06-16).
+        # Default brain is Claude Max (frontier, correct identity, subscription
+        # cost), with codex as the frontier fallback; an explicit operator route is
+        # still honored, but the automatic free lane is gone.
         if requested_provider == "claude":
             add(
                 "claude",
@@ -1044,14 +1046,19 @@ class TerminalBridge:
                 self._chat_claude_options(),
                 "configured route, chat-safe (no tools)",
             )
-        if openrouter_ready:
-            add("openrouter", free_model, {}, "free-first chat lane (model_hierarchy)")
+        if requested_provider == "openrouter" and openrouter_ready and requested_model:
+            add("openrouter", requested_model, {}, "configured route (operator-chosen)")
+        # Default chat lane: Claude Max (Opus 4.8) — no tools, subscription.
         add(
             "claude",
             self._chat_claude_model(),
             self._chat_claude_options(),
-            "subscription chat lane (claude Max, no tools)",
+            "default chat lane (claude Max, no tools)",
         )
+        # Frontier fallback when Claude is unavailable — never the sub-floor free lane.
+        codex_adapter = self._adapters.get("codex")
+        if codex_adapter is not None:
+            add("codex", str(codex_adapter.get_profile(None).model_id), {}, "frontier fallback (codex)")
         return lanes
 
     def _chat_claude_model(self) -> str:
