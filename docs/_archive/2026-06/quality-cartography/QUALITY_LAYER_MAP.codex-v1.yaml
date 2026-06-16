@@ -1,0 +1,355 @@
+schema_version: quality_layer_map.v1
+generated_at: "2026-06-12"
+repo_root: /Users/dhyana/dharma_swarm
+witnessed_branch: qwen/spine-adoption
+witnessed_head: ca890d117a
+status: seed_report
+authority: descriptive
+sources:
+  commands:
+    - make onboard
+    - make hygiene-check
+    - make docops-integrity
+    - make memory-kernel-readiness-strict
+    - make verifier-selfcheck
+    - make semgrep
+    - make module-budget
+    - make test-hygiene
+    - make uplift-guards
+    - make spine-check
+    - .venv/bin/python scripts/governance/verify_quality_membrane.py --repo-root . --json
+  manifests:
+    - ACTIVE_SURFACE_MANIFEST.yaml
+    - docs/governance/ACTIVE_TRACK.yaml
+    - docs/governance/SOVEREIGN_MANIFEST.md
+    - docs/governance/ANTI_SLOP_RULES.md
+  code_surfaces:
+    - scripts/governance/
+    - scripts/docops/
+    - scripts/runtime/
+    - dharma_swarm/memory_kernel/
+    - dharma_swarm/a2a/
+    - dharma_swarm/spine/
+gate_witness:
+  onboard:
+    status: pass
+    notes:
+      - branch=qwen/spine-adoption
+      - head=ca890d117a
+      - ahead_origin_main=0
+      - behind_origin_main=29
+      - dirty_files_observed=77
+  hygiene_check:
+    status: pass
+    evidence: Hygiene integrity OK
+  docops_integrity:
+    status: fail
+    failures:
+      - manifest-markdown-lines: doc says 235372, markdown_total_lines is 235465
+      - docs/governance/CANONICAL_DOC_STACK.md:44 missing referenced path check_track_status.py
+      - docs/governance/CANONICAL_DOC_STACK.md:52 missing referenced path render_active_track_includes.py
+      - docs/docops/AUTO_INVENTORY.md stale generated content
+  memory_kernel_readiness_strict:
+    status: pass
+    summary:
+      schema_version: memory_kernel_readiness.v1
+      report_status: ready
+      surface_count: 81
+      required_surface_count: 7
+      required_ready_count: 7
+      adapter_registered_count: 81
+      total_missing_adapter_count: 0
+      total_warning_count: 1
+  verifier_selfcheck:
+    status: pass
+    collected_tests: 11373
+  semgrep:
+    status: pass_with_blocking_finding
+    findings_count: 1
+    finding:
+      rule: semgrep.dharma.no-unauthorized-dharma-write
+      path: holon/cli.py
+      line: 213
+      issue: direct Path.home() / ".dharma" / "agents" receipt path outside allowlist
+  module_budget:
+    status: pass_with_warnings
+    warnings:
+      - dharma_swarm/runtime_state.py: 3796 lines already exceeds budget; not introduced here
+      - dharma_swarm/autonomous_agent.py: 1380 lines already exceeds budget; not introduced here
+      - dharma_swarm/operator_core/control_surface.py: 1046 lines; grandfather=1001; ceiling=1101
+  quality_membrane:
+    status: fail
+    first_failed_gate: runtime_names
+    findings_summary: 19 F821/F811 findings before later membrane gates run
+metrics:
+  frozen_dataclass_occurrences: 263
+  schema_version_occurrences: 395
+  non_frozen_or_slots_dataclass_occurrences: 430
+  receipt_or_witness_class_occurrences: 23
+  memory_kernel_module_count: 30
+  property_test_file_count: 4
+  test_file_count: 713
+layers:
+  syntactic_lint:
+    id: L1
+    name: Syntactic / Lint
+    strength_score: 7
+    current_observed_state: >
+      Syntax, F821 blockers, test collection, hygiene integrity, and semgrep
+      all run locally. The broader quality membrane fails on F821/F811, and
+      Semgrep has one blocking finding in untracked holon work.
+    key_files:
+      - Makefile
+      - .semgrep/dharma-anti-slop.yml
+      - scripts/governance/verify_quality_membrane.py
+      - scripts/governance/hygiene/check_hygiene_integrity.py
+      - holon/cli.py
+    enforcing_artifacts:
+      - make verifier-selfcheck
+      - make semgrep
+      - make hygiene-check
+      - scripts/governance/verify_quality_membrane.py
+    exemplars:
+      - path: Makefile:139
+        why: verifier-selfcheck proves syntax, F821 blockers, test collection, and onboard.
+      - path: .semgrep/dharma-anti-slop.yml:88
+        why: blanket git staging is blocked as a concrete anti-harm lint rule.
+      - path: scripts/governance/hygiene/check_hygiene_integrity.py:27
+        why: hygiene patterns are schema-checked with explicit stages and detector types.
+    anti_exemplars:
+      - path: holon/cli.py:213
+        why: Semgrep Rule 1 blocks direct ~/.dharma receipt path.
+      - path: scripts/governance/verify_quality_membrane.py:35
+        why: runtime_names uses F821,F811 and currently fails on 19 findings.
+      - finding: semgrep paths.exclude v2 warnings
+        why: rule-local path semantics need anchoring before future Semgrep behavior changes.
+  semantic_contract:
+    id: L2
+    name: Semantic / Contract
+    strength_score: 8
+    current_observed_state: >
+      Strong schema and receipt discipline, especially in MemoryKernel and
+      spine dispatch tests. Main open contract drift is the manifest-declared
+      A2ATaskReceipt request/response layer, which is missing in this worktree.
+    key_files:
+      - dharma_swarm/memory_kernel/readiness.py
+      - scripts/memory_kernel_readiness.py
+      - dharma_swarm/memory_kernel/context_admission.py
+      - dharma_swarm/memory_kernel/write_receipts.py
+      - dharma_swarm/a2a/a2a_bridge.py
+      - tests/test_spine_persistence_invariant.py
+    enforcing_artifacts:
+      - make memory-kernel-readiness-strict
+      - tests/test_memory_kernel_write_receipts.py
+      - tests/test_spine_persistence_invariant.py
+      - tests/test_spine_adoption_dispatch.py
+    exemplars:
+      - path: dharma_swarm/memory_kernel/readiness.py:25
+        why: readiness reports are schema-versioned frozen dataclasses with summary counts.
+      - path: dharma_swarm/memory_kernel/write_receipts.py:135
+        why: governed write receipts are immutable, append-only, and direct mutation is blocked.
+      - path: tests/test_spine_persistence_invariant.py:250
+        why: asserts task_id, run_id, trace_id, correlation_id, and idempotency_key agreement.
+    anti_exemplars:
+      - path: ACTIVE_SURFACE_MANIFEST.yaml:721
+        why: request_response layer names a module absent from this worktree.
+      - finding: make onboard reports missing request_response A2ATaskReceipt
+        why: one correlation-spine leg is not proven present.
+      - finding: only 4 property test files among 713 test files
+        why: core contracts are still mostly example tests, not generated invariants.
+  architectural_structural:
+    id: L3
+    name: Architectural / Structural
+    strength_score: 6
+    current_observed_state: >
+      Ownership manifests, module budget, MemoryKernel canonicality, and spine
+      bypass classification exist. Large grandfathered modules, legacy shell
+      loops, and many parallel worktrees remain structural debt.
+    key_files:
+      - ACTIVE_SURFACE_MANIFEST.yaml
+      - scripts/governance/check_module_budget.py
+      - scripts/governance/check_memory_kernel_canonical.py
+      - scripts/governance/spine_bypass_report.py
+      - scripts/mission_preflight.sh
+      - swarm.sh
+      - agent_loop.sh
+    enforcing_artifacts:
+      - make module-budget
+      - make spine-check
+      - scripts/governance/check_memory_kernel_canonical.py
+      - scripts/mission_preflight.sh
+    exemplars:
+      - path: ACTIVE_SURFACE_MANIFEST.yaml:702
+        why: new receipt types must be declared in the correlation spine and Rule 2 vocabulary.
+      - path: scripts/governance/check_memory_kernel_canonical.py:16
+        why: AST gate prevents memory-authority sprawl outside MemoryKernel.
+      - path: scripts/mission_preflight.sh:58
+        why: swarm launch fail-closes through mission-status.
+    anti_exemplars:
+      - finding: runtime_state.py 3796 lines, autonomous_agent.py 1380 lines
+        why: grandfathered god-file risk remains.
+      - path: swarm.sh:31
+        why: legacy shared-state shell prompt writes directly to ~/.dharma/shared.
+      - finding: 28 worktrees and 288 local branches
+        why: surface-disjoint lane doctrine exists, but continuous enforcement is partial.
+  coherence_manifest_alignment:
+    id: L4
+    name: Coherence / Manifest Alignment
+    strength_score: 6
+    current_observed_state: >
+      The repo has strong ownership doctrine and a single onboarding door, but
+      DocOps is currently red on four drift items. The failure mode is useful:
+      stale claims are surfaced instead of buried.
+    key_files:
+      - docs/governance/CANONICAL_DOC_STACK.md
+      - docs/docops/assertions.yaml
+      - scripts/docops/check_docops_integrity.py
+      - docs/docops/AUTO_INVENTORY.md
+      - AGENT_IDENTITY_UNIFICATION.md
+    enforcing_artifacts:
+      - make onboard
+      - make docops-integrity
+      - scripts/docops/check_docops_integrity.py
+      - docs/governance/CANONICAL_DOC_STACK.md
+    exemplars:
+      - path: docs/governance/CANONICAL_DOC_STACK.md:16
+        why: defines intent/surface/state single-source model.
+      - path: Makefile:321
+        why: onboard renders live truth from owners and always exits zero.
+      - path: AGENT_IDENTITY_UNIFICATION.md:1
+        why: archived root doctrine clearly says not to trust without reverification.
+    anti_exemplars:
+      - finding: manifest markdown_total_lines drift 235372 vs 235465
+        why: DocOps integrity is red.
+      - path: docs/governance/CANONICAL_DOC_STACK.md:44
+        why: missing referenced path check_track_status.py.
+      - path: docs/docops/AUTO_INVENTORY.md
+        why: generated content stale; needs --write-auto-sections.
+  verifiability_invariant:
+    id: L5
+    name: Verifiability / Invariant
+    strength_score: 5
+    current_observed_state: >
+      Many checks exist and several are green, but the system lacks a single
+      green quality membrane, automatic hygiene promotion, and a live
+      correlation-spine joinability gate.
+    key_files:
+      - scripts/governance/verify_quality_membrane.py
+      - tests/test_spine_adoption_dispatch.py
+      - tests/test_spine_persistence_invariant.py
+      - docs/governance/hygiene/LIFECYCLE.md
+      - tests/properties/
+    enforcing_artifacts:
+      - make uplift-guards
+      - make test-hygiene
+      - make verifier-selfcheck
+      - make memory-kernel-readiness-strict
+      - tests/properties
+    exemplars:
+      - path: tests/test_spine_adoption_dispatch.py:278
+        why: counts actual invoke_agent traversals to prove one EvidenceReceipt per dispatch.
+      - path: tests/test_spine_persistence_invariant.py:305
+        why: proves retry idempotency does not duplicate runtime receipts.
+      - path: docs/governance/hygiene/LIFECYCLE.md:16
+        why: promotion to enforced requires deterministic CI detector, low false positives, owner, rollback plan, and rule pointer.
+    anti_exemplars:
+      - path: scripts/governance/verify_quality_membrane.py:54
+        why: membrane still references missing tests/test_a2a_task_lifecycle.py after runtime_names is repaired.
+      - finding: hygiene lifecycle promotion is manual
+        why: patterns can remain advisory indefinitely without a report or ratchet.
+      - finding: correlation_spine has doctrine but no import-and-joinability gate for all declared layers.
+  dharmic_systemic_health:
+    id: L6
+    name: Dharmic / Systemic Health
+    strength_score: 6
+    current_observed_state: >
+      The doctrine is unusually explicit about witness, truth, harm reduction,
+      and long-horizon flourishing. Production closure and inline witness are
+      still incomplete.
+    key_files:
+      - WHAT_IT_WANTS_TO_BECOME.md
+      - WORLD_MODEL.md
+      - GNANI_LODESTONE.md
+      - CYBERNETIC_LOOP_MAP.md
+      - LIVING_LAYERS.md
+      - swarm.sh
+      - cron_jobs.json
+    enforcing_artifacts:
+      - make uplift-guards
+      - make onboard
+      - docs/governance/SOVEREIGN_MANIFEST.md
+      - docs/state/BROKEN_REGISTER.md
+    exemplars:
+      - path: WHAT_IT_WANTS_TO_BECOME.md:17
+        why: names five falsifiable structural gaps instead of pretending completion.
+      - path: GNANI_LODESTONE.md:41
+        why: states witness must be upstream of capability.
+      - path: WORLD_MODEL.md:78
+        why: defines Dharmic Equilibrium as the target attractor and goal-function change.
+    anti_exemplars:
+      - path: CYBERNETIC_LOOP_MAP.md:42
+        why: 0 fully closed production loops; 1 closed in test; 7 partial; 5 no.
+      - path: swarm.sh:89
+        why: legacy agent prompts have broad authority and need modern admission/receipt treatment.
+      - finding: no explicit waste budget
+        why: stale branches, scaffolding, and long-lived partial loops are not yet scored as systemic waste.
+proposed_invariants:
+  - id: Q-001
+    title: Semgrep owner declaration for new ~/.dharma surfaces
+    layers: [L1, L3, L6]
+    priority: 1
+    implementation: Semgrep plus manifest cross-check
+    current_evidence: holon/cli.py:213 violates Rule 1
+  - id: Q-002
+    title: Spine bypass allowlist at zero
+    layers: [L2, L5]
+    priority: 1
+    implementation: AST guard in uplift guards
+    current_evidence: scripts/governance/spine_bypass_report.py has 5 intentional bypass entries
+  - id: Q-003
+    title: A2ATaskReceipt presence and joinability
+    layers: [L2, L4, L5]
+    priority: 1
+    implementation: import check plus pytest/runtime probe
+    current_evidence: manifest-declared request_response layer missing
+  - id: Q-004
+    title: Module-budget descent ratchet
+    layers: [L3, L6]
+    priority: 2
+    implementation: extend check_module_budget.py with --ratchet
+    current_evidence: three grandfathered or near-ceiling modules
+  - id: Q-005
+    title: DocOps zero-drift before quality promotion
+    layers: [L4, L5]
+    priority: 2
+    implementation: DocOps assertion / Makefile gate for docs/quality promotion
+    current_evidence: make docops-integrity red on four items
+  - id: Q-006
+    title: Quality membrane repair
+    layers: [L1, L5]
+    priority: 2
+    implementation: clear F821/F811, update stale test target, wire only after green
+    current_evidence: verify_quality_membrane.py fails on runtime_names
+  - id: Q-007
+    title: Hygiene lifecycle promotion assistant
+    layers: [L5, L6]
+    priority: 3
+    implementation: scripts/governance/hygiene/promote.py --report-only
+    current_evidence: lifecycle criteria exist but promotion is manual
+  - id: Q-008
+    title: Inline witness latency and coverage
+    layers: [L6]
+    priority: 4
+    implementation: runtime receipt schema plus dashboard/onboard projection
+    current_evidence: witness doctrine is upstream, but production loop closure is incomplete
+recommended_manifest_updates:
+  - Add docs/quality artifacts to doc ownership as report artifacts once DocOps is green.
+  - Add a quality_cartography surface to ACTIVE_SURFACE_MANIFEST.yaml only after a tool consumes QUALITY_LAYER_MAP.yaml.
+  - Declare or reroute holon talk receipts before promoting holon package work.
+  - Add verify_quality_membrane.py to governance-all only after Q-006 is green.
+next_agent_handoff:
+  - Fix docops-integrity drift.
+  - Resolve holon/cli.py Semgrep Rule 1 finding.
+  - Repair verify_quality_membrane.py and stale target list.
+  - Drain spine bypass allowlist to zero.
+  - Add correlation_spine import-and-joinability gate.
