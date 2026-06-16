@@ -4,14 +4,25 @@
   "cluster": "C",
   "cluster_title": "Architectural Drift",
   "severity": "structural",
-  "stage": "advisory",
+  "stage": "enforced",
   "created": "2026-06-07",
-  "last_verified": "2026-06-07",
+  "last_verified": "2026-06-12",
   "next_review": "2026-09-07",
   "definition": "Large files keep absorbing unrelated behavior because local context makes additions feel natural.",
   "why_it_hurts": "Review, testing, and ownership become too broad to reason about.",
-  "detector": {"type": "command", "command": "find dharma_swarm api scripts -name '*.py' -not -path '*/__pycache__/*' -print0 | xargs -0 wc -l | sort -rn | head -20", "target": "new growth respects module budget rule"},
-  "enforcement": {"rule": "docs/governance/ANTI_SLOP_RULES.md#rule-10", "promoted_on": null},
-  "sources": ["initial-field-guide"],
-  "audit_questions": ["Did this change add lines to a grandfathered module, and what extraction would shrink it next?"]
+  "detector": {
+    "type": "command",
+    "command": "python3 scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+    "target": "exit 0; violations exit 1 (same command the blocking workflow runs)"
+  },
+  "enforcement": {
+    "rule": ".github/workflows/module-budget.yml",
+    "promoted_on": "2026-06-12"
+  },
+  "sources": [
+    "initial-field-guide"
+  ],
+  "audit_questions": [
+    "Did this change add lines to a grandfathered module, and what extraction would shrink it next?"
+  ]
 }

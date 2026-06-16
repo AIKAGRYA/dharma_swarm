@@ -25,6 +25,12 @@ MODEL_PROVIDER_MAP = {
 PROVIDER_ALIASES = {
     "openrouter_free": "openrouter",
 }
+# CLI providers wrap a backend model family without sharing its provider string
+# (they stay distinct lanes — see the provider_alias_mismatch check below). A
+# bare/qualified model from the wrapped family is therefore a legitimate match.
+CLI_PROVIDER_BACKENDS = {
+    "claude_code": "anthropic",
+}
 
 
 def _infer_provider_from_model(model_str: str) -> str | None:
@@ -59,6 +65,8 @@ def _provider_for_model_line(lines: list[str], model_line: int) -> tuple[int, st
 
 def _provider_matches_model(provider: str, expected: str, model_str: str) -> bool:
     if _canonical_provider(provider) == expected:
+        return True
+    if CLI_PROVIDER_BACKENDS.get(provider) == expected:
         return True
     if provider in {"local", "ollama"}:
         return True

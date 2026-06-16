@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci hygiene-delta-ratchet
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -51,8 +51,10 @@ help:
 	@echo "  make nats-substrate-contract Verify NATS substrate contract wiring"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
+	@echo "  make mypy-strict-ratchet Verify allowlisted modules pass mypy --strict"
 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
+	@echo "  make hygiene-delta-ratchet  Fail if PR-touched files added new hygiene violations"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
 	@echo "  make pr-queue Classify open GitHub PRs into a receipt-backed review queue"
@@ -215,6 +217,9 @@ governance-baseline:
 test-hygiene:
 	$(PYTHON) scripts/governance/check_test_hygiene.py
 
+mypy-strict-ratchet:
+	$(PYTHON) scripts/governance/hygiene/mypy_strict_ratchet.py
+
 test-contracts:
 	scripts/governance/run_pytest_with_repo_env.sh -q \
 		tests/test_contracts_scaffold.py \
@@ -248,9 +253,28 @@ hygiene-audit:
 hygiene-check:
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
 
+# One-way quality ratchet (QL-R1): counters may only improve vs the
+# git-tracked baselines; green improvements auto-tighten (commit the
+# baselines file with the improving change). CI/agents use plain check.
+quality-ratchet:
+	$(PYTHON) scripts/governance/hygiene/ratchet.py --tighten
+
+quality-ratchet-check:
+	$(PYTHON) scripts/governance/hygiene/ratchet.py
+
+# Assurance boundary V0: contracts (not counts) on spine, memory_kernel,
+# a2a, runtime_state, runtime_provider. Exit 1 lists hold-at-zero
+# violations with file:line evidence; the ratchet banks the drain.
+assurance-boundary:
+	$(PYTHON) scripts/governance/assurance_boundary.py
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+
+hygiene-delta-ratchet:
+	$(PYTHON) scripts/governance/hygiene/delta_ratchet.py \
+		--base-ref $${GITHUB_BASE_REF:-origin/main} --head-ref HEAD
 
 docops-report:
 	@mkdir -p reports/docops
@@ -362,10 +386,11 @@ spine-check:
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
 
-# Whole-system orientation: identity, organs, tracks, canon custody, liveness,
-# broken register — one read-only view projected from the owners. Always exits 0.
+# Whole-system orientation: identity, tracks, lanes, agents, receipts, A2A,
+# body state, and broken register. Explicitly emits generated repo_context
+# artifacts from existing owners; the artifacts own no facts.
 orient:
-	$(PYTHON) scripts/governance/orientation_graph.py
+	$(PYTHON) scripts/governance/orientation_graph.py --write-context
 
 # Quick cross-agent state snapshot: active track, open PRs, stale items,
 # broken register, hotlist. Any agent on any platform can run this.
