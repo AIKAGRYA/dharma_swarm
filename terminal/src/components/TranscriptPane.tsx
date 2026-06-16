@@ -15,6 +15,9 @@ type Props = {
   accentColor?: string;
   // F-111 zen: no border, no title block — the conversation IS the screen.
   frameless?: boolean;
+  // Claude-Code baseline: bottom-anchor the body so the newest line hugs the
+  // composer (only meaningful when the frameless box grows, i.e. the zen face).
+  bottomAnchor?: boolean;
 };
 
 function visibleWindow<T>(items: T[], scrollOffset: number, windowSize: number): T[] {
@@ -33,6 +36,7 @@ export function TranscriptPane({
   emptyState = "No content yet.",
   accentColor = THEME.ink,
   frameless = false,
+  bottomAnchor = false,
 }: Props): React.ReactElement {
   const visible = visibleWindow(lines, scrollOffset, windowSize);
   const body =
@@ -59,7 +63,12 @@ export function TranscriptPane({
     );
   if (frameless) {
     return (
-      <Box flexGrow={1} flexDirection="column" paddingX={1}>
+      <Box
+        flexGrow={1}
+        flexDirection="column"
+        justifyContent={bottomAnchor ? "flex-end" : "flex-start"}
+        paddingX={1}
+      >
         {body}
       </Box>
     );
