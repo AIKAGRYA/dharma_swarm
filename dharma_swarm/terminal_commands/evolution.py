@@ -111,7 +111,6 @@ def cmd_evolve_auto(
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
     async def _auto():
-        from pathlib import Path
         from dharma_swarm.models import ProviderType
 
         swarm = await _get_swarm()
