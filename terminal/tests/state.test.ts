@@ -49,6 +49,30 @@ describe("reduceApp UI state", () => {
     expect(closed.uiMode.activeOverlay).toEqual({kind: "none"});
   });
 
+  test("navigator rail: off by default, rail.toggle flips it, rail.set pins it", () => {
+    expect(initialState.uiMode.railVisible).toBe(false);
+
+    const on = reduceApp(initialState, {type: "rail.toggle"});
+    expect(on.uiMode.railVisible).toBe(true);
+    const off = reduceApp(on, {type: "rail.toggle"});
+    expect(off.uiMode.railVisible).toBe(false);
+
+    const pinned = reduceApp(initialState, {type: "rail.set", visible: true});
+    expect(pinned.uiMode.railVisible).toBe(true);
+    expect(reduceApp(pinned, {type: "rail.set", visible: false}).uiMode.railVisible).toBe(false);
+  });
+
+  test("navigator.narrate appends to the head-band ring buffer (capped at 3, newest last)", () => {
+    const state = reduce(initialState, [
+      {type: "navigator.narrate", line: "opened Agents"},
+      {type: "navigator.narrate", line: "switched to opus-4.8"},
+      {type: "navigator.narrate", line: "  "},
+      {type: "navigator.narrate", line: "refreshed Repo"},
+      {type: "navigator.narrate", line: "docked the rail"},
+    ]);
+    expect(state.navigatorNarration).toEqual(["switched to opus-4.8", "refreshed Repo", "docked the rail"]);
+  });
+
   test("toggles sidebar visible<->hidden (FACE-2: collapsed sliver is dead, default is hidden)", () => {
     // Command-post default: sidebar OFF — data panes carry the info.
     expect(initialState.uiMode.sidebarVisible).toBe("hidden");

@@ -7,6 +7,7 @@ const initialTabs = buildInitialTabs();
 const initialRoutePolicy = defaultRoutePolicy();
 const ACTIVITY_ENTRY_RETENTION = 1000;
 const TAB_LINE_RETENTION = 2000;
+const NAVIGATOR_NARRATION_RETENTION = 3;
 
 function activateFallbackTab(tabs: TabSpec[], preferred?: string): string {
   if (preferred && tabs.some((tab) => tab.id === preferred)) {
@@ -90,12 +91,15 @@ export const initialState: AppState = {
     compactMode: false,
     // F-111: zen is the boot default — never persisted, every boot starts here.
     layoutMode: "zen",
+    // Navigator rail OFF by default — the zen baseline stays pure.
+    railVisible: false,
   },
   bridgeStatus: "booting",
   routePolicy: initialRoutePolicy,
   executionEventLog: [],
   chatTraceLines: [],
   chatTraceExpanded: false,
+  navigatorNarration: [],
   sessionContinuity: {
     continuityMode: "fresh",
     boundedHistory: [],
@@ -340,6 +344,26 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           sidebarVisible: "visible",
         },
       };
+    case "rail.toggle":
+      return {
+        ...state,
+        uiMode: {...state.uiMode, railVisible: !state.uiMode.railVisible},
+      };
+    case "rail.set":
+      return {
+        ...state,
+        uiMode: {...state.uiMode, railVisible: action.visible},
+      };
+    case "navigator.narrate": {
+      const line = action.line.trim();
+      if (!line) {
+        return state;
+      }
+      return {
+        ...state,
+        navigatorNarration: [...state.navigatorNarration, line].slice(-NAVIGATOR_NARRATION_RETENTION),
+      };
+    }
     case "layout.mode.set":
       return {
         ...state,

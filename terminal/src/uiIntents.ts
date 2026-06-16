@@ -15,7 +15,9 @@ export type UiIntent =
   // with the route menu — NEVER forwarded to a billed backend turn (operator
   // cost incident: "change models to glm 4." ran as an agentic claude turn).
   | {kind: "model_unknown"; query: string}
-  | {kind: "tour"};
+  | {kind: "tour"}
+  // Navigator rail toggle: dock/undock the persistent chat rail in the cockpit.
+  | {kind: "rail"; on: boolean | "toggle"};
 
 type PaneRef = {id: string; title: string};
 
@@ -30,6 +32,15 @@ const UI_NOUN = /\b(mode|view|screen|layout|ui|tui|interface|dashboard|cockpit)\
 
 const PANE_NOUN = /\b(pane|panel|tab|surface|view|plane)\b/i;
 
+// Navigator rail: "dock the chat", "show the navigator", "undock", "hide the rail".
+const RAIL_NOUN = /\b(navigator|rail|copilot|co-pilot)\b/i;
+// Rail-specific verbs (no other surface "docks") — sufficient on their own.
+const RAIL_VERB_OFF = /\b(undock|detach)\b/i;
+const RAIL_VERB_ON = /\b(dock|tether)\b/i;
+// Ambiguous verbs — only count as rail when a rail/chat noun is present.
+const RAIL_WEAK_OFF = /\b(hide|close|dismiss|remove)\b/i;
+const RAIL_WEAK_ON = /\b(show|open|pin|bring|attach)\b/i;
+
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9.\s-]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -43,9 +54,29 @@ export function matchUiIntent(
   if (!text || text.startsWith("/")) {
     return null;
   }
+
+  // Navigator rail — checked BEFORE the imperative gate because "dock"/"undock"
+  // are rail-specific verbs that carry no imperative keyword. "dock the chat" /
+  // "show the navigator" -> on; "undock" / "hide the rail" -> off. Ambiguous
+  // verbs (show/hide/open/close) only count when a rail/chat noun is present.
+  if (RAIL_VERB_OFF.test(text)) {
+    return {kind: "rail", on: false};
+  }
+  if (RAIL_VERB_ON.test(text)) {
+    return {kind: "rail", on: true};
+  }
+  if (RAIL_NOUN.test(text)) {
+    if (RAIL_WEAK_OFF.test(text)) {
+      return {kind: "rail", on: false};
+    }
+    if (RAIL_WEAK_ON.test(text)) {
+      return {kind: "rail", on: true};
+    }
+  }
+
   // The tour is NEVER triggered by plain text (operator word 2026-06-16: typing
   // "tour" must reach the chat model, not pop the menu). It opens only via the
-  // /tour command or the ^G hotkey — see app.tsx.
+  // /tour command — see app.tsx.
   if (!IMPERATIVE.test(text)) {
     return null;
   }
@@ -178,7 +209,7 @@ export function tourLines(panes: PaneRef[]): string[] {
     "  Plain prompts go to the model.  Slash commands hit surfaces directly:",
     "  /status /runtime /models /git /memory /approvals /help  (/help lists all)",
     "",
-    "Keys  Enter send · Tab panes · ^K switcher · ^T trace · ^B sidebar · ^G tour · ^C quit",
+    "Keys  Enter send · Tab panes · ^K switcher · ^T trace · ^B sidebar · ^C quit",
     "",
     "Try /cockpit, then “back to zen” to return here.",
   ];

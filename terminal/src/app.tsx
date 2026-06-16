@@ -22,6 +22,7 @@ import {ModelPicker} from "./components/ModelPicker.tsx";
 import {OperatorSummaryBand} from "./components/OperatorSummaryBand.tsx";
 import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
 import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
+import {NavigatorRail} from "./components/NavigatorRail.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
 import {SessionsPane} from "./components/SessionsPane.tsx";
 import {TourOverlay} from "./components/TourOverlay.tsx";
@@ -34,6 +35,7 @@ import {closestCommand, matchUiIntent, tourLines, type UiIntent} from "./uiInten
 import {REGISTERED_SLASH_COMMANDS} from "./commandRegistry.ts";
 import {parseControlPulsePreview, parseRuntimeFreshness} from "./freshness.ts";
 import {routeLabel, routePolicyFromValue, routeSummary, selectableRouteTargets} from "./routePolicy.ts";
+import {THEME} from "./theme.ts";
 import {manuscriptLines, scrollStatusLine} from "./scrollFace.ts";
 import {focusModeFor, paneActionsFor, type PaneAction} from "./shellControls.ts";
 import {
@@ -2469,6 +2471,19 @@ export function App(): React.ReactElement {
   // chrome measures ~22-24 but the offset stays at 20 so the expanded-trace
   // anchor rows stay inside the end-anchored window at 100x30 (F-172 check).
   const paneWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, terminalHeight - (compactShell ? 17 : 20));
+  // Navigator rail (cockpit only): a fixed-width right column that mirrors the
+  // sidebar's clip-don't-squeeze discipline so it can only partition WIDTH,
+  // never inflate height (F-163 preserved by construction). It is the FIRST
+  // thing to yield — suppressed under compactShell and auto-hidden whenever the
+  // active pane would drop below 48 cols.
+  const railWidth = Math.min(40, Math.max(28, Math.round(terminalWidth * 0.3)));
+  const railSidebarOn = state.uiMode.sidebarVisible === "visible" && !compactShell;
+  const railVisible =
+    state.uiMode.railVisible &&
+    !compactShell &&
+    terminalWidth - railWidth - (railSidebarOn ? 34 : 0) >= 48;
+  const railChatLines = displayedTranscriptLinesForTab(state.tabs.find((tab) => tab.id === "chat"), state);
+  const railWindowSize = Math.max(MIN_SCROLL_WINDOW_SIZE, paneWindowSize - 3);
   const outline = useMemo(() => outlineFromTabs(state.tabs), [state.tabs]);
   const modelChoices = selectableRouteTargets(state.routePolicy);
   const displayedTranscriptLines = displayedTranscriptLinesForTab(activeTab, state);
@@ -2769,9 +2784,27 @@ export function App(): React.ReactElement {
       );
       return;
     }
+    if (intent.kind === "rail") {
+      const next = intent.on === "toggle" ? !stateRef.current.uiMode.railVisible : intent.on;
+      // The rail lives only in the cockpit face — turning it on brings the
+      // operator there so they can see it beside the Helm's panes.
+      if (next && stateRef.current.uiMode.layoutMode !== "cockpit") {
+        dispatch({type: "layout.mode.set", mode: "cockpit"});
+      }
+      dispatch({type: "rail.set", visible: next});
+      respond(
+        next
+          ? "Navigator docked — chat rides the right rail while the Helm's panes stay visible. Say \"undock\" or /rail to hide it."
+          : "Navigator undocked. /rail or \"dock the chat\" brings it back.",
+      );
+      return;
+    }
     // The tour opens in its own isolated overlay box — never inline transcript
     // text (operator word 2026-06-16).
-    dispatch({type: "tour.open"});
+    if (intent.kind === "tour") {
+      dispatch({type: "tour.open"});
+      return;
+    }
   }
 
   function localUiSlashIntent(submitted: string): UiIntent | null {
@@ -2782,6 +2815,8 @@ export function App(): React.ReactElement {
     // FACE-3: the reading-first manuscript face.
     if (text === "/scroll") return {kind: "layout", mode: "scroll"};
     if (text === "/tour") return {kind: "tour"};
+    // Navigator rail: /navigator and /rail toggle the persistent chat rail.
+    if (text === "/navigator" || text === "/rail") return {kind: "rail", on: "toggle"};
     return null;
   }
 
@@ -3039,11 +3074,6 @@ export function App(): React.ReactElement {
     if (state.uiMode.activeOverlay.kind === "tour") {
       dispatch({type: "tour.close"});
       dispatch({type: "status.set", value: "tour closed"});
-      return;
-    }
-    // ^G opens the guided tour as an isolated box from anywhere.
-    if (key.ctrl && input === "g") {
-      dispatch({type: "tour.open"});
       return;
     }
     if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
@@ -3593,6 +3623,21 @@ export function App(): React.ReactElement {
         )}
         </Box>
         </Box>
+        {/* Navigator rail: the sidebar's mirror image on the right edge — a
+            fixed-width, clip-don't-squeeze column so it can only partition the
+            pane row's WIDTH, never inflate its height (F-163 by construction). */}
+        {railVisible ? (
+          <Box flexDirection="column" overflow="hidden" flexShrink={0} width={railWidth} borderStyle="single" borderColor={THEME.ridge} borderTop={false} borderRight={false} borderBottom={false}>
+            <NavigatorRail
+              lines={railChatLines}
+              narration={state.navigatorNarration}
+              routeLabel={liveRouteLabel}
+              activeTitle={activeTab?.title ?? "Workspace"}
+              windowSize={railWindowSize}
+              width={railWidth}
+            />
+          </Box>
+        ) : null}
       </Box>
       <Box flexDirection="column" flexShrink={0}>
         <Composer prompt={state.prompt} compact={compactShell} />

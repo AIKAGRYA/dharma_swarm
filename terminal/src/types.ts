@@ -463,6 +463,10 @@ export type UIModeState = {
   focusedPaneId: string;
   compactMode: boolean;
   layoutMode: LayoutMode;
+  // Navigator copilot: a persistent chat rail docked in the cockpit pane row so
+  // the operator stays tethered to the agent while it drives the Helm. OFF by
+  // default (mirrors sidebarVisible); only meaningful in the cockpit face.
+  railVisible: boolean;
 };
 
 export type RoutePolicyState = {
@@ -513,6 +517,9 @@ export type AppState = {
   executionEventLog: CanonicalExecutionEvent[];
   chatTraceLines: TranscriptLine[];
   chatTraceExpanded: boolean;
+  // Navigator head-band: the last few "what the agent just did" narration lines
+  // (newest last, capped). Empty until the agent drives the Helm.
+  navigatorNarration: string[];
   sessionContinuity: SessionContinuityState;
   prompt: string;
   tabs: TabSpec[];
@@ -549,6 +556,9 @@ export type AppAction =
   | {type: "paneSwitcher.set"; index: number}
   | {type: "tour.open"}
   | {type: "tour.close"}
+  | {type: "rail.toggle"}
+  | {type: "rail.set"; visible: boolean}
+  | {type: "navigator.narrate"; line: string}
   | {type: "status.set"; value: string}
   | {type: "footer.set"; value: string}
   | {type: "sidebar.toggle"}

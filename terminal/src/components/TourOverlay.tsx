@@ -29,7 +29,7 @@ export function TourOverlay({lines, width, height}: Props): React.ReactElement {
           <Text key={index} color={THEME.foam} wrap="truncate-end">{line}</Text>
         ))}
         <Text color={THEME.stone}> </Text>
-        <Text color={THEME.stone}>Esc or any key to close · /tour or ^G reopens</Text>
+        <Text color={THEME.stone}>Esc or any key to close · /tour reopens</Text>
       </Box>
     </Box>
   );

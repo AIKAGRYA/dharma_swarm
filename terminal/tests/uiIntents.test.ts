@@ -93,6 +93,14 @@ describe("F-066 natural-language UI intents", () => {
     expect(matchUiIntent("hello, can you hear me?", PANES, TARGETS)).toBeNull();
   });
 
+  test("navigator rail: dock/show -> on, undock/hide -> off", () => {
+    expect(matchUiIntent("dock the chat", PANES, TARGETS)).toEqual({kind: "rail", on: true});
+    expect(matchUiIntent("show me the navigator", PANES, TARGETS)).toEqual({kind: "rail", on: true});
+    expect(matchUiIntent("pin the chat rail", PANES, TARGETS)).toEqual({kind: "rail", on: true});
+    expect(matchUiIntent("undock", PANES, TARGETS)).toEqual({kind: "rail", on: false});
+    expect(matchUiIntent("hide the rail", PANES, TARGETS)).toEqual({kind: "rail", on: false});
+  });
+
   test("tour lines list every pane and both layouts", () => {
     const lines = tourLines(PANES).join("\n");
     for (const pane of PANES) {
