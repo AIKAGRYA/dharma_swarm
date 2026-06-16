@@ -23,7 +23,6 @@ def cmd_xray(
     buyer: str = "CTO or founder under shipping pressure",
 ) -> None:
     """Run a Repo X-Ray analysis."""
-    from pathlib import Path
     from dharma_swarm.xray import (
         analyze_repo,
         render_markdown,
@@ -166,7 +165,6 @@ def cmd_cross(
 
 def cmd_field_scan() -> None:
     """Run full D3 field intelligence scan."""
-    import subprocess
 
     script = DHARMA_SWARM / "scripts" / "field_scan.py"
     if not script.exists():

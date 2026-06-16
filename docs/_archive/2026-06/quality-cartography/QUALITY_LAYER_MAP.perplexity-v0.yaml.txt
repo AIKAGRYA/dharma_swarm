@@ -1,0 +1,521 @@
+---
+schema_version: quality_layer_map.v0
+artifact: QUALITY_LAYER_MAP
+companion_to: docs/quality/QUALITY_CARTOGRAPHY.md
+witnessed_branch: qwen/spine-adoption
+witnessed_head: ca890d117a
+witnessed_repo: AmitabhainArunachala/dharma_swarm
+witnessed_at: 2026-06-12T10:30:00Z
+owners:
+  - quality-cartographer
+  - governance-stewards
+stage: observed
+severity: informational
+purpose: >
+  Machine-readable cartography of the dharma_swarm quality stack. Six layers
+  (L1..L6) with strength scores 0-10, exemplars, anti-exemplars, enforcing
+  surfaces, and a registry of eight proposed machine-checkable invariants
+  Q-001..Q-008. Strength scores match the table in QUALITY_CARTOGRAPHY.md §3.
+sources_of_truth:
+  - path: Makefile
+  - path: ACTIVE_SURFACE_MANIFEST.yaml
+  - path: docs/governance/AXIOMS.md
+  - path: docs/governance/hygiene/PATTERNS.yaml
+  - path: docs/governance/CANONICAL_DOC_STACK.md
+  - path: .semgrep/dharma-anti-slop.yml
+  - path: tools/check_hygiene_integrity.py
+  - path: tools/check_module_budget.py
+  - path: tools/memory_kernel_readiness.py
+  - path: tools/verify_quality_membrane.py
+  - path: scripts/spine_bypass_report.py
+  - path: scripts/agent_onboard.py
+gate_witness:
+  make_onboard: pass
+  make_hygiene_check: pass
+  make_docops_integrity: fail   # manifest-markdown-lines drift +93; 2 broken refs in CANONICAL_DOC_STACK; AUTO_INVENTORY.md stale
+  make_memory_kernel_readiness_strict: pass
+  make_verifier_selfcheck: environmental_failure  # __pycache__ permission error in sandbox; not a code defect
+  make_semgrep: skipped_local  # 4 pre-existing findings, warn-only Phase 1
+  make_uplift_guards: pass
+  make_spine_check: pass
+  make_module_budget: pass_with_grandfathered_warnings  # 3 over-budget modules
+  make_test_hygiene: pass_with_known_offender   # tests/test_full_loop.py:343
+
+# ---------------------------------------------------------------------------
+# Layered cartography
+# ---------------------------------------------------------------------------
+layers:
+
+  L1_syntactic_lint:
+    name: Syntactic / Lint
+    intent: >
+      Surface keystroke-level defects: trailing whitespace, bad imports,
+      missing frontmatter, obvious typos, AST-level pattern smells. Cheap,
+      fast, and stoppable at PR time.
+    strength_score: 8
+    current_observed_state: >
+      Solid hygiene-integrity gate (70 patterns), 10 semgrep rules with 3
+      blocking CI workflows, ast-grep available locally, frontmatter discipline
+      enforced as Axiom A8, mdformat in dev requirements. Mature for textual
+      lint; weaker at full multi-file static analysis (ruff/mypy/pyright are
+      not first-class CI surfaces).
+    key_files:
+      - docs/governance/hygiene/PATTERNS.yaml
+      - tools/check_hygiene_integrity.py
+      - .semgrep/dharma-anti-slop.yml
+      - .github/workflows/anti-slop.yml
+      - .github/workflows/anti-slop-required.yml
+      - .github/workflows/anti-slop-strict.yml
+      - docs/governance/AXIOMS.md  # A8 FRONTMATTER DISCIPLINE
+    exemplars:
+      - path: docs/governance/hygiene/PATTERNS.yaml
+        why: >
+          70 codified patterns (12 ai-agent + 58 vibe-code) with deterministic
+          regex, severity, owner, and lifecycle stage. Single source of truth
+          for L1.
+      - path: tools/check_hygiene_integrity.py
+        why: >
+          Reads PATTERNS.yaml + axiom file count to detect tampering. Self-
+          witnessing receipt; exits non-zero on drift.
+      - path: .semgrep/dharma-anti-slop.yml
+        why: >
+          10 high-value rules (bare except, eval, shell=True, datetime.utcnow,
+          duplicate prints, time.sleep on hotpath). Codifies "no vibe-coding".
+    anti_exemplars:
+      - path: <repo>/_dharma_baseline/**
+        why: >
+          Generated artifacts unscoped from current hygiene patterns; can
+          dilute pattern hit-rate. No frontmatter, no owners.
+      - path: tests/test_full_loop.py:343
+        why: >
+          Known test-hygiene offender (`state = RuntimeStateStore()`). Still
+          on allowlist — needs lifecycle promotion to enforced or fixed.
+      - finding: 4 pre-existing semgrep findings (3 shell=True + 1 eval)
+        why: >
+          Warn-only locally; would block CI under anti-slop-strict. Tracked
+          but unresolved.
+    enforcing_surfaces:
+      - make hygiene-check
+      - make hygiene-pre-commit
+      - make semgrep
+      - .github/workflows/anti-slop*.yml
+    gaps:
+      - No project-wide ruff/mypy/pyright gates in CI.
+      - Generated baselines not yet under hygiene patterns.
+      - Hygiene-pattern lifecycle promotion (observed -> enforced) is manual.
+
+  L2_semantic_contract:
+    name: Semantic / Contract
+    intent: >
+      Enforce type-level and contract-level invariants: schema_version on
+      receipts, frozen dataclasses, correlation-id round-trip, A2A receipt
+      shape, spine ownership of side-effects.
+    strength_score: 7
+    current_observed_state: >
+      Strong receipt discipline (62 frozen dataclasses, 61 schema_version
+      mentions); spine-check passes. Correlation-spine has one missing leg
+      (request_response: A2ATaskReceipt). Hypothesis PBT exists but is not
+      pervasive at the contract boundary.
+    key_files:
+      - operator_core/runtime_state.py
+      - operator_core/control_surface.py
+      - autonomous/autonomous_agent.py
+      - scripts/spine_bypass_report.py
+      - tools/verify_quality_membrane.py
+      - docs/governance/CORRELATION_SPINE.md
+    exemplars:
+      - path: tools/verify_quality_membrane.py
+        why: >
+          102 lines, frozen-receipt pattern, schema_version stamped, single
+          responsibility — model semantic gate.
+      - path: scripts/spine_bypass_report.py
+        why: >
+          Computes per-leg correlation completeness; emits machine-readable
+          receipt. Used by uplift-guards.
+      - finding: 62 @dataclass(frozen=True) + 61 schema_version mentions
+        why: >
+          Discipline is widespread, not aspirational.
+    anti_exemplars:
+      - finding: "[MISSING] request_response: A2ATaskReceipt"
+        why: >
+          One correlation-spine leg unowned. Q-001 target.
+      - path: operator_core/runtime_state.py
+        why: >
+          3796 lines, multiple concerns; semantic boundaries blurred even if
+          types are tight. Grandfathered.
+      - finding: bypass_allowlist non-empty
+        why: >
+          Active track runtime-truth-spine-adoption-2026-06 is 7/8; the open
+          criterion is empty bypass allowlist (Q-001).
+    enforcing_surfaces:
+      - make spine-check
+      - make uplift-guards
+      - make verifier-selfcheck
+      - scripts/spine_bypass_report.py
+    gaps:
+      - bypass allowlist not at zero (Q-001).
+      - No property-based test (Hypothesis) for correlation-id round-trip
+        (Q-002).
+      - No semgrep rule forbidding mutable @dataclass on receipts (Q-006).
+
+  L3_architectural_structural:
+    name: Architectural / Structural
+    intent: >
+      Constrain module size, import topology, layering, and spine ownership.
+      Keep cognitive load and blast-radius bounded.
+    strength_score: 6
+    current_observed_state: >
+      Module-budget gate enforces line ceilings with explicit grandfather
+      list; grimp + vulture available; no formal layered-architecture
+      enforcement (lint-imports not installed). Three over-budget modules
+      grandfathered; spine-ownership ratchet passing.
+    key_files:
+      - tools/check_module_budget.py
+      - operator_core/runtime_state.py        # 3796 lines, grandfathered
+      - autonomous/autonomous_agent.py        # 1380 lines, grandfathered
+      - operator_core/control_surface.py      # 1046 / 1101 ceiling
+      - ACTIVE_SURFACE_MANIFEST.yaml
+    exemplars:
+      - path: tools/check_module_budget.py
+        why: >
+          Ratcheted line-budget gate with explicit allowlist; clear receipts.
+      - path: ACTIVE_SURFACE_MANIFEST.yaml
+        why: >
+          25,604 chars enumerating active surfaces, owners, ratchets. The
+          structural backbone the architecture references.
+      - path: scripts/spine_bypass_report.py
+        why: >
+          Architectural ratchet (spine-ownership) with machine-readable
+          receipt. Bridges L2 and L3.
+    anti_exemplars:
+      - path: operator_core/runtime_state.py
+        why: 3796 lines — Axiom A5 (NO GOD OBJECTS) under tension.
+      - path: autonomous/autonomous_agent.py
+        why: 1380 lines, over budget, grandfathered.
+      - path: operator_core/control_surface.py
+        why: 1046 lines vs 1101 ceiling; near-ceiling drift risk.
+    enforcing_surfaces:
+      - make module-budget
+      - make spine-check
+      - grimp / vulture (local)
+    gaps:
+      - No descent ratchet — budgets only ratchet down on manual edit (Q-003).
+      - No lint-imports/import-linter enforcing layer rules.
+      - No automatic split proposal when a module crosses 80% of its budget.
+
+  L4_coherence_manifest_alignment:
+    name: Coherence / Manifest Alignment
+    intent: >
+      Keep manifests, docs, indices, and code in sync. Drift here breaks
+      every downstream layer because trust in the map dissolves.
+    strength_score: 7
+    current_observed_state: >
+      DocOps integrity gate exists and catches drift (currently failing on 4
+      items); CANONICAL_DOC_STACK + AUTO_INVENTORY active; stale-doc detector
+      exists. Failure modes are mostly correctable (`--write-auto-sections`)
+      but not auto-fixed in CI.
+    key_files:
+      - docs/governance/CANONICAL_DOC_STACK.md
+      - docs/docops/AUTO_INVENTORY.md
+      - ACTIVE_SURFACE_MANIFEST.yaml
+      - scripts/agent_onboard.py
+      - tools/check_docops_integrity.py
+    exemplars:
+      - path: docs/governance/CANONICAL_DOC_STACK.md
+        why: >
+          Single canonical doc index referenced by gates; broken refs surface
+          immediately in CI.
+      - path: scripts/agent_onboard.py
+        why: >
+          `make onboard` runs this; emits 390-line orientation receipt
+          aligning agents and gates.
+      - path: ACTIVE_SURFACE_MANIFEST.yaml
+        why: >
+          The coherence backbone; if it drifts, every layer drifts.
+    anti_exemplars:
+      - finding: manifest-markdown-lines drift +93 (235372 declared vs 235465)
+        why: Live docops-integrity failure.
+      - path: docs/governance/CANONICAL_DOC_STACK.md:44
+        why: Missing reference to `check_track_status.py`.
+      - path: docs/governance/CANONICAL_DOC_STACK.md:52
+        why: Missing reference to `render_active_track_includes.py`.
+      - path: docs/docops/AUTO_INVENTORY.md
+        why: Stale; needs `--write-auto-sections` regenerate.
+      - paths:
+          - docs/NEXT_10_SUBSTRATE_TODO.md            # 38d
+          - docs/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md  # 42d
+          - docs/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md      # 42d
+          - docs/000_MASTER_COHERENCE_SYNTHESIS.md    # 46d
+        why: Stale docs exceeding freshness threshold.
+    enforcing_surfaces:
+      - make docops-integrity
+      - make hygiene-check (frontmatter)
+      - make onboard
+      - tools/check_docops_integrity.py
+    gaps:
+      - docops-integrity is not yet a required CI check (Q-004).
+      - No auto-fix path or PR bot for `--write-auto-sections`.
+      - Stale docs lack mandatory BROKEN_REGISTER entries (Q-007).
+
+  L5_verifiability_invariant:
+    name: Verifiability / Invariant
+    intent: >
+      The provable, falsifiable layer. Each invariant has a machine check, a
+      witnessed receipt, and a lifecycle stage (observed -> measured ->
+      advisory -> enforced -> resolved -> archived).
+    strength_score: 5
+    current_observed_state: >
+      The lifecycle model is well-defined; promotion from advisory -> enforced
+      is largely manual. Hypothesis PBT is light. Many invariants exist as
+      gates but are not yet promoted to required checks. memory-kernel
+      readiness reports 38/57 in `review_required`.
+    key_files:
+      - docs/governance/AXIOMS.md
+      - docs/governance/UPLIFT_GUARDS.md
+      - tools/memory_kernel_readiness.py
+      - .github/workflows/anti-slop-required.yml
+      - .github/workflows/anti-slop-strict.yml
+    exemplars:
+      - path: docs/governance/UPLIFT_GUARDS.md
+        why: >
+          8 uplift guards (kernel-integrity, secrets-scan, autonomous-
+          destruction, hotpath-ack, fourfold-shakti-warrant, mismatch-
+          adjacency, assurance-diff, spine-ownership) — concrete, witnessed,
+          all currently passing.
+      - path: tools/memory_kernel_readiness.py
+        why: >
+          Classifies writers into approved/dormant/legacy_tolerated/
+          review_required — explicit lifecycle classification.
+      - path: docs/governance/AXIOMS.md
+        why: >
+          8 living axioms (A1..A8) are the meta-invariants every gate
+          ultimately defends.
+    anti_exemplars:
+      - finding: 38 of 57 memory-kernel writers in review_required
+        why: Two-thirds of writers not yet classified.
+      - finding: bypass_allowlist non-empty (track 7/8)
+        why: One uncovered seam blocking track completion (Q-001).
+      - finding: docops-integrity not yet a required CI check (Q-004).
+      - finding: only 1 hygiene pattern in 'enforced' stage (others advisory)
+        why: Lifecycle promotion lagging behind discovery.
+    enforcing_surfaces:
+      - make memory-kernel-readiness-strict
+      - make uplift-guards
+      - make verifier-selfcheck
+      - hygiene pattern lifecycle in docs/governance/hygiene/
+    gaps:
+      - No auto-promotion rule (advisory -> enforced) when zero-violations
+        sustained N days (Q-005).
+      - PBT coverage low (Q-002).
+      - Most invariants lack explicit time-decay or sunset clauses.
+
+  L6_dharmic_systemic_health:
+    name: Dharmic / Systemic Health
+    intent: >
+      The deepest layer: coherence under change, minimal-waste evolution,
+      recursive self-improvement, witness-not-witnessed health. Where
+      governance, ontology, and intent fuse.
+    strength_score: 6
+    current_observed_state: >
+      Strong philosophical scaffolding: ontology files
+      (WHAT_IT_WANTS_TO_BECOME.md, WORLD_MODEL.md, LIVING_LAYERS.md,
+      GNANI_LODESTONE.md, CYBERNETIC_LOOP_MAP.md), explicit dharmic
+      principles, and the 4-fold Shakti warrant. Quantitative dharmic-health
+      signals are mostly indirect; inline-witness latency is not yet a
+      first-class metric.
+    key_files:
+      - docs/manifest/WHAT_IT_WANTS_TO_BECOME.md
+      - docs/manifest/WORLD_MODEL.md
+      - docs/manifest/LIVING_LAYERS.md
+      - docs/manifest/GNANI_LODESTONE.md
+      - docs/manifest/CYBERNETIC_LOOP_MAP.md
+      - docs/governance/UPLIFT_GUARDS.md  # fourfold-shakti-warrant
+      - docs/governance/BROKEN_REGISTER.md
+    exemplars:
+      - path: docs/manifest/CYBERNETIC_LOOP_MAP.md
+        why: >
+          Names the perceive/act/witness loops the system claims to embody —
+          a lens for assessing systemic coherence.
+      - path: docs/manifest/GNANI_LODESTONE.md
+        why: >
+          Telos document; uplift-guards include a check that uplift never
+          violates this lodestone.
+      - path: docs/governance/UPLIFT_GUARDS.md (fourfold-shakti-warrant)
+        why: >
+          Codifies four dharmic uplift conditions as a machine-checkable
+          guard. Bridges L5 and L6.
+    anti_exemplars:
+      - path: docs/manifest/AGENT_IDENTITY_UNIFICATION.md
+        why: 4-line archived stub. Either restore or move to archive index.
+      - finding: 4 stale top-level docs aged 38-46 days
+        why: Dharmic-coherence rot proxy.
+      - finding: BROKEN_REGISTER has 23 items / 5 open
+        why: Healthy that they are tracked, but tail-aging unmonitored.
+      - finding: no inline-witness latency telemetry
+        why: Witness-not-witnessed loop not yet quantitatively measured (Q-008).
+    enforcing_surfaces:
+      - make uplift-guards (fourfold-shakti-warrant, mismatch-adjacency)
+      - make telos
+      - BROKEN_REGISTER.md lifecycle
+      - hygiene PATTERNS lifecycle (dharmic decay proxies)
+    gaps:
+      - No witness-latency invariant (Q-008).
+      - Stale-doc detection exists but no enforcement when a stale doc is
+        cited downstream (Q-007).
+      - No "dharmic-decay budget" (e.g., max % of docs > N days stale).
+
+# ---------------------------------------------------------------------------
+# Proposed machine-checkable invariants
+# ---------------------------------------------------------------------------
+proposed_invariants:
+
+  - id: Q-001
+    title: Allowlist-at-zero for spine bypass
+    layers: [L2, L5]
+    priority: 1
+    rationale: >
+      Closes the open criterion on active track
+      runtime-truth-spine-adoption-2026-06 (7/8). Reduces undeclared seams to
+      zero, satisfying Axiom A3.
+    machine_check: >
+      `python scripts/spine_bypass_report.py --strict` returns exit 0 iff
+      bypass allowlist is empty.
+    promotion_path: advisory -> enforced (CI required check)
+    proposed_owner: spine-stewards
+    estimated_effort: small-to-medium  # depends on remaining bypass count
+    blocks: [active_track_runtime_truth_spine_adoption]
+
+  - id: Q-002
+    title: Correlation-id round-trip property
+    layers: [L2, L5]
+    priority: 2
+    rationale: >
+      The MISSING request_response leg in correlation-spine is the single
+      strongest argument for property-based testing. Hypothesis can fuzz
+      A2ATaskReceipt round-trips end-to-end.
+    machine_check: >
+      pytest tests/property/test_correlation_roundtrip.py - Hypothesis
+      strategy covers (dispatch, request_response, test_acceptance) legs.
+    promotion_path: observed -> measured -> advisory
+    proposed_owner: a2a-stewards
+    estimated_effort: medium
+
+  - id: Q-003
+    title: Module-budget descent ratchet
+    layers: [L3]
+    priority: 3
+    rationale: >
+      Today's gate prevents new offenders but does not require shrinkage of
+      the 3 grandfathered giants (runtime_state.py, autonomous_agent.py,
+      control_surface.py). A descent ratchet sets a monotonic shrinkage
+      target.
+    machine_check: >
+      `tools/check_module_budget.py --descent` compares each grandfathered
+      module's line count against last receipt; fails if any increased.
+    promotion_path: observed -> advisory
+    proposed_owner: structural-stewards
+    estimated_effort: small (gate tweak), medium-to-large (actual descent)
+
+  - id: Q-004
+    title: DocOps zero-drift required CI check
+    layers: [L4]
+    priority: 1
+    rationale: >
+      docops-integrity already detects drift; promoting it to required-CI
+      converts L4 from "we'd notice eventually" to "merge blocked on drift".
+      Currently failing on 4 items — fixing them is prerequisite to
+      promotion.
+    machine_check: >
+      `make docops-integrity` exit 0 as required CI check on PRs touching
+      docs/** or manifests/**.
+    promotion_path: advisory -> enforced
+    proposed_owner: docops-stewards
+    estimated_effort: small (after current failures resolved)
+
+  - id: Q-005
+    title: Hygiene-pattern auto-promotion lifecycle
+    layers: [L5, L6]
+    priority: 4
+    rationale: >
+      Lifecycle stages exist but promotion is manual. Auto-promote any
+      pattern with zero violations over N rolling days from advisory ->
+      enforced; auto-demote on regression.
+    machine_check: >
+      `tools/hygiene_lifecycle.py --auto-promote --window-days 14` updates
+      PATTERNS.yaml stage fields and emits a receipt.
+    promotion_path: observed -> measured -> advisory
+    proposed_owner: hygiene-stewards
+    estimated_effort: medium
+
+  - id: Q-006
+    title: Frozen-receipt semgrep rule
+    layers: [L1, L2, L6]
+    priority: 5
+    rationale: >
+      Encode the 62-frozen-dataclass discipline as a semgrep rule that
+      forbids non-frozen @dataclass on classes whose name ends in `Receipt`
+      or `*Witness`.
+    machine_check: >
+      semgrep rule id `dharma.frozen-receipt-required` in
+      `.semgrep/dharma-anti-slop.yml`.
+    promotion_path: observed -> advisory -> enforced
+    proposed_owner: hygiene-stewards
+    estimated_effort: small
+
+  - id: Q-007
+    title: Stale-doc must-have-BROKEN_REGISTER entry
+    layers: [L4, L6]
+    priority: 6
+    rationale: >
+      Stale-doc detection exists; today it warns. Promote to: any doc > N
+      days without a BROKEN_REGISTER entry or `stage: archived` frontmatter
+      fails the gate.
+    machine_check: >
+      `tools/check_docops_integrity.py --stale-must-have-br` cross-references
+      docs/governance/BROKEN_REGISTER.md.
+    promotion_path: observed -> advisory
+    proposed_owner: docops-stewards
+    estimated_effort: small
+
+  - id: Q-008
+    title: Inline-witness latency invariant
+    layers: [L6]
+    priority: 7
+    rationale: >
+      The deepest dharmic-health metric: time between an event and the
+      witnessing receipt that records it. Needs human/agent collaboration to
+      define units, scope, and threshold. Flagged as needing collaboration
+      per task spec.
+    machine_check: TBD (requires definition).
+    promotion_path: research -> observed
+    proposed_owner: dharma-stewards + cartographer
+    estimated_effort: large (research first)
+    needs_collaboration: true
+
+# ---------------------------------------------------------------------------
+# Cross-layer summary
+# ---------------------------------------------------------------------------
+summary:
+  posture: >
+    Sattvic. Strong textual hygiene (L1) and coherent governance scaffolding
+    (L4) anchor the system. The middle (L3, L5) and depth (L6) are where
+    invariants are most under-promoted relative to the discipline already
+    exhibited.
+  top_strengths:
+    - 70-pattern hygiene system with self-witnessing integrity check (L1).
+    - 8 living axioms + 8 uplift guards forming a closed governance loop
+      (L4/L5).
+    - 62 frozen receipts + 61 schema_versions: receipt discipline is real,
+      not aspirational (L2).
+  top_gaps:
+    - Bypass allowlist non-zero (Q-001) — one criterion away from closing an
+      active track.
+    - docops-integrity failing on 4 items and not yet a required check (Q-004).
+    - 38/57 memory-kernel writers in review_required; lifecycle promotion
+      lagging (Q-005).
+  first_invariants_to_promote:
+    - Q-001
+    - Q-004
+    - Q-002
+  next_agent_handoff: >
+    See QUALITY_CARTOGRAPHY.md §8 "Next-agent handoff" for sequenced actions.
