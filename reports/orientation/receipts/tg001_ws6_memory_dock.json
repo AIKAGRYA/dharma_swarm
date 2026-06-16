@@ -1,0 +1,16 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS6 creates Codex Composer private memory dock for truth_graph_platform_v1 under the existing agent_memory namespace.",
+  "evidence": [
+    {"kind": "path", "value": "/Users/dhyana/.dharma/agent_memory/codex_composer/truth_graph_platform_v1/WS6_INTEGRATION.md"},
+    {"kind": "path", "value": "/Users/dhyana/.dharma/agent_memory/codex_composer/truth_graph_platform_v1/receipts/"}
+  ],
+  "verdict": "verified",
+  "next_action": "Keep private memory subordinate to shared repo/runtime receipts.",
+  "files_changed": [
+    "/Users/dhyana/.dharma/agent_memory/codex_composer/truth_graph_platform_v1/WS6_INTEGRATION.md",
+    "reports/orientation/receipts/tg001_ws6_memory_dock.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS6"
+}
