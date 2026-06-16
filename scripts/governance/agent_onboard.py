@@ -57,6 +57,7 @@ ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 LIVE_OPS = REPO_ROOT / "docs/state/LIVE_OPS_DASHBOARD.md"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
 SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
+TRUST_GATE_JSON = REPO_ROOT / "reports/governance/trust_gate_status.json"
 SWARM_GENOME = REPO_ROOT / "docs/governance/SWARM_GENOME.md"
 REALITY_DEBT_LEDGER = REPO_ROOT / "docs/governance/REALITY_DEBT_LEDGER.md"
 
@@ -621,6 +622,40 @@ def render_broken_register() -> None:
         print("  Top open items:")
         for it in top:
             print(f"    - [{it['status_word']}] {it['heading']}")
+
+
+def render_trust_gate() -> None:
+    """Compact projection of the NORTH_STAR §8 trust-gate scoreboard.
+
+    The scoreboard owner is scripts/governance/trust_gate_status.py (which
+    itself only projects existing owners); this section renders its last
+    JSON output and never recomputes — projection of a projection, zero
+    authority."""
+    section("TRUST GATE (fact-owner: docs/vision_maps/NORTH_STAR.md §8)")
+    if not TRUST_GATE_JSON.exists():
+        print("  No scoreboard yet — run: python3 scripts/governance/trust_gate_status.py")
+        return
+    try:
+        data = json.loads(TRUST_GATE_JSON.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        print("  Scoreboard JSON unreadable — regenerate with trust_gate_status.py")
+        return
+    generated = str(data.get("generated_at", ""))
+    age_note = ""
+    try:
+        when = datetime.fromisoformat(generated.replace("Z", "+00:00"))
+        age_days = (datetime.now(timezone.utc) - when).days
+        if age_days > 7:
+            age_note = f"  (STALE: {age_days}d old — rerun trust_gate_status.py)"
+    except ValueError:
+        pass
+    print(f"  Generated: {generated}{age_note}   gate_open: {data.get('gate_open')}")
+    for c in data.get("conditions", []):
+        if not isinstance(c, dict):
+            continue
+        print(f"  [{str(c.get('verdict', '?')):>5}] {c.get('id', '?')} "
+              f"score={c.get('score', 0):.2f} — {str(c.get('condition', ''))[:76]}")
+    print("  Full evidence: reports/governance/trust_gate_status.json")
 
 
 # Fallback only — the live list is parsed from SOVEREIGN_MANIFEST.md at
@@ -1479,6 +1514,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         render_manifest_health()
     render_broken_register()
+    render_trust_gate()
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
