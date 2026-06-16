@@ -83,15 +83,6 @@ class ObservedState(Generic[S]):
     timestamp: Union[float, datetime] = field(default_factory=time.time)
     """UTC timestamp of this observation (float epoch or datetime)."""
 
-    def __post_init__(self) -> None:
-        """Sync rv_measurement from rv_reading when only rv_reading is set."""
-        if self.rv_reading is not None and self.rv_measurement is None:
-            self.rv_measurement = self.rv_reading.rv
-            if self.pr_early is None:
-                self.pr_early = self.rv_reading.pr_early
-            if self.pr_late is None:
-                self.pr_late = self.rv_reading.pr_late
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ObservedState):
             return NotImplemented
@@ -716,41 +707,6 @@ def _rv_close(a: Optional[float], b: Optional[float], eps: float) -> bool:
 
 
 # ── Module-level convenience wrappers ─────────────────────────────────────
-
-
-def pure(value: A) -> ObservedState[A]:
-    """Monadic unit (eta) — wrap a bare value with no observation.
-
-    Returns an ObservedState with depth 0 and no R_V reading,
-    representing an unobserved value ready to enter the Kleisli category.
-    """
-    return ObservedState(
-        state=value,
-        rv_measurement=None,
-        rv_reading=None,
-        observation_depth=0,
-        introspection={},
-    )
-
-
-def bind(observed: ObservedState[A], f: Callable[[A], ObservedState[B]]) -> ObservedState[B]:
-    """Monadic bind (>>=) — extract and apply a Kleisli morphism.
-
-    ``bind(m, f)`` = mu . T(f) . m — apply f to the wrapped state,
-    then combine observation metadata (inner result augments outer context).
-    """
-    inner = f(observed.state)
-    # When f == pure, inner carries no observation — preserve m's context.
-    return ObservedState(
-        state=inner.state,
-        rv_measurement=inner.rv_measurement if inner.rv_measurement is not None else observed.rv_measurement,
-        rv_reading=inner.rv_reading if inner.rv_reading is not None else observed.rv_reading,
-        pr_early=inner.pr_early if inner.pr_early is not None else observed.pr_early,
-        pr_late=inner.pr_late if inner.pr_late is not None else observed.pr_late,
-        observation_depth=inner.observation_depth + observed.observation_depth,
-        introspection={**observed.introspection, **inner.introspection},
-        timestamp=inner.timestamp if not inner.is_pure else observed.timestamp,
-    )
 
 
 def flatten(nested: ObservedState[ObservedState[S]]) -> ObservedState[S]:
