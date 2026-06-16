@@ -1959,6 +1959,15 @@ class TerminalBridge:
                 target = model_routing.target_by_index(int(arg))
             if target is None:
                 return f"Unknown model target: {arg or 'missing'}"
+            # Unroutable (zero live provider keys) => non-selectable. Refuse the
+            # switch instead of flapping onto a dead provider. FAIL-OPEN: a blind
+            # key oracle keeps every target selectable (today's behaviour).
+            if not model_routing.is_routable(target):
+                return (
+                    f"Model '{target.alias}' is unroutable "
+                    f"(no live key for {target.provider_id}). "
+                    f"Run `dkeys test` or pick a live model with /model list."
+                )
             return self._render_model_policy_text(
                 self._build_model_policy_summary(
                     selected_provider=target.provider_id,
