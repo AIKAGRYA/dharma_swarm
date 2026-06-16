@@ -255,7 +255,7 @@ to main through the normal review path before it is called shipped.
 **Track id:** `agent-admission-semantic-commons-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-14 (TTL 14 days)
 **Relations:** complements: cybernetics-codex-stewardship-2026-06
-**Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py
+**Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, dharma_swarm/semantic_commons.py, dharma_swarm/engine/hybrid_retriever.py, dharma_swarm/context.py, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py, tests/test_hybrid_retriever.py
 **Moves vital signs:** quality_gates, memory_persistence
 
 Operator directive 2026-06-14: promote AgentAdmission and the Semantic
@@ -267,6 +267,8 @@ Canonical intent:
   AgentAdmission is the full lifecycle for a new swarm/fleet identity.
   Semantic Commons is the typed, versioned naming surface agents update
   as they build, without pretending the ontology is final.
+  SessionOrientation is the layered L0-L4 loading contract that keeps
+  agents from paying broad-search context costs before route selection.
 
 **Next items:**
 
@@ -274,6 +276,9 @@ Canonical intent:
 - [docs] (blocker) Create semantic_objects.yaml and semantic_aliases.yaml with AgentAdmission, RegistrationDesk, AgentSeed, LivingDock, A2ACard, NameDriftPreflight, and SessionOrientation.
 - [code] (blocker) Add one `dgc agent admit`/`make agent-admit` path or a documented shim that does not collide with make onboard semantics.
 - [test] (blocker) Add tests proving aliases catch hyphen/underscore/name-drift collisions.
+- [docs] (blocker) Generate read-only Obsidian/PKM Semantic Commons projections with Bases dashboard views.
+- [docs] (blocker) Add retrieval scoping contract proving structure-first recall before lexical/vector/graph search.
+- [code] (blocker) Wire Semantic Commons scope metadata into HybridRetriever runtime evidence.
 
 **Non-goals:**
 
@@ -455,15 +460,15 @@ These are the ground-truth metrics. All other documents citing different numbers
 <!-- DOCOPS:START metric=sovereign_manifest_inventory -->
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **745** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
-| Top-level (flat) modules | **401 (53.8%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **311,125** | wc -l across dharma_swarm Python modules |
-| Test files | **712** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **11,723 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
+| Total Python modules | **746** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Top-level (flat) modules | **402 (53.9%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Total Python LOC | **311,485** | wc -l across dharma_swarm Python modules |
+| Test files | **717** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **11,751 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1,046** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| wc -l |
-| Markdown total lines | **251,776** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
+| Markdown files | **1,053** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| wc -l |
+| Markdown total lines | **254,294** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f \| wc -l |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" \| wc -l |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" \| wc -l |

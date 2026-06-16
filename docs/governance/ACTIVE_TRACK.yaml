@@ -885,10 +885,14 @@ active_tracks:
     owned_surfaces:
       - docs/ontology/**
       - docs/ops/AGENT_ADMISSION.md
+      - dharma_swarm/semantic_commons.py
+      - dharma_swarm/engine/hybrid_retriever.py
+      - dharma_swarm/context.py
       - scripts/governance/agent_admission*.py
       - scripts/governance/name_drift*.py
       - tests/test_agent_admission*.py
       - tests/test_semantic_commons*.py
+      - tests/test_hybrid_retriever.py
     moves_vital_signs:
       - quality_gates
       - memory_persistence
@@ -903,6 +907,8 @@ active_tracks:
         AgentAdmission is the full lifecycle for a new swarm/fleet identity.
         Semantic Commons is the typed, versioned naming surface agents update
         as they build, without pretending the ontology is final.
+        SessionOrientation is the layered L0-L4 loading contract that keeps
+        agents from paying broad-search context costs before route selection.
 
     prerequisites:
       - id: generic_onboarding_doc_exists
@@ -937,6 +943,32 @@ active_tracks:
       - id: agent_admission_tests_exist
         kind: file_exists
         file: tests/test_agent_admission.py
+      - id: pkm_projection_config_exists
+        kind: file_exists
+        file: docs/ontology/pkm_projection.yaml
+      - id: retrieval_scope_contract_exists
+        kind: file_exists
+        file: docs/ontology/retrieval_scope.yaml
+      - id: pkm_projection_script_exists
+        kind: file_exists
+        file: scripts/governance/agent_admission_projection.py
+      - id: semantic_commons_projection_tests_exist
+        kind: file_exists
+        file: tests/test_semantic_commons_projection.py
+      - id: semantic_commons_projection_manifest_exists
+        kind: file_exists
+        file: reports/governance/semantic_commons_projection_manifest.json
+      - id: semantic_commons_runtime_helper_exists
+        kind: file_exists
+        file: dharma_swarm/semantic_commons.py
+      - id: hybrid_retriever_scope_consumes_semantic_commons
+        kind: file_contains
+        file: dharma_swarm/engine/hybrid_retriever.py
+        pattern: "orientation_route"
+      - id: retrieval_scope_runtime_test_exists
+        kind: file_contains
+        file: tests/test_hybrid_retriever.py
+        pattern: "test_hybrid_retriever_exposes_semantic_commons_scope_first"
 
     non_goals:
       - Do not overload `make onboard`; it remains session/governance orientation.
@@ -960,6 +992,18 @@ active_tracks:
       - id: 4
         what: "Add tests proving aliases catch hyphen/underscore/name-drift collisions."
         kind: test
+        blocker: true
+      - id: 5
+        what: "Generate read-only Obsidian/PKM Semantic Commons projections with Bases dashboard views."
+        kind: docs
+        blocker: true
+      - id: 6
+        what: "Add retrieval scoping contract proving structure-first recall before lexical/vector/graph search."
+        kind: docs
+        blocker: true
+      - id: 7
+        what: "Wire Semantic Commons scope metadata into HybridRetriever runtime evidence."
+        kind: code
         blocker: true
 
   - id: cybernetics-codex-stewardship-2026-06

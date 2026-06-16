@@ -98,6 +98,34 @@ def test_hybrid_retriever_boosts_title_terms(tmp_path) -> None:
     assert hits[0].record.metadata["source_path"].endswith("architecture.md")
 
 
+def test_hybrid_retriever_exposes_semantic_commons_scope_first(tmp_path) -> None:
+    db_path = tmp_path / "memory_plane.db"
+    index = UnifiedIndex(db_path)
+    retriever = HybridRetriever(index)
+
+    index.index_document(
+        "note",
+        "reports/noisy.md",
+        "# Archive\n\nSemantic Commons Semantic Commons Semantic Commons broad recall.",
+        {"topic": "archive"},
+    )
+    index.index_document(
+        "note",
+        "docs/ontology/SEMANTIC_COMMONS.md",
+        "# Semantic Commons\n\nRegistry hub.",
+        {"topic": "ontology"},
+    )
+
+    hits = retriever.search("semantic commons", limit=2)
+
+    assert hits[0].record.metadata["source_path"] == "docs/ontology/SEMANTIC_COMMONS.md"
+    assert hits[0].evidence["retrieval_lane"] == "orientation_route"
+    assert hits[0].evidence["canonical_target"] == "semobj.ontology_hub"
+    assert hits[0].evidence["retrieval_scope"]["structural_scope_first"] is True
+    assert "exact_match" in hits[0].evidence["lane_scores"]
+    assert "source_path" in hits[0].evidence
+
+
 def test_infer_temporal_query_parses_relative_windows() -> None:
     now = datetime(2026, 3, 9, 12, 0, tzinfo=timezone.utc)
 

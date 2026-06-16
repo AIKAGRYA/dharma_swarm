@@ -233,6 +233,10 @@ def _format_retrieval_line(hit) -> str:
         created_at = created_at.replace(tzinfo=timezone.utc)
     stamp = created_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%MZ")
 
+    evidence = getattr(hit, "evidence", {}) or {}
+    canonical_target = str(evidence.get("canonical_target") or "")
+    retrieval_lane = str(evidence.get("retrieval_lane") or "")
+
     if source_kind == "note":
         source_label = str(metadata.get("source_ref") or metadata.get("source_path") or "note")
         section = str(metadata.get("section_title") or "")
@@ -243,6 +247,14 @@ def _format_retrieval_line(hit) -> str:
         event_type = str(metadata.get("event_type") or "event")
         source = str(metadata.get("source") or "runtime")
         provenance = f"{event_type} @ {source} | {stamp}"
+
+    receipt_bits = [
+        bit
+        for bit in (canonical_target if canonical_target != "unknown" else "", retrieval_lane)
+        if bit
+    ]
+    if receipt_bits:
+        provenance = f"{provenance} | {' | '.join(receipt_bits)}"
 
     snippet = record.text.replace("\n", " ").strip()[:100]
     return f"  [retrieval:{source_kind}] {provenance} | {snippet}"

@@ -1,0 +1,74 @@
+schema_version: semantic-commons-pkm-projection-v0
+owner_track: agent-admission-semantic-commons-2026-06
+authority: projection
+source_files:
+  - docs/ontology/semantic_objects.yaml
+  - docs/ontology/semantic_aliases.yaml
+  - docs/ontology/session_orientation.yaml
+projection_policy:
+  generated: true
+  canon: false
+  read_only_notes: true
+  edit_source: docs/ontology
+  command_execution: disabled
+  mcp_access: read_only
+  mcp_path_scopes:
+    - /Users/dhyana/.dharma/knowledge/wiki/semantic-commons
+vaults:
+  - id: chetana_obsidian
+    path: /Users/dhyana/.dharma/knowledge/wiki
+    projection_root: semantic-commons
+    purpose: generated read-only object notes and Bases dashboards
+    write_mode: generated_projection
+  - id: curated_wiki
+    path: /Users/dhyana/wiki
+    projection_root: mocs/MOC-semantic-commons.md
+    purpose: curated pointer only; not the authority for registry mutation
+    write_mode: pointer_only
+required_note_properties:
+  - projection_of
+  - generated
+  - canon
+  - canonical_object_id
+  - source_path
+  - aliases
+  - lifecycle
+  - owner
+  - authority_level
+  - orientation_route
+  - review_state
+  - projection_family
+  - projection_kind
+base_views:
+  - id: semantic_commons_objects
+    name: Semantic Commons Objects
+    filter_property: projection_family
+    filter_value: semantic_commons
+  - id: duplicate_aliases
+    name: Duplicate Aliases
+    filter_property: has_duplicate_alias
+    filter_value: true
+  - id: missing_owner
+    name: Missing Owner
+    filter_property: missing_owner
+    filter_value: true
+  - id: stale_objects
+    name: Stale Objects
+    filter_property: stale_object
+    filter_value: true
+  - id: deprecated_alias_still_used
+    name: Deprecated Alias Still Used
+    filter_property: deprecated_alias_still_used
+    filter_value: true
+  - id: forbidden_alias_hit
+    name: Forbidden Alias Hit
+    filter_property: has_forbidden_alias_hit
+    filter_value: true
+  - id: missing_orientation_route
+    name: Missing Orientation Route
+    filter_property: missing_orientation_route
+    filter_value: true
+  - id: unreviewed_generated_note
+    name: Unreviewed Generated Note
+    filter_property: review_state
+    filter_value: generated_unreviewed

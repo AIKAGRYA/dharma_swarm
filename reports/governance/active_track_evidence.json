@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-16T01:36:28+09:00",
+  "generated_at": "2026-06-17T01:08:48+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 11,
     "max_active": 11,
     "warn_active": 11,
-    "shippable": 5
+    "shippable": 6
   },
   "spine_objectives": [
     {
@@ -883,10 +883,14 @@
       "owned_surfaces": [
         "docs/ontology/**",
         "docs/ops/AGENT_ADMISSION.md",
+        "dharma_swarm/semantic_commons.py",
+        "dharma_swarm/engine/hybrid_retriever.py",
+        "dharma_swarm/context.py",
         "scripts/governance/agent_admission*.py",
         "scripts/governance/name_drift*.py",
         "tests/test_agent_admission*.py",
-        "tests/test_semantic_commons*.py"
+        "tests/test_semantic_commons*.py",
+        "tests/test_hybrid_retriever.py"
       ],
       "moves_vital_signs": [
         "quality_gates",
@@ -895,11 +899,11 @@
       "verified_at": "2026-06-14",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": false,
+      "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 1,
-        "total": 8
+        "passed": 16,
+        "total": 16
       },
       "criteria": [
         {
@@ -917,26 +921,26 @@
         {
           "id": "semantic_commons_doc_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/ontology/SEMANTIC_COMMONS.md MISSING"
+          "passed": true,
+          "detail": "docs/ontology/SEMANTIC_COMMONS.md present"
         },
         {
           "id": "semantic_objects_index_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/ontology/semantic_objects.yaml MISSING"
+          "passed": true,
+          "detail": "docs/ontology/semantic_objects.yaml present"
         },
         {
           "id": "semantic_aliases_index_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/ontology/semantic_aliases.yaml MISSING"
+          "passed": true,
+          "detail": "docs/ontology/semantic_aliases.yaml present"
         },
         {
           "id": "agent_admission_doc_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/ops/AGENT_ADMISSION.md MISSING"
+          "passed": true,
+          "detail": "docs/ops/AGENT_ADMISSION.md present"
         },
         {
           "id": "name_drift_preflight_exists",
@@ -947,20 +951,68 @@
         {
           "id": "agent_admission_verifier_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "scripts/governance/agent_admission.py MISSING"
+          "passed": true,
+          "detail": "scripts/governance/agent_admission.py present"
         },
         {
           "id": "semantic_commons_tests_exist",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "tests/test_semantic_commons.py MISSING"
+          "passed": true,
+          "detail": "tests/test_semantic_commons.py present"
         },
         {
           "id": "agent_admission_tests_exist",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "tests/test_agent_admission.py MISSING"
+          "passed": true,
+          "detail": "tests/test_agent_admission.py present"
+        },
+        {
+          "id": "pkm_projection_config_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/ontology/pkm_projection.yaml present"
+        },
+        {
+          "id": "retrieval_scope_contract_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/ontology/retrieval_scope.yaml present"
+        },
+        {
+          "id": "pkm_projection_script_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/agent_admission_projection.py present"
+        },
+        {
+          "id": "semantic_commons_projection_tests_exist",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "tests/test_semantic_commons_projection.py present"
+        },
+        {
+          "id": "semantic_commons_projection_manifest_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "reports/governance/semantic_commons_projection_manifest.json present"
+        },
+        {
+          "id": "semantic_commons_runtime_helper_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/semantic_commons.py present"
+        },
+        {
+          "id": "hybrid_retriever_scope_consumes_semantic_commons",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'orientation_route' found in dharma_swarm/engine/hybrid_retriever.py"
+        },
+        {
+          "id": "retrieval_scope_runtime_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_hybrid_retriever_exposes_semantic_commons_scope_first' found in tests/test_hybrid_retriever.py"
         }
       ]
     },
@@ -1380,8 +1432,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:agent-admission-semantic-commons-2026-06",
-      "message": "[agent-admission-semantic-commons-2026-06] 1/8 completion criteria pass.",
+      "check": "track-shippable:agent-admission-semantic-commons-2026-06",
+      "message": "[agent-admission-semantic-commons-2026-06] all 16 completion criteria pass \u2014 SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.",
       "criterion_id": null
     },
     {

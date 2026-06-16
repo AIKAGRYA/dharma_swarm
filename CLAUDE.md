@@ -258,7 +258,7 @@ to main through the normal review path before it is called shipped.
 **Track id:** `agent-admission-semantic-commons-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-14 (TTL 14 days)
 **Relations:** complements: cybernetics-codex-stewardship-2026-06
-**Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py
+**Owns surfaces:** docs/ontology/**, docs/ops/AGENT_ADMISSION.md, dharma_swarm/semantic_commons.py, dharma_swarm/engine/hybrid_retriever.py, dharma_swarm/context.py, scripts/governance/agent_admission*.py, scripts/governance/name_drift*.py, tests/test_agent_admission*.py, tests/test_semantic_commons*.py, tests/test_hybrid_retriever.py
 **Moves vital signs:** quality_gates, memory_persistence
 
 Operator directive 2026-06-14: promote AgentAdmission and the Semantic
@@ -270,6 +270,8 @@ Canonical intent:
   AgentAdmission is the full lifecycle for a new swarm/fleet identity.
   Semantic Commons is the typed, versioned naming surface agents update
   as they build, without pretending the ontology is final.
+  SessionOrientation is the layered L0-L4 loading contract that keeps
+  agents from paying broad-search context costs before route selection.
 
 **Next items:**
 
@@ -277,6 +279,9 @@ Canonical intent:
 - [docs] (blocker) Create semantic_objects.yaml and semantic_aliases.yaml with AgentAdmission, RegistrationDesk, AgentSeed, LivingDock, A2ACard, NameDriftPreflight, and SessionOrientation.
 - [code] (blocker) Add one `dgc agent admit`/`make agent-admit` path or a documented shim that does not collide with make onboard semantics.
 - [test] (blocker) Add tests proving aliases catch hyphen/underscore/name-drift collisions.
+- [docs] (blocker) Generate read-only Obsidian/PKM Semantic Commons projections with Bases dashboard views.
+- [docs] (blocker) Add retrieval scoping contract proving structure-first recall before lexical/vector/graph search.
+- [code] (blocker) Wire Semantic Commons scope metadata into HybridRetriever runtime evidence.
 
 **Non-goals:**
 

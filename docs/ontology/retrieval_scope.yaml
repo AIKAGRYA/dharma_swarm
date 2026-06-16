@@ -1,0 +1,71 @@
+schema_version: semantic-retrieval-scope-v0
+owner_track: agent-admission-semantic-commons-2026-06
+authority: active_spec
+source_files:
+  - docs/ontology/semantic_objects.yaml
+  - docs/ontology/semantic_aliases.yaml
+  - docs/ontology/session_orientation.yaml
+structural_scope_first: true
+required_scope_metadata:
+  - repo_worktree_role
+  - canonical_path
+  - surface_id
+  - authority_level
+  - lifecycle_state
+  - review_state
+  - source_kind
+  - stale_valid_until
+  - projection_canon_distinction
+retrieval_order:
+  - id: orientation_route
+    lane: structural
+    description: Resolve L0/L1 SessionOrientation route before any broad recall.
+    allowed_layers:
+      - L0
+      - L1
+    must_precede:
+      - exact_match
+      - lexical_bm25_fts
+      - vector_search
+      - graph_expansion
+      - fusion
+  - id: exact_match
+    lane: exact
+    description: Resolve exact object ID, source path, alias, or api_name inside the chosen scope.
+    match_fields:
+      - canonical_object_id
+      - source_path
+      - aliases
+      - api_name
+  - id: lexical_bm25_fts
+    lane: lexical
+    description: Use BM25 or FTS inside the structural scope.
+  - id: vector_search
+    lane: vector
+    description: Use vector recall after structural and exact/lexical candidates are available.
+  - id: graph_expansion
+    lane: graph
+    description: Expand from canonical target and scoped candidate graph neighbors.
+  - id: fusion
+    lane: fusion
+    description: Fuse/rerank with RRF or measured fusion while preserving lane evidence.
+    allowed_methods:
+      - RRF
+      - measured_fusion
+result_required_fields:
+  - canonical_target
+  - authority_level
+  - lifecycle_state
+  - source_path
+  - projection_canon_status
+  - retrieval_lane
+  - timestamp
+  - freshness_marker
+  - selection_reason
+projection_rules:
+  canon_status_field: projection_canon_status
+  canon_values:
+    - canon
+    - projection
+  generated_notes_can_claim_canon: false
+  l4_never_first: true

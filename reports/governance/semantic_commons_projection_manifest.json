@@ -1,0 +1,120 @@
+{
+  "file_count": 19,
+  "files": [
+    {
+      "canonical_object_id": "",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/_index.md"
+    },
+    {
+      "canonical_object_id": "",
+      "kind": "base",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/bases/semantic-commons.base"
+    },
+    {
+      "canonical_object_id": "semobj.a2a_card",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/a2-a-card.md"
+    },
+    {
+      "canonical_object_id": "semobj.agent_admission",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/agent-admission.md"
+    },
+    {
+      "canonical_object_id": "semobj.agent_seed",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/agent-seed.md"
+    },
+    {
+      "canonical_object_id": "semobj.cybernetics_codex",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/cybernetics-codex.md"
+    },
+    {
+      "canonical_object_id": "semobj.glm_researcher_lane",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/glm-researcher-lane.md"
+    },
+    {
+      "canonical_object_id": "semobj.living_dock",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/living-dock.md"
+    },
+    {
+      "canonical_object_id": "semobj.name_drift_preflight",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/name-drift-preflight.md"
+    },
+    {
+      "canonical_object_id": "semobj.ontology_hub",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/ontology-hub.md"
+    },
+    {
+      "canonical_object_id": "semobj.ontology_registry",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/ontology-registry.md"
+    },
+    {
+      "canonical_object_id": "semobj.openclaw_integration",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/open-claw-integration.md"
+    },
+    {
+      "canonical_object_id": "semobj.opus_forge_architect",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/opus-forge-architect.md"
+    },
+    {
+      "canonical_object_id": "semobj.orientation_layer",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/orientation-layer.md"
+    },
+    {
+      "canonical_object_id": "semobj.orientation_route",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/orientation-route.md"
+    },
+    {
+      "canonical_object_id": "semobj.palantir_pilot",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/palantir-pilot.md"
+    },
+    {
+      "canonical_object_id": "semobj.registration_desk",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/registration-desk.md"
+    },
+    {
+      "canonical_object_id": "semobj.runtime_receipt",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/runtime-receipt.md"
+    },
+    {
+      "canonical_object_id": "semobj.session_orientation",
+      "kind": "markdown",
+      "path": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons/objects/session-orientation.md"
+    }
+  ],
+  "generated_at": "2026-06-16T15:59:13+00:00",
+  "object_count": 17,
+  "projection_policy": {
+    "canon": false,
+    "command_execution": "disabled",
+    "edit_source": "docs/ontology",
+    "generated": true,
+    "mcp_access": "read_only",
+    "mcp_path_scopes": [
+      "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons"
+    ],
+    "read_only_notes": true
+  },
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "source_files": [
+    "docs/ontology/semantic_objects.yaml",
+    "docs/ontology/semantic_aliases.yaml",
+    "docs/ontology/session_orientation.yaml"
+  ],
+  "vault_root": "/Users/dhyana/.dharma/knowledge/wiki/semantic-commons"
+}

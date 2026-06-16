@@ -1,0 +1,104 @@
+schema_version: session-orientation-v0
+owner_track: agent-admission-semantic-commons-2026-06
+routes:
+  - id: route.semantic_commons_campaign
+    canonical_name: Semantic Commons Campaign Orientation
+    active_track: agent-admission-semantic-commons-2026-06
+    canonical_object_id: semobj.session_orientation
+    lifecycle: working
+    entry_order:
+      - L0
+      - L1
+      - L2
+      - L3
+      - L4
+    layers:
+      - id: L0
+        name: Bootstrap
+        purpose: Enter safely with the smallest required context.
+        budget_tokens: 1000
+        source_kind: bootstrap
+        source_paths:
+          - CLAUDE.md
+          - AGENTS.md
+          - docs/ops/AGENT_ONBOARDING.md
+        commands:
+          - make onboard
+        required_answers:
+          - where am I
+          - what must I never touch
+          - what is the front door
+        search_allowed: false
+
+      - id: L1
+        name: Routing MOC
+        purpose: Choose the right surface before reading detail.
+        budget_tokens: 2000
+        source_kind: routing_moc
+        source_paths:
+          - docs/governance/ACTIVE_TRACK.yaml
+          - docs/governance/CANONICAL_DOC_STACK.md
+          - docs/ontology/SEMANTIC_COMMONS.md
+        commands:
+          - python3 scripts/governance/orientation_graph.py
+        required_answers:
+          - which docs own this task
+          - which code owns this task
+          - which tests own this task
+        search_allowed: false
+
+      - id: L2
+        name: Active Track Packet
+        purpose: Load the active track intent, scope, missing artifacts, and gates.
+        budget_tokens: 4000
+        source_kind: active_track_packet
+        source_paths:
+          - docs/governance/ACTIVE_TRACK.yaml
+          - reports/governance/active_track_evidence.md
+          - docs/ontology/semantic_objects.yaml
+          - docs/ontology/semantic_aliases.yaml
+        commands:
+          - python3 scripts/governance/check_track_status.py
+        required_answers:
+          - what is currently being built
+          - what counts as done
+          - what surfaces are owned
+        search_allowed: false
+
+      - id: L3
+        name: Reference Deep Context
+        purpose: Load authoritative references only after route selection.
+        budget_tokens: task_specific
+        source_kind: reference
+        source_paths:
+          - docs/architecture/ADRs/ADR-008-ontology-api-name-grammar.md
+          - dharma_swarm/external_agent_registration.py
+          - dharma_swarm/operator_core/living_agent_kernel.py
+          - scripts/governance/name_drift_preflight.py
+          - tests/test_semantic_commons.py
+          - tests/test_agent_admission.py
+        commands:
+          - make semantic-commons-check
+        required_answers:
+          - which reference owns the rule
+          - which verifier proves the rule
+        search_allowed: false
+
+      - id: L4
+        name: Corpus Search
+        purpose: Fuzzy recall, audit, archaeology, and broad research after L0-L2.
+        budget_tokens: task_specific
+        source_kind: corpus_search
+        source_paths:
+          - docs/research/**
+          - reports/**
+          - /Users/dhyana/wiki
+          - /Users/dhyana/.dharma/knowledge/wiki
+        commands:
+          - rg
+          - wiki search
+        required_answers:
+          - why was this result selected
+          - what canonical target does it support
+          - what authority and lifecycle does it have
+        search_allowed: true

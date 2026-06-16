@@ -1,0 +1,350 @@
+schema_version: semantic-commons-v0
+owner_track: agent-admission-semantic-commons-2026-06
+lifecycle_values:
+  - seed
+  - working
+  - preferred
+  - canonical
+  - deprecated
+  - forbidden
+objects:
+  - id: semobj.agent_admission
+    canonical_name: AgentAdmission
+    api_name: dharma.agent.AgentAdmission
+    lifecycle: working
+    owner_surface: docs/ops/AGENT_ADMISSION.md
+    authority_level: active_spec
+    source_path: docs/ops/AGENT_ADMISSION.md
+    object_kind: governance_contract
+    public_ontology: true
+    aliases:
+      - AgentAdmission
+      - agent-admission
+      - agent_admission
+      - agent admission
+      - agent-admit
+      - agent_admit
+    forbidden_aliases:
+      - admit-agent-without-receipt
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.registration_desk
+    canonical_name: RegistrationDesk
+    api_name: dharma.agent.RegistrationDesk
+    lifecycle: working
+    owner_surface: dharma_swarm/external_agent_registration.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/external_agent_registration.py
+    object_kind: runtime_surface
+    public_ontology: true
+    aliases:
+      - RegistrationDesk
+      - registration-desk
+      - registration_desk
+      - external-agent-registration
+      - external_agent_registration
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.agent_seed
+    canonical_name: AgentSeed
+    api_name: dharma.agent.AgentSeed
+    lifecycle: working
+    owner_surface: docs/agents/**
+    authority_level: active_spec
+    source_path: docs/agents
+    object_kind: agent_identity_record
+    public_ontology: true
+    aliases:
+      - AgentSeed
+      - agent-seed
+      - agent_seed
+      - agent.seed.yaml
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.living_dock
+    canonical_name: LivingDock
+    api_name: dharma.agent.LivingDock
+    lifecycle: working
+    owner_surface: dharma_swarm/operator_core/living_agent_kernel.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/operator_core/living_agent_kernel.py
+    object_kind: runtime_surface
+    public_ontology: true
+    aliases:
+      - LivingDock
+      - living-dock
+      - living_dock
+      - living agent dock
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.a2a_card
+    canonical_name: A2ACard
+    api_name: dharma.agent.A2ACard
+    lifecycle: working
+    owner_surface: dharma_swarm/a2a/agent_card.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/a2a/agent_card.py
+    object_kind: runtime_identity_card
+    public_ontology: true
+    aliases:
+      - A2ACard
+      - A2A card
+      - a2a-card
+      - a2a_card
+      - agent-card
+      - agent_card
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.name_drift_preflight
+    canonical_name: NameDriftPreflight
+    api_name: dharma.governance.NameDriftPreflight
+    lifecycle: working
+    owner_surface: scripts/governance/name_drift_preflight.py
+    authority_level: governance_check
+    source_path: scripts/governance/name_drift_preflight.py
+    object_kind: verifier
+    public_ontology: true
+    aliases:
+      - NameDriftPreflight
+      - name-drift-preflight
+      - name_drift_preflight
+      - name drift preflight
+      - bug-corral-scan
+      - bug_corral_scan
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.session_orientation
+    canonical_name: SessionOrientation
+    api_name: dharma.governance.SessionOrientation
+    lifecycle: working
+    owner_surface: docs/ontology/session_orientation.yaml
+    authority_level: active_spec
+    source_path: docs/ontology/session_orientation.yaml
+    object_kind: orientation_contract
+    public_ontology: true
+    aliases:
+      - SessionOrientation
+      - session-orientation
+      - session_orientation
+      - session loading
+      - context map
+      - orientation map
+    forbidden_aliases:
+      - ICM
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.orientation_layer
+    canonical_name: OrientationLayer
+    api_name: dharma.governance.OrientationLayer
+    lifecycle: working
+    owner_surface: docs/ontology/session_orientation.yaml
+    authority_level: active_spec
+    source_path: docs/ontology/session_orientation.yaml
+    object_kind: orientation_contract
+    public_ontology: true
+    aliases:
+      - OrientationLayer
+      - orientation-layer
+      - orientation_layer
+      - L0-L4 orientation layer
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.orientation_route
+    canonical_name: OrientationRoute
+    api_name: dharma.governance.OrientationRoute
+    lifecycle: working
+    owner_surface: docs/ontology/session_orientation.yaml
+    authority_level: active_spec
+    source_path: docs/ontology/session_orientation.yaml
+    object_kind: orientation_contract
+    public_ontology: true
+    aliases:
+      - OrientationRoute
+      - orientation-route
+      - orientation_route
+      - route.semantic_commons_campaign
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.ontology_registry
+    canonical_name: OntologyRegistry
+    api_name: dharma.ontology.OntologyRegistry
+    lifecycle: working
+    owner_surface: docs/ontology/semantic_objects.yaml
+    authority_level: active_spec
+    source_path: docs/ontology/semantic_objects.yaml
+    object_kind: registry
+    public_ontology: true
+    aliases:
+      - OntologyRegistry
+      - ontology-registry
+      - ontology_registry
+      - semantic object registry
+      - semantic-objects
+      - semantic_objects
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.ontology_hub
+    canonical_name: OntologyHub
+    api_name: dharma.ontology.OntologyHub
+    lifecycle: working
+    owner_surface: docs/ontology/SEMANTIC_COMMONS.md
+    authority_level: active_spec
+    source_path: docs/ontology/SEMANTIC_COMMONS.md
+    object_kind: orientation_hub
+    public_ontology: true
+    aliases:
+      - OntologyHub
+      - ontology-hub
+      - ontology_hub
+      - Semantic Commons
+      - semantic-commons
+      - semantic_commons
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.runtime_receipt
+    canonical_name: RuntimeReceipt
+    api_name: dharma.runtime.RuntimeReceipt
+    lifecycle: working
+    owner_surface: dharma_swarm/runtime_state.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/runtime_state.py
+    object_kind: runtime_receipt
+    public_ontology: true
+    aliases:
+      - RuntimeReceipt
+      - runtime-receipt
+      - runtime_receipt
+      - runtime receipt
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.openclaw_integration
+    canonical_name: OpenClawIntegration
+    api_name: dharma.integration.OpenClawIntegration
+    lifecycle: seed
+    owner_surface: dharma_swarm/terminal_commands/_status_helpers.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/terminal_commands/_status_helpers.py
+    object_kind: integration
+    public_ontology: true
+    aliases:
+      - OpenClaw
+      - openclaw
+      - colima-openclaw
+      - colima_openclaw
+      - colima-openclaw-secure
+      - colima_openclaw_secure
+    forbidden_aliases:
+      - opencalw
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.glm_researcher_lane
+    canonical_name: GLMResearcherLane
+    api_name: dharma.agent.GLMResearcherLane
+    lifecycle: seed
+    owner_surface: dharma_swarm/certified_lanes.py
+    authority_level: runtime_owner
+    source_path: dharma_swarm/certified_lanes.py
+    object_kind: agent_lane
+    public_ontology: true
+    aliases:
+      - GLMResearcherLane
+      - glm-researcher
+      - glm_researcher
+      - glm5-researcher
+      - glm5_researcher
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.opus_forge_architect
+    canonical_name: OpusForgeArchitect
+    api_name: dharma.agent.OpusForgeArchitect
+    lifecycle: seed
+    owner_surface: AGENTS.md
+    authority_level: behavior_contract
+    source_path: AGENTS.md
+    object_kind: agent_role
+    public_ontology: true
+    aliases:
+      - OpusForgeArchitect
+      - opus-forge-architect
+      - opus_forge_architect
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.palantir_pilot
+    canonical_name: PalantirPilot
+    api_name: dharma.agent.PalantirPilot
+    lifecycle: working
+    owner_surface: docs/agents/palantir_pilot/agent.seed.yaml
+    authority_level: active_spec
+    source_path: docs/agents/palantir_pilot/agent.seed.yaml
+    object_kind: persistent_agent
+    public_ontology: true
+    aliases:
+      - PalantirPilot
+      - Palantir Pilot
+      - palantir-pilot
+      - palantir_pilot
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign
+
+  - id: semobj.cybernetics_codex
+    canonical_name: CyberneticsCodex
+    api_name: dharma.agent.CyberneticsCodex
+    lifecycle: working
+    owner_surface: docs/agents/cybernetics_codex/agent.seed.yaml
+    authority_level: active_spec
+    source_path: docs/agents/cybernetics_codex/agent.seed.yaml
+    object_kind: persistent_agent
+    public_ontology: true
+    aliases:
+      - CyberneticsCodex
+      - Cybernetics Codex
+      - cybernetics-codex
+      - cybernetics_codex
+    forbidden_aliases: []
+    supersedes: []
+    superseded_by: []
+    orientation_route: route.semantic_commons_campaign

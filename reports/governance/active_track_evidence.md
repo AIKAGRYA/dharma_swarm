@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-16T01:36:28+09:00 (schema v2)
-Active tracks: **11** (warn 11, max 11) — shippable 5
+Generated: 2026-06-17T01:08:48+09:00 (schema v2)
+Active tracks: **11** (warn 11, max 11) — shippable 6
 
 ## Spine coverage
 
@@ -104,22 +104,30 @@ Active tracks: **11** (warn 11, max 11) — shippable 5
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
 
-## `agent-admission-semantic-commons-2026-06` — 1/8
+## `agent-admission-semantic-commons-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['cybernetics-codex-stewardship-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['docs/ontology/**', 'docs/ops/AGENT_ADMISSION.md', 'scripts/governance/agent_admission*.py', 'scripts/governance/name_drift*.py', 'tests/test_agent_admission*.py', 'tests/test_semantic_commons*.py']
+- owned_surfaces: ['docs/ontology/**', 'docs/ops/AGENT_ADMISSION.md', 'dharma_swarm/semantic_commons.py', 'dharma_swarm/engine/hybrid_retriever.py', 'dharma_swarm/context.py', 'scripts/governance/agent_admission*.py', 'scripts/governance/name_drift*.py', 'tests/test_agent_admission*.py', 'tests/test_semantic_commons*.py', 'tests/test_hybrid_retriever.py']
 - moves_vital_signs: ['quality_gates', 'memory_persistence']
 
   - ✓ `generic_onboarding_doc_exists` (file_exists) — docs/ops/AGENT_ONBOARDING.md present
   - ✓ `living_agent_kernel_exists` (file_exists) — dharma_swarm/operator_core/living_agent_kernel.py present
-  - ✗ `semantic_commons_doc_exists` (file_exists) — docs/ontology/SEMANTIC_COMMONS.md MISSING
-  - ✗ `semantic_objects_index_exists` (file_exists) — docs/ontology/semantic_objects.yaml MISSING
-  - ✗ `semantic_aliases_index_exists` (file_exists) — docs/ontology/semantic_aliases.yaml MISSING
-  - ✗ `agent_admission_doc_exists` (file_exists) — docs/ops/AGENT_ADMISSION.md MISSING
+  - ✓ `semantic_commons_doc_exists` (file_exists) — docs/ontology/SEMANTIC_COMMONS.md present
+  - ✓ `semantic_objects_index_exists` (file_exists) — docs/ontology/semantic_objects.yaml present
+  - ✓ `semantic_aliases_index_exists` (file_exists) — docs/ontology/semantic_aliases.yaml present
+  - ✓ `agent_admission_doc_exists` (file_exists) — docs/ops/AGENT_ADMISSION.md present
   - ✓ `name_drift_preflight_exists` (file_exists) — scripts/governance/name_drift_preflight.py present
-  - ✗ `agent_admission_verifier_exists` (file_exists) — scripts/governance/agent_admission.py MISSING
-  - ✗ `semantic_commons_tests_exist` (file_exists) — tests/test_semantic_commons.py MISSING
-  - ✗ `agent_admission_tests_exist` (file_exists) — tests/test_agent_admission.py MISSING
+  - ✓ `agent_admission_verifier_exists` (file_exists) — scripts/governance/agent_admission.py present
+  - ✓ `semantic_commons_tests_exist` (file_exists) — tests/test_semantic_commons.py present
+  - ✓ `agent_admission_tests_exist` (file_exists) — tests/test_agent_admission.py present
+  - ✓ `pkm_projection_config_exists` (file_exists) — docs/ontology/pkm_projection.yaml present
+  - ✓ `retrieval_scope_contract_exists` (file_exists) — docs/ontology/retrieval_scope.yaml present
+  - ✓ `pkm_projection_script_exists` (file_exists) — scripts/governance/agent_admission_projection.py present
+  - ✓ `semantic_commons_projection_tests_exist` (file_exists) — tests/test_semantic_commons_projection.py present
+  - ✓ `semantic_commons_projection_manifest_exists` (file_exists) — reports/governance/semantic_commons_projection_manifest.json present
+  - ✓ `semantic_commons_runtime_helper_exists` (file_exists) — dharma_swarm/semantic_commons.py present
+  - ✓ `hybrid_retriever_scope_consumes_semantic_commons` (file_contains) — pattern 'orientation_route' found in dharma_swarm/engine/hybrid_retriever.py
+  - ✓ `retrieval_scope_runtime_test_exists` (file_contains) — pattern 'test_hybrid_retriever_exposes_semantic_commons_scope_first' found in tests/test_hybrid_retriever.py
 
 ## `cybernetics-codex-stewardship-2026-06` — 10/12
 
@@ -197,7 +205,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 5
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-in-progress:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] 1/8 completion criteria pass.
+- **INFO** `track-shippable:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] all 16 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-in-progress:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] 10/12 completion criteria pass.
 - **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 4/7 completion criteria pass.
 - **INFO** `track-in-progress:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] 1/7 completion criteria pass.

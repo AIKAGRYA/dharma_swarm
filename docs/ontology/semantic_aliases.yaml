@@ -1,0 +1,362 @@
+schema_version: semantic-aliases-v0
+owner_track: agent-admission-semantic-commons-2026-06
+aliases:
+  - alias: AgentAdmission
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: display
+  - alias: agent-admission
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: slug
+  - alias: agent_admission
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: token
+  - alias: agent admission
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: phrase
+  - alias: agent-admit
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: command
+  - alias: agent_admit
+    canonical_id: semobj.agent_admission
+    status: active
+    kind: command
+
+  - alias: RegistrationDesk
+    canonical_id: semobj.registration_desk
+    status: active
+    kind: display
+  - alias: registration-desk
+    canonical_id: semobj.registration_desk
+    status: active
+    kind: slug
+  - alias: registration_desk
+    canonical_id: semobj.registration_desk
+    status: active
+    kind: token
+  - alias: external-agent-registration
+    canonical_id: semobj.registration_desk
+    status: active
+    kind: module
+  - alias: external_agent_registration
+    canonical_id: semobj.registration_desk
+    status: active
+    kind: module
+
+  - alias: AgentSeed
+    canonical_id: semobj.agent_seed
+    status: active
+    kind: display
+  - alias: agent-seed
+    canonical_id: semobj.agent_seed
+    status: active
+    kind: slug
+  - alias: agent_seed
+    canonical_id: semobj.agent_seed
+    status: active
+    kind: token
+  - alias: agent.seed.yaml
+    canonical_id: semobj.agent_seed
+    status: active
+    kind: path
+
+  - alias: LivingDock
+    canonical_id: semobj.living_dock
+    status: active
+    kind: display
+  - alias: living-dock
+    canonical_id: semobj.living_dock
+    status: active
+    kind: slug
+  - alias: living_dock
+    canonical_id: semobj.living_dock
+    status: active
+    kind: token
+  - alias: living agent dock
+    canonical_id: semobj.living_dock
+    status: active
+    kind: phrase
+
+  - alias: A2ACard
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: display
+  - alias: A2A card
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: phrase
+  - alias: a2a-card
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: slug
+  - alias: a2a_card
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: token
+  - alias: agent-card
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: slug
+  - alias: agent_card
+    canonical_id: semobj.a2a_card
+    status: active
+    kind: token
+
+  - alias: NameDriftPreflight
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: display
+  - alias: name-drift-preflight
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: slug
+  - alias: name_drift_preflight
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: token
+  - alias: name drift preflight
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: phrase
+  - alias: bug-corral-scan
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: command
+  - alias: bug_corral_scan
+    canonical_id: semobj.name_drift_preflight
+    status: active
+    kind: command
+
+  - alias: SessionOrientation
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: display
+  - alias: session-orientation
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: slug
+  - alias: session_orientation
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: token
+  - alias: session loading
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: phrase
+  - alias: context map
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: phrase
+  - alias: orientation map
+    canonical_id: semobj.session_orientation
+    status: active
+    kind: phrase
+
+  - alias: OrientationLayer
+    canonical_id: semobj.orientation_layer
+    status: active
+    kind: display
+  - alias: orientation-layer
+    canonical_id: semobj.orientation_layer
+    status: active
+    kind: slug
+  - alias: orientation_layer
+    canonical_id: semobj.orientation_layer
+    status: active
+    kind: token
+  - alias: L0-L4 orientation layer
+    canonical_id: semobj.orientation_layer
+    status: active
+    kind: phrase
+
+  - alias: OrientationRoute
+    canonical_id: semobj.orientation_route
+    status: active
+    kind: display
+  - alias: orientation-route
+    canonical_id: semobj.orientation_route
+    status: active
+    kind: slug
+  - alias: orientation_route
+    canonical_id: semobj.orientation_route
+    status: active
+    kind: token
+  - alias: route.semantic_commons_campaign
+    canonical_id: semobj.orientation_route
+    status: active
+    kind: route_id
+
+  - alias: OntologyRegistry
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: display
+  - alias: ontology-registry
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: slug
+  - alias: ontology_registry
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: token
+  - alias: semantic object registry
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: phrase
+  - alias: semantic-objects
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: file_stem
+  - alias: semantic_objects
+    canonical_id: semobj.ontology_registry
+    status: active
+    kind: file_stem
+
+  - alias: OntologyHub
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: display
+  - alias: ontology-hub
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: slug
+  - alias: ontology_hub
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: token
+  - alias: Semantic Commons
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: phrase
+  - alias: semantic-commons
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: slug
+  - alias: semantic_commons
+    canonical_id: semobj.ontology_hub
+    status: active
+    kind: token
+
+  - alias: RuntimeReceipt
+    canonical_id: semobj.runtime_receipt
+    status: active
+    kind: display
+  - alias: runtime-receipt
+    canonical_id: semobj.runtime_receipt
+    status: active
+    kind: slug
+  - alias: runtime_receipt
+    canonical_id: semobj.runtime_receipt
+    status: active
+    kind: token
+  - alias: runtime receipt
+    canonical_id: semobj.runtime_receipt
+    status: active
+    kind: phrase
+
+  - alias: OpenClaw
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: display
+  - alias: openclaw
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: token
+  - alias: colima-openclaw
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: slug
+  - alias: colima_openclaw
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: token
+  - alias: colima-openclaw-secure
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: slug
+  - alias: colima_openclaw_secure
+    canonical_id: semobj.openclaw_integration
+    status: active
+    kind: token
+
+  - alias: GLMResearcherLane
+    canonical_id: semobj.glm_researcher_lane
+    status: active
+    kind: display
+  - alias: glm-researcher
+    canonical_id: semobj.glm_researcher_lane
+    status: active
+    kind: slug
+  - alias: glm_researcher
+    canonical_id: semobj.glm_researcher_lane
+    status: active
+    kind: token
+  - alias: glm5-researcher
+    canonical_id: semobj.glm_researcher_lane
+    status: active
+    kind: slug
+  - alias: glm5_researcher
+    canonical_id: semobj.glm_researcher_lane
+    status: active
+    kind: token
+
+  - alias: OpusForgeArchitect
+    canonical_id: semobj.opus_forge_architect
+    status: active
+    kind: display
+  - alias: opus-forge-architect
+    canonical_id: semobj.opus_forge_architect
+    status: active
+    kind: slug
+  - alias: opus_forge_architect
+    canonical_id: semobj.opus_forge_architect
+    status: active
+    kind: token
+
+  - alias: PalantirPilot
+    canonical_id: semobj.palantir_pilot
+    status: active
+    kind: display
+  - alias: Palantir Pilot
+    canonical_id: semobj.palantir_pilot
+    status: active
+    kind: phrase
+  - alias: palantir-pilot
+    canonical_id: semobj.palantir_pilot
+    status: active
+    kind: slug
+  - alias: palantir_pilot
+    canonical_id: semobj.palantir_pilot
+    status: active
+    kind: token
+
+  - alias: CyberneticsCodex
+    canonical_id: semobj.cybernetics_codex
+    status: active
+    kind: display
+  - alias: Cybernetics Codex
+    canonical_id: semobj.cybernetics_codex
+    status: active
+    kind: phrase
+  - alias: cybernetics-codex
+    canonical_id: semobj.cybernetics_codex
+    status: active
+    kind: slug
+  - alias: cybernetics_codex
+    canonical_id: semobj.cybernetics_codex
+    status: active
+    kind: token
+
+forbidden_aliases:
+  - alias: ICM
+    canonical_id: semobj.session_orientation
+    reason: Bare acronym is polysemous; use SessionOrientation or an explicit expanded phrase.
+  - alias: opencalw
+    canonical_id: semobj.openclaw_integration
+    reason: Typo-distance collision with OpenClaw.
+  - alias: Message_v2
+    canonical_id: semobj.ontology_registry
+    reason: ADR-008 forbids version suffixes in public ontology names.

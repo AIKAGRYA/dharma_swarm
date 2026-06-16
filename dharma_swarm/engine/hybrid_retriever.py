@@ -14,6 +14,7 @@ from dharma_swarm.engine.knowledge_store import (
 )
 from dharma_swarm.engine.retrieval_feedback import FeedbackProfile, RetrievalFeedbackStore
 from dharma_swarm.engine.unified_index import UnifiedIndex, _search_text_for_record
+from dharma_swarm.semantic_commons import RetrievalScope, SemanticCommons, load_semantic_commons
 
 
 def _normalize(text: str) -> str:
@@ -123,6 +124,7 @@ class HybridRetriever:
         self._index = index
         self._rrf_k = max(1, rrf_k)
         self._feedback = RetrievalFeedbackStore(index.db_path)
+        self._semantic_commons: SemanticCommons = load_semantic_commons()
 
     def search(
         self,
@@ -148,6 +150,7 @@ class HybridRetriever:
         if not records:
             return []
 
+        semantic_scope = self._semantic_commons.resolve_scope(normalized_query)
         by_id = {record.record_id: record for record in records}
         fused_scores: dict[str, float] = {}
         evidence: dict[str, dict[str, Any]] = {}
@@ -161,6 +164,23 @@ class HybridRetriever:
         )
 
         for lane_name, lane_weight, scorer in (
+            (
+                "orientation_route",
+                1.8,
+                lambda query_text, record: self._semantic_commons.structural_score(
+                    record,
+                    semantic_scope,
+                ),
+            ),
+            (
+                "exact_match",
+                1.5,
+                lambda query_text, record: self._semantic_commons.exact_score(
+                    query_text,
+                    record,
+                    semantic_scope,
+                ),
+            ),
             ("lexical", 1.2, self._lexical_score),
             ("overlap", 1.0, self._overlap_score),
             ("semantic", 0.9, self._semantic_score),
@@ -186,6 +206,8 @@ class HybridRetriever:
                         "lane_ranks": {},
                     },
                 )
+                if semantic_scope.active:
+                    slot["retrieval_scope"] = semantic_scope.to_evidence()
                 slot["lane_scores"][lane_name] = round(lane_score, 6)
                 slot["lane_ranks"][lane_name] = rank
 
@@ -194,6 +216,10 @@ class HybridRetriever:
             hit_evidence = evidence.get(record_id, {})
             hit_evidence["matched_query"] = normalized_query
             structural_boost = self._structural_boost(normalized_query, by_id[record_id])
+            semantic_scope_boost = self._semantic_scope_boost(
+                by_id[record_id],
+                semantic_scope,
+            )
             temporal_boost = self._temporal_boost(
                 by_id[record_id],
                 recency_bias=recency_bias,
@@ -204,6 +230,8 @@ class HybridRetriever:
             )
             if structural_boost > 0:
                 hit_evidence["structural_boost"] = round(structural_boost, 6)
+            if semantic_scope_boost > 0:
+                hit_evidence["semantic_scope_boost"] = round(semantic_scope_boost, 6)
             if temporal_boost > 0:
                 hit_evidence["temporal_boost"] = round(temporal_boost, 6)
             if feedback_boost != 0:
@@ -215,11 +243,22 @@ class HybridRetriever:
                     "since": since.isoformat() if since is not None else None,
                     "until": until.isoformat() if until is not None else None,
                 }
+            hit_evidence.update(
+                self._semantic_commons.result_fields(
+                    by_id[record_id],
+                    semantic_scope,
+                    lane_scores=hit_evidence.get("lane_scores", {}),
+                )
+            )
             hits.append(
                 RetrievalHit(
                     record=by_id[record_id],
                     score=round(
-                        fused_score + structural_boost + temporal_boost + feedback_boost,
+                        fused_score
+                        + structural_boost
+                        + semantic_scope_boost
+                        + temporal_boost
+                        + feedback_boost,
                         6,
                     ),
                     evidence=hit_evidence,
@@ -293,6 +332,15 @@ class HybridRetriever:
             boost += 0.01
         boost += 0.005 * _token_overlap(query_tokens, title_text)
         return round(boost, 6)
+
+    def _semantic_scope_boost(self, record: KnowledgeRecord, scope: RetrievalScope) -> float:
+        if not scope.active:
+            return 0.0
+        return round(
+            0.02 * self._semantic_commons.structural_score(record, scope)
+            + 0.015 * self._semantic_commons.exact_score(scope.query, record, scope),
+            6,
+        )
 
     def search_with_temporal_query(
         self,

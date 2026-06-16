@@ -25,8 +25,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 CANONICAL_CORRAL = Path("DE_BUG_CORRAL")
 CORRAL_INDEX = CANONICAL_CORRAL / "00.md"
+
+try:
+    from scripts.governance.agent_admission import validate_semantic_commons
+except Exception:  # pragma: no cover - surfaced in payload
+    validate_semantic_commons = None  # type: ignore[assignment]
 
 SKIP_DIRS = {
     ".git",
@@ -41,11 +49,15 @@ SKIP_DIRS = {
 SKIP_PATH_PREFIXES = (
     "tests/",
     "docs/governance/hygiene/baselines/",
+    "reports/governance/name_drift_preflight_",
 )
 SKIP_EXACT_PATHS = {
     "scripts/governance/agent_onboard.py",
+    "scripts/governance/agent_admission.py",
+    "scripts/governance/agent_admission_projection.py",
     "scripts/governance/name_drift_preflight.py",
     "reports/governance/active_track_evidence.json",
+    "reports/governance/semantic_commons_projection_manifest.json",
     "reports/governance/track_portfolio.json",
 }
 
@@ -256,9 +268,44 @@ def scan_repo(repo_root: Path = REPO_ROOT) -> list[Hit]:
     return hits
 
 
+def inspect_semantic_commons(repo_root: Path = REPO_ROOT) -> dict[str, object]:
+    if validate_semantic_commons is None:
+        return {
+            "available": False,
+            "object_count": 0,
+            "alias_count": 0,
+            "orientation_route_count": 0,
+            "error_count": 1,
+            "warning_count": 0,
+            "errors": [
+                {
+                    "check": "semantic_commons_import",
+                    "severity": "error",
+                    "path": "scripts/governance/agent_admission.py",
+                    "detail": "could not import Semantic Commons verifier",
+                }
+            ],
+            "warnings": [],
+        }
+    report = validate_semantic_commons(repo_root)
+    return {
+        "available": True,
+        "object_count": report["object_count"],
+        "alias_count": report["alias_count"],
+        "orientation_route_count": report["orientation_route_count"],
+        "active_agent_uid_count": report["active_agent_uid_count"],
+        "a2a_card_uid_count": report["a2a_card_uid_count"],
+        "error_count": len(report["errors"]),
+        "warning_count": len(report["warnings"]),
+        "errors": report["errors"],
+        "warnings": report["warnings"],
+    }
+
+
 def build_payload(repo_root: Path = REPO_ROOT) -> dict[str, object]:
     hits = scan_repo(repo_root)
     corral = inspect_corral(repo_root)
+    semantic_commons = inspect_semantic_commons(repo_root)
     by_route: dict[str, int] = {}
     for hit in hits:
         by_route[hit.route] = by_route.get(hit.route, 0) + 1
@@ -267,6 +314,7 @@ def build_payload(repo_root: Path = REPO_ROOT) -> dict[str, object]:
         "repo_root": str(repo_root),
         "canonical_corral": CORRAL_INDEX.as_posix(),
         "corral_state": asdict(corral),
+        "semantic_commons": semantic_commons,
         "hit_count": len(hits),
         "by_route": dict(sorted(by_route.items())),
         "hits": [asdict(hit) for hit in hits],
@@ -292,9 +340,46 @@ def render_markdown(payload: dict[str, object], limit: int | None = None) -> str
         f"- existing numbered files: {', '.join(corral['existing_numbered_files']) or '(none)'}",
         f"- noncanonical corral paths: {', '.join(corral['noncanonical_paths']) or '(none)'}",
         "",
-        "## Route Summary",
+        "## Semantic Commons",
         "",
     ]
+    semantic = payload.get("semantic_commons", {})
+    assert isinstance(semantic, dict)
+    lines.extend(
+        [
+            f"- verifier available: {semantic.get('available')}",
+            f"- objects: {semantic.get('object_count', 0)}",
+            f"- aliases: {semantic.get('alias_count', 0)}",
+            f"- orientation routes: {semantic.get('orientation_route_count', 0)}",
+            f"- active agent_uid values: {semantic.get('active_agent_uid_count', 0)}",
+            f"- A2A card agent_uid values: {semantic.get('a2a_card_uid_count', 0)}",
+            f"- errors: {semantic.get('error_count', 0)}",
+            f"- warnings: {semantic.get('warning_count', 0)}",
+            "",
+        ]
+    )
+    semantic_errors = semantic.get("errors", [])
+    assert isinstance(semantic_errors, list)
+    for item in semantic_errors[:10]:
+        assert isinstance(item, dict)
+        lines.append(
+            f"- ERROR `{item.get('check')}` {item.get('path')}: {item.get('detail')}"
+        )
+    semantic_warnings = semantic.get("warnings", [])
+    assert isinstance(semantic_warnings, list)
+    for item in semantic_warnings[:10]:
+        assert isinstance(item, dict)
+        lines.append(
+            f"- WARN `{item.get('check')}` {item.get('path')}: {item.get('detail')}"
+        )
+    if semantic_errors or semantic_warnings:
+        lines.append("")
+    lines.extend(
+        [
+            "## Route Summary",
+            "",
+        ]
+    )
     by_route = payload["by_route"]
     assert isinstance(by_route, dict)
     if by_route:
@@ -329,7 +414,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="fail if the canonical corral is missing or noncanonical corral paths exist",
+        help="fail if canonical Corral paths or Semantic Commons checks fail",
+    )
+    parser.add_argument(
+        "--strict-semantic-commons",
+        action="store_true",
+        help="fail only on Semantic Commons registry/admission errors",
     )
     args = parser.parse_args(argv)
 
@@ -346,8 +436,13 @@ def main(argv: list[str] | None = None) -> int:
 
     corral = payload["corral_state"]
     assert isinstance(corral, dict)
+    semantic = payload["semantic_commons"]
+    assert isinstance(semantic, dict)
+    semantic_failed = int(semantic.get("error_count") or 0) > 0
+    if args.strict_semantic_commons and semantic_failed:
+        return 1
     if args.strict and (
-        not corral["canonical_dir_present"] or corral["noncanonical_paths"]
+        not corral["canonical_dir_present"] or corral["noncanonical_paths"] or semantic_failed
     ):
         return 1
     return 0
