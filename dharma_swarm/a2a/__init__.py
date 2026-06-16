@@ -46,6 +46,14 @@ from dharma_swarm.a2a.a2a_bridge import A2ABridge
 from dharma_swarm.a2a.nats_transport import A2ANatsTransport, NatsTransportConfig
 from dharma_swarm.a2a.node_registry import NodeRegistry, RemoteNode
 from dharma_swarm.a2a.registry_hydrator import hydrate_from_receipts
+from dharma_swarm.a2a.agent_presence import AgentPresence, list_agent_presence
+from dharma_swarm.a2a.task_receipt import (
+    RECEIPT_SCHEMA,
+    ReceiptValidation,
+    bounce_payload,
+    validate_or_quarantine_file,
+    validate_task_receipt,
+)
 
 __all__ = [
     "AgentCard",
@@ -68,4 +76,11 @@ __all__ = [
     "NodeRegistry",
     "RemoteNode",
     "hydrate_from_receipts",
+    "AgentPresence",
+    "list_agent_presence",
+    "RECEIPT_SCHEMA",
+    "ReceiptValidation",
+    "bounce_payload",
+    "validate_or_quarantine_file",
+    "validate_task_receipt",
 ]

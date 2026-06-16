@@ -36,7 +36,7 @@ class TestTelosObjectivesData:
             assert len(obj["name"]) > 5
 
     def test_perspectives_are_valid(self):
-        valid = {"purpose", "stakeholder", "process", "foundation"}
+        valid = {"purpose", "stakeholder", "process", "foundation", "financial"}
         for obj in TELOS_OBJECTIVES:
             assert obj["perspective"] in valid, (
                 f"Invalid perspective '{obj['perspective']}' for {obj['name']}"

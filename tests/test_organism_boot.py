@@ -35,9 +35,12 @@ class TestOrganismBoot:
         assert "booted_at" in diag
         assert "amiros" in diag
 
-    def test_organism_heartbeat(self):
+    def test_organism_heartbeat(self, tmp_path):
         from dharma_swarm.organism import Organism
-        org = Organism()
+        # Isolated state dir: identity sub-metrics default to 0.5 on an empty
+        # tree, so a freshly-booted organism heartbeats healthy deterministically.
+        # Reading the ambient ~/.dharma makes tcs hover at the health threshold.
+        org = Organism(state_dir=tmp_path)
         _run(org.boot())
         pulse = _run(org.heartbeat())
         assert pulse.cycle_number == 1
