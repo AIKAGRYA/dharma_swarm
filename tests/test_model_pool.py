@@ -59,11 +59,16 @@ def test_pool_routes_are_exactly_the_roster_literals():
     assert pool_pairs == roster_pairs
 
 
-def test_pool_collapses_25_roster_slots_to_18_logical_entries():
-    """The roster has 25 slots; 7 are multi-route duplicates of 7 logical
-    models, so the pool has 18 entries. Guards against silent regroup drift."""
-    assert len(EVOLUTION_ROSTER) == 25
-    assert len(MODEL_POOL) == 18
+def test_pool_collapses_roster_slots_to_logical_entries():
+    """The roster has 30 slots that collapse to 22 logical pool entries.
+    Guards against silent regroup drift.
+
+    Step 4 added 6 slots the provider matrix projects (the K2.6 floor model via
+    BOTH Ollama Cloud and OpenRouter, plus deepseek-v3.2 / qwen3-coder:480b /
+    minimax-m2.7 Ollama-cloud lanes). That is 4 new logical ids — kimi-k2.6
+    (2 routes -> 1 entry) + 3 single-route entries — taking 18 -> 22."""
+    assert len(EVOLUTION_ROSTER) == 30
+    assert len(MODEL_POOL) == 22
 
 
 # --------------------------------------------------------------------------

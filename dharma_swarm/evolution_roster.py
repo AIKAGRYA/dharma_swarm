@@ -242,6 +242,55 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         128_000,
         "Cloud-hosted reasoning lane via Ollama",
     ),
+    # K2.6 is the operator's floor model. Same weights served by Ollama Cloud
+    # (keyless cloud route) and OpenRouter (aggregator) — ONE logical model in
+    # the pool, best-route-first puts Ollama ahead of the flappy OpenRouter id
+    # that caused the kimi flapping bug the consolidation goal names.
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "kimi-k2.6:cloud",
+        "Kimi K2.6 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model — long-context semantic lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "moonshotai/kimi-k2.6",
+        "Kimi K2.6",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model via OpenRouter (deprioritised aggregator route)",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "deepseek-v3.2:cloud",
+        "DeepSeek V3.2 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        128_000,
+        "Cloud-hosted bulk-build lane via Ollama",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "qwen3-coder:480b-cloud",
+        "Qwen3 Coder 480B (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning"),
+        256_000,
+        "Cloud-hosted high-capacity coder lane via Ollama",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "minimax-m2.7:cloud",
+        "MiniMax M2.7 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis"),
+        128_000,
+        "Cloud-hosted challenger lane via Ollama",
+    ),
     # ── Free tier (OpenRouter free) ────────────────────────────────────
     ModelSlot(
         ProviderType.OPENROUTER_FREE,
