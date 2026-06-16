@@ -3351,8 +3351,10 @@ export function App(): React.ReactElement {
       state.bridgeStatus === "connected" ? "live" : state.bridgeStatus,
       "F2 cockpit · /tour",
     ].join("  ·  ");
-    // FACE-1 measure law: prose clamps to ~100 cols at wide terminals.
-    const zenWidth = Math.min(terminalWidth, 100);
+    // Claude-Code baseline (operator hard rule "full screen, just like claude
+    // code" — the ~100-col clamp left a dead gulf on the right half of wide
+    // terminals): the zen frame spans the full terminal width.
+    const zenWidth = terminalWidth;
     // Content-hugging like Claude Code: the composer sits directly under the
     // last message (operator: "still too bulky" — the old bottom-pin left a
     // dead gulf mid-screen). The frame stays full-height with the spacer BELOW
