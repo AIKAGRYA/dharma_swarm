@@ -35,6 +35,10 @@ from dharma_swarm.evolution_roster import (
     ModelSlot,
     ModelTier,
 )
+from dharma_swarm.model_defaults import (
+    _PROVIDER_DEFAULTS,
+    default_for_provider,
+)
 from dharma_swarm.models import ProviderType
 
 # ---------------------------------------------------------------------------
@@ -45,6 +49,13 @@ from dharma_swarm.models import ProviderType
 # recommendations. STEP 2 records it; it does not yet prune call sites.
 # ---------------------------------------------------------------------------
 K2_FLOOR_ID = "kimi-k2.6"
+
+# The per-provider default model strings live in :mod:`model_defaults` (a leaf
+# that imports only ``models``, so it sits below the roster→ollama_config→
+# model_hierarchy import cycle). The pool re-exports :func:`default_for_provider`
+# (imported above) so it remains the public model-grain owner the consolidation
+# goal names; ``_PROVIDER_DEFAULTS`` is reused below for the import-time coherence
+# guard against the roster route table.
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +253,49 @@ def entry_for_model_id(model_id: str) -> ModelEntry | None:
     return None
 
 
+# Providers whose default is a deliberate operator pin that supersedes the
+# legacy roster (the roster predates gpt-5 / opus-4.6 / codex gpt-5.4). These are
+# still owned by _PROVIDER_DEFAULTS; the coherence guard below only exempts them
+# from the "must match a roster route" check — it does NOT exempt them from being
+# present here.
+_OPERATOR_PINNED_DEFAULTS: frozenset[ProviderType] = frozenset(
+    {
+        ProviderType.OPENAI,        # gpt-5  (roster: gpt-4o)
+        ProviderType.ANTHROPIC,     # claude-opus-4-6  (roster: claude-opus-4-20250514)
+        ProviderType.CLAUDE_CODE,   # claude-opus-4-6 via Claude-Max (no roster route)
+        ProviderType.CODEX,         # gpt-5.4 via codex oauth (no roster route)
+    }
+)
+
+
+def _validate_provider_defaults() -> None:
+    """Import-time coherence guard for the per-provider default map.
+
+    Drift-killer: where the roster already serves a provider's default id (and
+    the provider is not an operator-pinned exception), the default MUST be one of
+    that provider's known pool routes — so the default string and the route table
+    can never silently disagree.
+    """
+    known: dict[ProviderType, set[str]] = {}
+    for entry in MODEL_POOL:
+        for route in entry.routes:
+            known.setdefault(route.provider, set()).add(route.model_id)
+    for provider, model_id in _PROVIDER_DEFAULTS.items():
+        if provider in _OPERATOR_PINNED_DEFAULTS:
+            continue
+        provider_ids = known.get(provider)
+        if provider_ids and model_id not in provider_ids:
+            # The roster knows this provider but not this id: a real disagreement
+            # between the default and the routes. Surface it loudly at import.
+            raise AssertionError(
+                f"model_pool default for {provider.value!r} ({model_id!r}) is "
+                f"not among that provider's roster routes {sorted(provider_ids)!r}"
+            )
+
+
+_validate_provider_defaults()
+
+
 def live_routes(
     entry: ModelEntry,
     key_oracle: set[str] | None,
@@ -281,6 +335,7 @@ __all__ = [
     "all_entries",
     "get_entry",
     "entry_for_model_id",
+    "default_for_provider",
     "live_routes",
     "best_live_route",
 ]

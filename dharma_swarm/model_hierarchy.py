@@ -27,6 +27,7 @@ import re
 from typing import TYPE_CHECKING, Mapping
 
 from dharma_swarm.models import LLMResponse, ProviderType
+from dharma_swarm.model_defaults import default_for_provider
 
 if TYPE_CHECKING:
     from dharma_swarm.resilience import CircuitBreakerRegistry
@@ -242,29 +243,17 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 
 # ─── Default Models ──────────────────────────────────────────────────────
 # Default model per provider (used when request.model is empty).
-# Moved here from runtime_provider.py as the single source.
+#
+# STEP 3 of the model-pool consolidation: the per-provider default STRINGS now
+# live in exactly ONE place — ``model_pool._PROVIDER_DEFAULTS`` — and this dict
+# is a thin PROJECTION of the pool (``model_pool.default_for_provider``). This
+# file keeps the PROVIDER-grain authority (tiers, lane roles, priority tuples);
+# only the model-id literals moved to the pool. Every provider in
+# ``CANONICAL_SEED_ORDER`` is projected, so the seed-order coverage invariant
+# (``test_default_models_dict_matches_all_seed_order``) holds without literals.
 
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
-    ProviderType.GROQ: "qwen/qwen3-32b",
-    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
-    ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
-    ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-    # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
-    ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
-    # Paid tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
-    ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
-    ProviderType.CODEX: "gpt-5.4",
+    p: default_for_provider(p) for p in CANONICAL_SEED_ORDER
 }
 
 

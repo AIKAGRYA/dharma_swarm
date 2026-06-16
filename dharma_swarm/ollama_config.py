@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from dharma_swarm.api_keys import OLLAMA_API_KEY_ENV, env_value
-from dharma_swarm.model_hierarchy import DEFAULT_MODELS
+from dharma_swarm.model_defaults import default_for_provider
 from dharma_swarm.models import ProviderType
 
 
@@ -15,7 +15,7 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 # default but is frequently not pulled (-> Ollama 404). Override with
 # OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
 OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
-OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
+OLLAMA_DEFAULT_CLOUD_MODEL = default_for_provider(ProviderType.OLLAMA)
 OLLAMA_CLOUD_FRONTIER_MODELS = (
     "glm-5:cloud",
     "deepseek-v3.2:cloud",
