@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci hygiene-delta-ratchet
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -54,6 +54,8 @@ help:
 	@echo "  make mypy-strict-ratchet Verify allowlisted modules pass mypy --strict"
 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
+	@echo "  make verify-corral  Verify DE_BUG_CORRAL findings still resolve to live code"
+	@echo "  make verify-corral-strict Same, but fail non-zero on any stale finding"
 	@echo "  make hygiene-delta-ratchet  Fail if PR-touched files added new hygiene violations"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
@@ -271,6 +273,12 @@ assurance-boundary:
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+
+verify-corral:
+	$(PYTHON) scripts/governance/verify_corral_findings.py
+
+verify-corral-strict:
+	$(PYTHON) scripts/governance/verify_corral_findings.py --strict
 
 hygiene-delta-ratchet:
 	$(PYTHON) scripts/governance/hygiene/delta_ratchet.py \
