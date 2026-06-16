@@ -203,7 +203,6 @@ class RevenueScoutDaemon:
 
     def _scout_github_inline(self) -> dict[str, Any]:
         """Lightweight inline scouting when scripts.revenue is not importable."""
-        import json
         from urllib.parse import quote_plus
         from urllib.request import Request, urlopen
 
