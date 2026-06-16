@@ -327,6 +327,16 @@
     "prompt": "Write Hermes state file (liveness proof) and poll queue.jsonl for unclaimed tasks matching Hermes capabilities."
   },
   {
+    "id": "de_bug_corral_scan",
+    "name": "De Bug Corral Name Drift Scan",
+    "trigger": "interval",
+    "interval_seconds": 21600,
+    "handler": "shell",
+    "shell_command": "python3 scripts/governance/name_drift_preflight.py --json-output ~/.dharma/logs/name_drift_preflight_latest.json --markdown-output ~/.dharma/logs/name_drift_preflight_latest.md",
+    "enabled": true,
+    "prompt": "Scan scattered naming-drift and Corral-path findings, then route them to the root DE_BUG_CORRAL files without dirtying the repo."
+  },
+  {
     "id": "provider_credit_check",
     "name": "Provider Credit Health Check",
     "trigger": "cron",

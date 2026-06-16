@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-15T00:02:57+09:00 (schema v2)
+Generated: 2026-06-16T01:36:28+09:00 (schema v2)
 Active tracks: **11** (warn 11, max 11) — shippable 5
 
 ## Spine coverage
@@ -104,7 +104,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 5
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
 
-## `agent-admission-semantic-commons-2026-06` — 0/8
+## `agent-admission-semantic-commons-2026-06` — 1/8
 
 - serves: `substrate-nativeness` · complements: ['cybernetics-codex-stewardship-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/ontology/**', 'docs/ops/AGENT_ADMISSION.md', 'scripts/governance/agent_admission*.py', 'scripts/governance/name_drift*.py', 'tests/test_agent_admission*.py', 'tests/test_semantic_commons*.py']
@@ -116,7 +116,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 5
   - ✗ `semantic_objects_index_exists` (file_exists) — docs/ontology/semantic_objects.yaml MISSING
   - ✗ `semantic_aliases_index_exists` (file_exists) — docs/ontology/semantic_aliases.yaml MISSING
   - ✗ `agent_admission_doc_exists` (file_exists) — docs/ops/AGENT_ADMISSION.md MISSING
-  - ✗ `name_drift_preflight_exists` (file_exists) — scripts/governance/name_drift_preflight.py MISSING
+  - ✓ `name_drift_preflight_exists` (file_exists) — scripts/governance/name_drift_preflight.py present
   - ✗ `agent_admission_verifier_exists` (file_exists) — scripts/governance/agent_admission.py MISSING
   - ✗ `semantic_commons_tests_exist` (file_exists) — tests/test_semantic_commons.py MISSING
   - ✗ `agent_admission_tests_exist` (file_exists) — tests/test_agent_admission.py MISSING
@@ -197,7 +197,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 5
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-in-progress:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] 0/8 completion criteria pass.
+- **INFO** `track-in-progress:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] 1/8 completion criteria pass.
 - **INFO** `track-in-progress:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] 10/12 completion criteria pass.
 - **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 4/7 completion criteria pass.
 - **INFO** `track-in-progress:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] 1/7 completion criteria pass.

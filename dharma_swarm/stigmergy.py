@@ -12,6 +12,7 @@ non-blocking I/O.
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -315,7 +316,8 @@ class StigmergyStore:
                 return
 
             self.base_path.mkdir(parents=True, exist_ok=True)
-            tmp = self._marks_file.with_suffix(".tmp")
+            # Use unique temp file to avoid race condition when multiple processes write
+            tmp = self._marks_file.parent / f".marks-{os.getpid()}-{_new_id()[:8]}.tmp"
             async with aiofiles.open(tmp, "w") as f:
                 for mark in persisted:
                     await f.write(mark.model_dump_json() + "\n")
@@ -360,7 +362,8 @@ class StigmergyStore:
                     await f.write(m.model_dump_json() + "\n")
 
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            # Use unique temp file to avoid race condition when multiple processes write
+            tmp = self._marks_file.parent / f".marks-{os.getpid()}-{_new_id()[:8]}.tmp"
             async with aiofiles.open(tmp, "w") as f:
                 for m in keep:
                     await f.write(m.model_dump_json() + "\n")
@@ -382,7 +385,8 @@ class StigmergyStore:
                     dead_count += 1
             self.base_path.mkdir(parents=True, exist_ok=True)
             # Atomic rewrite: temp file → rename
-            tmp = self._marks_file.with_suffix(".tmp")
+            # Use unique temp file to avoid race condition when multiple processes write
+            tmp = self._marks_file.parent / f".marks-{os.getpid()}-{_new_id()[:8]}.tmp"
             async with aiofiles.open(tmp, "w") as f:
                 for m in marks:
                     await f.write(m.model_dump_json() + "\n")

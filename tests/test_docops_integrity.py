@@ -172,6 +172,86 @@ def test_auto_section_update_writes_generated_inventory(tmp_path: Path) -> None:
     assert "| Dharma Python modules | 1 |" in text
 
 
+def test_auto_section_update_repairs_manifest_assertions_first(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(repo / "dharma_swarm" / "b.py", "y = 2\n")
+    write(
+        repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md",
+        (
+            "# Manifest\n\n"
+            "<!-- DOCOPS:START metric=sovereign_manifest_inventory -->\n"
+            "| Metric | Value | Verification |\n"
+            "|--------|-------|-------------|\n"
+            "| Total Python modules | **1** | stale |\n"
+            "<!-- DOCOPS:END -->\n"
+        ),
+    )
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["auto_sections"]["include"] = ["docs/governance/SOVEREIGN_MANIFEST.md"]
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*([\d,]+)\*\*",
+            "metric": "dharma_python_modules",
+        }
+    ]
+    save_config(config_path, config)
+
+    stale_findings, _metrics = docops.run_checks(
+        repo, config_path, None, docops.parse_iso_date("2026-05-05"), False
+    )
+    assert any(finding.check == "auto-section" for finding in stale_findings)
+    assert any("doc says 1" in finding.message for finding in stale_findings)
+
+    repaired_findings, _metrics = docops.run_checks(
+        repo, config_path, None, docops.parse_iso_date("2026-05-05"), True
+    )
+    assert not [finding for finding in repaired_findings if finding.severity == "FAIL"]
+    text = (repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md").read_text(encoding="utf-8")
+    assert "| Total Python modules | **2** |" in text
+
+
+def test_inventory_only_skips_blocking_docops_checks(tmp_path: Path) -> None:
+    repo = tmp_path
+    write(repo / "dharma_swarm" / "a.py", "x = 1\n")
+    write(repo / "dharma_swarm" / "b.py", "y = 2\n")
+    write(repo / "docs" / "governance" / "SOVEREIGN_MANIFEST.md", "Total Python modules | **1** |\n")
+    write(repo / "docs" / "loose.md", "This is the source of truth.\n")
+    config_path = base_config(repo)
+    config = load_config(config_path)
+    config["assertions"] = [
+        {
+            "id": "total-python",
+            "doc": "docs/governance/SOVEREIGN_MANIFEST.md",
+            "regex": r"Total Python modules \| \*\*([\d,]+)\*\*",
+            "metric": "dharma_python_modules",
+        }
+    ]
+    save_config(config_path, config)
+
+    inventory_path = repo / "reports" / "docops" / "corpus_inventory.json"
+    exit_code = docops.main(
+        [
+            "--repo-root",
+            str(repo),
+            "--assertions",
+            str(config_path),
+            "--today",
+            "2026-05-05",
+            "--inventory-only",
+            "--inventory-json",
+            str(inventory_path),
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(inventory_path.read_text(encoding="utf-8"))
+    assert payload["markdown_files_scanned"] == 2
+
+
 def test_change_review_reports_docs_that_reference_changed_python(tmp_path: Path) -> None:
     repo = tmp_path
     write(repo / "dharma_swarm" / "runner.py", "x = 1\n")

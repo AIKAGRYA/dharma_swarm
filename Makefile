@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -52,6 +52,7 @@ help:
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
+	@echo "  make bug-corral-scan Scan name drift and route findings to DE_BUG_CORRAL"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
@@ -249,6 +250,11 @@ hygiene-audit:
 
 hygiene-check:
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
+
+bug-corral-scan:
+	$(PYTHON) scripts/governance/name_drift_preflight.py $${ARGS:-}
+
+name-drift-preflight: bug-corral-scan
 
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py

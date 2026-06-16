@@ -495,10 +495,102 @@ def render_repo_inventory(metrics: dict[str, int]) -> str:
     return "\n".join(lines)
 
 
+def render_sovereign_manifest_inventory(metrics: dict[str, int]) -> str:
+    total_modules = metrics["dharma_python_modules"]
+    top_level_modules = metrics["dharma_top_level_python_modules"]
+    top_level_pct = 0.0 if total_modules == 0 else top_level_modules / total_modules * 100
+    rows = [
+        (
+            "Total Python modules",
+            f"**{total_modules:,}**",
+            "git ls-files dharma_swarm | rg '\\.py$' | wc -l",
+        ),
+        (
+            "Top-level (flat) modules",
+            f"**{top_level_modules:,} ({top_level_pct:.1f}%)**",
+            "git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l",
+        ),
+        (
+            "Total Python LOC",
+            f"**{metrics['total_python_loc']:,}**",
+            "wc -l across dharma_swarm Python modules",
+        ),
+        (
+            "Test files",
+            f"**{metrics['test_files']:,}**",
+            "git ls-files tests | rg '\\.py$' | wc -l",
+        ),
+        (
+            "Test functions",
+            f"**{metrics['test_def_occurrences']:,} `def test_` occurrences under tests/**",
+            "git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l",
+        ),
+        (
+            "Tests collected (pytest)",
+            "**Needs write-permitted refresh**",
+            "not run during this DocOps count pass",
+        ),
+        (
+            "Collection errors",
+            "**Historical: 16 on 2026-04-04**",
+            "refresh before relying on this count",
+        ),
+        (
+            "Markdown files",
+            f"**{metrics['markdown_files']:,}**",
+            "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l",
+        ),
+        (
+            "Markdown total lines",
+            f"**{metrics['markdown_total_lines']:,}**",
+            "git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l",
+        ),
+        (
+            "Bridge files",
+            f"**{metrics['bridge_files']:,}**",
+            'find dharma_swarm -name "*bridge*.py" -type f | wc -l',
+        ),
+        (
+            "Adapter files",
+            f"**{metrics['adapter_files']:,} across 8 locations**",
+            'find dharma_swarm -type f | rg -i "adapter" | wc -l',
+        ),
+        (
+            "Orchestrator files",
+            f"**{metrics['orchestrator_files']:,}**",
+            'find dharma_swarm -name "*orchestrat*" | wc -l',
+        ),
+        (
+            "Router files",
+            f"**{metrics['router_files']:,}** (4,976 LOC total)",
+            'find dharma_swarm -type f | rg -i "rout" | wc -l',
+        ),
+        ("Memory modules", "**11** (5,848 LOC)", 'find dharma_swarm -name "*memory*"'),
+        ("Context modules", "**8** (5,828 LOC)", 'find dharma_swarm -name "*context*"'),
+        ("Provider types (enum)", "**18**", "models.py ProviderType enum"),
+        ("Provider classes", "**19** (including LLMProvider base)", 'grep "class.*Provider" providers.py'),
+        ("Kernel axioms", "**25** (10 original + 15 foundations)", "dharma_kernel.py MetaPrinciple enum"),
+        ("Telos gates", "**11** (2 Tier A, 1 Tier B, 8 Tier C)", "telos_gates.py core gates"),
+        ("SQLite-using modules", "**49**", "grep aiosqlite/sqlite3"),
+        ("JSONL-writing modules", "**126**", "grep .jsonl"),
+        ("~/.dharma/ subdirectories", "**74**", "ls ~/.dharma/"),
+        ("Circular dependency chains", "**9 confirmed**", "import tracing"),
+        ("Files >500 lines", "**148**", "wc -l + awk"),
+        ("Files >3000 lines", "**7**", "wc -l + awk"),
+    ]
+    lines = ["| Metric | Value | Verification |", "|--------|-------|-------------|"]
+    for metric, value, verification in rows:
+        verification = verification.replace("|", "\\|")
+        lines.append(f"| {metric} | {value} | {verification} |")
+    return "\n".join(lines)
+
+
 def generated_section(attrs: dict[str, str], metrics: dict[str, int]) -> str:
     metric = attrs.get("metric")
     if metric == "repo_inventory":
         return render_repo_inventory(metrics)
+    if metric == "sovereign_manifest_inventory":
+        return render_sovereign_manifest_inventory(metrics)
     raise ValueError(f"unknown auto section metric: {metric}")
 
 
@@ -572,11 +664,14 @@ def run_checks(
     changed_files = [rel for _status, rel in changed_file_statuses]
 
     findings: list[Finding] = []
+    if write_auto_sections:
+        findings.extend(check_or_write_auto_sections(repo_root, config, metrics, True))
     findings.extend(check_staleness(config, today))
     findings.extend(check_assertions(repo_root, config, metrics))
     findings.extend(check_path_guards(repo_root, config))
     findings.extend(check_canonical_guard(repo_root, config, changed_file_statuses))
-    findings.extend(check_or_write_auto_sections(repo_root, config, metrics, write_auto_sections))
+    if not write_auto_sections:
+        findings.extend(check_or_write_auto_sections(repo_root, config, metrics, False))
     findings.extend(doc_review_candidates(repo_root, config, changed_files))
     return findings, metrics
 
@@ -746,6 +841,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory-json", type=Path)
     parser.add_argument("--inventory-markdown", type=Path)
     parser.add_argument(
+        "--inventory-only",
+        action="store_true",
+        help="Write corpus inventory artifacts without running blocking DocOps checks.",
+    )
+    parser.add_argument(
         "--inventory-glob",
         action="append",
         default=[],
@@ -759,13 +859,21 @@ def main(argv: list[str] | None = None) -> int:
         config_path = repo_root / config_path
     today = parse_iso_date(args.today) if args.today else date.today()
 
-    findings, metrics = run_checks(
-        repo_root=repo_root,
-        config_path=config_path,
-        changed_from=args.changed_from,
-        today=today,
-        write_auto_sections=args.write_auto_sections,
-    )
+    config: dict[str, Any] | None = None
+    if args.inventory_only:
+        if not args.inventory_json and not args.inventory_markdown:
+            parser.error("--inventory-only requires --inventory-json or --inventory-markdown")
+        config = load_config(config_path)
+        metrics = collect_metrics(repo_root)
+        findings: list[Finding] = []
+    else:
+        findings, metrics = run_checks(
+            repo_root=repo_root,
+            config_path=config_path,
+            changed_from=args.changed_from,
+            today=today,
+            write_auto_sections=args.write_auto_sections,
+        )
     if args.report_json:
         report_path = args.report_json
         if not report_path.is_absolute():
@@ -773,7 +881,8 @@ def main(argv: list[str] | None = None) -> int:
         write_json(report_path, check_report_payload(findings, metrics, today))
 
     if args.inventory_json or args.inventory_markdown:
-        config = load_config(config_path)
+        if config is None:
+            config = load_config(config_path)
         patterns = args.inventory_glob or ["**/*.md"]
         inventory = scan_doc_inventory(repo_root, config, patterns)
         if args.inventory_json:
@@ -794,6 +903,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"metric {key}={metrics[key]}")
     for finding in findings:
         print(finding.render())
+    if args.inventory_only:
+        print("DocOps corpus inventory written")
+        return 0
     failures = [finding for finding in findings if finding.severity == "FAIL"]
     if failures:
         return 1

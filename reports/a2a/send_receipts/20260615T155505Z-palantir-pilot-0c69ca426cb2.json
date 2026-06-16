@@ -1,0 +1,80 @@
+{
+  "ack_subject": "dharma.a2a.palantir-pilot.ack.0c69ca426cb2",
+  "ack_tier": "PUBLISH_ACCEPTED",
+  "cli_fallback_used": true,
+  "cli_stdout": "",
+  "collaboration_claim": "publish_only",
+  "consumed": false,
+  "contact_evidence_tier": "PUBLISH_ACCEPTED",
+  "file": "reports/a2a/operator_packets/20260615T1555Z-palantir-pilot-name-drift.md",
+  "live_contact_claim": false,
+  "nats": {
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": false,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "system_ca_store"
+  },
+  "operator_contact_note": "broker accepted the packet; this is not live collaboration by itself",
+  "packet_id": "0c69ca426cb2",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260615T155505Z-palantir-pilot-0c69ca426cb2.json",
+  "replied": false,
+  "reply_payload": null,
+  "reply_subject": "dharma.a2a.palantir-pilot.reply.0c69ca426cb2",
+  "route": "a2a",
+  "runtime_truth_ref": {
+    "claim_id": "claim_a2a_send_d11253e98035b494",
+    "correlation_id": "a2a_send:palantir-pilot:0c69ca426cb2",
+    "idempotency_inserted": true,
+    "idempotency_key": "idem_a2a_send:dharma.a2a.palantir-pilot:0c69ca426cb2",
+    "receipt_id": "rr_run_a2a_send_d11253e98035b494_a2a_send_publish_acked",
+    "run_id": "run_a2a_send_d11253e98035b494",
+    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
+    "side_effect_key": "a2a_send.publish:dharma.a2a.palantir-pilot:0c69ca426cb2",
+    "spine_evidence_receipt_ref": {
+      "operation": "a2a_send.publish",
+      "receipt_id": "a8715b01-69d7-41a4-bfb5-b799a2d67023",
+      "span_id": "run_a2a_send_d11253e98035b494",
+      "status": "ok",
+      "task_id": "a2a-send-0c69ca426cb2",
+      "trace_id": "trace_a2a_send_d11253e98035b494"
+    },
+    "task_id": "a2a-send-0c69ca426cb2",
+    "trace_id": "trace_a2a_send_d11253e98035b494"
+  },
+  "runtime_warrant_ref": {
+    "action": "publish",
+    "allowed_claims": [
+      "a2a_publish_attempt",
+      "broker_publish_attempt",
+      "publish_only",
+      "runtime_receipt_pending"
+    ],
+    "blocked_claims": [],
+    "idempotency_record_ref": "idempotency_records:idem_a2a_send:dharma.a2a.palantir-pilot:0c69ca426cb2:a2a_send.publish:dharma.a2a.palantir-pilot:0c69ca426cb2",
+    "receipt_id": "rr_run_a2a_send_d11253e98035b494_warrant_01feecd0d2659d69dcc9b494_granted",
+    "side_effect_key": "a2a_send.publish:dharma.a2a.palantir-pilot:0c69ca426cb2",
+    "status": "granted",
+    "surface": "scripts/runtime/a2a_send.py",
+    "warrant_id": "warrant_01feecd0d2659d69dcc9b494"
+  },
+  "schema_version": "dharma.a2a.send_receipt.v1",
+  "sha256": "1f149a4120577f9fd13e045a9dcdd855b2ac818a7b318829220443ee7fbd6ddb",
+  "spine_evidence_receipt_ref": {
+    "operation": "a2a_send.publish",
+    "receipt_id": "a8715b01-69d7-41a4-bfb5-b799a2d67023",
+    "span_id": "run_a2a_send_d11253e98035b494",
+    "status": "ok",
+    "task_id": "a2a-send-0c69ca426cb2",
+    "trace_id": "trace_a2a_send_d11253e98035b494"
+  },
+  "status": "PUBLISH_ACKED",
+  "subject": "dharma.a2a.palantir-pilot",
+  "target_uid": "palantir-pilot",
+  "timestamp": "2026-06-15T15:55:05Z",
+  "to": "palantir-pilot",
+  "transport_ack": "NATS_CLI_JETSTREAM_PUB_ACK"
+}

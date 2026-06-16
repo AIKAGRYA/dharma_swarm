@@ -538,9 +538,11 @@ def _score_wiki_note(path: Path, text: str, terms: list[str]) -> int:
             "claims",
             "compare",
             "corpus",
+            "debt",
             "dharma",
             "evaluation",
             "expert",
+            "exhausted",
             "family",
             "first",
             "gap",
@@ -555,6 +557,7 @@ def _score_wiki_note(path: Path, text: str, terms: list[str]) -> int:
             "product",
             "qa",
             "ratchet",
+            "synthesis",
             "swarm",
             "titanium",
             "transfer",
@@ -578,6 +581,8 @@ def _score_wiki_note(path: Path, text: str, terms: list[str]) -> int:
             score += 1200
         if {"corpus", "coverage", "indexed"} & term_set and "corpus-map" in name:
             score += 1200
+        if {"next", "synthesis", "debt", "exhausted", "canonical"} & term_set and "synthesis-debt" in name:
+            score += 3600
     if {"contribution", "packet"} & term_set and "contributions" in parts:
         score += 2400
     if {"dharma", "swarm", "aip", "governance", "observability", "model"} & term_set and "contributions" in parts:

@@ -51,6 +51,39 @@ def test_shell_handler_runs_shlex_split_command_without_shell(tmp_path):
     assert "shell" not in kwargs
 
 
+def test_shell_handler_allows_name_drift_preflight(tmp_path):
+    calls = []
+    repo_root = str(cron_runner.Path(cron_runner.__file__).resolve().parent.parent)
+
+    class FakeProc:
+        returncode = 0
+        stdout = "scan ok"
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProc()
+
+    with patch("subprocess.run", fake_run):
+        result = execute_cron_job(
+            {
+                "id": "de_bug_corral_scan",
+                "handler": "shell",
+                "shell_command": (
+                    "python3 scripts/governance/name_drift_preflight.py "
+                    "--json-output ~/.dharma/logs/name_drift_preflight_latest.json"
+                ),
+            }
+        )
+
+    assert result.status == CronJobRunStatus.COMPLETED
+    assert result.output == "scan ok"
+    args, kwargs = calls[0]
+    assert args[:2] == ["python3", "scripts/governance/name_drift_preflight.py"]
+    assert kwargs["cwd"] == repo_root
+    assert "shell" not in kwargs
+
+
 def test_shell_handler_rejects_non_allowlisted_command(tmp_path):
     with patch("subprocess.run") as mock_run:
         result = execute_cron_job(

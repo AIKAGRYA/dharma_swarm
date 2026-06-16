@@ -1,0 +1,335 @@
+{
+  "ack_subject": "dharma.a2a.palantir-pilot.ack.0fdbef615251",
+  "ack_tier": "HANDLER_ACKED",
+  "collaboration_claim": "handler_ack",
+  "consumed": true,
+  "contact_evidence_tier": "HANDLER_ACKED",
+  "file": "reports/a2a/operator_packets/20260615T1555Z-palantir-pilot-name-drift.md",
+  "live_contact_claim": true,
+  "nats": {
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": false,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "system_ca_store"
+  },
+  "operator_contact_note": "target handler acked the packet subject; this is not by itself a semantic peer reply",
+  "packet_id": "0fdbef615251",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260615T160902Z-palantir-pilot-0fdbef615251.json",
+  "replied": true,
+  "reply_payload": {
+    "answer": "Palantir Pilot can answer this from the local public-source workspace, but only as public-source synthesis. Focus terms found: pilot, advise, dharma, swarm, repo, wide. Strongest public source families: foundry, defense_osdk, site. Relevant workspace synthesis: # Palantir Pilot Titanium Dharma Swarm Application Layer Observed: 2026-06-14T15:25Z Boundary: This page separates sourced public Palantir observations from inference and Dharma Swarm recommendations. # Ontology Application Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. # Foundry Platform Foundation Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only.",
+    "answer_engine": "palantir_pilot.local_public_source_query",
+    "answer_packet": {
+      "agent": {
+        "callsign": "palantir-pilot",
+        "id": "palantir_pilot",
+        "label": "Palantir Pilot"
+      },
+      "answer": "Palantir Pilot can answer this from the local public-source workspace, but only as public-source synthesis. Focus terms found: pilot, advise, dharma, swarm, repo, wide. Strongest public source families: foundry, defense_osdk, site. Relevant workspace synthesis: # Palantir Pilot Titanium Dharma Swarm Application Layer Observed: 2026-06-14T15:25Z Boundary: This page separates sourced public Palantir observations from inference and Dharma Swarm recommendations. # Ontology Application Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. # Foundry Platform Foundation Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only.",
+      "confidence": "medium_public_source_grounded",
+      "limitations": [
+        "No official Palantir affiliation, certification, private tenant access, or insider knowledge is claimed.",
+        "Source hits are public URL metadata unless a cited wiki note is present.",
+        "Do not treat this as a substitute for authorized Palantir training, docs access, or tenant-specific guidance."
+      ],
+      "next_steps": [
+        "Read cited public docs directly before using the answer for implementation decisions.",
+        "Promote stronger summaries into the Palantir Pilot wiki after source-specific review.",
+        "Keep Learn/course-catalog material manual-review only unless an allowed access path is established."
+      ],
+      "note_citations": [
+        {
+          "evidence_type": "original_wiki_note_snippet",
+          "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/titanium-dharma-swarm-application-layer.md",
+          "snippet": "# Palantir Pilot Titanium Dharma Swarm Application Layer Observed: 2026-06-14T15:25Z Boundary: This page separates sourced public Palantir observations from inference and Dharma Swarm recommendations. It does not claim Palantir affiliation, certification, tena..."
+        },
+        {
+          "evidence_type": "original_wiki_note_snippet",
+          "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/ontology-application-loop-contribution.md",
+          "snippet": "# Ontology Application Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palanti..."
+        },
+        {
+          "evidence_type": "original_wiki_note_snippet",
+          "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/foundry-platform-foundation-contribution.md",
+          "snippet": "# Foundry Platform Foundation Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palan..."
+        },
+        {
+          "evidence_type": "original_wiki_note_snippet",
+          "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/developer-api-osdk-loop-contribution.md",
+          "snippet": "# Developer API and OSDK Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palan..."
+        }
+      ],
+      "observed_at": "2026-06-15T16:09:02.934868Z",
+      "query": "Palantir Pilot, advise on Dharma Swarm repo-wide name drift as a semantic ontology problem, citing your local Palantir public-source knowledge base and your registration boundaries.",
+      "query_packet": {
+        "agent": {
+          "callsign": "palantir-pilot",
+          "id": "palantir_pilot"
+        },
+        "family_filter": "",
+        "indexed_url_count": 5611,
+        "latest_source_index": "/Users/dhyana/.dharma/knowledge/wiki/raw/palantir-pilot/source-index-20260614T061333Z.json",
+        "note_hits": [
+          {
+            "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/titanium-dharma-swarm-application-layer.md",
+            "score": 2667,
+            "snippet": "# Palantir Pilot Titanium Dharma Swarm Application Layer Observed: 2026-06-14T15:25Z Boundary: This page separates sourced public Palantir observations from inference and Dharma Swarm recommendations. It does not claim Palantir affiliation, certification, tena..."
+          },
+          {
+            "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/ontology-application-loop-contribution.md",
+            "score": 1988,
+            "snippet": "# Ontology Application Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palanti..."
+          },
+          {
+            "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/source-card-index.md",
+            "score": 1973,
+            "snippet": "# Palantir Pilot Source Card Index Observed: 2026-06-14T16:52:20.982707Z Card count: 4261 Latest batch card count: 38 Machine receipt: `/Users/dhyana/.dharma/knowledge/wiki/raw/palantir-pilot/source-cards/source-cards-20260614T165401Z.json` Boundary: bounded p..."
+          },
+          {
+            "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/foundry-platform-foundation-contribution.md",
+            "score": 1958,
+            "snippet": "# Foundry Platform Foundation Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palan..."
+          },
+          {
+            "path": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/developer-api-osdk-loop-contribution.md",
+            "score": 1949,
+            "snippet": "# Developer API and OSDK Loop Playbook - Dharma Swarm Contribution Packet Observed: 2026-06-14T16:54:04.573886Z Source cards considered: 4261 Selected anchors: 8 Boundary: original Dharma Swarm synthesis from bounded public Palantir source cards only. No Palan..."
+          }
+        ],
+        "observed_at": "2026-06-15T16:09:02.053522Z",
+        "query": "Palantir Pilot, advise on Dharma Swarm repo-wide name drift as a semantic ontology problem, citing your local Palantir public-source knowledge base and your registration boundaries.",
+        "schema_version": "palantir_pilot.query_packet.v1",
+        "source_boundary": "Local search over source metadata and original wiki notes only; no private Palantir material and no full page/course body storage.",
+        "source_hits": [
+          {
+            "family": "site",
+            "lastmod": "2026-06-12T19:33:42.219Z",
+            "score": 13,
+            "sitemap": "https://www.palantir.com/sitemap.xml",
+            "url": "https://www.palantir.com/newsroom/press-releases/palantir-expands-longstanding-cdc-partnership-for-disease-monitoring-and/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.116Z",
+            "score": 12,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.116Z",
+            "score": 12,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/v2/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+          },
+          {
+            "family": "defense_osdk",
+            "lastmod": "2026-06-11T15:53:36.119Z",
+            "score": 11,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/defense-osdk/api/common/interfaceTypes/com-palantir-ontology-defense-types-reportObservation/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.116Z",
+            "score": 11,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/connection-basics/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.117Z",
+            "score": 11,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/ontologies-v2-resources/ontology-interfaces/ontology-interface-basics/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.117Z",
+            "score": 11,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/ontologies-v2-resources/ontology-object-sets/ontology-object-set-basics/"
+          },
+          {
+            "family": "foundry",
+            "lastmod": "2026-06-11T15:53:36.117Z",
+            "score": 11,
+            "sitemap": "https://www.palantir.com/docs/sitemap.xml",
+            "url": "https://palantir.com/docs/foundry/api/ontologies-v2-resources/ontology-objects/ontology-object-basics/"
+          }
+        ]
+      },
+      "schema_version": "palantir_pilot.answer_packet.v1",
+      "source_boundary": "Public-source workspace synthesis over URL metadata and original wiki notes only; no private Palantir material and no full page/course body storage.",
+      "source_citations": [
+        {
+          "evidence_type": "public_url_metadata",
+          "family": "site",
+          "lastmod": "2026-06-12T19:33:42.219Z",
+          "url": "https://www.palantir.com/newsroom/press-releases/palantir-expands-longstanding-cdc-partnership-for-disease-monitoring-and/"
+        },
+        {
+          "evidence_type": "public_url_metadata",
+          "family": "foundry",
+          "lastmod": "2026-06-11T15:53:36.116Z",
+          "url": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+        },
+        {
+          "evidence_type": "public_url_metadata",
+          "family": "foundry",
+          "lastmod": "2026-06-11T15:53:36.116Z",
+          "url": "https://palantir.com/docs/foundry/api/v2/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+        },
+        {
+          "evidence_type": "public_url_metadata",
+          "family": "defense_osdk",
+          "lastmod": "2026-06-11T15:53:36.119Z",
+          "url": "https://palantir.com/docs/defense-osdk/api/common/interfaceTypes/com-palantir-ontology-defense-types-reportObservation/"
+        },
+        {
+          "evidence_type": "public_url_metadata",
+          "family": "foundry",
+          "lastmod": "2026-06-11T15:53:36.116Z",
+          "url": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/connection-basics/"
+        }
+      ]
+    },
+    "confidence": "medium_public_source_grounded",
+    "display_name": "Palantir Pilot",
+    "evidence_refs": [
+      {
+        "family": "site",
+        "kind": "public_url_metadata",
+        "ref": "https://www.palantir.com/newsroom/press-releases/palantir-expands-longstanding-cdc-partnership-for-disease-monitoring-and/"
+      },
+      {
+        "family": "foundry",
+        "kind": "public_url_metadata",
+        "ref": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+      },
+      {
+        "family": "foundry",
+        "kind": "public_url_metadata",
+        "ref": "https://palantir.com/docs/foundry/api/v2/connectivity-v2-resources/connections/get-configuration-connections-batch/"
+      },
+      {
+        "family": "defense_osdk",
+        "kind": "public_url_metadata",
+        "ref": "https://palantir.com/docs/defense-osdk/api/common/interfaceTypes/com-palantir-ontology-defense-types-reportObservation/"
+      },
+      {
+        "family": "foundry",
+        "kind": "public_url_metadata",
+        "ref": "https://palantir.com/docs/foundry/api/connectivity-v2-resources/connections/connection-basics/"
+      },
+      {
+        "family": "",
+        "kind": "local_wiki_note",
+        "ref": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/titanium-dharma-swarm-application-layer.md"
+      },
+      {
+        "family": "",
+        "kind": "local_wiki_note",
+        "ref": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/ontology-application-loop-contribution.md"
+      },
+      {
+        "family": "",
+        "kind": "local_wiki_note",
+        "ref": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/foundry-platform-foundation-contribution.md"
+      },
+      {
+        "family": "",
+        "kind": "local_wiki_note",
+        "ref": "/Users/dhyana/.dharma/knowledge/wiki/research/palantir-pilot/contributions/developer-api-osdk-loop-contribution.md"
+      }
+    ],
+    "from_agent": "palantir-pilot",
+    "from_agent_id": "palantir_pilot",
+    "operator_contact_note": "semantic reply generated by the local Palantir Pilot public-source workspace; no official Palantir affiliation, private tenant access, or Learn/course scraping is claimed",
+    "packet_id": "0fdbef615251",
+    "peer_model_processed_claim": false,
+    "query": "Palantir Pilot, advise on Dharma Swarm repo-wide name drift as a semantic ontology problem, citing your local Palantir public-source knowledge base and your registration boundaries.",
+    "registration_boundary": {
+      "authority": "external_worker_evidence_only",
+      "forbidden_actions": [
+        "bypass login, paywall, robots.txt, rate limits, or course enrollment controls",
+        "store full copyrighted Palantir pages, course text, videos, transcripts, or labs wholesale",
+        "claim official Palantir affiliation, certification, access, or insider knowledge",
+        "read or write provider secrets outside the declared Dharma key owner",
+        "spend money, enroll accounts, submit forms, or touch live external accounts",
+        "mutate repo source outside an explicit assignment and verifier receipt",
+        "present summaries without source URL, retrieval date, and confidence"
+      ],
+      "official_affiliation": false,
+      "private_palantir_access": false,
+      "public_source_only": true
+    },
+    "reply_subject": "dharma.a2a.palantir-pilot.reply.0fdbef615251",
+    "schema_version": "dharma.a2a.semantic_reply.v1",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/palantir-pilot/0fdbef615251-answer.json",
+    "source_boundary": "Public-source workspace synthesis over URL metadata and original wiki notes only; no private Palantir material and no full page/course body storage.",
+    "timestamp": "2026-06-15T16:09:02Z",
+    "to_agent": "codex"
+  },
+  "reply_subject": "dharma.a2a.palantir-pilot.reply.0fdbef615251",
+  "route": "a2a",
+  "runtime_truth_ref": {
+    "claim_id": "claim_a2a_send_c28a72ba76293d70",
+    "correlation_id": "a2a_send:palantir-pilot:0fdbef615251",
+    "idempotency_inserted": true,
+    "idempotency_key": "idem_a2a_send:dharma.a2a.palantir-pilot:0fdbef615251",
+    "receipt_id": "rr_run_a2a_send_c28a72ba76293d70_a2a_send_palantir_pilot_replied",
+    "run_id": "run_a2a_send_c28a72ba76293d70",
+    "runtime_db": "/Users/dhyana/.dharma/state/runtime.db",
+    "side_effect_key": "a2a_send.publish:dharma.a2a.palantir-pilot:0fdbef615251",
+    "spine_evidence_receipt_ref": {
+      "operation": "a2a_send.publish",
+      "receipt_id": "a5203591-4e73-47e2-b03d-e5c191b9c21d",
+      "span_id": "run_a2a_send_c28a72ba76293d70",
+      "status": "ok",
+      "task_id": "a2a-send-0fdbef615251",
+      "trace_id": "trace_a2a_send_c28a72ba76293d70"
+    },
+    "task_id": "a2a-send-0fdbef615251",
+    "trace_id": "trace_a2a_send_c28a72ba76293d70"
+  },
+  "runtime_warrant_ref": {
+    "action": "publish",
+    "allowed_claims": [
+      "a2a_publish_attempt",
+      "broker_publish_attempt",
+      "publish_only",
+      "runtime_receipt_pending"
+    ],
+    "blocked_claims": [],
+    "idempotency_record_ref": "idempotency_records:idem_a2a_send:dharma.a2a.palantir-pilot:0fdbef615251:a2a_send.publish:dharma.a2a.palantir-pilot:0fdbef615251",
+    "receipt_id": "rr_run_a2a_send_c28a72ba76293d70_warrant_2998cd698616768fff72c580_granted",
+    "side_effect_key": "a2a_send.publish:dharma.a2a.palantir-pilot:0fdbef615251",
+    "status": "granted",
+    "surface": "scripts/runtime/a2a_send.py",
+    "warrant_id": "warrant_2998cd698616768fff72c580"
+  },
+  "schema_version": "dharma.a2a.send_receipt.v1",
+  "seq": 8372,
+  "sha256": "1f149a4120577f9fd13e045a9dcdd855b2ac818a7b318829220443ee7fbd6ddb",
+  "spine_evidence_receipt_ref": {
+    "operation": "a2a_send.publish",
+    "receipt_id": "a5203591-4e73-47e2-b03d-e5c191b9c21d",
+    "span_id": "run_a2a_send_c28a72ba76293d70",
+    "status": "ok",
+    "task_id": "a2a-send-0fdbef615251",
+    "trace_id": "trace_a2a_send_c28a72ba76293d70"
+  },
+  "status": "PALANTIR_PILOT_REPLIED",
+  "stream": "DHARMA_FLEET",
+  "subject": "dharma.a2a.palantir-pilot",
+  "target_uid": "palantir-pilot",
+  "timestamp": "2026-06-15T16:09:01Z",
+  "to": "palantir-pilot",
+  "transport_ack": "JETSTREAM_PUB_ACK"
+}

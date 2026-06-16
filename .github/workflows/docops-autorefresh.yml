@@ -25,7 +25,8 @@ name: docops-autorefresh
 #   - It does not edit anything but the auto-generated count sections.
 
 on:
-  pull_request:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main, "promote/**", "governance/**"]
   workflow_dispatch:
     inputs:
@@ -60,12 +61,14 @@ jobs:
           INPUT_PR: ${{ github.event.inputs.pr }}
           PULL_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PULL_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PULL_BASE_REF: ${{ github.event.pull_request.base.ref }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [ "${EVENT_NAME}" = "pull_request" ]; then
+          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
             head_ref="${PULL_HEAD_REF}"
             head_repo="${PULL_HEAD_REPO}"
+            base_ref="${PULL_BASE_REF}"
           else
             if [ -z "${INPUT_PR}" ]; then
               echo "workflow_dispatch requires the pr input" >&2
@@ -73,6 +76,7 @@ jobs:
             fi
             head_repo="$(gh pr view "${INPUT_PR}" --repo "${REPOSITORY}" --json headRepository --jq '.headRepository.nameWithOwner')"
             head_ref="$(gh pr view "${INPUT_PR}" --repo "${REPOSITORY}" --json headRefName --jq '.headRefName')"
+            base_ref="$(gh pr view "${INPUT_PR}" --repo "${REPOSITORY}" --json baseRefName --jq '.baseRefName')"
           fi
 
           if [ "${head_repo}" != "${REPOSITORY}" ]; then
@@ -84,6 +88,16 @@ jobs:
           echo "same_repo=true" >> "${GITHUB_OUTPUT}"
           echo "head_ref=${head_ref}" >> "${GITHUB_OUTPUT}"
           echo "head_repo=${head_repo}" >> "${GITHUB_OUTPUT}"
+          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout trusted DocOps source
+        if: steps.pr.outputs.same_repo == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ steps.pr.outputs.base_ref }}
+          path: trusted
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Checkout PR head branch
         if: steps.pr.outputs.same_repo == 'true'
@@ -91,6 +105,7 @@ jobs:
         with:
           # Check out the PR's head branch (not the merge ref) so we can commit back.
           ref: ${{ steps.pr.outputs.head_ref }}
+          path: worktree
           fetch-depth: 0
           persist-credentials: true
 
@@ -104,9 +119,14 @@ jobs:
         if: steps.pr.outputs.same_repo == 'true'
         run: |
           set -euo pipefail
-          # Reuse the existing writer. This rewrites only the auto-generated
-          # count sections in the docs the gate governs.
-          python3 scripts/docops/check_docops_integrity.py --write-auto-sections || true
+          # Run the trusted base-branch writer against the PR worktree. The PR
+          # may edit docs, but it does not get to replace the Python that runs
+          # with write-token authority.
+          cd worktree
+          python3 ../trusted/scripts/docops/check_docops_integrity.py \
+            --repo-root . \
+            --assertions docs/docops/assertions.yaml \
+            --write-auto-sections || true
 
       - name: Commit and push refreshed counts (only if changed)
         if: steps.pr.outputs.same_repo == 'true'
@@ -118,19 +138,26 @@ jobs:
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
         run: |
           set -euo pipefail
-          if [ -z "$(git status --porcelain)" ]; then
+          cd worktree
+          generated_paths=(
+            docs/docops/AUTO_INVENTORY.md
+            docs/governance/SOVEREIGN_MANIFEST.md
+          )
+          if [ -z "$(git status --porcelain -- "${generated_paths[@]}")" ]; then
             echo "DocOps counts already in sync — nothing to refresh."
             exit 0
           fi
           echo "DocOps counts were stale; committing refresh:"
-          git status --porcelain
+          git status --porcelain -- "${generated_paths[@]}"
           git config user.name "docops-autorefresh-bot"
           git config user.email "docops-autorefresh-bot@users.noreply.github.com"
-          # Stage only the docs the DocOps gate governs — never blanket `git add -A`
-          # (respects local rule dharma.scripts-no-git-add-all). The writer only
-          # rewrites tracked count sections, so staging modified-tracked files is
-          # sufficient and explicit.
-          git add -u
+          # Stage only generated DocOps count surfaces — never blanket `git add -A`
+          # and never stage unrelated files that a PR might have changed.
+          git add "${generated_paths[@]}"
+          if git diff --cached --quiet; then
+            echo "Generated DocOps paths had no staged changes."
+            exit 0
+          fi
           git commit \
             -m "chore(docops): auto-refresh count-sensitive sections" \
             -m "Mechanical refresh of auto-generated DocOps count sections so the read-only DocOps integrity gate passes. Generated by docops-autorefresh.yml (reuses scripts/docops/check_docops_integrity.py --write-auto-sections). No hand-authored content changed."

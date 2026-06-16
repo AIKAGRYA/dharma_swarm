@@ -89,7 +89,7 @@ def unattended_claude_auth_error(
     if merged.get("ANTHROPIC_API_KEY", "").strip():
         return None
     return (
-        "ERROR: unattended Claude bare mode requires ANTHROPIC_API_KEY; "
+        "SKIP: unattended Claude bare mode requires ANTHROPIC_API_KEY; "
         "OAuth/login is ignored in --bare mode"
     )
 

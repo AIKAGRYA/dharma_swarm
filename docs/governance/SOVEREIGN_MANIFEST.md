@@ -452,21 +452,22 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
+<!-- DOCOPS:START metric=sovereign_manifest_inventory -->
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **745** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **401 (53.8%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,811** | wc -l across dharma_swarm Python modules |
-| Test files | **712** | find tests -name "*.py" -type f |
-| Test functions | **11,720 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **745** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
+| Top-level (flat) modules | **401 (53.8%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
+| Total Python LOC | **311,125** | wc -l across dharma_swarm Python modules |
+| Test files | **712** | git ls-files tests \| rg '\.py$' \| wc -l |
+| Test functions | **11,723 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1046** | find . -name "*.md" -type f |
-| Markdown total lines | **251,772** | wc -l across all .md |
-| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
-| Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
-| Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
+| Markdown files | **1,046** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| wc -l |
+| Markdown total lines | **251,776** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
+| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f \| wc -l |
+| Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" \| wc -l |
+| Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" \| wc -l |
+| Router files | **14** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" \| wc -l |
 | Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
 | Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
 | Provider types (enum) | **18** | models.py ProviderType enum |
@@ -479,6 +480,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Circular dependency chains | **9 confirmed** | import tracing |
 | Files >500 lines | **148** | wc -l + awk |
 | Files >3000 lines | **7** | wc -l + awk |
+<!-- DOCOPS:END -->
 
 ---
 

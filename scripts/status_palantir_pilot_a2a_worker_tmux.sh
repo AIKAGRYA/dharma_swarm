@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SESSION="${SESSION_NAME:-dharma_a2a_inbox_bridge_hermes_m5}"
-AGENT_UID="${AGENT_UID:-hermes-m5}"
-CONSUMER="${CONSUMER:-hermes_inbox}"
+SESSION="${SESSION_NAME:-dharma_palantir_pilot_a2a_worker}"
+SUBJECT="${SUBJECT:-dharma.a2a.palantir-pilot}"
+CONSUMER="${CONSUMER:-palantir_pilot_a2a}"
 STREAM="${STREAM:-DHARMA_FLEET}"
-HEARTBEAT_FILE="${HOME}/.dharma/a2a_bus/bridge_heartbeats/${AGENT_UID}.json"
-LOG_FILE="${HOME}/.dharma/logs/a2a_inbox_bridge/${SESSION}.log"
+HEARTBEAT_FILE="${HOME}/.dharma/a2a_bus/worker_heartbeats/palantir-pilot.json"
+LOG_FILE="${HOME}/.dharma/logs/palantir_pilot_a2a_worker/${SESSION}.log"
 
 if tmux has-session -t "${SESSION}" 2>/dev/null; then
   echo "status=running session=${SESSION}"
@@ -15,7 +15,7 @@ else
   echo "status=stopped session=${SESSION}"
 fi
 
-echo "agent_uid=${AGENT_UID}"
+echo "subject=${SUBJECT}"
 echo "consumer=${CONSUMER}"
 echo "stream=${STREAM}"
 echo "heartbeat=${HEARTBEAT_FILE}"
@@ -31,9 +31,9 @@ if command -v nats >/dev/null 2>&1; then
   nats --no-context -s nats://127.0.0.1:4222 consumer info "${STREAM}" "${CONSUMER}" -j --no-select || true
 fi
 
-if [[ -d "${ROOT}/reports/a2a/inbox_bridge_receipts" ]]; then
-  echo "--- latest bridge receipts ---"
-  find "${ROOT}/reports/a2a/inbox_bridge_receipts" -maxdepth 1 -type f -name '*.json' -print \
+if [[ -d "${ROOT}/reports/a2a/palantir_pilot_worker_receipts" ]]; then
+  echo "--- latest worker receipts ---"
+  find "${ROOT}/reports/a2a/palantir_pilot_worker_receipts" -maxdepth 1 -type f -name '*.json' -print \
     | sort -r \
     | head -5
 fi

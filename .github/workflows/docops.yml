@@ -52,6 +52,7 @@ jobs:
         run: |
           mkdir -p reports/docops
           python3 scripts/docops/check_docops_integrity.py \
+            --inventory-only \
             --inventory-json reports/docops/corpus_inventory.json \
             --inventory-markdown reports/docops/corpus_inventory.md || true
 

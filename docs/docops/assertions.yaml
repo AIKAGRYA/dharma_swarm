@@ -263,7 +263,8 @@
   },
   "auto_sections": {
     "include": [
-      "docs/docops/AUTO_INVENTORY.md"
+      "docs/docops/AUTO_INVENTORY.md",
+      "docs/governance/SOVEREIGN_MANIFEST.md"
     ]
   },
   "change_review": {

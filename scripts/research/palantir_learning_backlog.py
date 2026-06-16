@@ -134,6 +134,10 @@ def _strict_checks(receipt: dict[str, object]) -> dict[str, bool]:
     action_rows = actions if isinstance(actions, list) else []
     quality = receipt.get("quality_snapshot")
     snapshot = quality if isinstance(quality, dict) else {}
+    canonical_allowed_coverage = float(
+        snapshot.get("canonical_coverage_percent_canonical_allowed_card_candidates") or 0
+    )
+    canonical_growth_exhausted = canonical_allowed_coverage >= 99.99
     candidate_urls = [
         str(url)
         for action in action_rows
@@ -143,7 +147,7 @@ def _strict_checks(receipt: dict[str, object]) -> dict[str, bool]:
     return {
         "has_source_index": int(snapshot.get("source_url_count") or 0) > 0,
         "has_source_cards": int(snapshot.get("source_card_count") or 0) > 0,
-        "has_learning_actions": bool(action_rows),
+        "has_learning_actions": bool(action_rows) or canonical_growth_exhausted,
         "candidate_urls_allowed": all(
             source_cards.is_allowed_source_card_url(url) for url in candidate_urls
         ),
@@ -175,15 +179,22 @@ def _format_backlog_markdown(receipt: dict[str, object]) -> str:
         f"- Cadence: {receipt.get('cadence', '')}",
         f"- Source URLs indexed: {snapshot.get('source_url_count', 0)}",
         f"- Allowed source-card candidates: {snapshot.get('allowed_source_card_candidate_count', 0)}",
+        f"- Canonical allowed source-card candidates: {snapshot.get('canonical_allowed_source_card_candidate_count', 0)}",
         f"- Canonical source cards: {snapshot.get('canonical_source_card_count', 0)}",
-        f"- Allowed candidate coverage: {snapshot.get('canonical_coverage_percent_allowed_card_candidates', 0)}%",
+        f"- Raw allowed candidate coverage: {snapshot.get('canonical_coverage_percent_allowed_card_candidates', 0)}%",
+        f"- Canonical allowed candidate coverage: {snapshot.get('canonical_coverage_percent_canonical_allowed_card_candidates', 0)}%",
         f"- Quality flags: `{snapshot.get('flag_counts', {})}`",
         "",
         "## Next Actions",
         "",
     ]
     if not action_rows:
-        lines.append("- No learning actions selected. Re-run after source index or quality queue changes.")
+        if receipt.get("learning_state") == "canonical_docs_exhausted":
+            lines.append(
+                "- No learning actions selected because all canonical allowed public-doc source-card candidates are covered. Re-run after source index or quality queue changes."
+            )
+        else:
+            lines.append("- No learning actions selected. Re-run after source index or quality queue changes.")
     for action in action_rows:
         if not isinstance(action, dict):
             continue
@@ -279,7 +290,16 @@ def build_learning_backlog(
     )
     flag_counts = quality.get("flag_counts")
     flags = flag_counts if isinstance(flag_counts, dict) else {}
-    learning_state = "repair_first" if flags else "growth_ready"
+    duplicate_count = int(quality.get("duplicate_group_count") or 0)
+    canonical_allowed_coverage = float(
+        quality.get("canonical_coverage_percent_canonical_allowed_card_candidates") or 0
+    )
+    if flags or duplicate_count:
+        learning_state = "repair_first"
+    elif canonical_allowed_coverage >= 99.99 and not actions:
+        learning_state = "canonical_docs_exhausted"
+    else:
+        learning_state = "growth_ready"
 
     receipt: dict[str, object] = {
         "schema_version": SCHEMA_VERSION,
@@ -290,10 +310,16 @@ def build_learning_backlog(
         "quality_snapshot": {
             "source_url_count": quality.get("source_url_count", 0),
             "allowed_source_card_candidate_count": quality.get("allowed_source_card_candidate_count", 0),
+            "canonical_allowed_source_card_candidate_count": quality.get(
+                "canonical_allowed_source_card_candidate_count", 0
+            ),
             "source_card_count": quality.get("source_card_count", 0),
             "canonical_source_card_count": quality.get("canonical_source_card_count", 0),
             "canonical_coverage_percent_allowed_card_candidates": quality.get(
                 "canonical_coverage_percent_allowed_card_candidates", 0
+            ),
+            "canonical_coverage_percent_canonical_allowed_card_candidates": quality.get(
+                "canonical_coverage_percent_canonical_allowed_card_candidates", 0
             ),
             "flag_counts": quality.get("flag_counts", {}),
             "duplicate_group_count": quality.get("duplicate_group_count", 0),

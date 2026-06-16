@@ -911,6 +911,67 @@ def test_learning_backlog_plans_bounded_growth_and_is_queryable(tmp_path):
     assert any("learning-backlog.md" in item["path"] for item in packet["note_hits"])
 
 
+def test_learning_backlog_passes_when_canonical_docs_are_exhausted(tmp_path):
+    dharma_home = tmp_path / ".dharma"
+    raw_dir = dharma_home / "knowledge/wiki/raw/palantir-pilot"
+    raw_dir.mkdir(parents=True)
+    (raw_dir / "source-index-20260614T000000Z.json").write_text(
+        """
+        {
+          "url_count": 2,
+          "urls": [
+            {"loc": "https://palantir.com/docs/foundry/api/ontologies-v2-resources/linked-objects/list-linked-objects/", "family": "foundry"},
+            {"loc": "https://palantir.com/docs/foundry/api/v2/ontologies-v2-resources/linked-objects/list-linked-objects/", "family": "foundry"}
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    card_dir = dharma_home / "knowledge/wiki/research/palantir-pilot/source-cards"
+    card_dir.mkdir(parents=True)
+    (card_dir / "linked-objects.md").write_text(
+        "# Palantir Source Card: Linked Objects\n\n"
+        "Source URL: https://palantir.com/docs/foundry/api/ontologies-v2-resources/linked-objects/list-linked-objects/\n"
+        "Family: `foundry`\n\n"
+        "## Source Summary\n\n"
+        "- Title: Linked Objects\n"
+        "- Meta description: Public metadata\n"
+        "- Short excerpt: Public excerpt for linked objects.\n\n"
+        "## Extracted Headings\n\n"
+        "- `h1` Linked Objects\n\n"
+        "## Practical Orientation\n\n"
+        "This public docs page is represented by one canonical source card even when "
+        "the source index contains versioned API aliases for the same underlying "
+        "public documentation route. The card stores only metadata, headings, one "
+        "short excerpt, and original synthesis for bounded test coverage.\n\n"
+        "## Storage Boundary\n\n"
+        "Stores title, meta description, headings, one short excerpt, and original "
+        "orientation only. Does not store full page body, course body, videos, labs, "
+        "quizzes, private tenant material, or gated Learn content.\n",
+        encoding="utf-8",
+    )
+
+    receipt = build_learning_backlog(
+        dharma_home=dharma_home,
+        observed_at="2026-06-14T00:00:00Z",
+        limit_per_topic=2,
+        max_actions=4,
+    )
+
+    assert receipt["learning_state"] == "canonical_docs_exhausted"
+    assert receipt["action_count"] == 0
+    assert receipt["strict_pass"] is True
+    assert receipt["strict_checks"]["has_learning_actions"] is True
+    assert (
+        receipt["quality_snapshot"][
+            "canonical_coverage_percent_canonical_allowed_card_candidates"
+        ]
+        == 100.0
+    )
+    backlog_text = Path(receipt["backlog_path"]).read_text(encoding="utf-8")
+    assert "all canonical allowed public-doc source-card candidates are covered" in backlog_text
+
+
 def test_source_card_topic_selection_skips_existing_and_indexes_all_cards(tmp_path):
     dharma_home = tmp_path / ".dharma"
     raw_dir = dharma_home / "knowledge/wiki/raw/palantir-pilot"
@@ -1091,6 +1152,8 @@ def test_source_card_quality_report_flags_duplicates_and_review_queue(tmp_path):
 
     assert report["source_card_count"] == 3
     assert report["canonical_source_card_count"] == 2
+    assert report["canonical_allowed_source_card_candidate_count"] == 3
+    assert report["canonical_coverage_percent_canonical_allowed_card_candidates"] == 66.67
     assert report["duplicate_excess_card_count"] == 1
     assert report["duplicate_group_count"] == 1
     assert report["flag_counts"]["canonical_duplicate_group"] == 2
@@ -1101,6 +1164,7 @@ def test_source_card_quality_report_flags_duplicates_and_review_queue(tmp_path):
     report_text = Path(outputs["report_path"]).read_text(encoding="utf-8")
     assert "Coverage of allowed source-card candidates" in report_text
     assert "Canonical coverage of allowed source-card candidates" in report_text
+    assert "Canonical coverage of canonical allowed source-card candidates" in report_text
     assert "deprecated_path" in report_text
 
 

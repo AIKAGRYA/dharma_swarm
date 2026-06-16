@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""Scan naming-drift evidence and route it into DE_BUG_CORRAL.
+
+This is a read-only preflight. It does not decide whether a finding is true;
+it locates the latest files that talk about naming drift, alias drift, name
+mismatches, and Corral path drift, then tells the operator which numbered
+DE_BUG_CORRAL file should own or point to each item.
+
+Default output is human-readable stdout. Cron should write receipts outside
+the worktree, for example:
+
+    python3 scripts/governance/name_drift_preflight.py \
+      --json-output ~/.dharma/logs/name_drift_preflight_latest.json \
+      --markdown-output ~/.dharma/logs/name_drift_preflight_latest.md
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CANONICAL_CORRAL = Path("DE_BUG_CORRAL")
+CORRAL_INDEX = CANONICAL_CORRAL / "00.md"
+
+SKIP_DIRS = {
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "node_modules",
+}
+SKIP_PATH_PREFIXES = (
+    "tests/",
+    "docs/governance/hygiene/baselines/",
+)
+SKIP_EXACT_PATHS = {
+    "scripts/governance/agent_onboard.py",
+    "scripts/governance/name_drift_preflight.py",
+    "reports/governance/active_track_evidence.json",
+    "reports/governance/track_portfolio.json",
+}
+
+NAME_DRIFT_RE = re.compile(
+    "|".join(
+        [
+            r"name[-_ ]?drift",
+            r"naming drift",
+            r"naming inconsisten",
+            r"name mismatch",
+            r"key-name contract",
+            r"hyphen/underscore",
+            r"separator[-_ ]?drift",
+            r"semantic_aliases",
+            r"semantic_objects",
+            r"NameDriftPreflight",
+            r"alias index",
+            r"api_name",
+            r"bridge.*adapter.*connector",
+        ]
+    ),
+    re.IGNORECASE,
+)
+
+CORRAL_RE = re.compile(r"DE_BUG_CORRAL|debug corral|bug[-_ ]corral", re.IGNORECASE)
+MISSING_FILE_RE = re.compile(
+    r"(?P<path>[A-Za-z0-9_./-]+\.(?:py|md|yaml|yml|json))\s+MISSING",
+    re.IGNORECASE,
+)
+
+TEXT_EXTENSIONS = {
+    ".md",
+    ".txt",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".py",
+    ".sh",
+    ".toml",
+}
+
+
+@dataclass(frozen=True)
+class Hit:
+    path: str
+    line: int
+    text: str
+    route: str
+    reason: str
+    source_kind: str
+    last_touched: str
+
+
+@dataclass(frozen=True)
+class CorralState:
+    canonical_dir_present: bool
+    canonical_index_present: bool
+    noncanonical_paths: list[str]
+    existing_numbered_files: list[str]
+
+
+def _run(cmd: list[str], cwd: Path = REPO_ROOT) -> str:
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+    except Exception:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def _tracked_or_local_files(repo_root: Path) -> list[Path]:
+    raw = _run(["git", "ls-files", "-co", "--exclude-standard"], repo_root)
+    if raw:
+        files = [repo_root / line for line in raw.splitlines()]
+    else:
+        files = [p for p in repo_root.rglob("*") if p.is_file()]
+    filtered: list[Path] = []
+    for path in files:
+        try:
+            rel = path.relative_to(repo_root)
+        except ValueError:
+            continue
+        rel_text = rel.as_posix()
+        if any(part in SKIP_DIRS for part in rel.parts):
+            continue
+        if rel_text in SKIP_EXACT_PATHS:
+            continue
+        if any(rel_text.startswith(prefix) for prefix in SKIP_PATH_PREFIXES):
+            continue
+        if path.suffix.lower() not in TEXT_EXTENSIONS:
+            continue
+        filtered.append(path)
+    return sorted(filtered)
+
+
+def _last_touched(repo_root: Path, rel: str, path: Path) -> str:
+    git_date = _run(["git", "log", "-1", "--format=%cs", "--", rel], repo_root)
+    if git_date:
+        return git_date
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).date().isoformat()
+    except OSError:
+        return "unknown"
+
+
+def _source_kind(rel: str) -> str:
+    if rel.startswith("DE_BUG_CORRAL/"):
+        return "canonical-corral"
+    if rel.startswith("docs/bug-corral") or rel.startswith("docs/bug_corral"):
+        return "noncanonical-corral"
+    if rel.startswith("docs/governance/ACTIVE_TRACK") or rel.startswith("CLAUDE.md"):
+        return "active-track"
+    if rel.startswith("reports/governance/active_track_evidence"):
+        return "generated-track-evidence"
+    if rel.startswith("docs/governance/hygiene/"):
+        return "hygiene-doctrine"
+    if rel.startswith("docs/research/"):
+        return "research-finder"
+    if rel == "INTERFACE_MISMATCH_MAP.md":
+        return "live-ledger"
+    if rel == "docs/governance/REPO_GOVERNANCE_AUDIT.md":
+        return "live-ledger"
+    return "finder-or-code"
+
+
+def _is_stale_missing_claim(repo_root: Path, text: str) -> bool:
+    """Ignore generated MISSING lines when the file now exists."""
+    for match in MISSING_FILE_RE.finditer(text):
+        if (repo_root / match.group("path")).exists():
+            return True
+    return False
+
+
+def _route(rel: str, text: str) -> tuple[str, str]:
+    haystack = f"{rel}\n{text}".lower()
+    if "de_bug_corral" in haystack or "bug-corral" in haystack or "debug corral" in haystack:
+        return "DE_BUG_CORRAL/09.md", "corral path/provenance drift"
+    if "interface_mismatch_map" in haystack or "key-name contract" in haystack:
+        return "DE_BUG_CORRAL/01.md", "declared-vs-actual name mismatch"
+    if "active_track_evidence" in haystack or "track_portfolio" in haystack:
+        return "DE_BUG_CORRAL/04.md", "generated inventory evidence"
+    if "active_track" in haystack or "agent_admission" in haystack:
+        return "DE_BUG_CORRAL/07.md", "live doctrine or active-track pointer"
+    if "hygiene" in haystack or "anti_ai_slop" in haystack:
+        return "DE_BUG_CORRAL/02.md", "hygiene or anti-slop naming signal"
+    return "DE_BUG_CORRAL/03.md", "repo-wide naming and structural drift"
+
+
+def inspect_corral(repo_root: Path) -> CorralState:
+    canonical = repo_root / CANONICAL_CORRAL
+    noncanonical: list[str] = []
+    for rel in ("docs/bug-corral", "docs/bug_corral", "docs/bug-corral-arbiter"):
+        if (repo_root / rel).exists():
+            noncanonical.append(rel)
+    existing = []
+    if canonical.exists():
+        existing = sorted(p.name for p in canonical.glob("[0-9][0-9].md"))
+    return CorralState(
+        canonical_dir_present=canonical.is_dir(),
+        canonical_index_present=(repo_root / CORRAL_INDEX).is_file(),
+        noncanonical_paths=noncanonical,
+        existing_numbered_files=existing,
+    )
+
+
+def scan_repo(repo_root: Path = REPO_ROOT) -> list[Hit]:
+    hits: list[Hit] = []
+    seen: set[tuple[str, int, str]] = set()
+    for path in _tracked_or_local_files(repo_root):
+        try:
+            rel = path.relative_to(repo_root).as_posix()
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for idx, raw in enumerate(lines, start=1):
+            if not (NAME_DRIFT_RE.search(raw) or CORRAL_RE.search(raw)):
+                continue
+            text = " ".join(raw.strip().split())
+            if not text:
+                continue
+            if _is_stale_missing_claim(repo_root, text):
+                continue
+            key = (rel, idx, text)
+            if key in seen:
+                continue
+            seen.add(key)
+            route, reason = _route(rel, text)
+            hits.append(
+                Hit(
+                    path=rel,
+                    line=idx,
+                    text=text[:220],
+                    route=route,
+                    reason=reason,
+                    source_kind=_source_kind(rel),
+                    last_touched=_last_touched(repo_root, rel, path),
+                )
+            )
+    hits.sort(key=lambda h: (h.last_touched, h.path, h.line), reverse=True)
+    return hits
+
+
+def build_payload(repo_root: Path = REPO_ROOT) -> dict[str, object]:
+    hits = scan_repo(repo_root)
+    corral = inspect_corral(repo_root)
+    by_route: dict[str, int] = {}
+    for hit in hits:
+        by_route[hit.route] = by_route.get(hit.route, 0) + 1
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "repo_root": str(repo_root),
+        "canonical_corral": CORRAL_INDEX.as_posix(),
+        "corral_state": asdict(corral),
+        "hit_count": len(hits),
+        "by_route": dict(sorted(by_route.items())),
+        "hits": [asdict(hit) for hit in hits],
+    }
+
+
+def render_markdown(payload: dict[str, object], limit: int | None = None) -> str:
+    corral = payload["corral_state"]
+    assert isinstance(corral, dict)
+    hits = payload["hits"]
+    assert isinstance(hits, list)
+    shown = hits if limit is None else hits[:limit]
+    lines = [
+        "# Name Drift Preflight",
+        "",
+        f"Generated: {payload['generated_at']}",
+        f"Canonical Corral: `{payload['canonical_corral']}`",
+        "",
+        "## Corral State",
+        "",
+        f"- canonical dir present: {corral['canonical_dir_present']}",
+        f"- canonical index present: {corral['canonical_index_present']}",
+        f"- existing numbered files: {', '.join(corral['existing_numbered_files']) or '(none)'}",
+        f"- noncanonical corral paths: {', '.join(corral['noncanonical_paths']) or '(none)'}",
+        "",
+        "## Route Summary",
+        "",
+    ]
+    by_route = payload["by_route"]
+    assert isinstance(by_route, dict)
+    if by_route:
+        for route, count in by_route.items():
+            lines.append(f"- `{route}`: {count}")
+    else:
+        lines.append("- no name-drift hits found")
+    lines.extend(["", "## Hits", ""])
+    for item in shown:
+        assert isinstance(item, dict)
+        lines.append(
+            f"- `{item['route']}` <- `{item['path']}:{item['line']}` "
+            f"({item['source_kind']}, {item['last_touched']}): {item['text']}"
+        )
+    if limit is not None and len(hits) > limit:
+        lines.append(f"- ... {len(hits) - limit} more")
+    return "\n".join(lines) + "\n"
+
+
+def _write_text(path_text: str, content: str) -> None:
+    path = Path(path_text).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json", action="store_true", help="print JSON to stdout")
+    parser.add_argument("--limit", type=int, default=60, help="max hits in text output")
+    parser.add_argument("--json-output", help="write JSON receipt to this path")
+    parser.add_argument("--markdown-output", help="write Markdown receipt to this path")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="fail if the canonical corral is missing or noncanonical corral paths exist",
+    )
+    args = parser.parse_args(argv)
+
+    payload = build_payload(REPO_ROOT)
+    if args.json_output:
+        _write_text(args.json_output, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    if args.markdown_output:
+        _write_text(args.markdown_output, render_markdown(payload, limit=None))
+
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(render_markdown(payload, limit=args.limit))
+
+    corral = payload["corral_state"]
+    assert isinstance(corral, dict)
+    if args.strict and (
+        not corral["canonical_dir_present"] or corral["noncanonical_paths"]
+    ):
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

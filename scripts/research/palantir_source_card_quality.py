@@ -115,6 +115,15 @@ def _allowed_url_count(dharma_home: Path) -> int:
     return count
 
 
+def _allowed_canonical_url_count(dharma_home: Path) -> int:
+    canonical_urls: set[str] = set()
+    for row in source_cards.load_source_index_rows(dharma_home):
+        url = str(row.get("loc") or "")
+        if source_cards.is_allowed_source_card_url(url):
+            canonical_urls.add(source_cards.canonical_source_url(url))
+    return len(canonical_urls)
+
+
 def _review_queue(dharma_home: Path, *, limit_per_topic: int) -> dict[str, list[str]]:
     queue: dict[str, list[str]] = {}
     for topic in sorted(source_cards.TOPIC_PROFILES):
@@ -136,6 +145,7 @@ def build_quality_report(
     cards = source_card_rows(dharma_home)
     source_rows = source_cards.load_source_index_rows(dharma_home)
     allowed_count = _allowed_url_count(dharma_home)
+    canonical_allowed_count = _allowed_canonical_url_count(dharma_home)
     total_urls = len(source_rows)
 
     duplicate_groups_raw: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -187,6 +197,11 @@ def build_quality_report(
     canonical_allowed_coverage_percent = (
         round((canonical_card_count / allowed_count * 100), 2) if allowed_count else 0.0
     )
+    canonical_allowed_candidate_coverage_percent = (
+        round((canonical_card_count / canonical_allowed_count * 100), 2)
+        if canonical_allowed_count
+        else 0.0
+    )
 
     return {
         "schema_version": "palantir_pilot.source_card_quality.v1",
@@ -194,6 +209,7 @@ def build_quality_report(
         "boundary": "quality analysis over local URL metadata and source-card markdown only; no page/course fetching",
         "source_url_count": total_urls,
         "allowed_source_card_candidate_count": allowed_count,
+        "canonical_allowed_source_card_candidate_count": canonical_allowed_count,
         "source_card_count": len(cards),
         "canonical_source_card_count": canonical_card_count,
         "duplicate_excess_card_count": duplicate_excess_count,
@@ -201,6 +217,7 @@ def build_quality_report(
         "coverage_percent_allowed_card_candidates": allowed_coverage_percent,
         "canonical_coverage_percent_all_indexed_urls": canonical_coverage_percent,
         "canonical_coverage_percent_allowed_card_candidates": canonical_allowed_coverage_percent,
+        "canonical_coverage_percent_canonical_allowed_card_candidates": canonical_allowed_candidate_coverage_percent,
         "source_index_family_counts": _family_counts_from_source_index(dharma_home),
         "source_card_family_counts": dict(sorted(card_family_counts.items())),
         "flag_counts": dict(sorted(flag_counts.items())),
@@ -245,6 +262,7 @@ def _format_quality_markdown(report: dict[str, object]) -> str:
         "",
         f"- Indexed public URLs: {report.get('source_url_count', 0)}",
         f"- Allowed source-card candidates: {report.get('allowed_source_card_candidate_count', 0)}",
+        f"- Canonical allowed source-card candidates: {report.get('canonical_allowed_source_card_candidate_count', 0)}",
         f"- Source cards: {report.get('source_card_count', 0)}",
         f"- Canonical source cards: {report.get('canonical_source_card_count', 0)}",
         f"- Duplicate excess cards: {report.get('duplicate_excess_card_count', 0)}",
@@ -252,6 +270,7 @@ def _format_quality_markdown(report: dict[str, object]) -> str:
         f"- Coverage of allowed source-card candidates: {report.get('coverage_percent_allowed_card_candidates', 0)}%",
         f"- Canonical coverage of all indexed URLs: {report.get('canonical_coverage_percent_all_indexed_urls', 0)}%",
         f"- Canonical coverage of allowed source-card candidates: {report.get('canonical_coverage_percent_allowed_card_candidates', 0)}%",
+        f"- Canonical coverage of canonical allowed source-card candidates: {report.get('canonical_coverage_percent_canonical_allowed_card_candidates', 0)}%",
         "",
         "## Card Families",
         "",

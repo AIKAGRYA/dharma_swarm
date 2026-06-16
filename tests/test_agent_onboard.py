@@ -120,6 +120,16 @@ def test_onboard_surfaces_ai_hygiene_tranche():
     assert "agent-build-closeout" in result.stdout
 
 
+def test_onboard_surfaces_de_bug_corral_scan():
+    """The front door must point bug/name-drift work to DE_BUG_CORRAL."""
+    result = subprocess.run(
+        [sys.executable, str(ONBOARD_SCRIPT)],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert "DE_BUG_CORRAL/00.md" in result.stdout
+    assert "make bug-corral-scan" in result.stdout
+
+
 # ---------------------------------------------------------------------------
 # Fixture-driven unit tests for the parsers
 # ---------------------------------------------------------------------------
