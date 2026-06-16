@@ -359,7 +359,13 @@ spine-check:
 # owners (ACTIVE_TRACK.yaml, LIVE_OPS_DASHBOARD.md, BROKEN_REGISTER.md,
 # ACTIVE_SURFACE_MANIFEST.yaml). Always exits 0. Run this before any build
 # session — humans and agents both.
+#
+# Also registers the dharma-docops-counter merge driver (keep-ours for the
+# generated count files; .gitattributes) so AUTO_INVENTORY.md /
+# SOVEREIGN_MANIFEST.md stop conflicting on merge. Best-effort, never blocks
+# onboarding.
 onboard:
+	-scripts/docops/install_docops_merge_driver.sh
 	$(PYTHON) scripts/governance/agent_onboard.py
 
 # Whole-system orientation: identity, organs, tracks, canon custody, liveness,

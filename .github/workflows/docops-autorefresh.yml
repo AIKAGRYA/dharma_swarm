@@ -12,17 +12,22 @@ name: docops-autorefresh
 #
 # What this does (mechanical, non-judgmental — like pr-ci-health.yml):
 #   On a PR, run the EXISTING writer (scripts/docops/check_docops_integrity.py
-#   --write-auto-sections). If it rewrote any tracked file, commit the refreshed
-#   counts back to the PR head branch with --force-with-lease. The read-only
-#   docops gate then re-runs on the new commit and passes, so Merge Master Mike
-#   can merge without a human touching counts.
+#   --write-auto-sections --write-manifest-counts). The first flag rewrites the
+#   auto-generated DOCOPS:START/END sections (AUTO_INVENTORY.md); the second
+#   rewrites the asserted count tokens the gate validates (SOVEREIGN_MANIFEST.md
+#   counts), driven by the same docs/docops/assertions.yaml the gate reads. If it
+#   rewrote any tracked file, commit the refreshed counts back to the PR head
+#   branch with --force-with-lease. The read-only docops gate then re-runs on the
+#   new commit and passes, so Merge Master Mike can merge without a human touching
+#   counts. (Before --write-manifest-counts existed, SOVEREIGN_MANIFEST counts had
+#   to be hand-bumped on every PR — that gap is what this closes.)
 #
 # What this does NOT do:
 #   - It does not merge anything (MMM owns merges).
-#   - It adds no new writer (reuses the existing --write-auto-sections capability;
+#   - It adds no new writer (reuses check_docops_integrity.py's own write modes;
 #     respects Axiom A2 — no duplicate implementations).
 #   - It does not touch forks (skips PRs from forked repos, where it cannot push).
-#   - It does not edit anything but the auto-generated count sections.
+#   - It does not edit anything but the auto-generated / asserted count sections.
 
 on:
   pull_request:
@@ -104,9 +109,13 @@ jobs:
         if: steps.pr.outputs.same_repo == 'true'
         run: |
           set -euo pipefail
-          # Reuse the existing writer. This rewrites only the auto-generated
-          # count sections in the docs the gate governs.
-          python3 scripts/docops/check_docops_integrity.py --write-auto-sections || true
+          # Reuse the existing writer. --write-auto-sections rewrites the
+          # auto-generated DOCOPS:START/END sections (AUTO_INVENTORY.md);
+          # --write-manifest-counts rewrites the asserted count tokens the gate
+          # validates (SOVEREIGN_MANIFEST.md counts), so neither file needs a
+          # hand-bump. Both heals are idempotent.
+          python3 scripts/docops/check_docops_integrity.py \
+            --write-auto-sections --write-manifest-counts || true
 
       - name: Commit and push refreshed counts (only if changed)
         if: steps.pr.outputs.same_repo == 'true'
