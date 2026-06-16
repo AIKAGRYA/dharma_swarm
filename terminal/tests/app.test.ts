@@ -9001,7 +9001,8 @@ describe("App prompt submission", () => {
       const normalized = normalizeTerminalText(rendered);
       expect(normalized).toContain("> Reply OK");
       // FACE-1: the zen frame shows the quiet waiting row, not transient statusLine spam.
-      expect(normalized).toContain("… thinking · codex:gpt-5.4");
+      // Default route is the chat brain (Claude Opus 4.8), not the codex driver.
+      expect(normalized).toContain("… thinking · claude:claude-opus-4-8");
     } finally {
       instance.unmount();
       instance.cleanup();

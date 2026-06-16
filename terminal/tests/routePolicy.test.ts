@@ -159,9 +159,11 @@ describe("routePolicyFromValue", () => {
   test("preserves a sane default policy baseline", () => {
     const policy = defaultRoutePolicy();
 
-    expect(policy.routeId).toBe("codex:gpt-5.4");
-    expect(policy.provider).toBe("codex");
-    expect(policy.model).toBe("gpt-5.4");
+    // The boot default is the chat brain (Claude Opus 4.8) — what the operator
+    // talks to — not the codex command-driver.
+    expect(policy.routeId).toBe("claude:claude-opus-4-8");
+    expect(policy.provider).toBe("claude");
+    expect(policy.model).toBe("claude-opus-4-8");
     expect(policy.targets).toEqual([]);
   });
 });

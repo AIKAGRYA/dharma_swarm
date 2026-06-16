@@ -407,10 +407,16 @@ class TerminalBridge:
                             "capabilities": sorted(cap.name.lower() for cap in type(profile.capabilities) if profile.supports(cap)),
                         }
                     )
+                default_model = adapter.get_profile(None).model_id
+                # The claude lane's chat brain is Opus 4.8 (genius strategy), not
+                # the bare CLI id — report THAT so the route the operator sees
+                # matches who they are actually talking to.
+                if provider_id == "claude":
+                    default_model = self._chat_claude_model() or default_model
                 providers.append(
                     {
                         "provider_id": provider_id,
-                        "default_model": adapter.get_profile(None).model_id,
+                        "default_model": default_model,
                         "models": models,
                     }
                 )
@@ -419,7 +425,14 @@ class TerminalBridge:
                 "type": "handshake.result",
                 "request_id": request_id,
                 "providers": providers,
-                "default_provider": "codex" if "codex" in self._adapters else (sorted(self._adapters)[0] if self._adapters else ""),
+                # Claude is the chat brain the operator talks to — show it as the
+                # default route (commands run provider-agnostically via _handle_command,
+                # so this is a display/seed change, not a command-routing change).
+                "default_provider": (
+                    "claude" if "claude" in self._adapters
+                    else "codex" if "codex" in self._adapters
+                    else (sorted(self._adapters)[0] if self._adapters else "")
+                ),
                 "legacy_terminal": {
                     "stack": "python-textual",
                     "replacement_target": "bun-ink",

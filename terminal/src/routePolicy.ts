@@ -63,16 +63,19 @@ function normalizeRouteTarget(target: Record<string, unknown>): RouteTarget | nu
 }
 
 export function defaultRoutePolicy(): RoutePolicyState {
+  // The boot default is the chat brain (Claude Opus 4.8) — what the operator
+  // talks to — so the status line never flashes a stale "codex" route before
+  // the first turn. The handshake reconciles to the live route on connect.
   return {
-    routeId: "codex:gpt-5.4",
-    provider: "codex",
-    model: "gpt-5.4",
+    routeId: "claude:claude-opus-4-8",
+    provider: "claude",
+    model: "claude-opus-4-8",
     strategy: "responsive",
     routeState: "ready",
     selectable: true,
     fallbackChain: [],
-    lastConfirmedRouteId: "codex:gpt-5.4",
-    activeLabel: "Codex 5.4",
+    lastConfirmedRouteId: "claude:claude-opus-4-8",
+    activeLabel: "Claude Opus 4.8",
     targets: [],
   };
 }
