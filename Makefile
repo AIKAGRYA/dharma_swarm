@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -51,6 +51,7 @@ help:
 	@echo "  make nats-substrate-contract Verify NATS substrate contract wiring"
 	@echo "  make uplift-guards Run uplift pre-commit guards"
 	@echo "  make hygiene-audit Run non-blocking vibe-code hygiene scan"
+	@echo "  make mypy-strict-ratchet Verify allowlisted modules pass mypy --strict"
 	@echo "  make hygiene-check Verify hygiene catalogue/generated docs integrity"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make verify-corral  Verify DE_BUG_CORRAL findings still resolve to live code"
@@ -217,6 +218,9 @@ governance-baseline:
 
 test-hygiene:
 	$(PYTHON) scripts/governance/check_test_hygiene.py
+
+mypy-strict-ratchet:
+	$(PYTHON) scripts/governance/hygiene/mypy_strict_ratchet.py
 
 test-contracts:
 	scripts/governance/run_pytest_with_repo_env.sh -q \
