@@ -668,7 +668,7 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
     provider = OllamaProvider()
     req = LLMRequest(
-        model="glm-5:cloud",
+        model="deepseek-v4-pro:cloud",
         messages=[{"role": "user", "content": "hello"}],
         max_tokens=32,
     )
@@ -676,7 +676,7 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
 
     class _RespFail:
         status_code = 500
-        text = "glm unavailable"
+        text = "deepseek unavailable"
 
         @staticmethod
         def json():
@@ -689,7 +689,7 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
         def json():
             return {
                 "choices": [{"message": {"content": "fallback ok"}, "finish_reason": "stop"}],
-                "model": "deepseek-v3.2",
+                "model": "glm-5.1",
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             }
 
@@ -705,8 +705,8 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
     out = await provider.complete(req)
 
     assert out.content == "fallback ok"
-    assert out.model == "deepseek-v3.2"
-    assert attempts[:2] == ["glm-5", "deepseek-v3.2"]
+    assert out.model == "glm-5.1"
+    assert attempts[:2] == ["deepseek-v4-pro", "glm-5.1"]
 
 
 @pytest.mark.asyncio

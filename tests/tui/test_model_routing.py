@@ -12,28 +12,27 @@ from dharma_swarm.tui.model_routing import (
 )
 
 
-def test_default_target_is_claude_sonnet() -> None:
+def test_default_target_is_claude_opus() -> None:
     target = default_target()
-    # Default is now GLM-5 (free frontier) per model_hierarchy.py
-    assert target.provider_id == "ollama"
-    assert target.model_id == "glm-5:cloud"
+    # Floor (>= K2.6): Claude Opus 4.8 leads the roster (the master lane).
+    assert target.provider_id == "claude"
+    assert target.model_id == "claude-opus-4-8"
 
 
 def test_resolve_alias_and_model_id() -> None:
-    assert resolve_model_target("opus 4.6") is not None
-    assert resolve_model_target("claude-opus-4-6") is not None
-    assert resolve_model_target("openai/gpt-5-codex") is not None
+    assert resolve_model_target("opus 4.8") is not None
+    assert resolve_model_target("claude-opus-4-8") is not None
     minimax = resolve_model_target("minimax")
     assert minimax is not None
-    assert minimax.model_id == "minimax-m2.7:cloud"
+    assert minimax.model_id == "minimax-m3:cloud"
     assert resolve_model_target("not-a-real-model") is None
 
 
 def test_inline_switch_detection() -> None:
-    target = detect_inline_switch_intent("hey, switch to codex 5.4")
+    target = detect_inline_switch_intent("hey, switch to codex 5.5")
     assert target is not None
     assert target.provider_id == "codex"
-    assert target.model_id == "gpt-5.4"
+    assert target.model_id == "gpt-5.5"
 
     assert detect_inline_switch_intent("can you summarize this text?") is None
 
@@ -57,6 +56,6 @@ def test_strategy_aliases_resolve() -> None:
 def test_target_by_index_maps_in_model_list_order() -> None:
     first = target_by_index(1)
     assert first is not None
-    # First target is now GLM-5 (free frontier) per model_hierarchy.py
-    assert first.alias == "glm-5"
+    # First target is Claude Opus 4.8 (the master lane) per the K2.6 floor roster.
+    assert first.alias == "opus-4.8"
     assert target_by_index(999) is None

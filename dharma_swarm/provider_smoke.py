@@ -32,23 +32,26 @@ _OLLAMA_ROOT_ERROR_MARKERS = (
     "ensure path elements are traversable",
     ".ollama: file exists",
 )
+# Frontier-only smoke catalogs (>= Kimi K2.6 floor). The prior entries
+# (kimi-k2.5, GLM-5, llama-3.3-70b, qwen2.5-coder-32b, nemotron, deepseek-r1)
+# were sub-floor / old-gen and are BANISHED.
 _NIM_HOSTED_FRONTIER_MODELS = (
-    "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
+    "moonshotai/kimi-k2.6",
+    "minimaxai/minimax-m3",
+    "mistralai/mistral-large-3-675b-instruct-2512",
 )
 _NIM_SELF_HOSTED_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "zai-org/GLM-5",
-    "meta/llama-3.3-70b-instruct",
-    "qwen/qwen2.5-coder-32b-instruct",
+    "moonshotai/kimi-k2.6",
+    "zai-org/GLM-5.1",
+    "deepseek-ai/DeepSeek-V4-Pro",
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
 )
 _OPENROUTER_FRONTIER_MODELS = (
-    "moonshotai/kimi-k2.5",
-    "z-ai/glm-5",
+    "moonshotai/kimi-k2.6",
+    "z-ai/glm-5.1",
     "openai/gpt-5-codex",
-    "deepseek/deepseek-r1",
-    "qwen/qwen3-235b-a22b",
+    "deepseek/deepseek-v4-pro",
+    "qwen/qwen3-coder",
 )
 _PROVIDER_SMOKE_OUTCOME_KIND = "provider_smoke_probe"
 _QWEN_DASHBOARD_SMOKE_PROVIDERS = {

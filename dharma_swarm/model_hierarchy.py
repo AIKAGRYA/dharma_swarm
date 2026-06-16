@@ -245,27 +245,35 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 # Moved here from runtime_provider.py as the single source.
 
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
-    ProviderType.GROQ: "qwen/qwen3-32b",
+    # Free tier — frontier only (>= Kimi K2.6 floor). Sub-floor defaults
+    # (glm-5, llama-3.3-70b, deepseek-v3.x, minimax-m2.x, qwen3-32b) are BANISHED.
+    ProviderType.OLLAMA: "deepseek-v4-pro:cloud",
+    ProviderType.NVIDIA_NIM: "moonshotai/kimi-k2.6",
+    ProviderType.GROQ: "moonshotai/kimi-k2-instruct",
     ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
+    ProviderType.SAMBANOVA: "DeepSeek-V4-Pro",
     ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-    # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
-    ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
-    # Paid tier
-    ProviderType.OPENROUTER: "xiaomi/mimo-v2-pro",
-    ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
+    ProviderType.FIREWORKS: "accounts/fireworks/models/deepseek-v4-pro",
+    # Cheap tier — upgraded to floor
+    ProviderType.MISTRAL: "mistral-large-3-675b",
+    ProviderType.GOOGLE_AI: "gemini-3-pro",
+    ProviderType.CHUTES: "deepseek-ai/DeepSeek-V4-Pro",
+    ProviderType.OPENROUTER_FREE: "z-ai/glm-5.1:free",
+    # Paid / subscription tier — frontier
+    ProviderType.OPENROUTER: "moonshotai/kimi-k2.6",
+    ProviderType.OPENAI: "gpt-5.5",
+    ProviderType.ANTHROPIC: "claude-opus-4-8",
+    # Bare provider ids: the helm bridge routes these to the Max-plan / Codex
+    # CLI (subscription, not metered) — preserved over the metered model ids.
     ProviderType.CLAUDE_CODE: "claude-code",
     ProviderType.CODEX: "codex",
 }
+
+# The hard power floor: never route/select/recommend a model weaker than this
+# (Kimi K2.6). Every DEFAULT_MODELS entry and the TUI model surfaces must sit
+# at or above it. See dharma_swarm/tui/model_routing.py + ollama_config.py.
+MODEL_POWER_FLOOR = "moonshotai/kimi-k2.6"
 
 
 def get_tier(provider: ProviderType) -> str:

@@ -473,10 +473,10 @@ def test_model_set_action_switches_provider_and_model(monkeypatch) -> None:
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_save_model_policy", lambda: None)
 
-    app._handle_action("model:set codex-5.4", "model set codex-5.4")
+    app._handle_action("model:set codex-5.5", "model set codex-5.5")
 
     assert app._active_provider == "codex"
-    assert app._active_model == "gpt-5.4"
+    assert app._active_model == "gpt-5.5"
     assert any("Model switched" in line for line in main.stream_output.system)
 
 
@@ -512,15 +512,20 @@ def test_report_slow_provider_start_writes_hint(monkeypatch) -> None:
 
 def test_model_set_resets_provider_session_even_same_provider(monkeypatch) -> None:
     app = DGCApp()
+    # Start on a claude model that differs from the one we switch to, so this
+    # exercises same-provider-different-model (opus-4.8 is the default roster
+    # head, so switch the other way: from opus to sonnet).
+    app._active_provider = "claude"
+    app._active_model = "claude-opus-4-8"
     app._provider_session_id = "prov-123"
     main = _DummyMain(running=False)
     monkeypatch.setattr(app, "_get_main_screen", lambda: main)
     monkeypatch.setattr(app, "_save_model_policy", lambda: None)
 
-    app._handle_action("model:set opus-4.6", "model set opus-4.6")
+    app._handle_action("model:set sonnet-4.6", "model set sonnet-4.6")
 
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-opus-4-6"
+    assert app._active_model == "claude-sonnet-4-6"
     assert app._provider_session_id is None
 
 
@@ -545,9 +550,9 @@ def test_model_set_action_accepts_index(monkeypatch) -> None:
 
     app._handle_action("model:set 3", "model set 3")
 
-    # Index 3 is now kimi-k2.5 (free frontier) per model_hierarchy.py
+    # Roster order: 1=opus-4.8, 2=sonnet-4.6, 3=kimi-k2.6 (first free frontier).
     assert app._active_provider == "ollama"
-    assert app._active_model == "kimi-k2.5:cloud"
+    assert app._active_model == "kimi-k2.6:cloud"
 
 
 def test_model_auto_strategy_sets_profile(monkeypatch) -> None:
@@ -599,10 +604,10 @@ def test_inline_switch_short_circuits_send(monkeypatch) -> None:
     sent: list[str] = []
     monkeypatch.setattr(app, "_dispatch_prompt", lambda text, **kwargs: sent.append(text))
 
-    handled = app._maybe_handle_inline_model_switch("please switch to opus 4.6")
+    handled = app._maybe_handle_inline_model_switch("please switch to opus 4.8")
     assert handled is True
     assert app._active_provider == "claude"
-    assert app._active_model == "claude-opus-4-6"
+    assert app._active_model == "claude-opus-4-8"
     assert sent == []
 
 
@@ -625,9 +630,9 @@ def test_rate_limit_rejected_marks_pending_fallback(monkeypatch) -> None:
 def test_auto_fallback_prefers_non_claude_provider_for_usage_exhaustion(monkeypatch) -> None:
     app = DGCApp()
     app._active_provider = "claude"
-    app._active_model = "claude-opus-4-6"
+    app._active_model = "claude-opus-4-8"
     app._preferred_provider = "claude"
-    app._preferred_model = "claude-opus-4-6"
+    app._preferred_model = "claude-opus-4-8"
     app._auto_model_fallback = True
     app._last_user_prompt = "keep going"
     app._last_error_code = "usage_exhausted"
@@ -651,9 +656,9 @@ def test_auto_fallback_prefers_non_claude_provider_for_usage_exhaustion(monkeypa
 
     assert moved is True
     assert app._active_provider == "codex"
-    assert app._active_model == "gpt-5.4"
+    assert app._active_model == "gpt-5.5"
     assert app._preferred_provider == "codex"
-    assert app._preferred_model == "gpt-5.4"
+    assert app._preferred_model == "gpt-5.5"
     assert policy_saves == [True]
     assert dispatched == [("keep going", False, False)]
-    assert any("Preferred route updated to codex:gpt-5.4" in line for line in main.stream_output.system)
+    assert any("Preferred route updated to codex:gpt-5.5" in line for line in main.stream_output.system)

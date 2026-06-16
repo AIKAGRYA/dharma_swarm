@@ -13,11 +13,16 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 OLLAMA_DEFAULT_LOCAL_MODEL = "llama3.2"
 OLLAMA_DEFAULT_CLOUD_MODEL = DEFAULT_MODELS[ProviderType.OLLAMA]
 OLLAMA_CLOUD_FRONTIER_MODELS = (
-    "glm-5:cloud",
-    "deepseek-v3.2:cloud",
-    "kimi-k2.5:cloud",
-    "minimax-m2.7:cloud",
+    # Frontier-only stable (>= Kimi K2.6). The prior entries (glm-5,
+    # deepseek-v3.2, kimi-k2.5, minimax-m2.7) were sub-floor and are BANISHED.
+    "deepseek-v4-pro:cloud",
+    "glm-5.1:cloud",
+    "kimi-k2.6:cloud",
+    "kimi-k2.7-code:cloud",
+    "minimax-m3:cloud",
     "qwen3-coder:480b-cloud",
+    "qwen3-coder-next:cloud",
+    "mistral-large-3:675b-cloud",
 )
 
 _LOCAL_BASE_URLS = {

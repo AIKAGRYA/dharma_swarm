@@ -22,78 +22,77 @@ class ModelTarget:
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
 
+# Frontier-only roster (>= Kimi K2.6 power floor). Every sub-floor model
+# (glm-5, deepseek-v3.x, kimi-k2.5, minimax-m2.x, sonnet-4.5, opus-4.6,
+# haiku-4.5, gemini-2.5) is BANISHED — never listed, never selectable, never
+# a fallback. Claude Opus 4.8 leads (the master lane); the Ollama-cloud open
+# frontier is the free workhorse stable.
 MODEL_TARGETS: tuple[ModelTarget, ...] = (
-    # Free frontier (Ollama Cloud)
+    # Subscription frontier — Claude Max (no metered cost)
     ModelTarget(
-        alias="glm-5",
-        provider_id="ollama",
-        model_id="glm-5:cloud",
-        label="GLM-5 744B [FREE]",
-        aliases=("glm5", "glm 5", "zhipu"),
-    ),
-    ModelTarget(
-        alias="deepseek-v3.2",
-        provider_id="ollama",
-        model_id="deepseek-v3.2:cloud",
-        label="DeepSeek V3.2 [FREE]",
-        aliases=("deepseek", "ds", "deepseek v3"),
-    ),
-    ModelTarget(
-        alias="kimi-k2.5",
-        provider_id="ollama",
-        model_id="kimi-k2.5:cloud",
-        label="Kimi K2.5 [FREE]",
-        aliases=("kimi", "moonshot"),
-    ),
-    ModelTarget(
-        alias="minimax-m2.7",
-        provider_id="ollama",
-        model_id="minimax-m2.7:cloud",
-        label="MiniMax M2.7 [FREE]",
-        aliases=("minimax", "m2.7", "minimax m2.7"),
-    ),
-    # Paid models
-    ModelTarget(
-        alias="sonnet-4.5",
+        alias="opus-4.8",
         provider_id="claude",
-        model_id="claude-sonnet-4-5",
-        label="Claude Sonnet 4.5",
-        aliases=("sonnet", "sonnet 4.5", "claude sonnet 4.5"),
+        model_id="claude-opus-4-8",
+        label="Claude Opus 4.8",
+        aliases=("opus", "opus 4.8", "claude opus", "claude opus 4.8"),
     ),
     ModelTarget(
         alias="sonnet-4.6",
         provider_id="claude",
         model_id="claude-sonnet-4-6",
         label="Claude Sonnet 4.6",
-        aliases=("sonnet 4.6", "claude sonnet 4.6"),
+        aliases=("sonnet", "sonnet 4.6", "claude sonnet 4.6"),
+    ),
+    # Free frontier (Ollama Cloud — the open-frontier gateway)
+    ModelTarget(
+        alias="kimi-k2.6",
+        provider_id="ollama",
+        model_id="kimi-k2.6:cloud",
+        label="Kimi K2.6 [FREE]",
+        aliases=("kimi", "k2.6", "kimi k2.6", "moonshot"),
     ),
     ModelTarget(
-        alias="opus-4.6",
-        provider_id="claude",
-        model_id="claude-opus-4-6",
-        label="Claude Opus 4.6",
-        aliases=("opus", "opus 4.6", "claude opus 4.6"),
+        alias="glm-5.1",
+        provider_id="ollama",
+        model_id="glm-5.1:cloud",
+        label="GLM-5.1 [FREE]",
+        aliases=("glm", "glm5.1", "glm 5.1", "zhipu"),
     ),
     ModelTarget(
-        alias="haiku-4.5",
-        provider_id="claude",
-        model_id="claude-haiku-4-5",
-        label="Claude Haiku 4.5",
-        aliases=("haiku", "haiku 4.5", "claude haiku 4.5"),
+        alias="deepseek-v4-pro",
+        provider_id="ollama",
+        model_id="deepseek-v4-pro:cloud",
+        label="DeepSeek V4 Pro [FREE]",
+        aliases=("deepseek", "ds", "deepseek v4", "deepseek v4 pro"),
     ),
     ModelTarget(
-        alias="codex-5.4",
+        alias="minimax-m3",
+        provider_id="ollama",
+        model_id="minimax-m3:cloud",
+        label="MiniMax M3 [FREE]",
+        aliases=("minimax", "m3", "minimax m3"),
+    ),
+    ModelTarget(
+        alias="qwen3-coder",
+        provider_id="ollama",
+        model_id="qwen3-coder:480b-cloud",
+        label="Qwen3-Coder 480B [FREE]",
+        aliases=("qwen", "qwen3", "qwen coder", "qwen3 coder"),
+    ),
+    # Paid frontier
+    ModelTarget(
+        alias="codex-5.5",
         provider_id="codex",
-        model_id="gpt-5.4",
-        label="Codex 5.4",
-        aliases=("codex", "codex 5.4", "gpt 5 codex"),
+        model_id="gpt-5.5",
+        label="Codex GPT-5.5",
+        aliases=("codex", "codex 5.5", "gpt 5 codex", "gpt-5.5"),
     ),
     ModelTarget(
         alias="gemini-3",
         provider_id="openrouter",
-        model_id="google/gemini-2.5-pro",
-        label="Gemini 3 class (via OpenRouter)",
-        aliases=("gemini", "gemini 3", "google gemini 3"),
+        model_id="google/gemini-3-pro",
+        label="Gemini 3 Pro (via OpenRouter)",
+        aliases=("gemini", "gemini 3", "gemini 3 pro", "google gemini"),
     ),
 )
 
@@ -101,29 +100,32 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
 _DEFAULT_TARGET = MODEL_TARGETS[0]
 ROUTING_STRATEGIES: tuple[str, ...] = ("responsive", "cost", "genius")
 _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
+    # Claude-first (operator doctrine), then codex as the first non-claude
+    # frontier fallback for usage-exhaustion, then the free Ollama frontier.
     "responsive": (
-        "sonnet-4.5",
-        "haiku-4.5",
         "sonnet-4.6",
-        "codex-5.4",
-        "opus-4.6",
-        "gemini-3",
+        "codex-5.5",
+        "kimi-k2.6",
+        "glm-5.1",
+        "opus-4.8",
+        "deepseek-v4-pro",
     ),
+    # "cost" = free-frontier-first (still entirely >= K2.6).
     "cost": (
-        "haiku-4.5",
-        "gemini-3",
-        "sonnet-4.5",
-        "codex-5.4",
+        "kimi-k2.6",
+        "glm-5.1",
+        "deepseek-v4-pro",
+        "minimax-m3",
+        "qwen3-coder",
         "sonnet-4.6",
-        "opus-4.6",
     ),
     "genius": (
-        "opus-4.6",
+        "opus-4.8",
+        "deepseek-v4-pro",
+        "kimi-k2.6",
+        "codex-5.5",
         "sonnet-4.6",
-        "codex-5.4",
         "gemini-3",
-        "sonnet-4.5",
-        "haiku-4.5",
     ),
 }
 
@@ -273,7 +275,7 @@ def format_model_list(
         "Usage: /model list | /model status | /model set <alias|index> | "
         "/model auto <on|off|status|responsive|cost|genius>"
     )
-    lines.append("Natural language: 'switch to opus 4.6' or 'switch to codex 5.4'")
+    lines.append("Natural language: 'switch to opus 4.8' or 'switch to codex 5.5'")
     return "\n".join(lines)
 
 

@@ -44,7 +44,8 @@ class TestConstants:
     def test_frontier_models_tuple(self):
         assert isinstance(OLLAMA_CLOUD_FRONTIER_MODELS, tuple)
         assert len(OLLAMA_CLOUD_FRONTIER_MODELS) >= 2
-        assert "minimax-m2.7:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
+        # Floor stable (>= Kimi K2.6); the old minimax-m2.7 is banished.
+        assert "minimax-m3:cloud" in OLLAMA_CLOUD_FRONTIER_MODELS
 
 
 # ---------------------------------------------------------------------------

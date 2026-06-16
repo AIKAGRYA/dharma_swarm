@@ -1062,7 +1062,10 @@ class TerminalBridge:
         return lanes
 
     def _chat_claude_model(self) -> str:
-        for target in model_routing.fallback_chain("", "", strategy="cost"):
+        # Genius strategy => Claude Opus 4.8 leads (the master lane). On the Max
+        # plan every Claude tier costs the same, so cost-ranking to the cheapest
+        # (Haiku, sub-floor) was pure downside — it picked a banished model.
+        for target in model_routing.fallback_chain("", "", strategy="genius"):
             if target.provider_id == "claude":
                 return target.model_id
         adapter = self._adapters.get("claude")
