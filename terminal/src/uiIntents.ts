@@ -28,9 +28,6 @@ const COCKPIT_WORDS = /\b(cockpit|dashboard|fusion|funky|full|mission control)\b
 const SCROLL_WORDS = /\b(manuscript|reading mode|the scroll)\b/i;
 const UI_NOUN = /\b(mode|view|screen|layout|ui|tui|interface|dashboard|cockpit)\b/i;
 
-const TOUR_RE =
-  /\b(guided tour|tour|walk me through|show me (all )?(the )?(options|commands|hotkeys|keys|panes|surfaces))\b/i;
-
 const PANE_NOUN = /\b(pane|panel|tab|surface|view|plane)\b/i;
 
 function normalize(text: string): string {
@@ -46,12 +43,11 @@ export function matchUiIntent(
   if (!text || text.startsWith("/")) {
     return null;
   }
-  if (!IMPERATIVE.test(text) && !TOUR_RE.test(text)) {
+  // The tour is NEVER triggered by plain text (operator word 2026-06-16: typing
+  // "tour" must reach the chat model, not pop the menu). It opens only via the
+  // /tour command or the ^G hotkey — see app.tsx.
+  if (!IMPERATIVE.test(text)) {
     return null;
-  }
-
-  if (TOUR_RE.test(text)) {
-    return {kind: "tour"};
   }
 
   // Layout intents need BOTH a mode word and a UI noun ("switch to zen mode",
@@ -160,29 +156,30 @@ function editDistance(a: string, b: string): number {
 // the control plane visually and or with a list of commands i can use or
 // hotkeys i can press"). Rendered locally; works offline.
 export function tourLines(panes: PaneRef[]): string[] {
-  const paneList = panes.map((pane) => `  ${pane.title}`).join("\n");
+  // Compact, one display line per element (no embedded newlines) so it renders
+  // cleanly inside the isolated tour box without vertical squeeze.
+  const titles = panes.map((pane) => pane.title);
+  const half = Math.ceil(titles.length / 2);
+  const paneRow1 = "  " + titles.slice(0, half).join(" · ");
+  const paneRow2 = "  " + titles.slice(half).join(" · ");
   return [
     "THE HELM — guided tour",
     "",
-    "Three layouts:",
-    "  zen      just this conversation (you are here; boot default)",
+    "Three layouts  (F2 toggles · /zen /cockpit /scroll · or just ask):",
+    "  zen      just this conversation — the boot default, you are here",
     "  cockpit  full instrument panel — tabs, sidebar, telemetry",
     "  scroll   reading manuscript — centered column, ^D telemetry drawer",
-    "  Switch any time: F2, /zen, /cockpit, /scroll — or just ask in plain language",
-    '  ("switch to the dashboard view", "back to the simple screen").',
     "",
-    "Panes (Tab / Shift-Tab cycle, ^K opens the switcher, or ask):",
-    paneList,
-    '  Plain language works: "open the control panel pane", "show me the models tab".',
+    "Panes  (Tab / Shift-Tab cycle · ^K switcher · or ask “open the models tab”):",
+    paneRow1,
+    paneRow2,
     "",
     "Talking vs steering:",
-    "  Plain prompts go to the swarm. Slash commands hit surfaces directly:",
-    "  /status /runtime /models /git /memory /approvals /help ... (/help lists all)",
+    "  Plain prompts go to the model.  Slash commands hit surfaces directly:",
+    "  /status /runtime /models /git /memory /approvals /help  (/help lists all)",
     "",
-    "Keys that matter:",
-    "  Enter send · Tab/Shift-Tab panes · ^K pane switcher · ^T expand/collapse trace",
-    "  ^B sidebar · ↑/↓ scroll · F2 zen/cockpit · ^C quit",
+    "Keys  Enter send · Tab panes · ^K switcher · ^T trace · ^B sidebar · ^G tour · ^C quit",
     "",
-    "Try: /cockpit — then \"back to zen\" to return here.",
+    "Try /cockpit, then “back to zen” to return here.",
   ];
 }

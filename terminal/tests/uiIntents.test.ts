@@ -76,9 +76,14 @@ describe("F-066 natural-language UI intents", () => {
     }
   });
 
-  test("operator example: guided tour", () => {
-    expect(matchUiIntent("give me a guided tour through the control plane", PANES, TARGETS)).toEqual({kind: "tour"});
-    expect(matchUiIntent("show me all the options and hotkeys", PANES, TARGETS)).toEqual({kind: "tour"});
+  test("plain-language tour requests are NEVER matched here (operator word 2026-06-16)", () => {
+    // The tour opens only via /tour or ^G — typing "tour" must reach the chat
+    // model, not pop the menu. matchUiIntent must never return {kind:"tour"}.
+    expect(matchUiIntent("can you give me a tour of the helm", PANES, TARGETS)).not.toEqual({kind: "tour"});
+    expect(matchUiIntent("show me all the options and hotkeys", PANES, TARGETS)).not.toEqual({kind: "tour"});
+    // A bare "tour" (no imperative UI noun) falls straight through to chat.
+    expect(matchUiIntent("tour", PANES, TARGETS)).toBeNull();
+    expect(matchUiIntent("give me a tour", PANES, TARGETS)).toBeNull();
   });
 
   test("non-intent control phrases route to chat (null)", () => {

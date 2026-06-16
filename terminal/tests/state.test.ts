@@ -41,6 +41,14 @@ describe("reduceApp UI state", () => {
     expect(closed.uiMode.activeOverlay).toEqual({kind: "none"});
   });
 
+  test("tour.open shows the isolated tour overlay; any key (tour.close) dismisses it", () => {
+    const opened = reduceApp(initialState, {type: "tour.open"});
+    expect(opened.uiMode.activeOverlay).toEqual({kind: "tour"});
+
+    const closed = reduceApp(opened, {type: "tour.close"});
+    expect(closed.uiMode.activeOverlay).toEqual({kind: "none"});
+  });
+
   test("toggles sidebar visible<->hidden (FACE-2: collapsed sliver is dead, default is hidden)", () => {
     // Command-post default: sidebar OFF — data panes carry the info.
     expect(initialState.uiMode.sidebarVisible).toBe("hidden");

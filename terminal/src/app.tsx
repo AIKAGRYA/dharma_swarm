@@ -24,6 +24,7 @@ import {PaneSwitcher} from "./components/PaneSwitcher.tsx";
 import {RepoPane, buildRepoPaneSections} from "./components/RepoPane.tsx";
 import {ScenicStrip} from "./components/ScenicStrip.tsx";
 import {SessionsPane} from "./components/SessionsPane.tsx";
+import {TourOverlay} from "./components/TourOverlay.tsx";
 import {ShellHeader} from "./components/ShellHeader.tsx";
 import {Sidebar} from "./components/Sidebar.tsx";
 import {StatusFooter} from "./components/StatusFooter.tsx";
@@ -2768,8 +2769,9 @@ export function App(): React.ReactElement {
       );
       return;
     }
-    const panes = stateRef.current.tabs.map((tab) => ({id: tab.id, title: tab.title}));
-    respond(tourLines(panes).join("\n"));
+    // The tour opens in its own isolated overlay box — never inline transcript
+    // text (operator word 2026-06-16).
+    dispatch({type: "tour.open"});
   }
 
   function localUiSlashIntent(submitted: string): UiIntent | null {
@@ -3030,6 +3032,18 @@ export function App(): React.ReactElement {
     if (key.ctrl && input === "c") {
       bridge.close();
       exit();
+      return;
+    }
+    // The guided tour modal swallows the next keystroke to dismiss itself —
+    // any key closes it (operator word 2026-06-16), except ^C handled above.
+    if (state.uiMode.activeOverlay.kind === "tour") {
+      dispatch({type: "tour.close"});
+      dispatch({type: "status.set", value: "tour closed"});
+      return;
+    }
+    // ^G opens the guided tour as an isolated box from anywhere.
+    if (key.ctrl && input === "g") {
+      dispatch({type: "tour.open"});
       return;
     }
     if (state.uiMode.activeOverlay.kind === "paneSwitcher") {
@@ -3334,6 +3348,16 @@ export function App(): React.ReactElement {
       dispatch({type: "prompt.append", value: input});
     }
   });
+
+  // The guided tour is an isolated, full-screen modal box (operator word
+  // 2026-06-16) — it pre-empts every face so it is never tangled with the
+  // transcript. Any key dismisses it (handled in the input handler above).
+  if (state.uiMode.activeOverlay.kind === "tour") {
+    const tourPanes = state.tabs.map((tab) => ({id: tab.id, title: tab.title}));
+    return (
+      <TourOverlay lines={tourLines(tourPanes)} width={terminalWidth} height={terminalHeight} />
+    );
+  }
 
   // F-111: zen is the boot default and contains exactly the transcript, the
   // composer, and ONE thin status line (F-110) — the Claude Code-grade main

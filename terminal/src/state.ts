@@ -286,6 +286,22 @@ export function reduceApp(state: AppState, action: AppAction): AppState {
           },
         },
       };
+    case "tour.open":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          activeOverlay: {kind: "tour"},
+        },
+      };
+    case "tour.close":
+      return {
+        ...state,
+        uiMode: {
+          ...state.uiMode,
+          activeOverlay: {kind: "none"},
+        },
+      };
     case "tab.replace":
       return {
         ...state,

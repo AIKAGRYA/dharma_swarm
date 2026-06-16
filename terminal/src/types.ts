@@ -444,7 +444,10 @@ export type ModelTarget = RouteTarget;
 export type UIModeOverlay =
   | {kind: "none"}
   | {kind: "modelPicker"; selectedIndex: number; returnTabId: string}
-  | {kind: "paneSwitcher"; selectedIndex: number};
+  | {kind: "paneSwitcher"; selectedIndex: number}
+  // The guided tour, shown in its own isolated full-screen box (never inline).
+  // Opens only via /tour or ^G; any key dismisses.
+  | {kind: "tour"};
 
 export type SidebarVisibility = "visible" | "collapsed" | "hidden";
 
@@ -544,6 +547,8 @@ export type AppAction =
   | {type: "paneSwitcher.open"}
   | {type: "paneSwitcher.close"}
   | {type: "paneSwitcher.set"; index: number}
+  | {type: "tour.open"}
+  | {type: "tour.close"}
   | {type: "status.set"; value: string}
   | {type: "footer.set"; value: string}
   | {type: "sidebar.toggle"}
