@@ -201,9 +201,13 @@ def collect_metrics(repo_root: Path) -> dict[str, int]:
 
 
 def check_assertions(
-    repo_root: Path, config: dict[str, Any], metrics: dict[str, int]
+    repo_root: Path,
+    config: dict[str, Any],
+    metrics: dict[str, int],
+    counts_advisory: bool = False,
 ) -> list[Finding]:
     findings: list[Finding] = []
+    value_severity = "WARN" if counts_advisory else "FAIL"
     for assertion in config.get("assertions", []):
         assertion_id = assertion.get("id", "<missing-id>")
         doc_path = repo_root / assertion["doc"]
@@ -224,7 +228,7 @@ def check_assertions(
         if not match:
             findings.append(
                 Finding(
-                    "FAIL",
+                    value_severity,
                     "assertion",
                     f"{assertion_id}: regex did not match {assertion['doc']}",
                 )
@@ -235,7 +239,7 @@ def check_assertions(
             verify = assertion.get("verify", metric_name)
             findings.append(
                 Finding(
-                    "FAIL",
+                    value_severity,
                     "assertion",
                     (
                         f"{assertion_id}: doc says {observed}, "
@@ -528,7 +532,11 @@ def rewrite_auto_sections(text: str, metrics: dict[str, int]) -> tuple[str, bool
 
 
 def check_or_write_auto_sections(
-    repo_root: Path, config: dict[str, Any], metrics: dict[str, int], write: bool
+    repo_root: Path,
+    config: dict[str, Any],
+    metrics: dict[str, int],
+    write: bool,
+    counts_advisory: bool = False,
 ) -> list[Finding]:
     findings: list[Finding] = []
     patterns = config.get("auto_sections", {}).get("include", [])
@@ -548,7 +556,7 @@ def check_or_write_auto_sections(
         else:
             findings.append(
                 Finding(
-                    "FAIL",
+                    "WARN" if counts_advisory else "FAIL",
                     "auto-section",
                     (
                         f"{repo_relative(doc, repo_root)} has stale generated content; "
@@ -626,6 +634,7 @@ def run_checks(
     today: date,
     write_auto_sections: bool,
     write_manifest_counts: bool = False,
+    counts_advisory: bool = False,
 ) -> tuple[list[Finding], dict[str, int]]:
     config = load_config(config_path)
     metrics = collect_metrics(repo_root)
@@ -636,10 +645,14 @@ def run_checks(
     findings.extend(check_staleness(config, today))
     if write_manifest_counts:
         findings.extend(write_assertion_counts(repo_root, config, metrics))
-    findings.extend(check_assertions(repo_root, config, metrics))
+    findings.extend(check_assertions(repo_root, config, metrics, counts_advisory))
     findings.extend(check_path_guards(repo_root, config))
     findings.extend(check_canonical_guard(repo_root, config, changed_file_statuses))
-    findings.extend(check_or_write_auto_sections(repo_root, config, metrics, write_auto_sections))
+    findings.extend(
+        check_or_write_auto_sections(
+            repo_root, config, metrics, write_auto_sections, counts_advisory
+        )
+    )
     findings.extend(doc_review_candidates(repo_root, config, changed_files))
     return findings, metrics
 
@@ -810,7 +823,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "Rewrite asserted count tokens (e.g. SOVEREIGN_MANIFEST counts) in "
-            "place to match live metrics; collapses merge=union duplicate rows."
+            "place to match live metrics. Used by the push:main reconcile job."
+        ),
+    )
+    parser.add_argument(
+        "--counts-advisory",
+        action="store_true",
+        help=(
+            "Downgrade generated-count drift (SOVEREIGN_MANIFEST count assertions "
+            "and AUTO_INVENTORY auto-sections) from FAIL to WARN. Counts are "
+            "reconciled on main by docops-reconcile-main.yml, so PRs and the "
+            "merge queue never gate on them. Structural problems (missing doc, "
+            "unknown metric, bad auto-section config) still FAIL."
         ),
     )
     parser.add_argument("--report-json", type=Path)
@@ -837,6 +861,7 @@ def main(argv: list[str] | None = None) -> int:
         today=today,
         write_auto_sections=args.write_auto_sections,
         write_manifest_counts=args.write_manifest_counts,
+        counts_advisory=args.counts_advisory,
     )
     if args.report_json:
         report_path = args.report_json
