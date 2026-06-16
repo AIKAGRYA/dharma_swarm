@@ -141,15 +141,15 @@ describe("status single-source projection (F-164)", () => {
   });
 });
 
-describe("Hokusai truecolor tokens (handoff §7)", () => {
-  test("surfaces and core text land the verified spec values", () => {
-    expect(THEME.night).toBe("#10141C");
-    expect(THEME.indigo).toBe("#1A2233");
-    expect(THEME.foam).toBe("#DCD7BA");
-    expect(THEME.wave).toBe("#7E9CD8");
-    expect(THEME.persimmon).toBe("#FF9E3B");
-    expect(THEME.vermilion).toBe("#FF5D62");
-    expect(THEME.ridge).toBe("#658594");
+describe("Nihonga Mineral truecolor tokens (operator pick 2026-06-16)", () => {
+  test("surfaces and core text land the mineral-pigment spec values", () => {
+    expect(THEME.night).toBe("#14110E"); // warm sumi black
+    expect(THEME.indigo).toBe("#201913");
+    expect(THEME.foam).toBe("#E8DCC0"); // gofun cream
+    expect(THEME.wave).toBe("#6FA890"); // rokushō verdigris — chrome accent
+    expect(THEME.persimmon).toBe("#E0A24E"); // ōdo ochre
+    expect(THEME.vermilion).toBe("#E85A4E"); // shu vermilion
+    expect(THEME.ridge).toBe("#9A7C5A"); // kincha ridge
   });
 
   test("AGENT_STATES pairs every color with a glyph (color never sole signal)", () => {

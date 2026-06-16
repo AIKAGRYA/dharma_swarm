@@ -1,9 +1,9 @@
-// Hokusai-futurist truecolor palette (S4 — FACE-2 command post).
-// Design truth: spec-forge/knowledge/DESIGN_FEEDBACK_OPERATOR_20260612.md +
-// handoff §7 contrast-verified token table (ratios vs night #10141C /
-// indigo #1A2233). Token NAMES are stable across the migration; only the
-// values moved to truecolor. ScenicStrip keeps its own verbatim art
-// constants (sanctioned exemption).
+// Nihonga Mineral truecolor palette (operator pick 2026-06-16) — bold mineral
+// pigments on a warm sumi-black canvas: rokushō verdigris is the chrome accent,
+// gunjō ultramarine streams, kincha gold marks model identity, shu vermilion is
+// danger. Token NAMES + the usage/contrast laws are STABLE across the repaint;
+// only the values moved (warmer canvas, mineral accents). ScenicStrip keeps its
+// own verbatim art constants (sanctioned exemption).
 //
 // Usage law (gradeable):
 //   - indigo / river appear ONLY as backgroundColor/borderColor (criterion #8).
@@ -12,30 +12,30 @@
 //   - wave is THE chrome accent (brand + active item); ridge is the focused
 //     border; parchment aims at seer/model-identity surfaces.
 export const THEME = {
-  // surfaces
-  night: "#10141C", // app canvas
-  indigo: "#1A2233", // raised surface (bg/border only)
-  harbor: "#223249", // selected/overlay surface (stone is meta-only on it)
+  // surfaces (warm sumi-black, not cold indigo)
+  night: "#14110E", // app canvas — warm sumi black
+  indigo: "#201913", // raised surface (bg/border only)
+  harbor: "#2C2218", // selected/overlay surface (stone is meta-only on it)
   // borders
-  river: "#2D4F67", // decorative border ONLY (2.13:1 — never carries meaning)
-  ridge: "#658594", // focused border (4.69:1)
+  river: "#3A2C20", // decorative border ONLY (low contrast — never carries meaning)
+  ridge: "#9A7C5A", // focused border — warm kincha ridge (~4.8:1)
   // text
-  foam: "#DCD7BA", // primary text (12.71:1)
-  mist: "#C8C093", // secondary text (10.02:1)
-  stone: "#8992A7", // labels / meta (5.91:1 — the legibility floor)
-  ink: "#727169", // decoration ONLY (3.76:1)
+  foam: "#E8DCC0", // primary text — gofun cream (12.9:1)
+  mist: "#D6C7A2", // secondary text (10.4:1)
+  stone: "#A89A7E", // labels / meta — warm stone (7.4:1, above the legibility floor)
+  ink: "#80735F", // decoration ONLY (3.9:1)
   // accents
-  wave: "#7E9CD8", // accent-witness — THE one decorative chrome accent (6.70:1)
-  crest: "#7FB4CA", // running/streaming (8.15:1)
-  parchment: "#DCA561", // accent-seer — model identity (8.43:1)
-  sunlit: "#E6C384", // (10.98:1)
-  bengara: "#8F2D12", // FILL ONLY — foam-on-bengara 5.67:1; raw text fails
+  wave: "#6FA890", // accent-witness — rokushō verdigris, THE chrome accent (7.0:1)
+  crest: "#6E90D0", // running/streaming — gunjō ultramarine (6.2:1)
+  parchment: "#D2A05A", // accent-seer — kincha gold, model identity (8.6:1)
+  sunlit: "#E4C07E", // (10.9:1)
+  bengara: "#8F2D12", // FILL ONLY — foam-on-bengara; raw text fails
   // status
-  moss: "#98BB6C", // success (8.48:1)
-  pine: "#7AA89F", // done / quiet-ok (6.96:1)
-  persimmon: "#FF9E3B", // warning — expected-offline class (8.96:1)
-  vermilion: "#FF5D62", // danger ONLY (6.14:1)
-  iris: "#957FB8", // spawning (5.27:1)
+  moss: "#9AB46A", // success — byakuroku pale green (8.4:1)
+  pine: "#86A492", // done / quiet-ok (7.1:1)
+  persimmon: "#E0A24E", // warning — ōdo ochre, expected-offline class (8.7:1)
+  vermilion: "#E85A4E", // danger ONLY — shu vermilion (5.6:1)
+  iris: "#B488A6", // spawning — murasaki clay (6.0:1)
 } as const;
 
 // §7 AGENT_STATES: glyph+color pairs — color is never the sole signal.
