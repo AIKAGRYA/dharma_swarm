@@ -3501,7 +3501,7 @@ export function App(): React.ReactElement {
           />
         </Box>
         <Box flexShrink={0} flexDirection="column" width={zenWidth}>
-          <Composer prompt={state.prompt} compact={compactShell} />
+          <Composer prompt={state.prompt} compact={compactShell} width={zenWidth} />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{zenStatus}</Text>
           </Box>
@@ -3543,7 +3543,7 @@ export function App(): React.ReactElement {
             emptyState={transcriptMeta.emptyState}
             accentColor={transcriptMeta.accentColor}
           />
-          <Composer prompt={state.prompt} compact={compactShell} />
+          <Composer prompt={state.prompt} compact={compactShell} width={scrollMeasure} />
           <Box paddingX={1}>
             <Text dimColor wrap="truncate-end">{scrollStatus}</Text>
           </Box>
@@ -3706,7 +3706,7 @@ export function App(): React.ReactElement {
         ) : null}
       </Box>
       <Box flexDirection="column" flexShrink={0}>
-        <Composer prompt={state.prompt} compact={compactShell} />
+        <Composer prompt={state.prompt} compact={compactShell} width={terminalWidth} />
         {/* F-110: exactly ONE status row at every size — the single source
             (F-164) for mode, route, gate state, and provider summary. */}
         <StatusFooter
