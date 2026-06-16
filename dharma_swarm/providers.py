@@ -42,6 +42,7 @@ from dharma_swarm.api_keys import (
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -2096,7 +2097,43 @@ class ModelRouter:
         for provider in [decision.selected_provider, *decision.fallback_providers]:
             if provider in available and provider in self._providers and provider not in chain:
                 chain.append(provider)
-        return chain
+        return self._prune_dead_key_providers(chain)
+
+    @staticmethod
+    def _prune_dead_key_providers(chain: list[ProviderType]) -> list[ProviderType]:
+        """Drop providers whose key is verifiably dead before the first attempt.
+
+        FAIL-OPEN: the key oracle returns ``None`` (unknown) on a stale/missing/
+        malformed status file — in that case we keep the chain unchanged and
+        preserve today's env-presence behaviour. If pruning would EMPTY the
+        chain (every routed provider is dead-keyed), we keep the UNFILTERED
+        chain and warn loudly rather than inflict a self-made outage.
+        """
+        if not chain:
+            return chain
+        try:
+            live = live_providers()
+        except Exception:  # never let the oracle take down routing
+            logger.warning("key_oracle raised; keeping unfiltered chain", exc_info=True)
+            return chain
+        if live is None:
+            # Unknown liveness -> fail open, env-presence behaviour unchanged.
+            return chain
+        filtered = [p for p in chain if p.value in live]
+        if not filtered:
+            logger.warning(
+                "key_oracle: all routed providers have dead keys (%s); "
+                "keeping UNFILTERED chain to avoid a self-inflicted outage "
+                "(run `dkeys test`).",
+                [p.value for p in chain],
+            )
+            return chain
+        if len(filtered) != len(chain):
+            pruned = [p.value for p in chain if p.value not in live]
+            logger.info(
+                "key_oracle: pruned dead-key providers from chain: %s", pruned
+            )
+        return filtered
 
     @staticmethod
     def _session_id_from_context(route_request: ProviderRouteRequest) -> str | None:
