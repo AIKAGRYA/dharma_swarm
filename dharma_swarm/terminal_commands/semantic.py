@@ -244,7 +244,6 @@ def cmd_semantic_brief(
 
 def cmd_semantic_proof(*, root: str = str(DHARMA_SWARM)) -> None:
     """Run live end-to-end proof of the Semantic Evolution Engine."""
-    import subprocess
 
     script = Path(root).parent / "scripts" / "semantic_proof.py"
     if not script.exists():

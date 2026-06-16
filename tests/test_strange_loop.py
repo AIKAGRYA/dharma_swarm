@@ -328,7 +328,6 @@ class TestCatalyticClosure:
     """Verify the torus: every module feeds and is fed."""
 
     def test_signal_bus_exists(self):
-        from dharma_swarm.signal_bus import SignalBus
         bus = SignalBus()
         assert hasattr(bus, "emit")
         assert hasattr(bus, "drain")
