@@ -118,7 +118,6 @@ def cmd_cascade(
     max_iter: int | None = None,
 ) -> None:
     """Run a strange loop cascade domain."""
-    import asyncio
 
     async def _run():
         from dharma_swarm.cascade import get_registered_domains, run_domain
