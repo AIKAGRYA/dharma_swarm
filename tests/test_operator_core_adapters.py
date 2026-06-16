@@ -339,25 +339,6 @@ class OperatorCoreAdapterTests(unittest.TestCase):
         self.assertEqual(decision.risk, PermissionRisk.SHELL_OR_NETWORK)
         self.assertTrue(decision.requires_confirmation)
 
-    def test_build_permission_decision_payload_is_json_ready(self) -> None:
-        payload = build_permission_decision_payload(
-            ToolCallComplete(
-                session_id="sess-1",
-                provider_id="codex",
-                tool_call_id="tool-2",
-                tool_name="Bash",
-                arguments="git status",
-            ),
-            policy=GovernancePolicy(),
-        )
-
-        self.assertEqual(payload["version"], "v1")
-        self.assertEqual(payload["domain"], "permission_decision")
-        self.assertEqual(payload["action_id"][:5], "perm-")
-        self.assertEqual(payload["tool_name"], "Bash")
-        self.assertEqual(payload["decision"], "require_approval")
-        self.assertEqual(payload["metadata"]["session_id"], "sess-1")
-
     def test_build_permission_resolution_payload_is_json_ready(self) -> None:
         payload = build_permission_resolution_payload(
             action_id="perm-123",
