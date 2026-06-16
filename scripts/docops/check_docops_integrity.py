@@ -559,12 +559,73 @@ def check_or_write_auto_sections(
     return findings
 
 
+def _format_count(value: int, sample: str) -> str:
+    """Render ``value`` preserving the comma style of the matched ``sample``."""
+    return f"{value:,}" if "," in sample else str(value)
+
+
+def _replace_capture_group(match: re.Match[str], new_value: str) -> str:
+    """Return ``match.group(0)`` with capture group 1 replaced by ``new_value``."""
+    whole = match.group(0)
+    rel_start = match.start(1) - match.start(0)
+    rel_end = match.end(1) - match.start(0)
+    return whole[:rel_start] + new_value + whole[rel_end:]
+
+
+def write_assertion_counts(
+    repo_root: Path, config: dict[str, Any], metrics: dict[str, int]
+) -> list[Finding]:
+    """Rewrite every asserted count token in place to match live metrics.
+
+    Driven by the same ``assertions`` config that ``check_assertions`` reads, so
+    the writer can never drift from the gate. Each assertion's regex capture
+    group is replaced with the live metric value (comma style preserved), for
+    every non-overlapping match — which also collapses ``merge=union`` duplicate
+    rows to a single correct value. Idempotent.
+    """
+    findings: list[Finding] = []
+    by_doc: dict[Path, list[dict[str, Any]]] = {}
+    for assertion in config.get("assertions", []):
+        by_doc.setdefault(repo_root / assertion["doc"], []).append(assertion)
+
+    for doc_path, assertions in by_doc.items():
+        if not doc_path.exists():
+            findings.append(
+                Finding("FAIL", "assertion-write", f"missing doc: {doc_path}")
+            )
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        original = text
+        for assertion in assertions:
+            metric_name = assertion["metric"]
+            if metric_name not in metrics:
+                findings.append(
+                    Finding(
+                        "FAIL",
+                        "assertion-write",
+                        f"{assertion.get('id')}: unknown metric {metric_name}",
+                    )
+                )
+                continue
+            expected = metrics[metric_name]
+            pattern = re.compile(assertion["regex"], flags=re.MULTILINE)
+
+            def _sub(m: re.Match[str], _expected: int = expected) -> str:
+                return _replace_capture_group(m, _format_count(_expected, m.group(1)))
+
+            text = pattern.sub(_sub, text)
+        if text != original:
+            doc_path.write_text(text, encoding="utf-8")
+    return findings
+
+
 def run_checks(
     repo_root: Path,
     config_path: Path,
     changed_from: str | None,
     today: date,
     write_auto_sections: bool,
+    write_manifest_counts: bool = False,
 ) -> tuple[list[Finding], dict[str, int]]:
     config = load_config(config_path)
     metrics = collect_metrics(repo_root)
@@ -573,6 +634,8 @@ def run_checks(
 
     findings: list[Finding] = []
     findings.extend(check_staleness(config, today))
+    if write_manifest_counts:
+        findings.extend(write_assertion_counts(repo_root, config, metrics))
     findings.extend(check_assertions(repo_root, config, metrics))
     findings.extend(check_path_guards(repo_root, config))
     findings.extend(check_canonical_guard(repo_root, config, changed_file_statuses))
@@ -742,6 +805,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--changed-from")
     parser.add_argument("--today")
     parser.add_argument("--write-auto-sections", action="store_true")
+    parser.add_argument(
+        "--write-manifest-counts",
+        action="store_true",
+        help=(
+            "Rewrite asserted count tokens (e.g. SOVEREIGN_MANIFEST counts) in "
+            "place to match live metrics; collapses merge=union duplicate rows."
+        ),
+    )
     parser.add_argument("--report-json", type=Path)
     parser.add_argument("--inventory-json", type=Path)
     parser.add_argument("--inventory-markdown", type=Path)
@@ -765,6 +836,7 @@ def main(argv: list[str] | None = None) -> int:
         changed_from=args.changed_from,
         today=today,
         write_auto_sections=args.write_auto_sections,
+        write_manifest_counts=args.write_manifest_counts,
     )
     if args.report_json:
         report_path = args.report_json

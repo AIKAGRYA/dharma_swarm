@@ -1,0 +1,18 @@
+# Generated count files. Every PR that adds/removes a file, test, or line edits
+# these, so they collide on a three-way merge constantly (the O(n^2) "counter
+# cascade"). Their content is fully derivable from the tree, so a textual merge
+# conflict is never meaningful — the correct values are recomputed by
+# scripts/docops/check_docops_integrity.py.
+#
+# These point at the `dharma-docops-counter` merge driver (keep-ours, no
+# conflict). Register it once per clone with:
+#     scripts/docops/install_docops_merge_driver.sh   (or: make onboard)
+# After a merge, the live values are healed by:
+#     python3 scripts/docops/check_docops_integrity.py --write-auto-sections --write-manifest-counts
+# CI does both automatically (.github/workflows/docops-autorefresh.yml).
+#
+# NOTE: a custom merge driver only runs where it is registered (local clones +
+# the autorefresh runner). GitHub's server-side merge ignores it, which is why
+# the autorefresh workflow also re-syncs open PRs after main moves.
+docs/docops/AUTO_INVENTORY.md merge=dharma-docops-counter
+docs/governance/SOVEREIGN_MANIFEST.md merge=dharma-docops-counter
