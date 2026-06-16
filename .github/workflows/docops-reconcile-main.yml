@@ -16,9 +16,13 @@ name: docops-reconcile-main
 #   not trigger new workflow runs — so this job never re-triggers itself.
 #
 # Admin requirement:
-#   The acting bot (github-actions[bot]) must be allowed to push the two count
-#   files to protected main (branch-protection / ruleset bypass). If it is not,
-#   the push step fails loudly so the missing bypass is visible.
+#   Pushing to protected main (especially once the merge-queue ruleset is on)
+#   requires the pushing identity to be a ruleset/branch-protection bypass actor.
+#   Provide a bypass-capable token as the DOCOPS_RECONCILE_TOKEN secret (a
+#   fine-grained PAT or GitHub App installation token with contents:write, added
+#   to the ruleset bypass list). If that secret is absent this falls back to the
+#   default GITHUB_TOKEN (works only if github-actions[bot] itself is granted
+#   bypass). If the push is rejected, the step warns loudly so the gap is visible.
 
 on:
   push:
@@ -44,6 +48,9 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: true
+          # Prefer a bypass-capable token (PAT / GitHub App) so the reconcile
+          # push clears the merge-queue ruleset; fall back to GITHUB_TOKEN.
+          token: ${{ secrets.DOCOPS_RECONCILE_TOKEN || github.token }}
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
