@@ -73,6 +73,51 @@ def _assign_tier(model_id: str) -> int:
     return 3
 
 
+# Hand-typed last-resort tiers if BOTH live discovery and the model pool are
+# unavailable. Kept minimal and known-good; the pool generator below is the real
+# offline source (STEP 6 of the model-routing consolidation).
+_FREE_FLEET_OFFLINE_FALLBACK: dict[int, list[str]] = {
+    1: ["meta-llama/llama-3.3-70b-instruct:free"],
+    2: ["google/gemma-3-27b-it:free"],
+    3: ["mistralai/mistral-small-3.1-24b-instruct:free"],
+}
+
+
+def _pool_free_tiers() -> dict[int, list[str]]:
+    """Tiered free-model fallback DERIVED from the ONE model pool.
+
+    Replaces the hand-typed fallback model-ids in :func:`discover_free_models_sync`
+    with the pool's OpenRouter-free routes, tiered through the existing
+    :func:`_assign_tier` prefix rules. The model-id strings live in exactly one
+    place (the pool); this module only re-tiers them. FAIL-OPEN: if the pool is
+    unavailable, fall back to the minimal hand-typed set so discovery never
+    strands the fleet with an empty roster.
+    """
+    try:
+        from dharma_swarm.model_pool import provider_model_ids  # noqa: PLC0415 (lazy)
+        from dharma_swarm.models import ProviderType  # noqa: PLC0415
+    except Exception:  # pragma: no cover - degenerate
+        return {k: list(v) for k, v in _FREE_FLEET_OFFLINE_FALLBACK.items()}
+
+    result: dict[int, list[str]] = {1: [], 2: [], 3: []}
+    for mid in provider_model_ids(ProviderType.OPENROUTER_FREE):
+        if mid.endswith(":free"):
+            result[_assign_tier(mid)].append(mid)
+
+    # Backfill empty tiers from the next-best populated tier so every tier is
+    # non-empty (the same invariant discover_free_models_sync guarantees).
+    if not result[1] and result[2]:
+        result[1] = [result[2][0]]
+    if not result[2] and result[3]:
+        result[2] = [result[3][0]]
+    if not result[3] and result[2]:
+        result[3] = [result[2][-1]]
+
+    if not any(result.values()):
+        return {k: list(v) for k, v in _FREE_FLEET_OFFLINE_FALLBACK.items()}
+    return result
+
+
 def discover_free_models_sync() -> dict[int, list[str]]:
     """Query OpenRouter /api/v1/models and return tiered free model dict.
 
@@ -109,13 +154,13 @@ def discover_free_models_sync() -> dict[int, list[str]]:
         if not result[2] and result[3]:
             result[2] = [result[3][0]]
 
+        # Live discovery returned an empty roster (e.g. all free models gone) —
+        # fall back to the pool-derived tiers, not a self-inflicted empty fleet.
+        if not any(result.values()):
+            return _pool_free_tiers()
         return result
     except Exception:
-        return {
-            1: ["meta-llama/llama-3.3-70b-instruct:free"],
-            2: ["google/gemma-3-27b-it:free"],
-            3: ["mistralai/mistral-small-3.1-24b-instruct:free"],
-        }
+        return _pool_free_tiers()
 
 
 # ---------------------------------------------------------------------------

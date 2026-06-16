@@ -327,6 +327,73 @@ def best_live_route(
     return routes[0] if routes else None
 
 
+# ---------------------------------------------------------------------------
+# Provider model-id generators (STEP 6 of the consolidation)
+# ---------------------------------------------------------------------------
+# These replace the hand-typed frontier tuples that used to live in
+# ollama_config (OLLAMA_CLOUD_FRONTIER_MODELS), provider_smoke (NIM hosted /
+# self-hosted / OpenRouter frontier catalogs) and elsewhere. Each returns the
+# provider-specific model-id strings the pool already owns — so the model-id
+# literals live in exactly ONE place (the roster -> pool), and downstream
+# catalogs become projections. Ordering callers care about (e.g. the smoke
+# probe sequence) is applied by the caller; these return pool order, deduped.
+
+
+def provider_model_ids(
+    provider: ProviderType,
+    *,
+    tiers: tuple[ModelTier, ...] | None = None,
+) -> tuple[str, ...]:
+    """Every provider-specific model-id the pool serves for ``provider``.
+
+    Pool order (best-route-first across entries), deduped. ``tiers`` optionally
+    restricts to entries of those logical tiers (e.g. only STRONG models for a
+    smoke catalog). No key strings, no liveness — pure model-grain projection.
+    """
+    out: list[str] = []
+    for entry in MODEL_POOL:
+        if tiers is not None and entry.tier not in tiers:
+            continue
+        for route in entry.routes:
+            if route.provider is provider and route.model_id not in out:
+                out.append(route.model_id)
+    return tuple(out)
+
+
+def ollama_cloud_model_ids() -> tuple[str, ...]:
+    """Ollama routes served over the cloud endpoint (``:cloud`` / ``-cloud``).
+
+    Source for ``ollama_config.OLLAMA_CLOUD_FRONTIER_MODELS``. Pool order,
+    deduped, K2.6 floor included (the pool carries it as an Ollama-Cloud route).
+    """
+    out: list[str] = []
+    for mid in provider_model_ids(ProviderType.OLLAMA):
+        if (mid.endswith(":cloud") or mid.endswith("-cloud")) and mid not in out:
+            out.append(mid)
+    return tuple(out)
+
+
+def strong_vendor_model_ids() -> tuple[str, ...]:
+    """Vendor-namespaced ids for STRONG-tier logical models, pool order.
+
+    Used to project the NVIDIA-NIM self-hosted smoke catalog: a self-hosted NIM
+    OpenAI-compatible endpoint can serve the same open weights under their
+    vendor namespace (e.g. ``moonshotai/kimi-k2.5``, ``z-ai/glm-5``). Each STRONG
+    entry contributes its first vendor-namespaced route id (an OpenRouter or NIM
+    route carries the ``vendor/model`` form); bare-name local/Ollama-only ids are
+    skipped (no vendor namespace to serve self-hosted under).
+    """
+    out: list[str] = []
+    for entry in MODEL_POOL:
+        if entry.tier is not ModelTier.STRONG:
+            continue
+        for route in entry.routes:
+            if "/" in route.model_id and route.model_id not in out:
+                out.append(route.model_id)
+                break
+    return tuple(out)
+
+
 __all__ = [
     "Route",
     "ModelEntry",
@@ -338,4 +405,7 @@ __all__ = [
     "default_for_provider",
     "live_routes",
     "best_live_route",
+    "provider_model_ids",
+    "ollama_cloud_model_ids",
+    "strong_vendor_model_ids",
 ]

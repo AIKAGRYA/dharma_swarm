@@ -82,18 +82,28 @@ def _resolve_default_crew() -> list[dict]:
     decorrelated errors — same model prompted differently does NOT suffice).
     """
     if _has_ollama_key():
-        # Ollama Cloud — diverse frontier models for error decorrelation
-        from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
-        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, deepseek-v3.2, kimi-k2.5, minimax-m2.7, qwen3-coder
+        # Ollama Cloud — DIVERSE frontier models for error decorrelation. The
+        # chain is now derived from the ONE model pool (Ollama-Cloud routes,
+        # best-route-first); we hand each agent a DIFFERENT entry so the crew's
+        # errors decorrelate. Indices are spread, not pinned to a fixed model.
+        from dharma_swarm.ollama_config import (
+            OLLAMA_CLOUD_FRONTIER_MODELS,
+            OLLAMA_DEFAULT_CLOUD_MODEL,
+        )
+        _models = OLLAMA_CLOUD_FRONTIER_MODELS
+        # Spread picks across the chain; wrap if the pool is short so we never
+        # IndexError and still maximise distinctness for the four roles.
+        def _pick(i: int) -> str:
+            return _models[i % len(_models)] if _models else OLLAMA_DEFAULT_CLOUD_MODEL
         return [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
-             "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _models[0]},  # glm-5
+             "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _pick(0)},
             {"name": "surgeon", "role": AgentRole.SURGEON,
-             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[2]},    # kimi-k2.5
+             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _pick(1)},
             {"name": "architect", "role": AgentRole.ARCHITECT,
-             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[1]}, # deepseek-v3.2
+             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _pick(2)},
             {"name": "validator", "role": AgentRole.VALIDATOR,
-             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]},       # qwen3-coder
+             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _pick(3)},
         ]
 
     if _has_openrouter_key():

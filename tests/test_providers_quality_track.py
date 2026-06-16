@@ -706,7 +706,13 @@ async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
 
     assert out.content == "fallback ok"
     assert out.model == "deepseek-v3.2"
-    assert attempts[:2] == ["glm-5", "deepseek-v3.2"]
+    # Requested model (glm-5) is tried first; on failure the provider falls
+    # through to the NEXT entry in the Ollama-Cloud frontier chain. That chain
+    # is now derived from the model pool (best-route-first, STEP 6), so the
+    # second attempt is kimi-k2.5 (next pool entry after glm-5), not the old
+    # hand-typed deepseek-v3.2 ordering. The mock returns OK on the 2nd attempt
+    # regardless, so out.model stays the fixture's deepseek-v3.2.
+    assert attempts[:2] == ["glm-5", "kimi-k2.5"]
 
 
 @pytest.mark.asyncio

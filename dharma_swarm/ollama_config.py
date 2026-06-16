@@ -16,13 +16,51 @@ OLLAMA_CLOUD_BASE_URL = "https://ollama.com"
 # OLLAMA_LOCAL_MODEL=<name> per machine. (2026-06-06: "available" must mean serveable.)
 OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 OLLAMA_DEFAULT_CLOUD_MODEL = default_for_provider(ProviderType.OLLAMA)
-OLLAMA_CLOUD_FRONTIER_MODELS = (
+
+
+# Fail-open fallback for the Ollama Cloud frontier chain: used ONLY if the model
+# pool cannot be imported at populate time (mid import-cycle / partial init). The
+# pool (seeded from evolution_roster) is the real source; this keeps the module
+# importable and the chain non-empty in the degenerate case. Mirrors the pool's
+# Ollama-Cloud routes, K2.6 floor included, best-route-first.
+_OLLAMA_CLOUD_FRONTIER_FALLBACK: tuple[str, ...] = (
+    "kimi-k2.6:cloud",
     "glm-5:cloud",
     "deepseek-v3.2:cloud",
     "kimi-k2.5:cloud",
-    "minimax-m2.7:cloud",
     "qwen3-coder:480b-cloud",
+    "minimax-m2.7:cloud",
 )
+
+
+def _generate_ollama_cloud_frontier_models() -> tuple[str, ...]:
+    """Derive the Ollama Cloud frontier chain from the ONE model pool.
+
+    STEP 6 of the model-routing consolidation: this REPLACES the hand-typed
+    frontier tuple. The chain is every Ollama route the pool serves over the
+    cloud endpoint (``:cloud`` / ``-cloud`` serving tag), in pool order
+    (best-route-first), deduped. The K2.6 floor model is included because the
+    pool carries it as an Ollama-Cloud route.
+
+    Lazy import: ``model_pool`` -> ``evolution_roster`` -> this module form an
+    import cycle. We import the pool *inside* the function so ``ollama_config``
+    stays importable on its own. FAIL-OPEN: any import/parse failure falls back
+    to ``_OLLAMA_CLOUD_FRONTIER_FALLBACK`` so the chain is never empty.
+    """
+    try:
+        from dharma_swarm.model_pool import ollama_cloud_model_ids  # noqa: PLC0415 (lazy: cycle break)
+    except Exception:  # pragma: no cover - degenerate mid-cycle import
+        return _OLLAMA_CLOUD_FRONTIER_FALLBACK
+
+    return ollama_cloud_model_ids() or _OLLAMA_CLOUD_FRONTIER_FALLBACK
+
+
+#: Ollama Cloud frontier chain — a SNAPSHOT of the pool generator (no longer a
+#: hand-typed literal). Populated at the BOTTOM of this module (after the helper
+#: functions evolution_roster needs are defined) so the model_pool import cycle
+#: resolves cleanly. Consumers (providers.py hot path, startup_crew, smoke tests)
+#: keep reading this module constant unchanged.
+OLLAMA_CLOUD_FRONTIER_MODELS: tuple[str, ...] = _OLLAMA_CLOUD_FRONTIER_FALLBACK
 
 _LOCAL_BASE_URLS = {
     OLLAMA_LOCAL_BASE_URL,
@@ -129,10 +167,20 @@ def build_ollama_headers(
 def get_ollama_cloud_frontier_chain() -> tuple[str, ...]:
     """Return Ollama Cloud frontier models in priority order for fallback rotation.
 
-    When the primary model (GLM-5) fails, callers should try the next model
+    The chain is derived from the ONE model pool (Ollama-Cloud routes,
+    best-route-first). When the primary model fails, callers try the next model
     in this chain.  All models are FREE on Ollama Cloud.
     """
     return OLLAMA_CLOUD_FRONTIER_MODELS
+
+
+# Populate the snapshot from the pool now that every helper evolution_roster
+# needs is defined above — so the model_pool -> evolution_roster -> ollama_config
+# cycle re-enters this module cleanly. Fail-open: keeps the fallback on any error.
+try:  # pragma: no cover - exercised by import
+    OLLAMA_CLOUD_FRONTIER_MODELS = _generate_ollama_cloud_frontier_models()
+except Exception:  # pragma: no cover - degenerate
+    OLLAMA_CLOUD_FRONTIER_MODELS = _OLLAMA_CLOUD_FRONTIER_FALLBACK
 
 
 __all__ = [
