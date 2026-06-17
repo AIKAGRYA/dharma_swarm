@@ -18,19 +18,30 @@ OLLAMA_DEFAULT_LOCAL_MODEL = os.getenv("OLLAMA_LOCAL_MODEL", "mistral:latest")
 OLLAMA_DEFAULT_CLOUD_MODEL = default_for_provider(ProviderType.OLLAMA)
 
 
-# Fail-open fallback for the Ollama Cloud frontier chain: used ONLY if the model
-# pool cannot be imported at populate time (mid import-cycle / partial init). The
-# pool (seeded from evolution_roster) is the real source; this keeps the module
-# importable and the chain non-empty in the degenerate case. Mirrors the pool's
-# Ollama-Cloud routes, K2.6 floor included, best-route-first.
-_OLLAMA_CLOUD_FRONTIER_FALLBACK: tuple[str, ...] = (
-    "kimi-k2.6:cloud",
-    "glm-5:cloud",
-    "deepseek-v3.2:cloud",
-    "kimi-k2.5:cloud",
-    "qwen3-coder:480b-cloud",
-    "minimax-m2.7:cloud",
-)
+def _ollama_cloud_frontier_from_roster() -> tuple[str, ...]:
+    """Fail-open fallback for the Ollama Cloud frontier chain, with NO literals.
+
+    Used ONLY if the model pool cannot be imported at populate time (mid
+    import-cycle / partial init). The model-id strings live in exactly one place
+    — ``evolution_roster.EVOLUTION_ROSTER`` (the pool's seed, and the sanctioned
+    home for model-id literals). This derives the Ollama-Cloud routes directly
+    from that seed so the chain stays non-empty without re-typing any model-id.
+
+    Lazy import inside the function: at call time (bottom-of-module populate, or
+    a later degenerate retry) the roster is fully initialised even though the
+    ``model_pool`` projection may not be. Returns pool-equivalent order
+    (roster order), deduped, K2.6 floor included.
+    """
+    try:
+        from dharma_swarm.evolution_roster import EVOLUTION_ROSTER  # noqa: PLC0415 (lazy: cycle break)
+    except Exception:  # pragma: no cover - degenerate mid-cycle import
+        return ()
+    out: list[str] = []
+    for slot in EVOLUTION_ROSTER:
+        mid = slot.model_id
+        if (mid.endswith(":cloud") or mid.endswith("-cloud")) and mid not in out:
+            out.append(mid)
+    return tuple(out)
 
 
 def _generate_ollama_cloud_frontier_models() -> tuple[str, ...]:
@@ -45,22 +56,23 @@ def _generate_ollama_cloud_frontier_models() -> tuple[str, ...]:
     Lazy import: ``model_pool`` -> ``evolution_roster`` -> this module form an
     import cycle. We import the pool *inside* the function so ``ollama_config``
     stays importable on its own. FAIL-OPEN: any import/parse failure falls back
-    to ``_OLLAMA_CLOUD_FRONTIER_FALLBACK`` so the chain is never empty.
+    to the roster-derived chain (still no literals here) so the chain is never
+    empty.
     """
     try:
         from dharma_swarm.model_pool import ollama_cloud_model_ids  # noqa: PLC0415 (lazy: cycle break)
     except Exception:  # pragma: no cover - degenerate mid-cycle import
-        return _OLLAMA_CLOUD_FRONTIER_FALLBACK
+        return _ollama_cloud_frontier_from_roster()
 
-    return ollama_cloud_model_ids() or _OLLAMA_CLOUD_FRONTIER_FALLBACK
+    return ollama_cloud_model_ids() or _ollama_cloud_frontier_from_roster()
 
 
 #: Ollama Cloud frontier chain — a SNAPSHOT of the pool generator (no longer a
-#: hand-typed literal). Populated at the BOTTOM of this module (after the helper
-#: functions evolution_roster needs are defined) so the model_pool import cycle
-#: resolves cleanly. Consumers (providers.py hot path, startup_crew, smoke tests)
-#: keep reading this module constant unchanged.
-OLLAMA_CLOUD_FRONTIER_MODELS: tuple[str, ...] = _OLLAMA_CLOUD_FRONTIER_FALLBACK
+#: hand-typed literal). Initialised empty and populated at the BOTTOM of this
+#: module (after the helper functions evolution_roster needs are defined) so the
+#: model_pool import cycle resolves cleanly. Consumers (providers.py hot path,
+#: startup_crew, smoke tests) keep reading this module constant unchanged.
+OLLAMA_CLOUD_FRONTIER_MODELS: tuple[str, ...] = ()
 
 _LOCAL_BASE_URLS = {
     OLLAMA_LOCAL_BASE_URL,
@@ -176,11 +188,12 @@ def get_ollama_cloud_frontier_chain() -> tuple[str, ...]:
 
 # Populate the snapshot from the pool now that every helper evolution_roster
 # needs is defined above — so the model_pool -> evolution_roster -> ollama_config
-# cycle re-enters this module cleanly. Fail-open: keeps the fallback on any error.
+# cycle re-enters this module cleanly. Fail-open: keeps the roster-derived chain
+# (no literals) on any error.
 try:  # pragma: no cover - exercised by import
     OLLAMA_CLOUD_FRONTIER_MODELS = _generate_ollama_cloud_frontier_models()
 except Exception:  # pragma: no cover - degenerate
-    OLLAMA_CLOUD_FRONTIER_MODELS = _OLLAMA_CLOUD_FRONTIER_FALLBACK
+    OLLAMA_CLOUD_FRONTIER_MODELS = _ollama_cloud_frontier_from_roster()
 
 
 __all__ = [

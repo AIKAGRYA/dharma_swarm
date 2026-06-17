@@ -64,22 +64,25 @@ def _ordered(prefer: tuple[str, ...], pool_ids: tuple[str, ...]) -> tuple[str, .
 def _nim_hosted_frontier_models() -> tuple[str, ...]:
     """NVIDIA-NIM hosted-API smoke catalog — projected from the pool's NIM routes.
 
-    Lead with the large reasoning lane (Nemotron Ultra 253B) per the roster note,
-    then the workhorse 70B. Both strings are pool routes."""
-    return _ordered(
-        ("nvidia/llama-3.1-nemotron-ultra-253b-v1",),
-        provider_model_ids(ProviderType.NVIDIA_NIM),
-    )
+    Lead with the NIM-native reasoning lane, then the re-hosted workhorses. The
+    lead is DERIVED from the pool, not a literal: among the pool's NIM routes,
+    the NIM-native (``nvidia/`` vendor namespace) ids come first — that is the
+    large dedicated reasoning model NVIDIA serves first-party — then the rest in
+    pool order. Every string is a pool route."""
+    nim_ids = provider_model_ids(ProviderType.NVIDIA_NIM)
+    nim_native = tuple(m for m in nim_ids if m.startswith("nvidia/"))
+    return _ordered(nim_native, nim_ids)
 
 
 def _nim_self_hosted_frontier_models() -> tuple[str, ...]:
     """NVIDIA-NIM self-hosted smoke catalog — STRONG-tier open weights served via
-    their vendor namespace on a self-hosted OpenAI-compatible NIM endpoint, plus
-    the real NIM routes. All strings are pool ids (vendor-namespaced)."""
-    return _ordered(
-        ("moonshotai/kimi-k2.5",),
-        strong_vendor_model_ids(),
-    )
+    their vendor namespace on a self-hosted OpenAI-compatible NIM endpoint.
+
+    Pure pool projection: :func:`strong_vendor_model_ids` already returns the
+    STRONG-tier vendor-namespaced ids in pool order (best-route-first), which
+    leads with the high-stakes reasoning model. No literal preference seed is
+    needed — the pool order is the smoke order. All strings are pool ids."""
+    return strong_vendor_model_ids()
 
 
 def _openrouter_frontier_models() -> tuple[str, ...]:

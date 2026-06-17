@@ -45,18 +45,27 @@ logger = logging.getLogger(__name__)
 
 _MIN_CTX = 32_000  # Minimum context to be useful
 
-# Tier assignment rules: prefix → tier
+# Tier assignment rules: prefix → tier.
+#
+# This is a CLASSIFIER over whatever models live OpenRouter discovery returns —
+# a heuristic that buckets a live model-id into a capability tier, NOT a list of
+# models the swarm runs. The prefixes are vendor/family namespaces, not model
+# selections.
+#
+# Floor doctrine (2026-06 model-routing consolidation): sub-floor / BANISHED
+# families (nvidia/nemotron-*, google/gemma-3) are deliberately ABSENT here. If
+# live discovery still surfaces one, it falls through to the tier-3 default
+# rather than being promoted into a reasoning tier — the floor is never lifted by
+# elevating a banished model. The remaining prefixes are vendor namespaces (not
+# specific sub-floor model-ids), so no floor model-id literal lives in this map.
 _TIER_RULES: list[tuple[str, int]] = [
     # Tier 1: heavy reasoning
-    ("nvidia/nemotron-3-super", 1),
     ("nousresearch/hermes-3-llama-3.1-405b", 1),
     ("openai/gpt-oss-120b", 1),
     ("meta-llama/llama-3.3-70b", 1),
     # Tier 2: general purpose
     ("qwen/", 2),
-    ("nvidia/nemotron-3-nano", 2),
     ("minimax/", 2),
-    ("google/gemma-3-27b", 2),
     ("arcee-ai/trinity", 2),
     ("openai/gpt-oss-20b", 2),
     ("z-ai/", 2),
