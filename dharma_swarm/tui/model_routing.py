@@ -222,13 +222,15 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         pool_id=None,
         pinned_model_id="gpt-5.4",
     ),
+    # Gemini 3 class now rides a real pool entry (gemini-3-pro at the FLOOR), so
+    # its OpenRouter model_id is SOURCED FROM the pool like the other free lanes —
+    # no pinned literal. The sub-floor google/gemini-2.5-pro string is retired.
     _projected(
         alias="gemini-3",
         provider_id="openrouter",
         label="Gemini 3 class (via OpenRouter)",
         aliases=("gemini", "gemini 3", "google gemini 3"),
-        pool_id=None,
-        pinned_model_id="google/gemini-2.5-pro",
+        pool_id="gemini-3-pro",
     ),
 )
 

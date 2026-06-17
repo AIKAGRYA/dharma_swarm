@@ -24,9 +24,37 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Pool-sourced Ollama-Cloud ids (model-pool consolidation 2026-06)
+# ---------------------------------------------------------------------------
+# The cybernetics crew rides Ollama-Cloud routes. These used to be hand-typed
+# ``<name>:cloud`` literals (including the sub-floor ``kimi-k2.5:cloud``); they
+# are now DERIVED from the ONE model pool at the FLOOR, so the model-id strings
+# live in exactly one place and no sub-floor literal can survive here.
+#   kimi-k2.5:cloud  -> kimi-k2.6 (K2.6 FLOOR)
+#   glm-5 / deepseek-v3.2 / qwen3-coder: in-pool floor entries, kept.
+
+
+def _cloud_id(pool_id: str) -> str:
+    """The Ollama-Cloud route id the pool serves for ``pool_id``.
+
+    Raises at import if the pool has no Ollama-Cloud route for it — a crew row
+    can never silently reference a model outside the pool/floor.
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.endswith(":cloud") or mid.endswith("-cloud"):
+                return mid
+    raise AssertionError(
+        f"startup_crew references pool id {pool_id!r} with no Ollama-Cloud route"
+    )
 
 MEMORY_SURVIVAL_INSTINCT = (
     "MEMORY SURVIVAL INSTINCT:\n"
@@ -144,7 +172,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.RESEARCHER,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "glm-5:cloud",
+        "model": _cloud_id("glm-5"),
         "system_prompt": (
             "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
             "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
@@ -156,7 +184,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.CARTOGRAPHER,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "kimi-k2.5:cloud",
+        "model": _cloud_id("kimi-k2.6"),  # K2.6 FLOOR (was sub-floor kimi-k2.5:cloud)
         "system_prompt": (
             "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
             "Trace cross-file, cross-module, and cross-ledger connections; make the "
@@ -168,7 +196,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.SURGEON,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "qwen3-coder:480b-cloud",
+        "model": _cloud_id("qwen3-coder:480b-cloud"),
         "system_prompt": (
             "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
             "Prefer the smallest hot-path control improvement over broad subsystem invention. "
@@ -180,7 +208,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.ARCHITECT,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "deepseek-v3.2:cloud",
+        "model": _cloud_id("deepseek-v3.2"),
         "system_prompt": (
             "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
             "Hold telos, constitutional coherence, and the bounded mission shape. "

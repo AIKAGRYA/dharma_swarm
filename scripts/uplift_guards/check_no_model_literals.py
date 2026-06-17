@@ -56,6 +56,11 @@ FALSE_POSITIVES: set[tuple[str, str]] = {
     ("identity.py", "'meta/identity_history.jsonl'"),     # state-file path key
     ("providers.py", "'nvidia/nemotron'"),                # _PREFERRED_PREFIXES (startswith)
     ("providers.py", "'google/gemma'"),                   # _PREFERRED_PREFIXES (startswith)
+    # EVAL-ONLY benchmark candidate — a long-context sidecar model being
+    # *evaluated*, NOT a routing/dispatch target. It must NOT be forced into the
+    # routing pool/floor; the literal stays as the benchmark's candidate-model id
+    # (default arg + CLI default). Two identical occurrences in the same file.
+    ("long_context_sidecar_eval.py", "'moonshotai/Kimi-Linear-48B-A3B-Instruct'"),
 }
 
 

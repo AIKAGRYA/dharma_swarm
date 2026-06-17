@@ -60,15 +60,20 @@ def test_pool_routes_are_exactly_the_roster_literals():
 
 
 def test_pool_collapses_roster_slots_to_logical_entries():
-    """The roster has 30 slots that collapse to 22 logical pool entries.
+    """The roster has 31 slots that collapse to 23 logical pool entries.
     Guards against silent regroup drift.
 
     Step 4 added 6 slots the provider matrix projects (the K2.6 floor model via
     BOTH Ollama Cloud and OpenRouter, plus deepseek-v3.2 / qwen3-coder:480b /
     minimax-m2.7 Ollama-cloud lanes). That is 4 new logical ids — kimi-k2.6
-    (2 routes -> 1 entry) + 3 single-route entries — taking 18 -> 22."""
-    assert len(EVOLUTION_ROSTER) == 30
-    assert len(MODEL_POOL) == 22
+    (2 routes -> 1 entry) + 3 single-route entries — taking 18 -> 22.
+
+    The misc-surfaces consolidation (2026-06) added 1 slot: gemini-3-pro via
+    OpenRouter (google/gemini-3-pro), the FLOOR the TUI/openrouter Gemini lane
+    now projects instead of the sub-floor google/gemini-2.5-pro literal. One new
+    single-route logical id -> 30 -> 31 slots, 22 -> 23 entries."""
+    assert len(EVOLUTION_ROSTER) == 31
+    assert len(MODEL_POOL) == 23
 
 
 # --------------------------------------------------------------------------

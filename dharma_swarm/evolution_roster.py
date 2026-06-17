@@ -187,6 +187,18 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ("code", "reasoning"),
         128_000,
     ),
+    # Gemini frontier-class lane via the OpenRouter aggregator. The TUI/openrouter
+    # adapter used to hand-type ``google/gemini-2.5-pro`` (sub-floor); the floor is
+    # gemini-3-pro, so the pool owns the route here and the surfaces project it.
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "google/gemini-3-pro",
+        "Gemini 3 Pro",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "multimodal"),
+        1_000_000,
+        "Gemini 3 class via OpenRouter — large-context multimodal reasoning lane",
+    ),
     ModelSlot(
         ProviderType.OPENROUTER,
         "meta-llama/llama-3.3-70b-instruct",
