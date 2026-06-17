@@ -42,7 +42,12 @@ OUT_DIR = REPO_ROOT / "reports" / "model_pool"
 
 
 def _enumerate(oracle: set[str] | None) -> tuple[list[dict], list[dict]]:
-    """Split the pool into operable (≥1 live route) and unroutable rows."""
+    """Split the pool into operable (≥1 live route) and unroutable rows.
+
+    Each row carries ``below_floor`` so the floor (real-path) models are clearly
+    demarcated from the grunt-only sub-floor ones — the real-vs-grunt line the
+    operator requires must be visible in the artifact, never blurred together.
+    """
     operable: list[dict] = []
     unroutable: list[dict] = []
     for entry in all_entries():
@@ -51,6 +56,8 @@ def _enumerate(oracle: set[str] | None) -> tuple[list[dict], list[dict]]:
             "id": entry.id,
             "display": entry.display,
             "tier": getattr(entry.tier, "name", str(entry.tier)),
+            "below_floor": bool(getattr(entry, "below_floor", False)),
+            "lane": "grunt" if getattr(entry, "below_floor", False) else "floor",
             "aliases": list(entry.aliases),
             "all_routes": [f"{r.provider.value}:{r.model_id}" for r in entry.routes],
             "live_routes": [f"{r.provider.value}:{r.model_id}" for r in routes],
@@ -138,28 +145,40 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%dT%H%M%S")
     mode = "live" if args.live else "dry-run"
-    live_results = _drive_live(operable, height=args.height, width=args.width,
-                               probe_timeout=args.probe_timeout) if args.live else []
 
+    floor_op = [r for r in operable if not r["below_floor"]]
+    grunt_op = [r for r in operable if r["below_floor"]]
+    # Live probes drive ONLY the floor path — grunt models are fenced out of the
+    # picker, so /model set <grunt> isn't a real route to verify.
+    live_results = _drive_live(floor_op, height=args.height, width=args.width,
+                               probe_timeout=args.probe_timeout) if args.live else []
     artifact = {
         "mode": mode,
         "live_providers": sorted(oracle) if oracle is not None else None,
         "oracle_note": "None = key status stale/missing → fail-open (routes unfiltered)",
-        "counts": {"operable": len(operable), "unroutable": len(unroutable)},
-        "operable": operable,
+        "counts": {"floor_operable": len(floor_op), "grunt_operable": len(grunt_op),
+                   "unroutable": len(unroutable)},
+        "floor_operable": floor_op,
+        "grunt_operable": grunt_op,
         "unroutable": unroutable,
         "live_results": live_results,
     }
     out = OUT_DIR / f"e2e_{stamp}.json"
     out.write_text(json.dumps(artifact, indent=2), encoding="utf-8")
 
-    print(f"model_pool_e2e [{mode}] — {len(operable)} operable / {len(unroutable)} unroutable")
+    def _tag(row: dict) -> str:
+        return next((r["status"] for r in live_results if r["id"] == row["id"]), "(dry-run)")
+
+    print(f"model_pool_e2e [{mode}] — FLOOR {len(floor_op)} · grunt {len(grunt_op)} · unroutable {len(unroutable)}")
     print(f"live providers: {sorted(oracle) if oracle is not None else 'STALE (fail-open)'}")
-    for row in operable:
-        tag = next((r["status"] for r in live_results if r["id"] == row["id"]), "(dry-run)")
-        print(f"  ✓ {row['id']:20s} -> {row['live_routes'][0] if row['live_routes'] else '?':32s} {tag}")
+    print("\n── FLOOR (real path — picker + default routing) ──")
+    for row in floor_op:
+        print(f"  ✓ {row['id']:24s} -> {row['live_routes'][0] if row['live_routes'] else '?':34s} {_tag(row)}")
+    print("\n── GRUNT-ONLY (sub-floor — fenced, explicit opt-in only) ──")
+    for row in grunt_op:
+        print(f"  · {row['id']:24s} -> {row['live_routes'][0] if row['live_routes'] else '?':34s} [grunt]")
     for row in unroutable:
-        print(f"  · {row['id']:20s} UNROUTABLE (no live route: {row['all_routes']})")
+        print(f"  ✗ {row['id']:24s} UNROUTABLE (no live route)")
     print(f"\nartifact: {out.relative_to(REPO_ROOT)}")
     if args.live:
         failed = [r["id"] for r in live_results if r["status"] != "operable"]
