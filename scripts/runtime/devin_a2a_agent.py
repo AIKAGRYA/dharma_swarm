@@ -54,11 +54,36 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _tls_context() -> ssl.SSLContext:
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    return ctx
+def _normalize_ca_pem(value: str) -> str:
+    normalized = value.strip()
+    if "\\n" in normalized and "\n" not in normalized:
+        normalized = normalized.replace("\\n", "\n")
+    return normalized + "\n" if normalized and not normalized.endswith("\n") else normalized
+
+
+def _tls_context() -> tuple[ssl.SSLContext, str]:
+    ca_pem = (
+        os.environ.get("DEVIN_NATS_CA_PEM")
+        or os.environ.get("DHARMA_NATS_CA_PEM")
+        or os.environ.get("NATS_CA_PEM")
+        or ""
+    )
+    tls_hostname = (
+        os.environ.get("DEVIN_NATS_TLS_HOSTNAME")
+        or os.environ.get("DHARMA_NATS_TLS_HOSTNAME")
+        or ""
+    )
+    ca_pem = _normalize_ca_pem(ca_pem)
+    if ca_pem:
+        ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+        ctx.load_verify_locations(cadata=ca_pem)
+    elif os.environ.get("DEVIN_NATS_INSECURE_TLS", "").lower() in ("1", "true", "yes"):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    else:
+        ctx = ssl.create_default_context()
+    return ctx, tls_hostname
 
 
 def _nats_creds() -> tuple[str, str, str]:
@@ -68,6 +93,19 @@ def _nats_creds() -> tuple[str, str, str]:
     if not pw:
         raise RuntimeError("DEVIN_NATS_PW not set")
     return url, user, pw
+
+
+def _check_nats_dependency() -> None:
+    try:
+        import nats as _nats  # noqa: F401
+    except ImportError:
+        print(
+            "[error] nats-py is not installed. Install with:\n"
+            "  pip install nats-py\n"
+            "  # or: uv run --with nats-py python3 scripts/runtime/devin_a2a_agent.py",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def build_agent_card() -> dict[str, Any]:
@@ -98,7 +136,6 @@ def build_agent_card() -> dict[str, Any]:
         ],
         "supported_interfaces": [
             {"protocol": "nats", "binding": A2A_SUBJECT},
-            {"protocol": "nats", "binding": f"dharma.agent.{AGENT_UID}.inbox"},
         ],
         "endpoint": f"nats://{A2A_SUBJECT}",
         "created_at": now,
@@ -192,7 +229,8 @@ async def _process_message(msg: Any, *, js: Any) -> dict[str, Any]:
         try:
             await js.publish(ack_subject, ack_payload, timeout=3)
         except Exception:
-            pass
+            await msg.nak()
+            return delivery
 
     await msg.ack()
     return delivery
@@ -202,7 +240,7 @@ async def run_agent(*, heartbeat_interval: int, as_json: bool) -> None:
     import nats
 
     url, user, pw = _nats_creds()
-    tls_ctx = _tls_context()
+    tls_ctx, tls_hostname = _tls_context()
 
     shutdown = asyncio.Event()
 
@@ -217,17 +255,20 @@ async def run_agent(*, heartbeat_interval: int, as_json: bool) -> None:
         if not as_json:
             print(f"[nats-error] {e}", file=sys.stderr)
 
-    nc = await nats.connect(
-        servers=[url],
-        user=user,
-        password=pw,
-        connect_timeout=10,
-        allow_reconnect=True,
-        max_reconnect_attempts=-1,
-        reconnect_time_wait=5,
-        tls=tls_ctx,
-        error_cb=err_handler,
-    )
+    connect_kwargs: dict[str, Any] = {
+        "servers": [url],
+        "user": user,
+        "password": pw,
+        "connect_timeout": 10,
+        "allow_reconnect": True,
+        "max_reconnect_attempts": -1,
+        "reconnect_time_wait": 5,
+        "tls": tls_ctx,
+        "error_cb": err_handler,
+    }
+    if tls_hostname:
+        connect_kwargs["tls_hostname"] = tls_hostname
+    nc = await nats.connect(**connect_kwargs)
     js = nc.jetstream()
 
     # Save agent card to disk
@@ -326,6 +367,7 @@ async def run_agent(*, heartbeat_interval: int, as_json: bool) -> None:
 
 
 def main() -> None:
+    _check_nats_dependency()
     parser = argparse.ArgumentParser(description="Devin A2A agent daemon")
     parser.add_argument("--heartbeat-interval", type=int, default=DEFAULT_HEARTBEAT_INTERVAL)
     parser.add_argument("--json", action="store_true", help="Machine-readable output")
