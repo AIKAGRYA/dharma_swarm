@@ -93,6 +93,27 @@ def _violations() -> list[tuple[Path, int, str, str]]:
     return found
 
 
+def check_no_model_literals(repo_root: Path, **_kwargs) -> tuple[bool, str]:
+    """Guard entry-point for ``run_pre_commit.py`` composition (fail-closed).
+
+    Conforms to the ``(repo_root, **kwargs) -> (ok, message)`` shape every
+    uplift guard uses. ``repo_root`` is accepted for interface parity; this
+    guard scans the fixed ``dharma_swarm/`` source root resolved at import.
+    """
+    violations = _violations()
+    if not violations:
+        return True, "no stray model-id literals outside the pool"
+    first = violations[0]
+    rel = first[0].relative_to(REPO_ROOT)
+    return (
+        False,
+        f"{len(violations)} stray model-id literal(s) outside model_pool.py; "
+        f"first: {rel}:{first[1]} [{first[2]}] {first[3]}. "
+        "Move them into dharma_swarm/model_pool.py and derive the surface "
+        "from a pool projection.",
+    )
+
+
 def main() -> int:
     violations = _violations()
     if not violations:
