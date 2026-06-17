@@ -4,13 +4,13 @@ Every agent action is timestamped (JIKOKU = UTC ISO-8601).
 Fitness is computed from task_log.jsonl metrics.
 Prompt evolution tracks system prompt versions with generation numbers.
 
-Standalone module — only stdlib imports.
+Stdlib + ``dharma_swarm.model_pool`` (the priced model-id keys are projected
+from the pool so no provider-specific model-id literal lives in this surface).
 
-Model pricing ($/Mtok):
-  moonshotai/kimi-k2.5: $0.45
-  deepseek/deepseek-chat-v3-0324: $0.26
-  nvidia/llama-3.1-nemotron-70b-instruct:free: $0.00
-  zhipuai/glm-5-plus: $0.72
+Model pricing ($/Mtok), keyed by model_pool logical id:
+  kimi-k2.5: $0.45
+  deepseek-chat-v3-0324: $0.26
+  (free-tier / non-pool keys are zero-cost or historical accounting entries)
 """
 
 from __future__ import annotations
@@ -25,26 +25,72 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
+from dharma_swarm import model_pool as _model_pool
+
 logger = logging.getLogger(__name__)
 
 GINKO_DIR = dharma_state_dir("DHARMA_HOME") / "ginko"
 
-# $/token pricing for cost computation.
-# Keys are full OpenRouter model identifiers.
-MODEL_PRICING: dict[str, float] = {
-    "xiaomi/mimo-v2-pro": 1.0e-6,  # Xiaomi MiMo-V2-Pro 1T MoE (42B active, 1M ctx) $1/M in $3/M out
-    "moonshotai/kimi-k2.5": 0.45e-6,
-    "deepseek/deepseek-chat-v3-0324": 0.26e-6,
+# ---------------------------------------------------------------------------
+# Model pricing ($/token) — pool-projected priced keys + free-tier accounting
+# ---------------------------------------------------------------------------
+#
+# Prices are pricing DATA (not a routing target), so they live here keyed by the
+# model_pool LOGICAL id. The provider-specific keys that callers pass at runtime
+# (e.g. "moonshotai/kimi-k2.5") are DERIVED from the pool's routes for each priced
+# logical id — so no provider-specific model-id literal lives in this surface and
+# the pool stays the single source of model-id truth. The free-tier keys below are
+# zero-cost historical accounting entries (never routing targets); they are not
+# pool entries and contribute $0 to every cost computation.
+
+# Price per token, keyed by model_pool logical id.
+_PRICE_BY_POOL_ID: dict[str, float] = {
+    "kimi-k2.5": 0.45e-6,
+    "deepseek-chat-v3-0324": 0.26e-6,
+}
+
+
+def _build_model_pricing() -> dict[str, float]:
+    """Project per-token prices onto the pool's provider-specific model ids.
+
+    Each priced logical id contributes every provider-specific model_id the pool
+    serves it under (so a caller passing either the OpenRouter or Ollama route
+    string gets the same price). Free-tier accounting keys are merged on top.
+    """
+    pricing: dict[str, float] = {}
+    for pool_id, price in _PRICE_BY_POOL_ID.items():
+        entry = _model_pool.get_entry(pool_id)
+        if entry is None:  # pragma: no cover - guarded by pool construction
+            raise AssertionError(f"MODEL_PRICING references unknown pool id {pool_id!r}")
+        for model_id in entry.model_ids:
+            pricing[model_id] = price
+    # Non-pool priced + free-tier accounting keys (not routing targets).
+    pricing.update(_NON_POOL_PRICING)
+    pricing.update(_FREE_TIER_PRICING)
+    return pricing
+
+
+# Priced keys for models not (yet) in the pool — historical accounting only.
+_NON_POOL_PRICING: dict[str, float] = {
+    "xiaomi/mimo-v2-pro": 1.0e-6,  # Xiaomi MiMo-V2-Pro 1T MoE (42B active, 1M ctx)
+    "zhipuai/glm-5-plus": 0.72e-6,
+}
+
+# Zero-cost accounting keys for free/historical models (never routing targets).
+_FREE_TIER_PRICING: dict[str, float] = {
     "nvidia/llama-3.1-nemotron-70b-instruct:free": 0.0,
     "nvidia/nemotron-nano-9b-v2:free": 0.0,
     "nvidia/nemotron-3-super-120b-a12b:free": 0.0,
-    "zhipuai/glm-5-plus": 0.72e-6,
     "z-ai/glm-4.5-air:free": 0.0,
     "google/gemma-3-27b-it:free": 0.0,
     "nousresearch/hermes-3-llama-3.1-405b:free": 0.0,
     "meta-llama/llama-3.3-70b-instruct:free": 0.0,
     "qwen/qwen3-coder:free": 0.0,
 }
+
+# $/token pricing for cost computation. Provider-specific priced keys are
+# projected from the pool; free-tier keys are zero-cost accounting entries.
+MODEL_PRICING: dict[str, float] = _build_model_pricing()
 
 # Latency threshold (ms) used to normalize speed score.
 # Anything at or below this gets a 1.0 speed score; above decays linearly.
