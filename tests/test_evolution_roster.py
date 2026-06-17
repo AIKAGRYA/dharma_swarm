@@ -128,11 +128,20 @@ class TestGetAvailableRoster:
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
         monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        monkeypatch.delenv("SAMBANOVA_API_KEY", raising=False)
+        monkeypatch.delenv("FIREWORKS_API_KEY", raising=False)
         # Ollama not reachable
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
             available = get_available_roster()
-        # Should be empty with no keys and no Ollama
-        assert len(available) == 0
+        # With no API keys and no Ollama, only the FLOOR subscription lanes
+        # survive — CLAUDE_CODE and CODEX are keyless oauth (Claude Max / Codex
+        # subscription), so the floor default chat brain is never stranded.
+        providers = {s.provider for s in available}
+        assert providers <= {ProviderType.CLAUDE_CODE, ProviderType.CODEX}
+        assert ProviderType.CLAUDE_CODE in providers
+        # No keyed provider leaks through without its key.
+        assert ProviderType.OPENROUTER not in providers
+        assert ProviderType.SAMBANOVA not in providers
 
     def test_openrouter_gives_models(self, monkeypatch):
         reset_ollama_cache()
@@ -240,8 +249,20 @@ class TestSelectModels:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        # Use a keyed-only custom roster so the genuinely-empty branch is
+        # reachable: the real roster now carries keyless FLOOR subscription
+        # lanes (CLAUDE_CODE / CODEX) that never strand the fleet.
+        keyed_only = (
+            ModelSlot(
+                ProviderType.OPENROUTER,
+                "meta-llama/llama-3.3-70b-instruct",
+                "Llama 3.3 70B",
+                ModelTier.STRONG,
+                ("code",),
+            ),
+        )
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
-            selected = select_models_for_cycle(2, "explore")
+            selected = select_models_for_cycle(2, "explore", keyed_only)
         assert len(selected) == 2
         assert all(s.model_id == "meta-llama/llama-3.3-70b-instruct" for s in selected)
 
@@ -276,8 +297,19 @@ class TestRosterSummary:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
         monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
+        # Keyed-only custom roster reaches the genuinely-empty branch; the real
+        # roster now keeps keyless FLOOR subscription lanes that never strand.
+        keyed_only = (
+            ModelSlot(
+                ProviderType.OPENROUTER,
+                "meta-llama/llama-3.3-70b-instruct",
+                "Llama 3.3 70B",
+                ModelTier.STRONG,
+                ("code",),
+            ),
+        )
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
-            summary = roster_summary()
+            summary = roster_summary(keyed_only)
         assert "No models available" in summary
 
 

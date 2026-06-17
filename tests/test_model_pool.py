@@ -60,20 +60,19 @@ def test_pool_routes_are_exactly_the_roster_literals():
 
 
 def test_pool_collapses_roster_slots_to_logical_entries():
-    """The roster has 31 slots that collapse to 23 logical pool entries.
+    """The roster has 42 slots that collapse to 30 logical pool entries.
     Guards against silent regroup drift.
 
-    Step 4 added 6 slots the provider matrix projects (the K2.6 floor model via
-    BOTH Ollama Cloud and OpenRouter, plus deepseek-v3.2 / qwen3-coder:480b /
-    minimax-m2.7 Ollama-cloud lanes). That is 4 new logical ids — kimi-k2.6
-    (2 routes -> 1 entry) + 3 single-route entries — taking 18 -> 22.
-
-    The misc-surfaces consolidation (2026-06) added 1 slot: gemini-3-pro via
-    OpenRouter (google/gemini-3-pro), the FLOOR the TUI/openrouter Gemini lane
-    now projects instead of the sub-floor google/gemini-2.5-pro literal. One new
-    single-route logical id -> 30 -> 31 slots, 22 -> 23 entries."""
-    assert len(EVOLUTION_ROSTER) == 31
-    assert len(MODEL_POOL) == 23
+    The floor-demarcation work (2026-06-17) added 11 slots for the K2.6-floor
+    frontier the roster must SERVE: claude-opus-4.8 + claude-sonnet-4.6
+    (CLAUDE_CODE Max-plan oauth), gpt-5.5 (CODEX + OPENAI), kimi-k2.7-code
+    (Ollama), deepseek-v4-pro (Ollama + SambaNova + Fireworks -> ONE entry via
+    casefolded logical id), glm-5.1 (Ollama), minimax-m3 (Ollama + NIM). That is
+    11 new slots (31 -> 42) and 7 new logical entries (23 -> 30): claude-opus-4.8,
+    claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
+    minimax-m3. No sub-floor model was removed — they are marked, not deleted."""
+    assert len(EVOLUTION_ROSTER) == 42
+    assert len(MODEL_POOL) == 30
 
 
 # --------------------------------------------------------------------------
@@ -213,3 +212,102 @@ def test_live_routes_empty_when_all_providers_dead_is_valid_not_failopen():
 
 def test_k2_floor_marker_present():
     assert model_pool.K2_FLOOR_ID == "kimi-k2.6"
+    # Re-exported, single documented source.
+    assert model_pool.MODEL_POWER_FLOOR == "kimi-k2.6"
+    assert model_pool.K2_FLOOR_ID == model_pool.MODEL_POWER_FLOOR
+
+
+# --------------------------------------------------------------------------
+# Floor demarcation: below_floor carried from roster -> entry, floor/grunt API
+# --------------------------------------------------------------------------
+
+
+def test_below_floor_marker_carried_from_roster_into_entries():
+    """Every entry's below_floor reflects its grouped roster slots (the
+    demarcation lives in the DATA, not in prose)."""
+    for entry in MODEL_POOL:
+        slots = [s for s in EVOLUTION_ROSTER if model_pool._logical_id(s) == entry.id]
+        assert slots, f"entry {entry.id} has no backing roster slots"
+        expected = any(s.below_floor for s in slots)
+        assert entry.below_floor is expected, entry.id
+
+
+def test_floor_and_grunt_partition_the_pool():
+    floor = model_pool.floor_entries()
+    grunt = model_pool.grunt_entries()
+    # Disjoint and exhaustive.
+    assert set(floor).isdisjoint(set(grunt))
+    assert len(floor) + len(grunt) == len(MODEL_POOL)
+    assert all(not e.below_floor for e in floor)
+    assert all(e.below_floor for e in grunt)
+    assert len(floor) == 12
+    assert len(grunt) == 18
+
+
+def test_floor_path_has_a_claude_chat_brain():
+    """The REAL path must carry a floor Claude for the default chat brain."""
+    floor_ids = {e.id for e in model_pool.floor_entries()}
+    assert "claude-opus-4.8" in floor_ids
+    opus = get_entry("claude-opus-4.8")
+    assert opus is not None and not opus.below_floor
+    # Routes via the Claude-Max oauth lane (THE ONE WAY), not the metered API.
+    assert ProviderType.CLAUDE_CODE in {r.provider for r in opus.routes}
+
+
+def test_named_subfloor_models_are_grunt_only():
+    """The operator's BELOW-FLOOR / grunt list must all be marked below_floor."""
+    grunt_ids = {e.id for e in model_pool.grunt_entries()}
+    for sub in (
+        "kimi-k2.5",
+        "glm-5",
+        "deepseek-v3.2",
+        "deepseek-r1",
+        "deepseek-chat-v3-0324",
+        "minimax-m2.7",
+        "gpt-4o",
+        "claude-opus-4",
+        "claude-sonnet-4",
+        "qwen-2.5-coder-32b-instruct",
+        "mistral-large-2411",
+        "mistral-small-3.1-24b-instruct",
+        "llama-3.3-70b-instruct",
+        "llama-3.1-nemotron-ultra-253b-v1",
+        "gemma-3-27b-it",
+        "qwen2.5-coder:14b",
+        "deepseek-coder-v2:16b",
+        "llama3.2",
+    ):
+        assert sub in grunt_ids, f"{sub} must be marked below_floor (grunt-only)"
+
+
+def test_floor_frontier_models_present_and_above_floor():
+    """The K2.6-floor frontier the roster must SERVE — all floor (real path)."""
+    floor_ids = {e.id for e in model_pool.floor_entries()}
+    for use in (
+        "claude-opus-4.8",
+        "claude-sonnet-4.6",
+        "gpt-5.5",
+        "kimi-k2.6",
+        "kimi-k2.7-code",
+        "deepseek-v4-pro",
+        "glm-5.1",
+        "minimax-m3",
+        "qwen3-coder:480b-cloud",
+        "gemini-3-pro",
+    ):
+        assert use in floor_ids, f"{use} must be a FLOOR (real-path) entry"
+
+
+def test_deepseek_v4_pro_is_one_entry_live_provider_first():
+    """deepseek-v4-pro collapses ollama + sambanova + fireworks into ONE entry,
+    with the live keyless Ollama route first."""
+    dv4 = get_entry("deepseek-v4-pro")
+    assert dv4 is not None and not dv4.below_floor
+    providers = {r.provider for r in dv4.routes}
+    assert providers == {
+        ProviderType.OLLAMA,
+        ProviderType.SAMBANOVA,
+        ProviderType.FIREWORKS,
+    }
+    # Live provider (Ollama Cloud) ranked first, dead/secondary after.
+    assert dv4.routes[0].provider is ProviderType.OLLAMA

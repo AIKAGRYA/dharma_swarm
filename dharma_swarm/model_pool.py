@@ -32,6 +32,7 @@ from typing import Iterable
 
 from dharma_swarm.evolution_roster import (
     EVOLUTION_ROSTER,
+    MODEL_POWER_FLOOR,
     ModelSlot,
     ModelTier,
 )
@@ -41,14 +42,28 @@ from dharma_swarm.model_defaults import (
 )
 from dharma_swarm.models import ProviderType
 
-# ---------------------------------------------------------------------------
-# Floor: never route / recommend a model below this grade (GOAL doctrine).
-# K2.6 is the operator's floor; K2.5 entries seeded from the legacy roster are
-# the live frontier-equivalent today. The floor is a marker the pool exposes so
-# downstream projections (DEFAULT_MODELS, MODEL_TARGETS) can refuse sub-floor
-# recommendations. STEP 2 records it; it does not yet prune call sites.
-# ---------------------------------------------------------------------------
-K2_FLOOR_ID = "kimi-k2.6"
+# ═══════════════════════════════════════════════════════════════════════════
+# THE POWER FLOOR — the unmistakable demarcation in the DATA
+# ═══════════════════════════════════════════════════════════════════════════
+# Operator word (2026-06-17): "sub-floor models can exist just for real grunt
+# work only but ONLY with a very clear demarcation."
+#
+# :data:`MODEL_POWER_FLOOR` (re-exported from ``evolution_roster``, and equal to
+# :data:`K2_FLOOR_ID`) is the documented line: Kimi K2.6-class. Every roster slot
+# carries a ``below_floor`` boolean; the pool propagates it onto each
+# :class:`ModelEntry` (``below_floor`` == True iff a grouped slot is sub-floor).
+#
+# REAL path  (``below_floor == False``): the default chat brain, the frontier,
+#            and the model picker's main list — sourced via :func:`floor_entries`.
+# GRUNT path (``below_floor == True``):  old / weak / genuinely-local weights the
+#            K2.6 floor banishes from the real path. Reachable ONLY via an
+#            explicit grunt opt-in (:func:`grunt_entries`) — NEVER the
+#            default/frontier path or the picker's main list.
+#
+# The demarcation lives in the data so no consumer can route a sub-floor model
+# onto the frontier by accident: they read one boolean.
+# ═══════════════════════════════════════════════════════════════════════════
+K2_FLOOR_ID = MODEL_POWER_FLOOR  # "kimi-k2.6" — single documented source
 
 # The per-provider default model strings live in :mod:`model_defaults` (a leaf
 # that imports only ``models``, so it sits below the roster→ollama_config→
@@ -91,6 +106,11 @@ class ModelEntry:
     context: int
     routes: tuple[Route, ...]
     aliases: tuple[str, ...] = ()
+    # The UNMISTAKABLE demarcation: True == sub-floor (below MODEL_POWER_FLOOR),
+    # grunt-work-only. Carried from the roster's ModelSlot.below_floor. The
+    # default / frontier / picker projections use :func:`floor_entries` (this
+    # flag False); sub-floor entries are reachable only via :func:`grunt_entries`.
+    below_floor: bool = False
 
     @property
     def model_ids(self) -> tuple[str, ...]:
@@ -141,6 +161,7 @@ def _logical_id(slot: ModelSlot) -> str:
         "kimi-k2.5:cloud"             -> "kimi-k2.5"
         "meta-llama/llama-3.3-70b-instruct:free" -> "llama-3.3-70b-instruct"
         "qwen2.5-coder:14b"           -> "qwen2.5-coder:14b"   (size tag kept)
+        "DeepSeek-V4-Pro"             -> "deepseek-v4-pro"      (casefolded)
     """
     mid = slot.model_id
     # Drop a leading provider namespace (only the first "<vendor>/").
@@ -150,7 +171,10 @@ def _logical_id(slot: ModelSlot) -> str:
     base = base.removesuffix(":cloud")
     # Drop a trailing date pin (Anthropic/OpenAI dated ids).
     base = re.sub(r"-\d{8}$", "", base)
-    return base
+    # Casefold so the SAME weights group regardless of a provider's id casing
+    # (e.g. SambaNova ``DeepSeek-V4-Pro`` joins the Ollama/Fireworks lowercase
+    # routes for one logical model, not a duplicate entry).
+    return base.lower()
 
 
 # Tier ordering: lower index == stronger grade (for picking the entry's
@@ -205,6 +229,12 @@ def _build_pool(roster: tuple[ModelSlot, ...]) -> tuple[ModelEntry, ...]:
         context = max(s.max_context for s in slots)
         tier = _best_tier(s.tier for s in slots)
         display = _display_for(slots)
+        # Demarcation: an entry is sub-floor if ANY grouped slot is sub-floor.
+        # ``any`` (not ``all``) is the safe direction — if a single route is
+        # below the floor we keep the whole logical model out of the real path
+        # rather than risk leaking it onto the frontier. In a coherent roster a
+        # logical model's slots are uniform, so this is exact in practice.
+        below_floor = any(s.below_floor for s in slots)
         entries.append(
             ModelEntry(
                 id=key,
@@ -213,6 +243,7 @@ def _build_pool(roster: tuple[ModelSlot, ...]) -> tuple[ModelEntry, ...]:
                 caps=tuple(caps),
                 context=context,
                 routes=routes,
+                below_floor=below_floor,
             )
         )
     return tuple(entries)
@@ -235,6 +266,26 @@ for _e in MODEL_POOL:
 
 def all_entries() -> tuple[ModelEntry, ...]:
     return MODEL_POOL
+
+
+def floor_entries() -> tuple[ModelEntry, ...]:
+    """REAL-path entries: at or above :data:`MODEL_POWER_FLOOR` (Kimi K2.6).
+
+    This is the ONLY set the default chat brain, the frontier, and the model
+    picker's main list project from. Sub-floor (grunt) models are excluded by
+    construction, so no surface can route below the floor by accident.
+    """
+    return tuple(e for e in MODEL_POOL if not e.below_floor)
+
+
+def grunt_entries() -> tuple[ModelEntry, ...]:
+    """GRUNT-path entries: sub-floor models, reachable ONLY by explicit opt-in.
+
+    These are the demarcated old / weak / genuinely-local weights the K2.6 floor
+    banishes from the real path. They exist for real grunt work only and are
+    NEVER part of the default/frontier path or the picker's main list.
+    """
+    return tuple(e for e in MODEL_POOL if e.below_floor)
 
 
 def get_entry(name: str) -> ModelEntry | None:
@@ -260,10 +311,17 @@ def entry_for_model_id(model_id: str) -> ModelEntry | None:
 # present here.
 _OPERATOR_PINNED_DEFAULTS: frozenset[ProviderType] = frozenset(
     {
-        ProviderType.OPENAI,        # gpt-5  (roster: gpt-4o)
+        ProviderType.OPENAI,        # gpt-5  (roster: gpt-4o / gpt-5.5)
         ProviderType.ANTHROPIC,     # claude-opus-4-6  (roster: claude-opus-4-20250514)
-        ProviderType.CLAUDE_CODE,   # claude-opus-4-6 via Claude-Max (no roster route)
-        ProviderType.CODEX,         # gpt-5.4 via codex oauth (no roster route)
+        ProviderType.CLAUDE_CODE,   # claude-opus-4-6 via Claude-Max (roster: claude-opus-4.8)
+        ProviderType.CODEX,         # gpt-5.4 via codex oauth (roster: gpt-5.5)
+        # Secondary floor routes (DeepSeek-V4-Pro / MiniMax-M3 fan-out) gave
+        # these providers a roster entry, but their per-provider *default* is a
+        # deliberate constant (Llama-3.3-70B / qwen3-coder-480b), not that
+        # secondary route — exempt them from the "default must be a roster route"
+        # check exactly like the other operator-pinned defaults.
+        ProviderType.SAMBANOVA,     # Meta-Llama-3.3-70B-Instruct (roster: DeepSeek-V4-Pro route)
+        ProviderType.FIREWORKS,     # qwen3-coder-480b (roster: deepseek-v4-pro route)
     }
 )
 
@@ -399,7 +457,10 @@ __all__ = [
     "ModelEntry",
     "MODEL_POOL",
     "K2_FLOOR_ID",
+    "MODEL_POWER_FLOOR",
     "all_entries",
+    "floor_entries",
+    "grunt_entries",
     "get_entry",
     "entry_for_model_id",
     "default_for_provider",

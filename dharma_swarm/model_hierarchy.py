@@ -27,7 +27,12 @@ import re
 from typing import TYPE_CHECKING, Mapping
 
 from dharma_swarm.models import LLMResponse, ProviderType
-from dharma_swarm.model_defaults import default_for_provider
+from dharma_swarm.model_defaults import MODEL_POWER_FLOOR, default_for_provider
+
+# The documented power-floor line (Kimi K2.6-class). Re-exported here so the
+# provider-grain hierarchy and any caller that already imports model_hierarchy
+# read the SAME constant the pool/roster carry as ``below_floor`` demarcation.
+__all_floor__ = ("MODEL_POWER_FLOOR",)
 
 if TYPE_CHECKING:
     from dharma_swarm.resilience import CircuitBreakerRegistry

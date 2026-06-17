@@ -28,8 +28,11 @@ from dharma_swarm.models import ProviderType
 
 # Floor marker re-stated for locality (the pool owns the doctrine; this is the
 # grade the per-provider defaults must respect): never default a provider to a
-# model below Kimi K2.6-class.
+# model below Kimi K2.6-class. ``MODEL_POWER_FLOOR`` is the documented-line
+# alias (same string), re-exported by ``model_hierarchy`` and ``model_pool`` so
+# every layer reads ONE constant.
 K2_FLOOR_ID = "kimi-k2.6"
+MODEL_POWER_FLOOR = K2_FLOOR_ID
 
 # ---------------------------------------------------------------------------
 # The ONE per-provider default map. The string is the EXACT id a given provider
@@ -38,8 +41,10 @@ K2_FLOOR_ID = "kimi-k2.6"
 # ollama_config) into this single owner is the keystone of the consolidation.
 # ---------------------------------------------------------------------------
 _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
+    # Free tier — frontier. FLOOR-compliant (>= MODEL_POWER_FLOOR / K2.6): the
+    # Ollama default is the GLM-5.1 floor lane, not the superseded sub-floor
+    # GLM-5 — so an empty-model request on this provider never routes sub-floor.
+    ProviderType.OLLAMA: "glm-5.1:cloud",
     ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
     ProviderType.GROQ: "qwen/qwen3-32b",
     ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
@@ -53,7 +58,10 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid / subscription tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
+    # FLOOR-compliant: the K2.6 floor route (not the superseded sub-floor K2.5).
+    # OpenRouter is a DEAD aggregator anyway — this only fixes the empty-model
+    # default so it can never name a sub-floor id.
+    ProviderType.OPENROUTER: "moonshotai/kimi-k2.6",
     ProviderType.OPENAI: "gpt-5",
     ProviderType.ANTHROPIC: "claude-opus-4-6",
     ProviderType.CLAUDE_CODE: "claude-opus-4-6",
@@ -72,5 +80,6 @@ def default_for_provider(provider: ProviderType) -> str:
 
 __all__ = [
     "K2_FLOOR_ID",
+    "MODEL_POWER_FLOOR",
     "default_for_provider",
 ]

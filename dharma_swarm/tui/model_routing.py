@@ -6,9 +6,15 @@ table. Each :class:`ModelTarget` declares the ``ProviderType`` routes that serve
 it (``pool_providers``); where the pool holds the logical model, the provider
 set and the exact provider-specific ``model_id`` are SOURCED FROM the pool at
 import time (drift-killer), and an import-time guard asserts the projection is
-faithful. Operator-pinned lanes the roster predates (Claude-Max / Codex oauth,
-Sonnet/Haiku, the Gemini aggregator lane) keep their pinned strings but still
-declare their provider routes, so routability is uniform.
+faithful.
+
+FLOOR-ONLY DEMARCATION (operator word 2026-06-17): the picker's main list and
+the default chat brain project ONLY ``model_pool.floor_entries()`` — models at
+or above :data:`~dharma_swarm.model_pool.MODEL_POWER_FLOOR` (Kimi K2.6). The
+default target (index 1) is a FLOOR Claude on the Claude-Max oauth lane. Sub-floor
+(grunt-only) models are DELIBERATELY ABSENT here; ``_validate_targets`` fails the
+import if any target projects a ``below_floor`` pool entry. The grunt path is an
+explicit opt-in elsewhere, NEVER the picker or a fallback.
 
 UNROUTABLE = a target whose providers have ZERO live keys per the key oracle.
 Such a target is non-selectable: ``resolve_model_target`` / ``target_by_index``
@@ -139,32 +145,44 @@ def _projected(
     )
 
 
+# ───────────────────────────────────────────────────────────────────────────
+# THE PICKER'S MAIN LIST — FLOOR MODELS ONLY (>= MODEL_POWER_FLOOR / K2.6).
+#
+# Every target here projects a ``model_pool.floor_entries()`` entry (or is a
+# floor-class operator-pinned Claude/Codex lane). Sub-floor (grunt) models are
+# DELIBERATELY ABSENT — they were glm-5 / deepseek-v3.2 / kimi-k2.5 / minimax-m2.7
+# in the old list and are now reachable ONLY via an explicit grunt opt-in, NEVER
+# the picker's main list or the default chat brain (operator demarcation).
+#
+# An import-time guard (:func:`_validate_targets`) asserts NO target projects a
+# sub-floor pool entry, so the demarcation can never silently regress here.
+# ───────────────────────────────────────────────────────────────────────────
 MODEL_TARGETS: tuple[ModelTarget, ...] = (
-    # Free frontier (Ollama Cloud) — model ids sourced from the pool.
+    # DEFAULT chat brain (index 1): a FLOOR Claude on the Max-plan oauth lane.
     _projected(
-        alias="glm-5",
-        provider_id="ollama",
-        label="GLM-5 744B [FREE]",
-        aliases=("glm5", "glm 5", "zhipu"),
-        pool_id="glm-5",
+        alias="opus-4.8",
+        provider_id="claude",
+        label="Claude Opus 4.8 [floor default]",
+        aliases=("opus", "opus 4.8", "claude opus 4.8", "default"),
+        pool_id="claude-opus-4.8",
     ),
     _projected(
-        alias="deepseek-v3.2",
-        provider_id="ollama",
-        label="DeepSeek V3.2 [FREE]",
-        aliases=("deepseek", "ds", "deepseek v3"),
-        pool_id="deepseek-v3.2",
+        alias="sonnet-4.6",
+        provider_id="claude",
+        label="Claude Sonnet 4.6",
+        aliases=("sonnet", "sonnet 4.6", "claude sonnet 4.6"),
+        pool_id="claude-sonnet-4.6",
     ),
+    # GPT-5.5 floor lane via the codex oauth subscription (THE ONE WAY).
     _projected(
-        alias="kimi-k2.5",
-        provider_id="ollama",
-        label="Kimi K2.5 [FREE]",
-        aliases=("kimi 2.5", "kimi k2.5"),
-        pool_id="kimi-k2.5",
+        alias="gpt-5.5",
+        provider_id="codex",
+        label="GPT-5.5 (Codex)",
+        aliases=("gpt", "gpt 5.5", "codex", "gpt-5.5"),
+        pool_id="gpt-5.5",
     ),
-    # K2.6 is the operator's FLOOR model. One logical pool entry, Ollama-Cloud
-    # route ahead of the flappy OpenRouter route — the fix for the kimi flap bug
-    # the consolidation goal names. The TUI ollama lane rides the Ollama route.
+    # Kimi K2.6 — the operator's FLOOR model. Ollama-Cloud route ahead of the
+    # flappy OpenRouter route (the fix for the kimi flap bug).
     _projected(
         alias="kimi-k2.6",
         provider_id="ollama",
@@ -173,58 +191,42 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
         pool_id="kimi-k2.6",
     ),
     _projected(
-        alias="minimax-m2.7",
+        alias="kimi-k2.7",
         provider_id="ollama",
-        label="MiniMax M2.7 [FREE]",
-        aliases=("minimax", "m2.7", "minimax m2.7"),
-        pool_id="minimax-m2.7",
-    ),
-    # Paid / operator-pinned lanes. These post-date the evolution roster, so the
-    # pool has no route; the model-id strings are deliberate operator pins (same
-    # exemption class as model_pool._OPERATOR_PINNED_DEFAULTS).
-    _projected(
-        alias="sonnet-4.5",
-        provider_id="claude",
-        label="Claude Sonnet 4.5",
-        aliases=("sonnet", "sonnet 4.5", "claude sonnet 4.5"),
-        pool_id=None,
-        pinned_model_id="claude-sonnet-4-5",
+        label="Kimi K2.7 Code [FREE]",
+        aliases=("kimi 2.7", "kimi k2.7", "k2.7"),
+        pool_id="kimi-k2.7-code",
     ),
     _projected(
-        alias="sonnet-4.6",
-        provider_id="claude",
-        label="Claude Sonnet 4.6",
-        aliases=("sonnet 4.6", "claude sonnet 4.6"),
-        pool_id=None,
-        pinned_model_id="claude-sonnet-4-6",
+        alias="deepseek-v4-pro",
+        provider_id="ollama",
+        label="DeepSeek V4 Pro [FREE]",
+        aliases=("deepseek", "ds", "deepseek v4", "v4 pro"),
+        pool_id="deepseek-v4-pro",
     ),
     _projected(
-        alias="opus-4.6",
-        provider_id="claude",
-        label="Claude Opus 4.6",
-        aliases=("opus", "opus 4.6", "claude opus 4.6"),
-        pool_id=None,
-        pinned_model_id="claude-opus-4-6",
+        alias="glm-5.1",
+        provider_id="ollama",
+        label="GLM-5.1 [FREE]",
+        aliases=("glm", "glm5.1", "glm 5.1", "zhipu"),
+        pool_id="glm-5.1",
     ),
     _projected(
-        alias="haiku-4.5",
-        provider_id="claude",
-        label="Claude Haiku 4.5",
-        aliases=("haiku", "haiku 4.5", "claude haiku 4.5"),
-        pool_id=None,
-        pinned_model_id="claude-haiku-4-5",
+        alias="minimax-m3",
+        provider_id="ollama",
+        label="MiniMax M3 [FREE]",
+        aliases=("minimax", "m3", "minimax m3"),
+        pool_id="minimax-m3",
     ),
     _projected(
-        alias="codex-5.4",
-        provider_id="codex",
-        label="Codex 5.4",
-        aliases=("codex", "codex 5.4", "gpt 5 codex"),
-        pool_id=None,
-        pinned_model_id="gpt-5.4",
+        alias="qwen3-coder-480b",
+        provider_id="ollama",
+        label="Qwen3 Coder 480B [FREE]",
+        aliases=("qwen", "qwen3 coder", "qwen3-coder", "480b"),
+        pool_id="qwen3-coder:480b-cloud",
     ),
-    # Gemini 3 class now rides a real pool entry (gemini-3-pro at the FLOOR), so
-    # its OpenRouter model_id is SOURCED FROM the pool like the other free lanes —
-    # no pinned literal. The sub-floor google/gemini-2.5-pro string is retired.
+    # Gemini 3 class rides a real FLOOR pool entry (gemini-3-pro); its OpenRouter
+    # model_id is SOURCED FROM the pool — no pinned literal.
     _projected(
         alias="gemini-3",
         provider_id="openrouter",
@@ -236,17 +238,26 @@ MODEL_TARGETS: tuple[ModelTarget, ...] = (
 
 
 def _validate_targets() -> None:
-    """Import-time guard: every target declares at least one provider route, and
-    every pool-backed target's ``model_id`` matches the pool route it projects.
+    """Import-time guard: every target declares at least one provider route,
+    every pool-backed target's ``model_id`` matches the pool route it projects,
+    and NO target projects a sub-floor (grunt-only) pool entry.
 
-    This is the projection-faithfulness gate: it makes ``MODEL_TARGETS`` provably
-    a view of the pool (for the models the pool knows) rather than a parallel
-    literal table that can silently drift.
+    This is the projection-faithfulness gate plus the FLOOR demarcation gate: it
+    makes ``MODEL_TARGETS`` provably a view of the pool's ``floor_entries()`` (for
+    the models the pool knows) rather than a parallel literal table that can
+    silently drift OR leak a sub-floor model onto the picker's main list.
     """
     for t in MODEL_TARGETS:
         if not t.pool_providers:
             raise AssertionError(
                 f"model_routing target {t.alias!r} declares no provider routes"
+            )
+        entry = _model_pool.entry_for_model_id(t.model_id)
+        if entry is not None and entry.below_floor:
+            raise AssertionError(
+                f"model_routing target {t.alias!r} projects SUB-FLOOR pool entry "
+                f"{entry.id!r}; the picker's main list is FLOOR-ONLY — sub-floor "
+                f"models are reachable only via the explicit grunt opt-in"
             )
         for provider in t.pool_providers:
             pool_id = _pool_id_for_model(t.model_id)
@@ -268,32 +279,33 @@ def _pool_id_for_model(model_id: str) -> str | None:
 _validate_targets()
 
 
+# _DEFAULT_TARGET is the default chat brain: MODEL_TARGETS[0] == a FLOOR Claude
+# (claude-opus-4.8 on the Max-plan oauth lane). NEVER a sub-floor model.
 _DEFAULT_TARGET = MODEL_TARGETS[0]
 ROUTING_STRATEGIES: tuple[str, ...] = ("responsive", "cost", "genius")
+# Fallback orders reference FLOOR aliases only (the picker's main list). No
+# sub-floor alias can appear here — the grunt path is opt-in, never a fallback.
 _FALLBACK_ORDER_BY_STRATEGY: dict[str, tuple[str, ...]] = {
     "responsive": (
-        "sonnet-4.5",
-        "haiku-4.5",
         "sonnet-4.6",
-        "codex-5.4",
-        "opus-4.6",
+        "kimi-k2.6",
+        "gpt-5.5",
         "gemini-3",
+        "opus-4.8",
     ),
     "cost": (
-        "haiku-4.5",
+        "kimi-k2.6",
+        "glm-5.1",
+        "deepseek-v4-pro",
+        "minimax-m3",
         "gemini-3",
-        "sonnet-4.5",
-        "codex-5.4",
-        "sonnet-4.6",
-        "opus-4.6",
     ),
     "genius": (
-        "opus-4.6",
+        "opus-4.8",
         "sonnet-4.6",
-        "codex-5.4",
+        "gpt-5.5",
+        "kimi-k2.7",
         "gemini-3",
-        "sonnet-4.5",
-        "haiku-4.5",
     ),
 }
 
