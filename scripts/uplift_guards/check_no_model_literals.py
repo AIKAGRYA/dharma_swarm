@@ -41,6 +41,29 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     )),
 ]
 
+# Confirmed FALSE POSITIVES — strings the ``vendor/...`` pattern matches that are
+# NOT deployable model-id literals. Keyed by ``(filename, matched-snippet)`` so the
+# exemption is surgical: it clears exactly these tokens and never blanket-allowlists
+# a whole file (a REAL literal added to any of these files would still fail).
+#
+#   - file-path components fed to ``Path(...)`` / used as state-file keys
+#   - substring prefixes used with ``startswith`` in router discovery logic
+#     (bare vendor families, not deployable ids)
+#
+# Quoting normalised to single quotes for the key (see ``_norm`` below).
+FALSE_POSITIVES: set[tuple[str, str]] = {
+    ("agent_export.py", "'qwen/agents'"),                 # export-dir path component
+    ("identity.py", "'meta/identity_history.jsonl'"),     # state-file path key
+    ("providers.py", "'nvidia/nemotron'"),                # _PREFERRED_PREFIXES (startswith)
+    ("providers.py", "'google/gemma'"),                   # _PREFERRED_PREFIXES (startswith)
+}
+
+
+def _norm(snippet: str) -> str:
+    """Normalise a matched literal to single-quote form for stable keying."""
+    inner = snippet[1:-1] if len(snippet) >= 2 and snippet[0] in "\"'" else snippet
+    return f"'{inner}'"
+
 
 def _violations() -> list[tuple[Path, int, str, str]]:
     found: list[tuple[Path, int, str, str]] = []
@@ -58,7 +81,10 @@ def _violations() -> list[tuple[Path, int, str, str]]:
             for label, pattern in PATTERNS:
                 match = pattern.search(line)
                 if match:
-                    found.append((path, lineno, label, match.group(0)))
+                    snippet = match.group(0)
+                    if (path.name, _norm(snippet)) in FALSE_POSITIVES:
+                        continue
+                    found.append((path, lineno, label, snippet))
     return found
 
 
