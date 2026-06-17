@@ -28,6 +28,7 @@ Write behavior: default and --json never write; --write-context writes only
 reports/orientation/repo_context.{json,md}. Exit code: always 0
 (informational).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -37,6 +38,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -105,6 +107,8 @@ class Track:
     serves: str
     owner: str
     owned_surfaces: list[str] = field(default_factory=list)
+    complements: list[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -193,6 +197,298 @@ class OrientationPacket:
     context_hash: str = ""
 
 
+# ── Graph-shaped query layer ───────────────────────────────────────────
+#
+# Typed nodes + edges over the same owners the flat packet already reads.
+# Traversal: organ -> tracks -> surfaces -> liveness edges.
+# No new truth store; purely derived from the packet.
+
+
+@dataclass
+class GraphNode:
+    kind: str  # "organ", "track", "surface", "objective", "broken"
+    id: str
+    label: str
+    status: str = ""
+    attrs: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class GraphEdge:
+    source: str
+    target: str
+    relation: str  # "serves", "owns_surface", "complements", "depends_on",
+    #                 "liveness", "has_broken"
+
+
+@dataclass
+class SurfaceLiveness:
+    pattern: str
+    exists: bool
+    matched_paths: list[str] = field(default_factory=list)
+    newest_mtime: str = ""
+
+
+@dataclass
+class OrientationGraph:
+    nodes: list[GraphNode] = field(default_factory=list)
+    edges: list[GraphEdge] = field(default_factory=list)
+    surface_liveness: list[SurfaceLiveness] = field(default_factory=list)
+
+
+def _probe_surface(pattern: str) -> SurfaceLiveness:
+    """Check whether an owned-surface glob matches files in the worktree."""
+    if pattern.endswith("/**"):
+        directory = REPO_ROOT / pattern[:-3]
+        if directory.is_dir():
+            matched = [
+                str(p.relative_to(REPO_ROOT))
+                for p in sorted(directory.rglob("*"))
+                if p.is_file()
+            ][:5]
+            mtime = ""
+            if matched:
+                newest = max(
+                    (REPO_ROOT / m for m in matched),
+                    key=lambda p: p.stat().st_mtime,
+                )
+                mtime = _mtime_iso(newest)
+            return SurfaceLiveness(
+                pattern=pattern,
+                exists=bool(matched),
+                matched_paths=matched,
+                newest_mtime=mtime,
+            )
+        return SurfaceLiveness(pattern=pattern, exists=False)
+
+    if "*" in pattern or "?" in pattern:
+        parent = REPO_ROOT
+        parts = pattern.split("/")
+        glob_part = "/".join(parts)
+        matched = [
+            str(p.relative_to(REPO_ROOT))
+            for p in sorted(parent.glob(glob_part))
+            if p.is_file()
+        ][:5]
+        mtime = ""
+        if matched:
+            newest = max(
+                (REPO_ROOT / m for m in matched),
+                key=lambda p: p.stat().st_mtime,
+            )
+            mtime = _mtime_iso(newest)
+        return SurfaceLiveness(
+            pattern=pattern,
+            exists=bool(matched),
+            matched_paths=matched,
+            newest_mtime=mtime,
+        )
+
+    target = REPO_ROOT / pattern
+    if target.exists():
+        return SurfaceLiveness(
+            pattern=pattern,
+            exists=True,
+            matched_paths=[pattern],
+            newest_mtime=_mtime_iso(target),
+        )
+    return SurfaceLiveness(pattern=pattern, exists=False)
+
+
+def build_graph(packet: OrientationPacket) -> OrientationGraph:
+    """Build a typed graph from the flat orientation packet.
+
+    Node kinds: objective, organ, track, surface, broken.
+    Edge relations: serves, owns_surface, complements, depends_on,
+    liveness (surface -> surface_liveness probe), has_broken.
+    """
+    nodes: list[GraphNode] = []
+    edges: list[GraphEdge] = []
+    surface_probes: list[SurfaceLiveness] = []
+    seen_objectives: set[str] = set()
+
+    # Objective nodes (deduplicated from tracks)
+    for track in packet.tracks:
+        obj_id = track.serves
+        if obj_id and obj_id not in seen_objectives:
+            seen_objectives.add(obj_id)
+            nodes.append(
+                GraphNode(
+                    kind="objective",
+                    id=f"obj:{obj_id}",
+                    label=obj_id,
+                    status="declared",
+                )
+            )
+
+    # Organ nodes
+    for organ in packet.organs:
+        nodes.append(
+            GraphNode(
+                kind="organ",
+                id=f"organ:{organ.id}",
+                label=organ.id,
+                status=organ.status,
+                attrs={
+                    "instrument": organ.instrument,
+                    "external_name": organ.external_name,
+                },
+            )
+        )
+
+    # Track nodes + edges
+    for track in packet.tracks:
+        tid = f"track:{track.id}"
+        nodes.append(
+            GraphNode(
+                kind="track",
+                id=tid,
+                label=track.id,
+                status=track.status,
+                attrs={"owner": track.owner},
+            )
+        )
+        if track.serves:
+            edges.append(
+                GraphEdge(source=tid, target=f"obj:{track.serves}", relation="serves")
+            )
+        for comp in track.complements:
+            edges.append(
+                GraphEdge(source=tid, target=f"track:{comp}", relation="complements")
+            )
+        for dep in track.depends_on:
+            edges.append(
+                GraphEdge(source=tid, target=f"track:{dep}", relation="depends_on")
+            )
+
+        # Surface nodes + edges
+        for surface in track.owned_surfaces:
+            sid = f"surface:{surface}"
+            nodes.append(GraphNode(kind="surface", id=sid, label=surface, status=""))
+            edges.append(GraphEdge(source=tid, target=sid, relation="owns_surface"))
+            probe = _probe_surface(surface)
+            surface_probes.append(probe)
+            status = "live" if probe.exists else "missing"
+            nodes[-1].status = status
+            if probe.newest_mtime:
+                nodes[-1].attrs["newest_mtime"] = probe.newest_mtime
+
+    # Broken-register nodes
+    for item in packet.broken:
+        bid = f"broken:{item.id}"
+        nodes.append(
+            GraphNode(
+                kind="broken",
+                id=bid,
+                label=f"{item.id} — {item.title}",
+                status=item.status,
+            )
+        )
+
+    return OrientationGraph(nodes=nodes, edges=edges, surface_liveness=surface_probes)
+
+
+def query_neighbors(
+    graph: OrientationGraph,
+    node_id: str,
+    relation: str | None = None,
+) -> list[tuple[GraphEdge, GraphNode]]:
+    """Return (edge, target_node) pairs reachable from *node_id*.
+
+    If *relation* is given, only edges of that type are returned.
+    """
+    node_map = {n.id: n for n in graph.nodes}
+    results: list[tuple[GraphEdge, GraphNode]] = []
+    for edge in graph.edges:
+        if edge.source != node_id:
+            continue
+        if relation and edge.relation != relation:
+            continue
+        target = node_map.get(edge.target)
+        if target:
+            results.append((edge, target))
+    return results
+
+
+def query_subgraph(
+    graph: OrientationGraph,
+    root_id: str,
+    max_depth: int = 3,
+) -> OrientationGraph:
+    """BFS traversal from *root_id* up to *max_depth* hops."""
+    node_map = {n.id: n for n in graph.nodes}
+    visited: set[str] = set()
+    frontier = [root_id]
+    collected_nodes: list[GraphNode] = []
+    collected_edges: list[GraphEdge] = []
+    depth = 0
+
+    while frontier and depth <= max_depth:
+        next_frontier: list[str] = []
+        for nid in frontier:
+            if nid in visited:
+                continue
+            visited.add(nid)
+            node = node_map.get(nid)
+            if node:
+                collected_nodes.append(node)
+            for edge in graph.edges:
+                if edge.source == nid and edge.target not in visited:
+                    collected_edges.append(edge)
+                    next_frontier.append(edge.target)
+        frontier = next_frontier
+        depth += 1
+
+    liveness = [
+        sl for sl in graph.surface_liveness if f"surface:{sl.pattern}" in visited
+    ]
+    return OrientationGraph(
+        nodes=collected_nodes, edges=collected_edges, surface_liveness=liveness
+    )
+
+
+# ── Time-to-orientation measurement ───────────────────────────────────
+
+ORIENTATION_RECEIPT_DIR = Path.home() / ".dharma/ops"
+ORIENTATION_RECEIPT = ORIENTATION_RECEIPT_DIR / "orientation_timing_receipt.json"
+
+
+def measure_orientation(write_receipt: bool = True) -> dict[str, Any]:
+    """Time a full build_packet + build_graph cycle.
+
+    Target: < 10 s for a fresh agent.  Returns the timing receipt dict.
+    """
+    t0 = time.monotonic()
+    packet = build_packet()
+    t_packet = time.monotonic() - t0
+
+    t1 = time.monotonic()
+    graph = build_graph(packet)
+    t_graph = time.monotonic() - t1
+
+    total = t_packet + t_graph
+    receipt = {
+        "event": "orientation_timing",
+        "packet_build_s": round(t_packet, 4),
+        "graph_build_s": round(t_graph, 4),
+        "total_s": round(total, 4),
+        "target_s": 10.0,
+        "meets_target": total < 10.0,
+        "node_count": len(graph.nodes),
+        "edge_count": len(graph.edges),
+        "surface_probes": len(graph.surface_liveness),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "context_hash": packet.context_hash,
+    }
+    if write_receipt:
+        ORIENTATION_RECEIPT_DIR.mkdir(parents=True, exist_ok=True)
+        ORIENTATION_RECEIPT.write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    return receipt
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     try:
         import yaml  # type: ignore
@@ -218,10 +514,11 @@ def build_identity() -> Identity:
                 one_line = stripped.lstrip("> ").strip().strip("*")
                 break
     if not one_line:
-        one_line = ("(identity owner missing — read docs/vision_maps/"
-                    "NORTH_STAR.md §1 for the telos)")
-    return Identity(one_line=one_line, read_first=read_first,
-                    missing_sources=missing)
+        one_line = (
+            "(identity owner missing — read docs/vision_maps/"
+            "NORTH_STAR.md §1 for the telos)"
+        )
+    return Identity(one_line=one_line, read_first=read_first, missing_sources=missing)
 
 
 def build_organs() -> list[Organ]:
@@ -230,12 +527,14 @@ def build_organs() -> list[Organ]:
     for cell in data.get("cells") or []:
         if not isinstance(cell, dict):
             continue
-        organs.append(Organ(
-            id=str(cell.get("id", "")),
-            instrument=str(cell.get("instrument", "")),
-            status=str(cell.get("status", "")),
-            external_name=str(cell.get("external_name", "") or ""),
-        ))
+        organs.append(
+            Organ(
+                id=str(cell.get("id", "")),
+                instrument=str(cell.get("instrument", "")),
+                status=str(cell.get("status", "")),
+                external_name=str(cell.get("external_name", "") or ""),
+            )
+        )
     return organs
 
 
@@ -245,13 +544,17 @@ def build_tracks() -> list[Track]:
     for entry in data.get("active_tracks") or []:
         if not isinstance(entry, dict):
             continue
-        tracks.append(Track(
-            id=str(entry.get("id", "")),
-            status=str(entry.get("status", "")),
-            serves=str(entry.get("serves", "")),
-            owner=str(entry.get("owner", "")),
-            owned_surfaces=[str(s) for s in entry.get("owned_surfaces") or []],
-        ))
+        tracks.append(
+            Track(
+                id=str(entry.get("id", "")),
+                status=str(entry.get("status", "")),
+                serves=str(entry.get("serves", "")),
+                owner=str(entry.get("owner", "")),
+                owned_surfaces=[str(s) for s in entry.get("owned_surfaces") or []],
+                complements=[str(s) for s in entry.get("complements") or []],
+                depends_on=[str(s) for s in entry.get("depends_on") or []],
+            )
+        )
     return tracks
 
 
@@ -276,9 +579,12 @@ def build_custody() -> CustodyReport:
 def build_liveness() -> Liveness:
     receipt_path = _census_receipt_path()
     if receipt_path is None or not receipt_path.exists():
-        return Liveness(receipt=(
-            "no census receipt — run "
-            "python3 scripts/runtime/live_ops_census.py --write"))
+        return Liveness(
+            receipt=(
+                "no census receipt — run "
+                "python3 scripts/runtime/live_ops_census.py --write"
+            )
+        )
     try:
         payload = json.loads(receipt_path.read_text(encoding="utf-8"))
     except Exception:
@@ -287,11 +593,13 @@ def build_liveness() -> Liveness:
     for surface in payload.get("surfaces") or []:
         if not isinstance(surface, dict):
             continue
-        surfaces.append({
-            "id": str(surface.get("surface_id") or surface.get("id") or ""),
-            "label": str(surface.get("label", "")),
-            "status": str(surface.get("status", "")),
-        })
+        surfaces.append(
+            {
+                "id": str(surface.get("surface_id") or surface.get("id") or ""),
+                "label": str(surface.get("label", "")),
+                "status": str(surface.get("status", "")),
+            }
+        )
     return Liveness(
         receipt=str(receipt_path),
         generated_at=str(payload.get("generated_at", "")),
@@ -314,8 +622,9 @@ def build_broken() -> list[BrokenItem]:
             break
         head = _BR_HEAD.match(stripped)
         if head:
-            current = BrokenItem(id=head.group("id"), status="OPEN",
-                                 title=head.group("title").strip())
+            current = BrokenItem(
+                id=head.group("id"), status="OPEN", title=head.group("title").strip()
+            )
             items.append(current)
             continue
         status = _BR_STATUS.match(stripped)
@@ -394,12 +703,14 @@ def build_lanes() -> list[Lane]:
             for item in raw_lanes:
                 if not isinstance(item, dict):
                     continue
-                lanes.append(Lane(
-                    path=str(item.get("path") or item.get("worktree") or ""),
-                    branch=str(item.get("branch") or ""),
-                    head=str(item.get("head") or item.get("sha") or ""),
-                    status=str(item.get("status") or ""),
-                ))
+                lanes.append(
+                    Lane(
+                        path=str(item.get("path") or item.get("worktree") or ""),
+                        branch=str(item.get("branch") or ""),
+                        head=str(item.get("head") or item.get("sha") or ""),
+                        status=str(item.get("status") or ""),
+                    )
+                )
     if lanes:
         return [_stable_lane(lane) for lane in lanes]
 
@@ -418,11 +729,16 @@ def build_lanes() -> list[Lane]:
     for line in result.stdout.splitlines() + [""]:
         if not line.strip():
             if current:
-                lanes.append(_stable_lane(Lane(
-                    path=current.get("worktree", ""),
-                    branch=current.get("branch", "").removeprefix("refs/heads/") or "(detached)",
-                    head=current.get("HEAD", ""),
-                )))
+                lanes.append(
+                    _stable_lane(
+                        Lane(
+                            path=current.get("worktree", ""),
+                            branch=current.get("branch", "").removeprefix("refs/heads/")
+                            or "(detached)",
+                            head=current.get("HEAD", ""),
+                        )
+                    )
+                )
                 current = {}
             continue
         key, _, value = line.partition(" ")
@@ -475,7 +791,11 @@ def build_receipts_tail(limit: int = 8) -> list[ReceiptTail]:
             if nats_receipt.exists():
                 candidates.append(nats_receipt)
         elif root.exists():
-            candidates.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in {".json", ".jsonl"})
+            candidates.extend(
+                p
+                for p in root.rglob("*")
+                if p.is_file() and p.suffix in {".json", ".jsonl"}
+            )
     candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
     tail: list[ReceiptTail] = []
     for path in candidates[:limit]:
@@ -570,7 +890,9 @@ def _repo_context_markdown(packet: OrientationPacket) -> str:
         "## Tracks",
     ]
     for track in packet.tracks:
-        lines.append(f"- `{track.id}` [{track.status}] serves `{track.serves}` owner `{track.owner}`")
+        lines.append(
+            f"- `{track.id}` [{track.status}] serves `{track.serves}` owner `{track.owner}`"
+        )
     lines.append("")
     lines.append("## Agents")
     for agent in packet.agents:
@@ -630,20 +952,30 @@ def render(packet: OrientationPacket) -> None:
         marker = "MISSING " if path in packet.identity.missing_sources else ""
         print(f"    - {marker}{path}")
 
-    _section(f"ORGANS ({len(packet.organs)}) — owner: docs/governance/VENTURE_CELL_PORTFOLIO.yaml")
+    _section(
+        f"ORGANS ({len(packet.organs)}) — owner: docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
+    )
     for organ in packet.organs:
         name = f" ({organ.external_name})" if organ.external_name else ""
         print(f"  [{organ.status:<18}] {organ.id}{name} — {organ.instrument}")
 
-    _section(f"ACTIVE TRACKS ({len(packet.tracks)}) — owner: docs/governance/ACTIVE_TRACK.yaml")
+    _section(
+        f"ACTIVE TRACKS ({len(packet.tracks)}) — owner: docs/governance/ACTIVE_TRACK.yaml"
+    )
     for track in packet.tracks:
-        print(f"  [{track.status}] {track.id} serves={track.serves} owner={track.owner}")
+        print(
+            f"  [{track.status}] {track.id} serves={track.serves} owner={track.owner}"
+        )
         for surface in track.owned_surfaces:
             print(f"      owns {surface}")
 
-    _section("CANON CUSTODY — owner: docs/docops/assertions.yaml canonical_guard.registered")
-    print(f"  Registered canon docs: {packet.custody.registered_total} "
-          f"(present in this checkout: {packet.custody.present})")
+    _section(
+        "CANON CUSTODY — owner: docs/docops/assertions.yaml canonical_guard.registered"
+    )
+    print(
+        f"  Registered canon docs: {packet.custody.registered_total} "
+        f"(present in this checkout: {packet.custody.present})"
+    )
     for path in packet.custody.missing:
         print(f"  MISSING: {path}")
 
@@ -671,21 +1003,104 @@ def render(packet: OrientationPacket) -> None:
     print("  This view writes nothing and owns nothing.")
 
 
+def render_graph(graph: OrientationGraph) -> None:
+    """Human-readable dump of the orientation graph."""
+    _section(f"ORIENTATION GRAPH ({len(graph.nodes)} nodes, {len(graph.edges)} edges)")
+    by_kind: dict[str, list[GraphNode]] = {}
+    for node in graph.nodes:
+        by_kind.setdefault(node.kind, []).append(node)
+
+    for kind in ("objective", "organ", "track", "surface", "broken"):
+        group = by_kind.get(kind, [])
+        if not group:
+            continue
+        print(f"\n  {kind.upper()} nodes ({len(group)}):")
+        for node in group:
+            print(f"    [{node.status or '-':<18}] {node.id}  {node.label}")
+
+    print(f"\n  EDGES ({len(graph.edges)}):")
+    for edge in graph.edges:
+        print(f"    {edge.source} --{edge.relation}--> {edge.target}")
+
+    live = [sl for sl in graph.surface_liveness if sl.exists]
+    missing = [sl for sl in graph.surface_liveness if not sl.exists]
+    print(f"\n  SURFACE LIVENESS: {len(live)} live, {len(missing)} missing")
+    for sl in missing:
+        print(f"    MISSING: {sl.pattern}")
+    for sl in live:
+        mtime_note = f"  newest={sl.newest_mtime}" if sl.newest_mtime else ""
+        print(f"    LIVE:    {sl.pattern} ({len(sl.matched_paths)} files){mtime_note}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Render the whole organism at once from its owners.")
-    parser.add_argument("--json", action="store_true", dest="as_json",
-                        help="print the machine packet JSON to stdout")
-    parser.add_argument("--write-context", action="store_true",
-                        help="write reports/orientation/repo_context.{json,md}")
+        description="Render the whole organism at once from its owners."
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="print the machine packet JSON to stdout",
+    )
+    parser.add_argument(
+        "--write-context",
+        action="store_true",
+        help="write reports/orientation/repo_context.{json,md}",
+    )
+    parser.add_argument(
+        "--graph",
+        action="store_true",
+        help="render the orientation graph (nodes + edges)",
+    )
+    parser.add_argument(
+        "--graph-json", action="store_true", help="print the graph as JSON to stdout"
+    )
+    parser.add_argument(
+        "--query",
+        type=str,
+        default=None,
+        metavar="NODE_ID",
+        help="BFS subgraph from NODE_ID (e.g. track:loop-closure-2026-06)",
+    )
+    parser.add_argument(
+        "--measure",
+        action="store_true",
+        help="measure time-to-orientation and write receipt",
+    )
     args = parser.parse_args(argv)
+
+    if args.measure:
+        receipt = measure_orientation(write_receipt=True)
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+        return 0
+
     packet = build_packet()
+
     if args.write_context:
         json_path, md_path = write_repo_context(packet)
         render(packet)
         print(f"  Wrote: {json_path}")
         print(f"  Wrote: {md_path}")
         return 0
+
+    graph = build_graph(packet)
+
+    if args.query:
+        sub = query_subgraph(graph, args.query)
+        if not sub.nodes:
+            print(f"  No node found for id={args.query!r}")
+            return 1
+        render_graph(sub)
+        return 0
+
+    if args.graph_json:
+        print(json.dumps(asdict(graph), sort_keys=True, indent=1))
+        return 0
+
+    if args.graph:
+        render_graph(graph)
+        return 0
+
     if args.as_json:
         print(json.dumps(asdict(packet), sort_keys=True, indent=1))
     else:
