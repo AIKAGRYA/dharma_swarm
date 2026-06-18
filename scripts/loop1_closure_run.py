@@ -23,6 +23,7 @@ import argparse
 import asyncio
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import time
@@ -127,6 +128,7 @@ async def run(args: argparse.Namespace) -> dict:
         1 for entry in tasks_out if entry["failure_source"] == "dispatch_dropoff"
     )
     completed = sum(1 for entry in tasks_out if entry["status"] == "completed")
+    provider_truth = _read_served_provider_truth(Path(state_dir))
     report = {
         "provider": provider_type.value,
         "model": args.model,
@@ -136,6 +138,7 @@ async def run(args: argparse.Namespace) -> dict:
         "tasks_completed": completed,
         "tasks_failed": sum(1 for e in tasks_out if e["status"] == "failed"),
         "dispatch_dropoffs": dropoffs,
+        "served_provider_truth": provider_truth,
         "evidence_receipts": receipts,
         "ticks": ticks,
         "stigmergy_hot_paths": hot_paths,
@@ -144,6 +147,81 @@ async def run(args: argparse.Namespace) -> dict:
     }
     await swarm.shutdown()
     return report
+
+
+def _read_served_provider_truth(state_dir: Path) -> dict[str, object]:
+    db_path = state_dir / "state" / "runtime.db"
+    out: dict[str, object] = {
+        "runtime_db": str(db_path),
+        "exists": db_path.exists(),
+        "completed_runs_with_truth": 0,
+        "runtime_receipts_with_truth": 0,
+        "sample": None,
+    }
+    if not db_path.exists():
+        return out
+    try:
+        with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0) as conn:
+            conn.row_factory = sqlite3.Row
+            cols = {
+                row[1] for row in conn.execute("pragma table_info(delegation_runs)")
+            }
+            if {"status", "metadata_json"}.issubset(cols):
+                for row in conn.execute(
+                    """
+                    select run_id, metadata_json
+                    from delegation_runs
+                    where status='completed'
+                    """
+                ):
+                    truth = _served_truth(json.loads(row["metadata_json"] or "{}"))
+                    if truth:
+                        out["completed_runs_with_truth"] = int(out["completed_runs_with_truth"]) + 1
+                        out["sample"] = {"run_id": row["run_id"], **truth}
+            cols = {
+                row[1] for row in conn.execute("pragma table_info(runtime_receipts)")
+            }
+            if "payload_json" in cols:
+                for row in conn.execute(
+                    """
+                    select receipt_id, run_id, payload_json
+                    from runtime_receipts
+                    """
+                ):
+                    truth = _served_truth(json.loads(row["payload_json"] or "{}"))
+                    if truth:
+                        out["runtime_receipts_with_truth"] = int(out["runtime_receipts_with_truth"]) + 1
+                        out["sample"] = {
+                            "receipt_id": row["receipt_id"],
+                            "run_id": row["run_id"],
+                            **truth,
+                        }
+    except (sqlite3.Error, json.JSONDecodeError) as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
+def _served_truth(payload: object) -> dict[str, str] | None:
+    if not isinstance(payload, dict):
+        return None
+    provider = str(
+        payload.get("actual_served_provider")
+        or payload.get("served_provider")
+        or ""
+    ).strip()
+    model = str(
+        payload.get("actual_served_model")
+        or payload.get("served_model")
+        or ""
+    ).strip()
+    if provider and model and provider != "orchestrator":
+        return {"served_provider": provider, "served_model": model}
+    for value in payload.values():
+        if isinstance(value, dict):
+            truth = _served_truth(value)
+            if truth:
+                return truth
+    return None
 
 
 def main() -> int:
@@ -168,6 +246,10 @@ def main() -> int:
         report["tasks_completed"] == report["tasks_requested"]
         and report["dispatch_dropoffs"] == 0
         and bool(report["evidence_receipts"])
+        and (
+            int(report["served_provider_truth"]["completed_runs_with_truth"]) > 0
+            or int(report["served_provider_truth"]["runtime_receipts_with_truth"]) > 0
+        )
     )
     print(f"\nLOOP1_CLOSED={'yes' if closed else 'no'}")
     return 0 if closed else 1
