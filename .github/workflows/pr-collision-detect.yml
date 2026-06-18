@@ -137,8 +137,10 @@ jobs:
           only the latest/most complete PR for a given intent should remain open.
           Close superseded PRs with a comment linking to the successor.*"
 
-          existing="$(gh pr view "${PR_NUMBER}" --json comments \
-            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+          # Use the REST API so we get a numeric comment ID (GraphQL .id is a node ID
+          # and cannot be used with the REST PATCH endpoint).
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("'"${marker}"'")) | .id' \
             | head -1)"
 
           if [ -n "${existing}" ]; then
@@ -171,8 +173,10 @@ jobs:
           intersection cleanly. See \`docs/governance/COHERENCE_DELTA.md\`.*"
 
           # Find an existing bot comment with our marker (idempotent re-runs).
-          existing="$(gh pr view "${PR_NUMBER}" --json comments \
-            --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+          # Use the REST API so we get a numeric comment ID (GraphQL .id is a node ID
+          # and cannot be used with the REST PATCH endpoint).
+          existing="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | startswith("'"${marker}"'")) | .id' \
             | head -1)"
 
           if [ -n "${existing}" ]; then
