@@ -1,0 +1,59 @@
+{
+  "provider": "ollama",
+  "model": "llama3.2",
+  "spine_dispatch": "1",
+  "agents": 2,
+  "tasks_requested": 5,
+  "tasks_completed": 5,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "evidence_receipts": {
+    "6c74e7f4-98d4-408b-9ae2-f2ffb1a31e1d": "failed",
+    "27f25110-0385-4a11-8921-73b821a0c0a3": "failed",
+    "716a5674-6508-4917-a2ce-408ab9f3372a": "ok",
+    "da6f1ad6-6a9c-4440-8a1b-05f4a3401a7f": "ok",
+    "c6747f62-3a67-4b5a-b289-01bd943a23c7": "ok",
+    "6488ab36-6140-4af2-a2f6-5c271eef3437": "ok",
+    "f112a234-47f8-4b6e-bf09-bca3a4a92ab5": "ok"
+  },
+  "ticks": 193,
+  "stigmergy_hot_paths": [],
+  "state_dir": "/tmp/loop1-run5k",
+  "tasks": [
+    {
+      "task_id": "a61e5a87ce644d37",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "Based on the available information, feedback loops require both sensing and acting to effectively monitor and adjust their behavior in response to changing cond"
+    },
+    {
+      "task_id": "0a785c304b454b0c",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Externalized Findings\n\n### Task Failure Modes\n#### 1. **Resource Exhaustion**: Insufficient computational resources lead to prolonged processing times, causi"
+    },
+    {
+      "task_id": "094c01ef650d4dcf",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "from functools import wraps\nimport time\n\ndef retry_with_exponential_backoff(max_attempts=3, initial_delay=1):\n    def decorator(func):\n        @wraps(func)\n    "
+    },
+    {
+      "task_id": "db777106e1424d00",
+      "title": "loop1-closure-0004",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Task Report\n\nAs per the task loop1-closure-0004, I will explain the difference between a rate limit and a quota in one paragraph.\n\nA rate limit is a mechanis"
+    },
+    {
+      "task_id": "f5d65fe896b0433b",
+      "title": "loop1-closure-0005",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "Here are four properties that a good evidence receipt should record:\n\n1. **Task State**: This includes information such as the task ID, run ID, and current task"
+    }
+  ]
+}

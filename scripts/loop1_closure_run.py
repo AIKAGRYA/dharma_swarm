@@ -75,7 +75,10 @@ async def run(args: argparse.Namespace) -> dict:
             title=title,
             description=prompt,
             priority=TaskPriority.URGENT,
-            metadata={"provider_allowlist": [provider_type.value]},
+            metadata={
+                "provider_allowlist": [provider_type.value],
+                "timeout_seconds": args.timeout_per_task,
+            },
         )
         task_ids.append(task.id)
 
