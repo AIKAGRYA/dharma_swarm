@@ -11,13 +11,15 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.cybernetics_codex import build_audit, format_markdown  # noqa: E402
+from dharma_swarm.cybernetics_codex import build_audit  # noqa: E402
+from dharma_swarm.cybernetics_codex_format import format_markdown  # noqa: E402
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
-    parser.add_argument("--state-dir", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--state-dir", default=str(dharma_state_dir()))
     parser.add_argument("--runtime-db", default=None)
     parser.add_argument(
         "--since",

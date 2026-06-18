@@ -12,9 +12,10 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.cybernetics_codex import (  # noqa: E402
+from dharma_swarm.cybernetics_codex_registration import (  # noqa: E402
     build_external_worker_registration,
 )
+from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 from dharma_swarm.external_agent_registration import register_external_worker  # noqa: E402
 
 
@@ -38,7 +39,7 @@ async def _write_registration(args: argparse.Namespace) -> dict[str, object]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
-    parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+    parser.add_argument("--dharma-home", default=str(dharma_state_dir()))
     parser.add_argument(
         "--write",
         action="store_true",

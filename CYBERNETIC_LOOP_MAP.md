@@ -1,6 +1,6 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-06-18T16:29:00Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Last audit:** 2026-06-18T16:49:32Z by `scripts/governance/cybernetics_codex_audit.py --json`
 **Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
@@ -26,13 +26,26 @@ Live runtime truth from the latest audit:
 
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 5,216 total, 2,024 completed, 3,144 failed, 47 running, 1 claimed |
-| `runtime_receipts` | 17,281 rows, latest 2026-06-18T16:28:35Z |
+| `delegation_runs` | 5,222 total, 2,027 completed, 3,144 failed, 50 running, 1 claimed |
+| `runtime_receipts` | 17,410 rows, latest 2026-06-18T16:45:05Z |
 | `receipt_json` | 669 rows, orchestrator surface only |
-| served provider/model truth | 599 completed delegation runs, 1,710 runtime receipts |
+| served provider/model truth | 599 completed delegation runs, 1,716 runtime receipts |
 | `dispatch_dropoff` | 1,428 failures, latest 2026-06-18T15:02:59Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
 | evolution archive | 11,591 entries, 11,145 internal-positive-fitness risk rows, 0 external authority markers |
+
+Bounded Loop 1 replay proof (current code/provider lane):
+
+| Surface | Current value |
+|---------|---------------|
+| report | `reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
+| command | `python3 scripts/loop1_closure_run.py --tasks 3 --agents 1 --provider ollama --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
+| result | `LOOP1_CLOSED=yes` |
+| completed tasks | 3/3 |
+| dispatch dropoff | 0 |
+| evidence receipts | 3 ok |
+| served provider/model truth | 3/3 completed delegation receipts, source `receipt_json` |
+| tick errors | 0 |
 
 ---
 
@@ -40,7 +53,7 @@ Live runtime truth from the latest audit:
 
 | # | Loop | Interval | Closed? | Remaining Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **PARTIAL** | Activity exists, but all-history scope still has `dispatch_dropoff=1428`. Provider/model truth now exists on 599 completed delegation runs and 1,710 runtime receipts, so the next closure attempt must use a bounded `--since` batch with zero dropoff and tick N->N+1 proof. |
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1428`, so do not call the whole daemon history clean. |
 | 2 | Organism Heartbeat | 300s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
@@ -54,7 +67,7 @@ Live runtime truth from the latest audit:
 | 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 | 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 
-**Summary: 0 fully closed in production. 11 PARTIAL. 2 BLOCKED. The old "1 of 13 closed" reading came from mixing a historical harness receipt, this stale prose map, and live runtime truth. The live audit now resolves those surfaces through one projection.**
+**Summary: standing all-history audit is still 0 fully clean, 11 PARTIAL, 2 BLOCKED. Current bounded production replay closes Loop 1 only. The old "1 of 13 closed" reading came from mixing a historical harness receipt, this stale prose map, and live runtime truth; the current map separates standing history from bounded replay proof.**
 
 ---
 

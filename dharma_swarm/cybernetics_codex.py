@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.daemon_config import dharma_state_dir
+
 try:  # pragma: no cover - exercised by repo runtime; tests run with PyYAML.
     import yaml  # type: ignore
 except Exception:  # pragma: no cover
@@ -21,11 +23,12 @@ except Exception:  # pragma: no cover
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_STATE_DIR = Path.home() / ".dharma"
+DEFAULT_STATE_DIR = dharma_state_dir()
 
 AGENT_ID = "cybernetics_codex"
 CALLSIGN = "cybernetics-codex"
 SCHEMA_VERSION = "cybernetics_codex.audit.v2"
+LOOP1_BOUNDED_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop1*_spine_dispatch.json"
 REPO_AGENT_HOME = Path("docs/agents/cybernetics_codex")
 SEED_FILE = REPO_AGENT_HOME / "agent.seed.yaml"
 SOUL_FILE = REPO_AGENT_HOME / "SOUL.md"
@@ -107,6 +110,7 @@ def build_audit(
     active_track = read_active_track_summary(repo)
     seed = read_seed_summary(repo)
     live_registration = read_live_registration_summary(state)
+    bounded_replays = read_bounded_replays_summary(repo)
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -128,9 +132,15 @@ def build_audit(
         "seed_registration": seed,
         "live_registration": live_registration,
         "runtime": runtime,
+        "bounded_replays": bounded_replays,
         "one_wire": one_wire,
         "evolution_archive": archive,
-        "loop_statuses": build_loop_statuses(runtime, one_wire, archive),
+        "loop_statuses": build_loop_statuses(
+            runtime,
+            one_wire,
+            archive,
+            bounded_replays=bounded_replays,
+        ),
         "verifier_commands": VERIFIER_COMMANDS,
         "closure_rule": (
             "A loop is closed only when sense -> interpret -> constrain -> act -> "
@@ -144,99 +154,12 @@ def build_audit(
             "dispatch_dropoff in the audited scope."
         ),
         "next_build_packet": [
-            "Run a bounded DHARMA_SPINE_DISPATCH=1 batch and audit it with --since from the batch start timestamp.",
-            "Cross-check served provider/model truth in runtime DB, witness logs, and orient output.",
+            "Keep Loop 1 bounded replay green; do not claim all-history cleanliness while historical dispatch_dropoff remains.",
+            "Add dedicated closure receipts for Loops 2-11 that prove output changes later action/adaptation.",
             "Add One Wire archive-fitness guard tests before enabling Loops 12/13.",
             "Regenerate the loop map from a live projection instead of hand-editing stale prose.",
         ],
     }
-
-
-def build_external_worker_registration(
-    *,
-    dharma_home: Path | str | None = None,
-    repo_root: Path | str = REPO_ROOT,
-):
-    """Construct the Stage-1 registration record for the steward.
-
-    This is intentionally local metadata only: it creates a discoverable dock,
-    external registration, A2A card, and onboarding receipt when passed to the
-    registration desk. It does not start a daemon or bind a provider.
-    """
-    from dharma_swarm.external_agent_registration import (
-        AutonomyPolicy,
-        ExternalAgentAuthority,
-        ExternalAgentStatus,
-        ExternalRoamingWorker,
-        WorkspacePolicy,
-        external_agent_sandbox_root,
-    )
-
-    home = Path(dharma_home) if dharma_home else DEFAULT_STATE_DIR
-    repo = Path(repo_root)
-    return ExternalRoamingWorker(
-        agent_uid=AGENT_ID,
-        callsign=CALLSIGN,
-        display_name="Cybernetics Codex Steward",
-        harness="codex",
-        model_identity="codex",
-        department="cybernetics",
-        role="closure_ledger_steward",
-        squad_id="loop_closure",
-        team_id="dharma_swarm",
-        endpoint="pending://manual",
-        mailbox=f"nats://{NATS_SUBJECT}",
-        authority=ExternalAgentAuthority.EXTERNAL_WORKER_EVIDENCE_ONLY,
-        autonomy_policy=AutonomyPolicy(
-            mode="manual",
-            requires_approval=True,
-            explicit_task_assignment_required=True,
-        ),
-        workspace_policy=WorkspacePolicy(
-            sandbox_root=str(external_agent_sandbox_root(home) / AGENT_ID),
-            repo_writes_allowed=False,
-            canonical_dharma_dir_writes_allowed=False,
-        ),
-        memory_namespace=f"agent:{AGENT_ID}",
-        trace_identity=f"trace:{AGENT_ID}",
-        status=ExternalAgentStatus.REGISTERED,
-        is_returning_historical_embodiment=False,
-        notes=(
-            "Read-only cybernetic loop closure steward. Evidence-only: audits "
-            "loop closure claims, One Wire invariants, provider health receipts, "
-            "and VSM/cybernetic stewardship surfaces. No provider calls, source "
-            "writes, dispatch, PR approval, spend, or live external account action."
-        ),
-        registration_source="cybernetics_codex_registration",
-        capabilities=(
-            "cybernetic_loop_audit",
-            "closure_ledger",
-            "vsm_mapping",
-            "one_wire_guardian_review",
-            "receipt_integrity",
-            "context_engineering",
-        ),
-        metadata={
-            "repo_home": str(repo / REPO_AGENT_HOME),
-            "seed_path": str(repo / SEED_FILE),
-            "soul_file": str(repo / SOUL_FILE),
-            "context_engineering_desk": str(repo / CONTEXT_ENGINEERING_FILE),
-            "charter": str(repo / "docs/ops/CYBERNETICS_CODEX.md"),
-            "manifest_agent_id": AGENT_ID,
-            "a2a_route": A2A_INBOX_ROUTE,
-            "nats_subject": NATS_SUBJECT,
-            "nats_runtime_status": "declared_not_started",
-            "a2a_transport_status": "card_registered_only_after_onboarding",
-            "authority_boundary": "external_worker_evidence_only",
-            "no_provider_calls": True,
-            "no_autonomous_dispatch": True,
-            "one_wire_invariant": (
-                "internal artifacts never touch archive fitness; only "
-                "countersigned external acted receipts above quorum do"
-            ),
-        },
-    )
-
 
 def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str, Any]:
     summary: dict[str, Any] = {
@@ -347,6 +270,77 @@ def read_runtime_summary(db_path: Path, *, since: str | None = None) -> dict[str
     finally:
         conn.close()
     return summary
+
+
+def read_bounded_replays_summary(repo_root: Path) -> dict[str, Any]:
+    """Read bounded replay proof reports owned by the Cybernetics Codex lane."""
+    out: dict[str, Any] = {
+        "loop1": {
+            "exists": False,
+            "closed": False,
+            "path": None,
+            "blocker": "no bounded Loop 1 replay report found",
+        }
+    }
+    reports = sorted(
+        repo_root.glob(LOOP1_BOUNDED_REPLAY_GLOB),
+        key=lambda path: path.stat().st_mtime if path.exists() else 0.0,
+        reverse=True,
+    )
+    if not reports:
+        return out
+
+    report_path = reports[0]
+    loop1 = out["loop1"]
+    loop1["exists"] = True
+    loop1["path"] = str(report_path)
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        loop1["blocker"] = f"bounded replay report unreadable: {type(exc).__name__}: {exc}"
+        return out
+
+    served_truth = data.get("served_provider_truth") or {}
+    evidence_receipts = data.get("evidence_receipts") or {}
+    tasks_requested = int(data.get("tasks_requested") or 0)
+    tasks_completed = int(data.get("tasks_completed") or 0)
+    dispatch_dropoffs = int(data.get("dispatch_dropoffs") or 0)
+    tick_errors = data.get("tick_errors") or []
+    completed_with_truth = int(served_truth.get("completed_runs_with_truth") or 0)
+    receipt_truth = int(served_truth.get("delegation_receipts_with_truth") or 0)
+    receipt_statuses = [str(status) for status in evidence_receipts.values()]
+    closed = (
+        tasks_requested > 0
+        and tasks_completed == tasks_requested
+        and dispatch_dropoffs == 0
+        and not tick_errors
+        and bool(receipt_statuses)
+        and all(status == "ok" for status in receipt_statuses)
+        and completed_with_truth >= tasks_completed
+    )
+    loop1.update(
+        {
+            "closed": closed,
+            "tasks_requested": tasks_requested,
+            "tasks_completed": tasks_completed,
+            "tasks_failed": int(data.get("tasks_failed") or 0),
+            "dispatch_dropoffs": dispatch_dropoffs,
+            "tick_errors": len(tick_errors),
+            "evidence_receipts": len(receipt_statuses),
+            "evidence_receipts_ok": sum(1 for status in receipt_statuses if status == "ok"),
+            "completed_runs_with_truth": completed_with_truth,
+            "delegation_receipts_with_truth": receipt_truth,
+            "served_provider_sample": served_truth.get("sample"),
+            "state_dir": data.get("state_dir"),
+            "provider": data.get("provider"),
+            "model": data.get("model"),
+            "spine_dispatch": data.get("spine_dispatch"),
+            "read_only_boot": data.get("read_only_boot"),
+            "ollama_force_local": data.get("ollama_force_local"),
+            "blocker": "" if closed else "bounded replay did not satisfy strict Loop 1 closure predicate",
+        }
+    )
+    return out
 
 
 def _served_provider_truth_summary(
@@ -721,6 +715,8 @@ def build_loop_statuses(
     runtime: dict[str, Any],
     one_wire: dict[str, Any],
     archive: dict[str, Any],
+    *,
+    bounded_replays: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     rows = []
     delegation = runtime.get("delegation_runs") or {}
@@ -741,6 +737,8 @@ def build_loop_statuses(
     }
     one_wire_eligible = bool(one_wire.get("eligible"))
     archive_risk = int(archive.get("positive_internal_fitness_risk") or 0)
+    loop1_replay = ((bounded_replays or {}).get("loop1") or {})
+    loop1_bounded_closed = bool(loop1_replay.get("closed"))
 
     for number, loop_id, label in LOOPS:
         status = "UNKNOWN"
@@ -754,9 +752,24 @@ def build_loop_statuses(
                 "runtime.provider_truth",
                 "runtime.failure_codes",
             ]
+            if loop1_bounded_closed:
+                evidence.append("bounded_replays.loop1")
             if total_runs == 0:
                 status = "UNKNOWN"
                 blocker = "no delegation runs found"
+            elif loop1_bounded_closed:
+                status = "CLOSED_BOUNDED_REPLAY"
+                blocker = (
+                    "bounded replay closes current Loop 1 lane "
+                    f"({loop1_replay.get('tasks_completed')}/"
+                    f"{loop1_replay.get('tasks_requested')} completed, "
+                    f"dispatch_dropoff={loop1_replay.get('dispatch_dropoffs')}, "
+                    f"evidence_receipts_ok={loop1_replay.get('evidence_receipts_ok')}, "
+                    f"served_provider_truth="
+                    f"{loop1_replay.get('completed_runs_with_truth')}); "
+                    "standing all-history audit still includes historical "
+                    f"dispatch_dropoff={failure_counts.get('dispatch_dropoff', 0)}"
+                )
             elif failure_counts.get("dispatch_dropoff", 0):
                 status = "PARTIAL"
                 blocker = (
@@ -817,62 +830,6 @@ def build_loop_statuses(
             "blocker": blocker,
         })
     return rows
-
-
-def format_markdown(report: dict[str, Any]) -> str:
-    """Render a compact human-readable audit packet."""
-    lines = [
-        "# cybernetics_codex Audit",
-        "",
-        f"- observed_at: `{report['observed_at']}`",
-        f"- mode: `{report['agent']['mode']}`",
-        f"- manifest_registered: `{report['manifest_registration'].get('registered')}`",
-        f"- loop_track_found: `{report['active_track'].get('loop_track_found')}`",
-        f"- seed_registered: `{report['seed_registration'].get('registered')}`",
-        f"- live_registration: `{report['live_registration'].get('registered')}`",
-        f"- nats_runtime_status: `{report['live_registration'].get('nats_runtime_status')}`",
-        "",
-        "## Runtime",
-        "",
-    ]
-    runtime = report["runtime"]
-    delegation = runtime.get("delegation_runs") or {}
-    receipt = runtime.get("receipt_json") or {}
-    provider_truth = runtime.get("provider_truth") or {}
-    delegation_truth = provider_truth.get("delegation_runs") or {}
-    runtime_receipt_truth = provider_truth.get("runtime_receipts") or {}
-    lines.extend([
-        f"- runtime_db: `{runtime.get('path')}`",
-        f"- read_ok: `{runtime.get('read_ok')}`",
-        f"- scope_since: `{(runtime.get('scope') or {}).get('since')}`",
-        f"- delegation_runs: `{delegation.get('total', 0)}` total, "
-        f"`{delegation.get('completed', 0)}` completed, "
-        f"`{delegation.get('failed', 0)}` failed",
-        f"- receipt_json: `{receipt.get('rows_with_receipt_json', 0)}` rows "
-        "`(orchestrator surface; A2A empty is success)`",
-        f"- served_provider_truth: delegation completed "
-        f"`{delegation_truth.get('completed_with_served_provider_model', 0)}/"
-        f"{delegation_truth.get('completed', 0)}`, runtime_receipts "
-        f"`{runtime_receipt_truth.get('rows_with_served_provider_model', 0)}` rows",
-        "",
-        "## Loop Statuses",
-        "",
-        "| # | Loop | Verdict | Blocker |",
-        "|---|---|---|---|",
-    ])
-    for row in report["loop_statuses"]:
-        lines.append(
-            f"| {row['number']} | {row['label']} | {row['verdict']} | "
-            f"{str(row['blocker']).replace('|', '/')} |"
-        )
-    lines.extend([
-        "",
-        "## Verifier Commands",
-        "",
-        *[f"- `{cmd}`" for cmd in report["verifier_commands"]],
-        "",
-    ])
-    return "\n".join(lines)
 
 
 def _table_summary(conn: sqlite3.Connection, table: str) -> dict[str, Any]:

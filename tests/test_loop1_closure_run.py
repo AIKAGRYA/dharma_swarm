@@ -16,7 +16,8 @@ def test_loop1_closure_run_counts_served_provider_truth(tmp_path):
         create table delegation_runs (
             run_id text primary key,
             status text,
-            metadata_json text
+            metadata_json text,
+            receipt_json text
         );
         create table runtime_receipts (
             receipt_id text primary key,
@@ -26,7 +27,7 @@ def test_loop1_closure_run_counts_served_provider_truth(tmp_path):
         """
     )
     conn.execute(
-        "insert into delegation_runs values (?, ?, ?)",
+        "insert into delegation_runs values (?, ?, ?, ?)",
         (
             "run_1",
             "completed",
@@ -36,6 +37,16 @@ def test_loop1_closure_run_counts_served_provider_truth(tmp_path):
                     "actual_served_model": "qwen3-coder",
                 }
             ),
+            json.dumps({"provider": "orchestrator", "model": ""}),
+        ),
+    )
+    conn.execute(
+        "insert into delegation_runs values (?, ?, ?, ?)",
+        (
+            "run_2",
+            "completed",
+            "{}",
+            json.dumps({"provider": "ollama", "model": "llama3.2"}),
         ),
     )
     conn.execute(
@@ -52,6 +63,7 @@ def test_loop1_closure_run_counts_served_provider_truth(tmp_path):
     truth = _read_served_provider_truth(state_dir)
 
     assert truth["exists"] is True
-    assert truth["completed_runs_with_truth"] == 1
+    assert truth["completed_runs_with_truth"] == 2
+    assert truth["delegation_receipts_with_truth"] == 1
     assert truth["runtime_receipts_with_truth"] == 1
     assert truth["sample"]["served_provider"] == "ollama"

@@ -9,9 +9,9 @@ from dharma_swarm.cybernetics_codex import (
     AGENT_ID,
     CALLSIGN,
     build_audit,
-    build_external_worker_registration,
-    format_markdown,
 )
+from dharma_swarm.cybernetics_codex_format import format_markdown
+from dharma_swarm.cybernetics_codex_registration import build_external_worker_registration
 
 
 def _seed_runtime_db(path):
@@ -108,6 +108,57 @@ def test_build_audit_marks_loop1_partial_when_dispatch_dropoff_exists(tmp_path):
     assert loop1["verdict"] == "PARTIAL"
     assert "dispatch_dropoff=1" in loop1["blocker"]
     assert "receipt_json is orchestrator-surface only" in loop1["blocker"]
+
+
+def test_build_audit_marks_loop1_closed_when_bounded_replay_is_green(tmp_path):
+    state = tmp_path / ".dharma"
+    db = state / "state" / "runtime.db"
+    db.parent.mkdir(parents=True)
+    _seed_runtime_db(db)
+    report_path = (
+        tmp_path
+        / "reports"
+        / "loop_closure"
+        / "cybernetics_codex"
+        / "2026-06-18_loop1_bounded_spine_dispatch.json"
+    )
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(
+        json.dumps(
+            {
+                "provider": "ollama",
+                "model": "llama3.2:latest",
+                "spine_dispatch": "1",
+                "read_only_boot": "1",
+                "ollama_force_local": "1",
+                "tasks_requested": 3,
+                "tasks_completed": 3,
+                "tasks_failed": 0,
+                "dispatch_dropoffs": 0,
+                "tick_errors": [],
+                "evidence_receipts": {"r1": "ok", "r2": "ok", "r3": "ok"},
+                "served_provider_truth": {
+                    "completed_runs_with_truth": 3,
+                    "delegation_receipts_with_truth": 3,
+                    "sample": {
+                        "source": "receipt_json",
+                        "served_provider": "ollama",
+                        "served_model": "llama3.2:latest",
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = build_audit(repo_root=tmp_path, state_dir=state)
+
+    loop1 = report["loop_statuses"][0]
+    assert loop1["verdict"] == "CLOSED_BOUNDED_REPLAY"
+    assert "bounded replay closes" in loop1["blocker"]
+    assert "bounded_replays.loop1" in loop1["evidence"]
+    assert report["bounded_replays"]["loop1"]["closed"] is True
+    assert report["bounded_replays"]["loop1"]["completed_runs_with_truth"] == 3
 
 
 def test_loop1_accepts_a2a_runtime_receipt_truth_without_receipt_json(tmp_path):

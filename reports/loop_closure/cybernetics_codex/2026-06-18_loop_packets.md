@@ -6,7 +6,7 @@ Generated from:
 python3 scripts/governance/cybernetics_codex_audit.py --json
 ```
 
-Observed at: `2026-06-18T16:29:00Z`
+Observed at: `2026-06-18T16:49:32Z`
 Runtime DB: `~/.dharma/state/runtime.db`
 
 ## Acceptance Rules
@@ -20,18 +20,27 @@ truth and zero `dispatch_dropoff` in the audited scope.
 
 ## Loop 1 Packet
 
-Verdict: `PARTIAL`
+Verdict: `CLOSED_IN_BOUNDED_REPLAY`; `PARTIAL_IN_ALL_HISTORY_AUDIT`
 
-Current blocker: all-history runtime scope still has `dispatch_dropoff=1428`.
-Provider/model truth exists now, but not enough to close the loop because the
-batch must be bounded and replayable.
+Bounded replay proof:
+
+- report: `reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json`
+- command: `python3 scripts/loop1_closure_run.py --tasks 3 --agents 1 --provider ollama --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json`
+- result: `LOOP1_CLOSED=yes`
+- tasks: `3/3` completed
+- dispatch_dropoff: `0`
+- evidence receipts: `3` ok
+- served provider/model truth: `3/3` completed delegation receipts, source `receipt_json`
+- runtime tick errors: `0`
+
+The standing all-history audit remains partial because historical runtime scope
+still has `dispatch_dropoff=1428`. Do not erase that history; use bounded
+`--since` or this replay report when evaluating the current closure lane.
 
 Replay command for the next closure attempt:
 
 ```bash
-BATCH_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-DHARMA_SPINE_DISPATCH=1 .venv/bin/python scripts/loop1_closure_run.py --tasks 3 --agents 1 --report reports/loop_closure/cybernetics_codex/loop1_bounded_batch.json
-python3 scripts/governance/cybernetics_codex_audit.py --since "$BATCH_START" --json
+python3 scripts/loop1_closure_run.py --tasks 3 --agents 1 --provider ollama --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/loop1_bounded_batch.json
 ```
 
 Close only if the scoped audit shows:

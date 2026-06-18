@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Loop 1 closure run — drive real tasks through the full orchestrator path.
 
-Boots a SwarmManager, spawns agents on a real provider lane (Ollama by
-default — keyless, local), submits N tasks, and ticks the swarm until every
-task reaches a terminal state. Execution runs with DHARMA_SPINE_DISPATCH=1 so
-each dispatch emits exactly one EvidenceReceipt through the spine's blessed
-path (orchestrator._run_task_via_spine).
+Boots a SwarmManager in bounded/read-only boot mode, spawns only the requested
+agents on a real provider lane (Ollama by default — keyless, local), submits N
+tasks, and ticks the swarm until every task reaches a terminal state. Execution
+runs with DHARMA_SPINE_DISPATCH=1 so each dispatch emits exactly one
+EvidenceReceipt through the spine's blessed path (orchestrator._run_task_via_spine).
 
 Prints a JSON closure report: per-task terminal status, evidence receipt ids,
 dispatch_dropoff occurrences, and stigmergy hot paths (the ADAPT half of
@@ -32,6 +32,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 os.environ.setdefault("DHARMA_SPINE_DISPATCH", "1")
+os.environ.setdefault("DHARMA_READ_ONLY_BOOT", "1")
+os.environ.setdefault("OLLAMA_FORCE_LOCAL", "1")
+os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
 
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus
 
@@ -40,7 +43,7 @@ TERMINAL = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
 TASK_PROMPTS = [
     "Summarize in two sentences why feedback loops need both sensing and acting.",
     "Name three failure modes of a distributed task queue and one mitigation each.",
-    "Write a one-line docstring for a function that retries with exponential backoff.",
+    "State one concise principle for retrying transient failures with exponential backoff.",
     "Explain the difference between a rate limit and a quota in one paragraph.",
     "List four properties a good evidence receipt should record.",
 ]
@@ -78,6 +81,8 @@ async def run(args: argparse.Namespace) -> dict:
             priority=TaskPriority.URGENT,
             metadata={
                 "provider_allowlist": [provider_type.value],
+                "requires_tooling": False,
+                "task_type": "loop1_closure",
                 "timeout_seconds": args.timeout_per_task,
             },
         )
@@ -85,9 +90,20 @@ async def run(args: argparse.Namespace) -> dict:
 
     deadline = time.monotonic() + args.timeout_per_task * args.tasks
     receipts: dict[str, str] = {}
+    tick_errors: list[dict[str, str]] = []
     ticks = 0
     while time.monotonic() < deadline:
-        await swarm.tick()
+        try:
+            await swarm.tick()
+        except Exception as exc:  # noqa: BLE001 - report proof gaps, do not hide them
+            tick_errors.append(
+                {
+                    "type": type(exc).__name__,
+                    "error": str(exc)[:500],
+                }
+            )
+            await asyncio.sleep(args.tick_sleep)
+            continue
         ticks += 1
         orch = swarm._orchestrator
         receipt = getattr(orch, "_last_evidence_receipt", None)
@@ -133,6 +149,8 @@ async def run(args: argparse.Namespace) -> dict:
         "provider": provider_type.value,
         "model": args.model,
         "spine_dispatch": os.environ.get("DHARMA_SPINE_DISPATCH"),
+        "read_only_boot": os.environ.get("DHARMA_READ_ONLY_BOOT"),
+        "ollama_force_local": os.environ.get("OLLAMA_FORCE_LOCAL"),
         "agents": len(agents),
         "tasks_requested": args.tasks,
         "tasks_completed": completed,
@@ -140,6 +158,7 @@ async def run(args: argparse.Namespace) -> dict:
         "dispatch_dropoffs": dropoffs,
         "served_provider_truth": provider_truth,
         "evidence_receipts": receipts,
+        "tick_errors": tick_errors,
         "ticks": ticks,
         "stigmergy_hot_paths": hot_paths,
         "state_dir": str(state_dir),
@@ -155,6 +174,7 @@ def _read_served_provider_truth(state_dir: Path) -> dict[str, object]:
         "runtime_db": str(db_path),
         "exists": db_path.exists(),
         "completed_runs_with_truth": 0,
+        "delegation_receipts_with_truth": 0,
         "runtime_receipts_with_truth": 0,
         "sample": None,
     }
@@ -166,18 +186,32 @@ def _read_served_provider_truth(state_dir: Path) -> dict[str, object]:
             cols = {
                 row[1] for row in conn.execute("pragma table_info(delegation_runs)")
             }
-            if {"status", "metadata_json"}.issubset(cols):
+            if "status" in cols and (
+                "metadata_json" in cols or "receipt_json" in cols
+            ):
+                select_cols = ["run_id", "status"]
+                select_cols.append(
+                    "metadata_json" if "metadata_json" in cols else "null as metadata_json"
+                )
+                select_cols.append(
+                    "receipt_json" if "receipt_json" in cols else "null as receipt_json"
+                )
                 for row in conn.execute(
-                    """
-                    select run_id, metadata_json
-                    from delegation_runs
-                    where status='completed'
-                    """
+                    f"select {', '.join(select_cols)} from delegation_runs "
+                    "where status='completed'"
                 ):
-                    truth = _served_truth(json.loads(row["metadata_json"] or "{}"))
+                    metadata_truth = _served_truth(json.loads(row["metadata_json"] or "{}"))
+                    receipt_truth = _served_truth(json.loads(row["receipt_json"] or "{}"))
+                    truth = metadata_truth or receipt_truth
                     if truth:
                         out["completed_runs_with_truth"] = int(out["completed_runs_with_truth"]) + 1
-                        out["sample"] = {"run_id": row["run_id"], **truth}
+                        if receipt_truth:
+                            out["delegation_receipts_with_truth"] = int(out["delegation_receipts_with_truth"]) + 1
+                        out["sample"] = {
+                            "source": "metadata_json" if metadata_truth else "receipt_json",
+                            "run_id": row["run_id"],
+                            **truth,
+                        }
             cols = {
                 row[1] for row in conn.execute("pragma table_info(runtime_receipts)")
             }
@@ -207,11 +241,13 @@ def _served_truth(payload: object) -> dict[str, str] | None:
     provider = str(
         payload.get("actual_served_provider")
         or payload.get("served_provider")
+        or payload.get("provider")
         or ""
     ).strip()
     model = str(
         payload.get("actual_served_model")
         or payload.get("served_model")
+        or payload.get("model")
         or ""
     ).strip()
     if provider and model and provider != "orchestrator":
@@ -229,7 +265,7 @@ def main() -> int:
     parser.add_argument("--tasks", type=int, default=1)
     parser.add_argument("--agents", type=int, default=1)
     parser.add_argument("--provider", default=ProviderType.OLLAMA.value)
-    parser.add_argument("--model", default="llama3.2")
+    parser.add_argument("--model", default=os.environ.get("OLLAMA_LOCAL_MODEL", "llama3.2:latest"))
     parser.add_argument("--timeout-per-task", type=float, default=300.0)
     parser.add_argument("--tick-sleep", type=float, default=1.0)
     parser.add_argument("--state-dir", default=None)
@@ -245,6 +281,7 @@ def main() -> int:
     closed = (
         report["tasks_completed"] == report["tasks_requested"]
         and report["dispatch_dropoffs"] == 0
+        and not report["tick_errors"]
         and bool(report["evidence_receipts"])
         and (
             int(report["served_provider_truth"]["completed_runs_with_truth"]) > 0
