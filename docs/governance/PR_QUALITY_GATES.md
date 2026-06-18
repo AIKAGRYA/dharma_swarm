@@ -144,6 +144,37 @@ It runs on PR open/reopen, every 6 hours on a schedule, and on
 or trusted same-repo automation signal are never touched, and nothing is ever
 merged by this lane.
 
+### Ephemeral snapshot-report PRs (`pr-dedupe.yml`, Pass 1)
+
+An external ops automation (running under a maintainer PAT, not an in-repo
+workflow) opens a fresh draft PR every few hours that is a pure **status
+snapshot** rather than a change to merge:
+
+- `report(governance): PR lifecycle + spine adoption ops report <timestamp>`
+- `chore(governance): refresh spine adoption metric [automated] <timestamp>`
+
+Each title carries a unique timestamp, so the title-grouping dedupe above never
+collapses them and they accumulate (12+ at once), burying real PRs. Their data
+is a projection already rendered from owners (`make onboard`,
+`reports/governance/**`), so a snapshot report should be emitted as an
+artifact/comment, never as a standing PR.
+
+Pass 1 of `pr-dedupe.yml` therefore **closes every such snapshot PR outright**
+(not keep-newest), comments a governance explanation pointing at the rendered
+projection, and deletes the branch. The match is deliberately conservative — a
+PR is closed only when **all** hold:
+
+1. The PR head is in the same repository (repo owner).
+2. The title carries an automation marker (`[automated]` or `[auto]`).
+3. A known snapshot intent matches — either the title phrase (`PR lifecycle +
+   spine adoption ops report`, `refresh spine adoption metric`) or the headRef
+   lane (`pr-lifecycle-spine`, `spine-adoption-metric`).
+
+A PR that does not match a declared snapshot intent is never touched. If a real
+change is mis-titled into this set, reopen it and retitle so it no longer
+matches. Runs on PR open/reopen, the 6-hourly schedule, and `workflow_dispatch`
+(honors `dry_run`).
+
 ---
 
 ## 2b. Automerge Lane (`automerge.yml`)
@@ -180,6 +211,33 @@ Mike's required reviewer receipts are **`copilot,claude`**. Devin is a
 requiring a `devin` receipt left the gate permanently unclearable. If Devin
 gains a review surface later, add it back to `REQUIRED_REVIEWERS` in
 `codex-mention-router.yml` and the `merge-master-mike-backlog.yml` default.
+
+#### `bot-pr` waiver (trusted automation merges when green)
+
+A PR carrying the **`bot-pr`** label is produced by trusted automation
+(`automerge.yml` enrolls bot/automated PRs). For these — and **only** these —
+Mike's gate in `scripts/runtime/pr_merge_control.py` (`build_gate`) waives the
+human/agent reviewer-receipt requirement and ignores **advisory review-bot**
+comment threads, so a genuinely green automation PR can merge without a human
+in the loop:
+
+- **Reviewer receipts waived.** The `copilot,claude` receipt requirement is
+  dropped (these PRs never receive human reviews); the waiver is surfaced in
+  the gate's `bot_pr.waivers` output for transparency.
+- **Advisory-bot threads ignored.** Review threads whose every comment is
+  authored by an advisory review bot (`ADVISORY_REVIEW_BOTS`, e.g. Greptile's
+  `greptile-apps`) post perpetually-unresolved informational summaries that
+  never represent a human change request. They are not counted as blocking
+  unresolved threads for a `bot-pr`. A thread with **any** non-advisory
+  participant (a human, Copilot, Codex, Devin, …) still blocks.
+
+Everything else stays strict, for `bot-pr` and non-`bot-pr` alike: mergeability,
+failing/pending CI checks, `CHANGES_REQUESTED`, the Coherence Delta gate, CI
+truth, and HIGH/CRITICAL risk all still block. Non-`bot-pr` PRs are unaffected
+— they still require the full reviewer receipts and are still blocked by any
+unresolved thread, advisory or not. This neither silences Greptile nor relaxes
+substance for human reviewers; it only scopes a narrow waiver to trusted,
+labeled automation.
 
 ---
 
