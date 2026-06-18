@@ -74,13 +74,23 @@ jobs:
           DHARMA_EVOLUTION_SHADOW: "1"
           DGC_AUTONOMY_LEVEL: "0"
         run: |
+          # pipefail so pytest's exit code (not tee's) determines the step
+          # result. Without this, `pytest ... | tee` always exits 0 under the
+          # default `bash -e {0}` shell and test failures never fail CI.
+          # +e around the pipeline lets us still surface the count tail on
+          # failure before re-exiting with pytest's real status.
+          set -o pipefail
+          set +e
           python -m pytest tests/ -q --tb=short \
             -x \
             --timeout=30 \
             -m "not slow and not docker and not network" \
             2>&1 | tee pytest_output.txt
-          # Surface pass/fail counts
+          status=${PIPESTATUS[0]}
+          set -e
+          # Surface pass/fail counts even on failure.
           tail -3 pytest_output.txt
+          exit "$status"
 
       - name: Upload test results
         if: always()
