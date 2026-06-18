@@ -404,7 +404,13 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "session_events") >= 3
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
+    delegation_statuses: list[str] = []
+    for _ in range(20):
+        delegation_statuses = _runtime_delegation_statuses(runtime_db_path)
+        if delegation_statuses == ["completed"]:
+            break
+        await asyncio.sleep(0.05)
+    assert delegation_statuses == ["completed"]
     artifact_count = 0
     for _ in range(20):
         artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")

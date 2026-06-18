@@ -5,10 +5,15 @@ tier in comments. Scope excludes ``scripts/`` (operator utilities).
 
 Routing truth (2026 maintenance):
 - ``api/routers/chat.py`` remains the in-repo **dashboard** bypass (per-request provider).
-- ``AutonomousAgent`` injected path: ``openrouter`` → ``ModelRouter.complete_for_task``
-  when the router registers overlapping runtime providers; ``codex`` always uses
+- ``AutonomousAgent`` injected path: ``anthropic`` and ``openrouter`` →
+  ``ModelRouter.complete_for_task`` when the router registers overlapping runtime
+  providers; ``codex`` always uses
   ``create_runtime_provider(..., working_dir=identity.working_directory)``;
   fallbacks use direct runtime chain. ``cli_wake`` documents no router (legacy CLI).
+- ``holon_bridge.py`` is the read-only agent-as-itself bridge and resolves through the
+  canonical runtime-provider door.
+- ``living_agent_kernel_provider_worker.py`` is the promoted kernel provider execution
+  boundary after promotion admission.
 Also asserts shared ``create_default_router()`` is invoked once per long-running
 ``orchestrate_live`` loop (source-inspect guard).
 """
@@ -31,6 +36,8 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
         "dharma_swarm/api_key_audit.py",
         "dharma_swarm/autonomous_agent.py",
         "dharma_swarm/consolidation.py",
+        "dharma_swarm/holon_bridge.py",
+        "dharma_swarm/operator_core/living_agent_kernel_provider_worker.py",
         "dharma_swarm/provider_matrix.py",
         "dharma_swarm/provider_smoke.py",
         "dharma_swarm/runtime_provider.py",
@@ -77,7 +84,7 @@ def test_dashboard_chat_bypass_remains_inventoried() -> None:
 def test_autonomous_agent_exposes_model_router_and_codex_stays_direct() -> None:
     src = (REPO_ROOT / "dharma_swarm/autonomous_agent.py").read_text(encoding="utf-8")
     assert "def __init__(self, identity: AgentIdentity, *, model_router:" in src
-    assert src.count("await self._model_router.complete_for_task(") == 1
+    assert src.count("await self._model_router.complete_for_task(") == 2
     codex_start = src.index("async def _call_codex")
     nxt = src.find("\n    async def ", codex_start + 1)
     codex_block = src[codex_start:nxt] if nxt != -1 else src[codex_start:]

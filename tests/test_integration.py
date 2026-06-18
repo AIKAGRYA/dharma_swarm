@@ -78,6 +78,16 @@ def _engine_paths(tmp_path: Path) -> dict[str, Path]:
     }
 
 
+def _gate_ready_description(summary: str) -> str:
+    """Return a self-mod description that satisfies the Telos review gate."""
+    return (
+        f"{summary}: include the mechanism-level rationale, "
+        "witness-observed audit evidence, ecosystem resilience impact, "
+        "and reversible rollback plan. Counterargument: this change may "
+        "increase maintenance load or mask regressions unless reviewed."
+    )
+
+
 async def _init_engine(tmp_path: Path) -> DarwinEngine:
     """Create and initialize a DarwinEngine rooted in tmp_path."""
     paths = _engine_paths(tmp_path)
@@ -108,7 +118,7 @@ async def test_full_cycle_propose_gate_evaluate_archive_select(tmp_path: Path) -
     proposal = await engine.propose(
         component="metrics.py",
         change_type="mutation",
-        description="Add entropy normalization",
+        description=_gate_ready_description("Add entropy normalization"),
         diff="--- a/metrics.py\n+++ b/metrics.py\n@@ -1 +1 @@\n-old\n+new",
     )
     assert proposal.status == EvolutionStatus.PENDING
@@ -137,7 +147,7 @@ async def test_multiple_proposals_some_rejected(tmp_path: Path) -> None:
     safe = await engine.propose(
         component="utils.py",
         change_type="mutation",
-        description="Add helper function",
+        description=_gate_ready_description("Add helper function"),
         diff="+def helper(): pass",
     )
     harmful = await engine.propose(
@@ -182,7 +192,7 @@ async def test_elegance_integrated_with_fitness(tmp_path: Path) -> None:
     proposal = await engine.propose(
         component="elegance_test.py",
         change_type="mutation",
-        description="Refactor code",
+        description=_gate_ready_description("Refactor code"),
         diff="+improved code",
     )
     await engine.gate_check(proposal)
@@ -195,7 +205,7 @@ async def test_elegance_integrated_with_fitness(tmp_path: Path) -> None:
     proposal2 = await engine.propose(
         component="elegance_test.py",
         change_type="mutation",
-        description="Messy code",
+        description=_gate_ready_description("Messy code"),
         diff="+messy code",
     )
     await engine.gate_check(proposal2)
@@ -215,7 +225,7 @@ async def test_trace_logging_during_evolution_cycle(tmp_path: Path) -> None:
     proposal = await engine.propose(
         component="traces_test.py",
         change_type="mutation",
-        description="Add logging",
+        description=_gate_ready_description("Add logging"),
     )
     await engine.run_cycle([proposal])
 
@@ -238,7 +248,7 @@ async def test_parent_selection_from_populated_archive(tmp_path: Path) -> None:
         p = await engine.propose(
             component=f"module_{i}.py",
             change_type="mutation",
-            description=f"Change {i}",
+            description=_gate_ready_description(f"Change {i}"),
         )
         await engine.gate_check(p)
         await engine.evaluate(
@@ -263,7 +273,7 @@ async def test_fitness_trend_after_multiple_cycles(tmp_path: Path) -> None:
         p = await engine.propose(
             component="trend.py",
             change_type="mutation",
-            description=f"Iteration {i}",
+            description=_gate_ready_description(f"Iteration {i}"),
         )
         await engine.gate_check(p)
         await engine.evaluate(p, test_results={"pass_rate": 0.6 + i * 0.05})
@@ -635,7 +645,7 @@ async def test_evolution_cycle_logs_traces_monitor_picks_up(tmp_path: Path) -> N
     proposal = await engine.propose(
         component="cross_test.py",
         change_type="mutation",
-        description="Improve helper function",
+        description=_gate_ready_description("Improve helper function"),
     )
     await engine.run_cycle([proposal])
 
@@ -679,7 +689,7 @@ async def test_telos_gates_in_evolution_harmful_blocked(tmp_path: Path) -> None:
     safe = await engine.propose(
         component="safe.py",
         change_type="mutation",
-        description="Add type hints to function parameters",
+        description=_gate_ready_description("Add type hints to function parameters"),
     )
     harmful = await engine.propose(
         component="wipe.py",
@@ -716,7 +726,7 @@ class DataProcessor:
     proposal = await engine.propose(
         component="processor.py",
         change_type="mutation",
-        description="Add data processor class",
+        description=_gate_ready_description("Add data processor class"),
         diff=f"+{code}",
     )
     await engine.gate_check(proposal)
@@ -759,7 +769,7 @@ async def test_archive_lineage_chain(tmp_path: Path) -> None:
     p1 = await engine.propose(
         component="lineage.py",
         change_type="mutation",
-        description="Initial version",
+        description=_gate_ready_description("Initial version"),
     )
     await engine.gate_check(p1)
     await engine.evaluate(p1, test_results={"pass_rate": 0.7})
@@ -768,7 +778,7 @@ async def test_archive_lineage_chain(tmp_path: Path) -> None:
     p2 = await engine.propose(
         component="lineage.py",
         change_type="mutation",
-        description="Improve version 1",
+        description=_gate_ready_description("Improve version 1"),
         parent_id=id1,
     )
     await engine.gate_check(p2)
@@ -778,7 +788,7 @@ async def test_archive_lineage_chain(tmp_path: Path) -> None:
     p3 = await engine.propose(
         component="lineage.py",
         change_type="mutation",
-        description="Improve version 2",
+        description=_gate_ready_description("Improve version 2"),
         parent_id=id2,
     )
     await engine.gate_check(p3)
@@ -788,12 +798,12 @@ async def test_archive_lineage_chain(tmp_path: Path) -> None:
     lineage = await engine.archive.get_lineage(id3)
 
     assert len(lineage) == 3
-    assert lineage[0].description == "Improve version 2"
-    assert lineage[2].description == "Initial version"
+    assert lineage[0].description.startswith("Improve version 2")
+    assert lineage[2].description.startswith("Initial version")
 
     children = await engine.archive.get_children(id1)
     assert len(children) == 1
-    assert children[0].description == "Improve version 1"
+    assert children[0].description.startswith("Improve version 1")
 
 
 # =========================================================================
@@ -826,7 +836,7 @@ async def test_concurrent_archive_writes(tmp_path: Path) -> None:
         p = await engine.propose(
             component=f"concurrent_{i}.py",
             change_type="mutation",
-            description=f"Concurrent change {i}",
+            description=_gate_ready_description(f"Concurrent change {i}"),
         )
         await engine.gate_check(p)
         await engine.evaluate(p, test_results={"pass_rate": 0.8})
@@ -857,7 +867,7 @@ async def test_large_diff_efficiency_penalty(tmp_path: Path) -> None:
     p_small = await engine.propose(
         component="small.py",
         change_type="mutation",
-        description="Small change",
+        description=_gate_ready_description("Small change"),
         diff=small_diff,
     )
     await engine.gate_check(p_small)
@@ -866,7 +876,7 @@ async def test_large_diff_efficiency_penalty(tmp_path: Path) -> None:
     p_large = await engine.propose(
         component="large.py",
         change_type="mutation",
-        description="Large change",
+        description=_gate_ready_description("Large change"),
         diff=large_diff,
     )
     await engine.gate_check(p_large)

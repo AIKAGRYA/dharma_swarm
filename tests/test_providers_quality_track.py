@@ -44,6 +44,13 @@ class _Dumpable:
         return self._payload
 
 
+def _force_ollama_cloud(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
+
+
 def _mk_resp(
     content: str | None = "ok",
     *,
@@ -560,8 +567,7 @@ async def test_ollama_complete_uses_chat_api(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_complete_uses_auth_headers(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="kimi-k2.5:cloud",
@@ -600,8 +606,7 @@ async def test_ollama_cloud_complete_uses_auth_headers(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_glm5_applies_completion_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="glm-5:cloud",
@@ -637,8 +642,7 @@ async def test_ollama_cloud_glm5_applies_completion_token_floor(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_kimi_strips_cloud_suffix_and_applies_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="kimi-k2.5:cloud",
@@ -672,8 +676,7 @@ async def test_ollama_cloud_kimi_strips_cloud_suffix_and_applies_token_floor(mon
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_minimax_strips_cloud_suffix_and_applies_token_floor(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="minimax-m2.7:cloud",
@@ -707,8 +710,7 @@ async def test_ollama_cloud_minimax_strips_cloud_suffix_and_applies_token_floor(
 
 @pytest.mark.asyncio
 async def test_ollama_cloud_falls_through_frontier_chain_on_error(monkeypatch):
-    monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    _force_ollama_cloud(monkeypatch)
     provider = OllamaProvider()
     req = LLMRequest(
         model="glm-5:cloud",
