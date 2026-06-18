@@ -1,0 +1,21 @@
+schema_version: dharma.semantic_aliases.v1
+aliases:
+  agent-inbox:
+    canonical: A2AInboxRoute
+    kind: route_alias
+  nats:
+    canonical: NATSSubstrate
+    kind: substrate_alias
+  agent_card:
+    canonical: A2ACard
+    kind: object_alias
+  agent_uid:
+    canonical: AgentUID
+    kind: identifier_alias
+agent_uid_aliases:
+  codex: codex_composer
+  opus: opus_composer
+  hermes: hermes-m5
+  hermes_m5: hermes-m5
+  devin: devin-roaming-2987d222
+  fable-5-cursor: fable_5_cursor

@@ -25,9 +25,9 @@ if str(REPO_ROOT) not in sys.path:
 from scripts.runtime.a2a_send import (  # noqa: E402
     ACK_TIER_HANDLER_ACKED,
     ROUTE_AGENT_INBOX,
-    resolve_agent_uid,
 )
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.a2a.agent_card import a2a_inbox_subject, resolve_agent_uid  # noqa: E402
 
 DEFAULT_A2A_BUS = Path.home() / ".dharma" / "a2a_bus"
 DEFAULT_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "inbox_bridge_receipts"
@@ -71,7 +71,7 @@ class InboxBridgeConfig:
 
 
 def subject_for_agent(agent_uid: str) -> str:
-    return f"dharma.agent.{resolve_agent_uid(agent_uid)}.inbox"
+    return a2a_inbox_subject(resolve_agent_uid(agent_uid))
 
 
 def default_inbox_dir(agent_uid: str) -> Path:
