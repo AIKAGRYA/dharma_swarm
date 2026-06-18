@@ -60,6 +60,10 @@ def _provider_for_model_line(lines: list[str], model_line: int) -> tuple[int, st
 def _provider_matches_model(provider: str, expected: str, model_str: str) -> bool:
     if _canonical_provider(provider) == expected:
         return True
+    # Claude Code (the Max-plan lane) legitimately runs bare Anthropic claude-*
+    # models, so claude_code + an anthropic-implied model is not a mismatch.
+    if provider == "claude_code" and expected == "anthropic":
+        return True
     if provider in {"local", "ollama"}:
         return True
     if provider == "groq" and model_str.lower().startswith("llama-"):
