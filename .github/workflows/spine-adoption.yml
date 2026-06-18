@@ -1,0 +1,133 @@
+name: spine-adoption
+
+# Informational PR comment showing spine bypass site count and delta.
+#
+# Not a blocking gate — reports only. The hard gate lives in
+# scripts/uplift_guards/check_spine_ownership.py.
+#
+# Posts (or updates) a single comment on every PR showing:
+#   - current bypass count by classification
+#   - delta vs. the base branch
+#
+# A rising unknown count means a new unclassified bypass was introduced.
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**", "codex/**"]
+    types: [opened, reopened, synchronize, ready_for_review]
+  merge_group:
+
+concurrency:
+  group: spine-adoption-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bypass-delta:
+    name: Spine bypass delta
+    runs-on: ubuntu-latest
+    if: github.event_name != 'merge_group'
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Run bypass report on PR head
+        id: head
+        run: |
+          python3 scripts/governance/spine_bypass_report.py --json > /tmp/head.json
+          echo "intentional=$(python3 -c "import json; d=json.load(open('/tmp/head.json')); print(d['summary'].get('intentional',0))")" >> "$GITHUB_OUTPUT"
+          echo "unknown=$(python3 -c "import json; d=json.load(open('/tmp/head.json')); print(d['summary'].get('unknown',0))")" >> "$GITHUB_OUTPUT"
+          echo "adopted=$(python3 -c "import json; d=json.load(open('/tmp/head.json')); print(d['summary'].get('spine-adopted',0))")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout base branch for comparison
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Run bypass report on base
+        id: base
+        run: |
+          python3 scripts/governance/spine_bypass_report.py --json > /tmp/base.json 2>/dev/null || echo '{"summary":{}}' > /tmp/base.json
+          echo "intentional=$(python3 -c "import json; d=json.load(open('/tmp/base.json')); print(d['summary'].get('intentional',0))")" >> "$GITHUB_OUTPUT"
+          echo "unknown=$(python3 -c "import json; d=json.load(open('/tmp/base.json')); print(d['summary'].get('unknown',0))")" >> "$GITHUB_OUTPUT"
+          echo "adopted=$(python3 -c "import json; d=json.load(open('/tmp/base.json')); print(d['summary'].get('spine-adopted',0))")" >> "$GITHUB_OUTPUT"
+
+      - name: Post bypass delta comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_INTENTIONAL: ${{ steps.head.outputs.intentional }}
+          HEAD_UNKNOWN: ${{ steps.head.outputs.unknown }}
+          HEAD_ADOPTED: ${{ steps.head.outputs.adopted }}
+          BASE_INTENTIONAL: ${{ steps.base.outputs.intentional }}
+          BASE_UNKNOWN: ${{ steps.base.outputs.unknown }}
+          BASE_ADOPTED: ${{ steps.base.outputs.adopted }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, subprocess
+
+          hi = int(os.environ["HEAD_INTENTIONAL"])
+          hu = int(os.environ["HEAD_UNKNOWN"])
+          ha = int(os.environ["HEAD_ADOPTED"])
+          bi = int(os.environ["BASE_INTENTIONAL"])
+          bu = int(os.environ["BASE_UNKNOWN"])
+          ba = int(os.environ["BASE_ADOPTED"])
+
+          def delta(h, b):
+              d = h - b
+              if d > 0: return f"+{d} ⬆️"
+              if d < 0: return f"{d} ⬇️"
+              return "±0"
+
+          status = "✅" if hu == 0 else "⚠️"
+          alert = ""
+          if hu > bu:
+              alert = f"\n> ⚠️ **{hu - bu} new unclassified bypass(es) introduced.** Add them to the intentional allowlist or wire through `invoke_agent()` before merging."
+          elif hu < bu:
+              alert = f"\n> ✅ {bu - hu} unclassified bypass(es) drained."
+
+          body = f"""<!-- spine-adoption-report -->
+          ## {status} Spine Adoption — Bypass Delta
+
+          | Classification | Base | Head | Delta |
+          |---|---|---|---|
+          | spine-adopted | {ba} | {ha} | {delta(ha, ba)} |
+          | intentional (allowlisted) | {bi} | {hi} | {delta(hi, bi)} |
+          | unknown (needs action) | {bu} | {hu} | {delta(hu, bu)} |
+          {alert}
+          *Informational only — not a blocking gate. Full map: `python3 scripts/governance/spine_bypass_report.py`*"""
+
+          pr = os.environ["PR_NUMBER"]
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+
+          # Find and update existing comment, or create new one
+          import json
+          result = subprocess.run(
+              ["gh", "api", f"repos/{repo}/issues/{pr}/comments", "--paginate",
+               "--jq", '[.[] | select(.body | contains("spine-adoption-report")) | .id] | first'],
+              capture_output=True, text=True
+          )
+          existing_id = result.stdout.strip()
+
+          if existing_id and existing_id != "null":
+              subprocess.run(
+                  ["gh", "api", "-X", "PATCH",
+                   f"repos/{repo}/issues/comments/{existing_id}",
+                   "-f", f"body={body}"],
+                  check=True
+              )
+          else:
+              subprocess.run(
+                  ["gh", "issue", "comment", pr, "--body", body, "--repo", repo],
+                  check=True
+              )
+          PYEOF
