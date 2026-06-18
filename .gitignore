@@ -107,3 +107,13 @@ paper/
 tools/world_scout_go/world_scout_go
 tools/evidence_ingestor_go/evidence_ingestor_go
 reports/capital_lab/goal_a_12h/session_logs/*.log
+
+# runtime receipts — loop-generated, never source (cleanup 2026-06-18)
+reports/a2a/palantir_pilot_worker_receipts/
+reports/a2a/inbox_bridge_receipts/
+reports/a2a/send_receipts/
+reports/model_pool/
+reports/model_routing/e2e/
+
+# obey plugin (personal rules)
+.claude/obey.rules.local.json

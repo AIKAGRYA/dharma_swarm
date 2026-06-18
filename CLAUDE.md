@@ -421,6 +421,9 @@ For machine-readable status, see [`reports/governance/active_track_evidence.md`]
 - ALWAYS read a file before editing it
 - NEVER commit secrets, credentials, or .env files
 - BEFORE opening any PR that closes / demotes / adds a BR-id, ALWAYS run `gh pr list --state open --search "BR-NNN"` for each cited BR-id. If another open PR cites the same id, coordinate (rebase / split / close-as-redundant) before pushing. The `pr-collision-detect` workflow is an after-the-fact safety net, not a substitute for this check. See `docs/governance/COHERENCE_DELTA.md` § Pre-flight check.
+- **Worktree budget (enforced 2026-06-18):** open git worktrees must be ≤ active-track count (`docs/governance/ACTIVE_TRACK.yaml`) + 1 canonical tree + ≤2 TTL-tagged scratch. Every non-canonical worktree maps to an active track; excess/unmapped worktrees are a governance violation — compost the branch list to `~/.claude/cabinet/_compost/` first, then `git worktree remove`. Replaces the fixed 24-lane law.
+- **Naming / identity SSOT = Semantic Commons (`docs/ontology/`).** Resolve any concept / agent / object name against `docs/ontology/semantic_objects.yaml` (26 objects) + `docs/ontology/semantic_aliases.yaml` (143 aliases, 9 forbidden) BEFORE inventing a name. `docs/ontology/SEMANTIC_COMMONS.md` is the contract; `scripts/governance/name_drift_preflight.py` is the checker; the `api_name` grammar is ADR-008 (PROPOSED — needs ratification). Do NOT create parallel naming schemes — that drift is what Semantic Commons exists to kill.
+- **Runtime receipts never enter git.** `reports/a2a/*_receipts/`, `reports/model_*/e2e/` are loop-generated artifacts → `.gitignore`, write under `~/.dharma/` ideally. (2026-06-18: 20,898 stray receipts were blocking deploy.)
 
 ## File Organization
 
