@@ -339,8 +339,9 @@ async def run_swarm_loop(
                              f"{alert.message} → {alert.intervention}")
                     try:
                         supervisor.save_state()
-                    except Exception:
-                        logger.debug("Swarm: loop supervisor state save failed", exc_info=True)
+                    except (OSError, TypeError, ValueError) as exc:
+                        _log("watchdog", "Loop supervisor state save failed; continuing")
+                        logger.warning("Swarm: loop supervisor state save failed: %s", exc)
 
                 swarm_state = await swarm.status()
                 _update_runtime_health_state(
