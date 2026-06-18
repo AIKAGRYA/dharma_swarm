@@ -10,8 +10,8 @@ no skill files found.
 
 Provider strategy:
   - OPENROUTER: All agents route through OpenRouter API (fast, no subprocess
-    overhead). Primary workers use llama-3.3-70b-instruct; support roles use
-    mistral-small-3.1-24b for speed/cost.
+    overhead). Per the model preference doctrine (model_hierarchy.py), every
+    seat gets the most powerful free model its lane offers.
   - CLAUDE_CODE/CODEX: Available as subprocess providers for tasks requiring
     full tool access (file editing, bash). Use spawn_agent() with those types.
   - ANTHROPIC/OPENAI: Available for direct API calls when keys are set.
@@ -97,20 +97,21 @@ def _resolve_default_crew() -> list[dict]:
         ]
 
     if _has_openrouter_key():
-        # OpenRouter Free — diverse free models for error decorrelation
+        # OpenRouter Free — most powerful free models per family for error
+        # decorrelation (model preference doctrine: free POWERFUL frontier first)
         return [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "meta-llama/llama-3.3-70b-instruct:free"},
+             "model": "nvidia/nemotron-3-super-120b-a12b:free"},
             {"name": "surgeon", "role": AgentRole.SURGEON,
              "thread": "alignment", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "qwen/qwen3-32b:free"},
+             "model": "z-ai/glm-4.5-air:free"},
             {"name": "architect", "role": AgentRole.ARCHITECT,
              "thread": "architectural", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "deepseek/deepseek-chat-v3-0324:free"},
+             "model": "deepseek/deepseek-r1:free"},
             {"name": "validator", "role": AgentRole.VALIDATOR,
              "thread": "scaling", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "mistralai/mistral-small-3.1-24b-instruct:free"},
+             "model": "openai/gpt-oss-120b:free"},
         ]
 
     # No API keys — use Claude Code (authenticated via `claude` CLI)

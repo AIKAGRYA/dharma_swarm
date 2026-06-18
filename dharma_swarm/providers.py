@@ -52,6 +52,7 @@ from dharma_swarm.ollama_config import (
     OLLAMA_LOCAL_BASE_URL,
     build_ollama_headers,
     get_ollama_cloud_frontier_chain,
+    is_ollama_cloud_model,
     ollama_transport_mode,
     resolve_ollama_base_url,
     resolve_ollama_model,
@@ -987,6 +988,12 @@ class OllamaProvider(LLMProvider):
         if self._transport_mode == "cloud_api":
             return await self._complete_openai_compat(model, messages, request)
 
+        # Keyless local transport cannot serve :cloud models (the local daemon
+        # proxies them to ollama.com and gets 401). Degrade to the local
+        # default so frontier-pinned agents stay functional without a key.
+        if is_ollama_cloud_model(model) and not (self._api_key or "").strip():
+            model = OLLAMA_DEFAULT_LOCAL_MODEL
+
         return await self._complete_native(model, messages, request)
 
     async def _complete_openai_compat(
@@ -1051,13 +1058,36 @@ class OllamaProvider(LLMProvider):
             f"Ollama cloud error after {len(attempts)} attempts: {last_error or 'unknown error'}"
         )
 
+    @staticmethod
+    def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Native /api/chat requires tool_call arguments as objects, not JSON
+        strings — Ollama rejects string arguments with a 400 parse error."""
+        normalized: list[dict[str, Any]] = []
+        for msg in messages:
+            tool_calls = msg.get("tool_calls")
+            if not tool_calls:
+                normalized.append(msg)
+                continue
+            fixed_calls = []
+            for tc in tool_calls:
+                fn = dict(tc.get("function") or {})
+                args = fn.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        fn["arguments"] = json.loads(args) if args.strip() else {}
+                    except (ValueError, TypeError):
+                        fn["arguments"] = {}
+                fixed_calls.append({**tc, "function": fn})
+            normalized.append({**msg, "tool_calls": fixed_calls})
+        return normalized
+
     async def _complete_native(
         self, model: str, messages: list[dict[str, str]], request: LLMRequest,
     ) -> LLMResponse:
         """Local path: native Ollama /api/chat endpoint."""
         payload: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": self._native_messages(messages),
             "stream": False,
             "options": {
                 "temperature": request.temperature,

@@ -60,21 +60,32 @@ class LaneRole(str, Enum):
 # Within each tier, ordering is the Day 1 seed.  EWMA scores override this
 # after sufficient routing events (~100 calls).
 
+# MODEL PREFERENCE DOCTRINE — FREE/CHEAP POWERFUL FRONTIER FIRST.
+# Within every lane, the default model is the MOST POWERFUL model that lane
+# offers at $0 (or near-$0) — never the small convenience model. Small models
+# (llama3.2, mistral-small, 8B-class) are permitted ONLY as explicit keyless
+# local fallbacks (see ollama_config.OLLAMA_DEFAULT_LOCAL_MODEL) or fast-path
+# T0 classifiers — never as a lane's default. Every other file seeds its
+# models from DEFAULT_MODELS / default_model() below; do not hardcode model
+# ids elsewhere.
+
+# Tier members are listed MOST INTELLIGENT FIRST (see MODEL_INTELLIGENCE
+# below) — the cost ladder picks the tier, intelligence picks within it.
 TIER_FREE: tuple[ProviderType, ...] = (
-    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5
-    ProviderType.NVIDIA_NIM,     # Llama 3.3 70B  (50 req/day)
-    ProviderType.GROQ,           # Qwen3-32B      (3000 tok/s)
+    ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5 (cloud)
+    ProviderType.GROQ,           # Kimi K2 1T (fast inference)
     ProviderType.CEREBRAS,       # Qwen3 235B / GPT-OSS 120B (3000 tok/s)
+    ProviderType.SAMBANOVA,      # DeepSeek V3 671B
     ProviderType.SILICONFLOW,    # Qwen3-Coder 480B
-    ProviderType.SAMBANOVA,      # Llama 3.3 70B
     ProviderType.TOGETHER,       # Qwen3-Coder 480B
     ProviderType.FIREWORKS,      # Qwen3-Coder 480B
+    ProviderType.NVIDIA_NIM,     # Nemotron Ultra 253B (50 req/day — quota-poor, so late)
 )
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
-    ProviderType.MISTRAL,        # mistral-small (1B tok/mo free tier)
-    ProviderType.GOOGLE_AI,      # gemini-2.5-flash (1M ctx free)
+    ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
+    ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
     ProviderType.OPENROUTER_FREE,  # Nemotron 120B, GLM-4.5-Air, etc.
 )
 
@@ -244,21 +255,23 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 # Default model per provider (used when request.model is empty).
 # Moved here from runtime_provider.py as the single source.
 
+# Doctrine: the default per lane is the most powerful model the lane offers
+# at $0/near-$0 — see MODEL PREFERENCE DOCTRINE above the tier definitions.
 DEFAULT_MODELS: dict[ProviderType, str] = {
     # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",
-    ProviderType.NVIDIA_NIM: "meta/llama-3.3-70b-instruct",
-    ProviderType.GROQ: "qwen/qwen3-32b",
-    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",
+    ProviderType.OLLAMA: "glm-5:cloud",                                   # GLM-5 744B
+    ProviderType.NVIDIA_NIM: "nvidia/llama-3.1-nemotron-ultra-253b-v1",   # Nemotron Ultra 253B
+    ProviderType.GROQ: "moonshotai/kimi-k2-instruct",                     # Kimi K2 1T MoE
+    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",              # Qwen3 235B
     ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "Meta-Llama-3.3-70B-Instruct",
+    ProviderType.SAMBANOVA: "DeepSeek-V3-0324",                           # DeepSeek V3 671B
     ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
     ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
     # Cheap tier
-    ProviderType.MISTRAL: "mistral-small-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-flash",
+    ProviderType.MISTRAL: "mistral-large-latest",
+    ProviderType.GOOGLE_AI: "gemini-2.5-pro",
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
+    ProviderType.OPENROUTER_FREE: "nvidia/nemotron-3-super-120b-a12b:free",  # Nemotron 120B
     # Paid tier
     ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
     ProviderType.OPENAI: "gpt-5",
@@ -286,6 +299,64 @@ def default_model(provider: ProviderType) -> str:
     return DEFAULT_MODELS.get(provider, "")
 
 
+# ─── Model Intelligence Seed ──────────────────────────────────────────
+# Relative capability of each lane's DEFAULT model (0–100, ordinal seed —
+# the RANKING matters, not the absolute number). Grounded in public
+# benchmark standings of the model classes the lanes serve. This is the
+# Day 1 prior only: EWMA scores from routing_memory override it with real
+# measured quality after ~100 events. Update this table when a lane's
+# DEFAULT_MODELS entry changes — nowhere else.
+
+MODEL_INTELLIGENCE: dict[ProviderType, int] = {
+    # Paid / subscription frontier
+    ProviderType.ANTHROPIC: 72,        # Opus-class
+    ProviderType.OPENAI: 71,           # GPT-5
+    ProviderType.CLAUDE_CODE: 70,      # Opus-class via subscription
+    ProviderType.CODEX: 70,            # GPT-5-class via subscription
+    # Free / cheap frontier
+    ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
+    ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
+    ProviderType.GROQ: 64,             # Kimi K2 1T MoE
+    ProviderType.CEREBRAS: 63,         # Qwen3 235B
+    ProviderType.SAMBANOVA: 62,        # DeepSeek V3 671B
+    ProviderType.CHUTES: 61,           # DeepSeek-R1
+    ProviderType.SILICONFLOW: 60,      # Qwen3-Coder 480B
+    ProviderType.TOGETHER: 60,         # Qwen3-Coder 480B
+    ProviderType.FIREWORKS: 60,        # Qwen3-Coder 480B
+    ProviderType.OPENROUTER: 59,       # paid OR default
+    ProviderType.NVIDIA_NIM: 58,       # Nemotron Ultra 253B
+    ProviderType.MISTRAL: 56,          # Mistral Large
+    ProviderType.OPENROUTER_FREE: 55,  # Nemotron 120B
+}
+
+
+def intelligence_score(provider: ProviderType) -> int:
+    """Seed intelligence score for a provider's default model (0–100)."""
+    return MODEL_INTELLIGENCE.get(provider, 0)
+
+
+def intelligence_order(
+    candidates: tuple[ProviderType, ...] | list[ProviderType] | None = None,
+    *,
+    respect_cost_tiers: bool = True,
+) -> list[ProviderType]:
+    """Order providers most-intelligent-first.
+
+    With respect_cost_tiers=True (default), the cost ladder picks the tier
+    (free → cheap → subscription → paid API) and intelligence ranks within
+    each tier — powerful free frontier before anything paid. With
+    respect_cost_tiers=False, raw intelligence wins regardless of cost.
+    """
+    pool = list(candidates if candidates is not None else CANONICAL_SEED_ORDER)
+    if not respect_cost_tiers:
+        return sorted(pool, key=lambda p: -intelligence_score(p))
+    tier_rank = {"free": 0, "cheap": 1, "subscription": 2, "paid_api": 3, "paid": 3}
+    return sorted(
+        pool,
+        key=lambda p: (tier_rank.get(get_tier(p), 4), -intelligence_score(p)),
+    )
+
+
 # ─── Live Ordering (EWMA + Circuit Breakers) ─────────────────────────────
 
 def get_live_order(
@@ -303,7 +374,8 @@ def get_live_order(
 
     Providers with open circuit breakers are moved to the end.
 
-    Falls back to CANONICAL_SEED_ORDER if no EWMA data exists.
+    Falls back to intelligence_order() of the candidates (most intelligent
+    available model first within the cost ladder) if no EWMA data exists.
 
     Args:
         routing_memory: EWMA score store. If None, returns seed order.
@@ -314,7 +386,7 @@ def get_live_order(
     Returns:
         Ordered list of ProviderType, best first.
     """
-    pool = list(candidates or CANONICAL_SEED_ORDER)
+    pool = intelligence_order(candidates or CANONICAL_SEED_ORDER)
 
     # Phase 1: EWMA ranking (if data exists)
     if routing_memory is not None:

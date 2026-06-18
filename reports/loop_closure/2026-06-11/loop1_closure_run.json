@@ -1,0 +1,57 @@
+{
+  "provider": "ollama",
+  "model": "llama3.2",
+  "spine_dispatch": "1",
+  "agents": 1,
+  "tasks_requested": 5,
+  "tasks_completed": 5,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "evidence_receipts": {
+    "f4201069-9491-41ba-804d-b505145f789c": "ok",
+    "e472f2f3-c952-4483-8f77-cd422f1ba661": "ok",
+    "9c04aa32-52fa-4a05-ac8a-0ab5f824c79e": "ok",
+    "7a96d1d2-afbd-4c6a-ad5a-b1e6dbdf0c17": "ok",
+    "c7616392-5f45-4eaf-81eb-ceb52ff0ee35": "ok"
+  },
+  "ticks": 539,
+  "stigmergy_hot_paths": [],
+  "state_dir": "/home/ubuntu/.dharma",
+  "tasks": [
+    {
+      "task_id": "029292ab8f25494c",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## <mem>\nconfidence: 0.8\nkey_facts:\n- Feedback loops require both sensing and acting to maintain stability.\n- Sensing allows feedback loops to detect changes, w"
+    },
+    {
+      "task_id": "e27103ff85d8488a",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## <mem>\nconfidence: 0.8\nkey_facts:\n- Task failure is a significant concern in distributed task queues.\n- Low epistemological diversity can lead to inadequate r"
+    },
+    {
+      "task_id": "2d847ff6edfc4801",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "<mem>\nconfidence: 0.8\nkey_facts:\n- Feedback loops require both sensing and acting to maintain stability.\n- Sensing enables detection of changes, while acting fa"
+    },
+    {
+      "task_id": "bd911c6e2c444d8b",
+      "title": "loop1-closure-0004",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Stigmergy Recall\n\nA rate limit and a quota are two distinct concepts that regulate the usage of resources, but they serve different purposes.\n\nA **quota** re"
+    },
+    {
+      "task_id": "25513486639b4b74",
+      "title": "loop1-closure-0005",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "## Evidence Receipt for loop1-closure-0005\n\n\nThe following properties should be recorded in an evidence receipt:\n\n\n1. `task_id`: The unique identifier of the cu"
+    }
+  ]
+}

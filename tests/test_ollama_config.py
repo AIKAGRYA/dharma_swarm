@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
@@ -36,7 +38,9 @@ class TestConstants:
         assert OLLAMA_CLOUD_BASE_URL == "https://ollama.com"
 
     def test_default_local_model(self):
-        assert OLLAMA_DEFAULT_LOCAL_MODEL == "llama3.2"
+        assert OLLAMA_DEFAULT_LOCAL_MODEL == os.getenv(
+            "OLLAMA_LOCAL_MODEL", "mistral:latest"
+        )
 
     def test_default_cloud_model(self):
         assert OLLAMA_DEFAULT_CLOUD_MODEL == DEFAULT_MODELS[ProviderType.OLLAMA]
@@ -309,3 +313,12 @@ class TestBuildOllamaHeaders:
             api_key="sk-explicit",
         )
         assert headers["Authorization"] == "Bearer sk-explicit"
+
+
+def test_is_ollama_cloud_model_variants():
+    from dharma_swarm.ollama_config import is_ollama_cloud_model
+
+    assert is_ollama_cloud_model("glm-5:cloud")
+    assert is_ollama_cloud_model("qwen3-coder:480b-cloud")
+    assert not is_ollama_cloud_model("llama3.2")
+    assert not is_ollama_cloud_model(None)
