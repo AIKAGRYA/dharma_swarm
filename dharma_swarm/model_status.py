@@ -70,6 +70,8 @@ _SAFE_DKEYS_FIELDS = (
     "env_var",
 )
 
+_TRANSIENT_LIVE_FAILURES = frozenset({"rate_limited"})
+
 
 @dataclass(frozen=True, slots=True)
 class RouteStatus:
@@ -205,6 +207,14 @@ def _merge_live_result(
         return candidate
     existing_status = str(existing.get("status", "")).strip()
     candidate_status = str(candidate.get("status", "")).strip()
+    candidate_failure = str(candidate.get("failure_class") or "").strip()
+    existing_failure = str(existing.get("failure_class") or "").strip()
+    if candidate_status == "ok":
+        return candidate
+    if candidate_status == "failed" and candidate_failure in _TRANSIENT_LIVE_FAILURES:
+        return existing
+    if existing_status == "failed" and existing_failure in _TRANSIENT_LIVE_FAILURES:
+        return candidate
     if existing_status == "failed":
         return candidate if candidate_status == "failed" else existing
     if candidate_status == "failed":
@@ -293,6 +303,15 @@ def _classify_route(
             )
         if result_status == "failed":
             reason = str(live_result.get("failure_class") or "routing_bug")
+            if reason in _TRANSIENT_LIVE_FAILURES:
+                return RouteStatus(
+                    provider=route.provider.value,
+                    model_id=route.model_id,
+                    route=route_id,
+                    status="live_routable",
+                    reason=None,
+                    dkeys_row=_safe_row(_row_for_provider(route.provider, status_data)),
+                )
             return RouteStatus(
                 provider=route.provider.value,
                 model_id=route.model_id,
@@ -342,7 +361,7 @@ def _classify_unavailable_reason(row: dict[str, Any] | None) -> str:
     if glyph == "$" or "funds=0" in status or "insufficient" in status:
         return "quota"
     if glyph == "~" or http == "429" or "rate" in status:
-        return "quota"
+        return "rate_limited"
     if "model" in status and ("missing" in status or "not found" in status):
         return "model_missing"
     if http == "404":
@@ -359,6 +378,7 @@ def _dominant_reason(route_statuses: Iterable[RouteStatus]) -> str | None:
     for reason in (
         "key_status_unknown",
         "key_missing",
+        "rate_limited",
         "quota",
         "model_missing",
         "provider_dead",

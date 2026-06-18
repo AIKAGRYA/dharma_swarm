@@ -67,7 +67,7 @@ def _projection(model: ModelStatus) -> ModelStatusProjection:
     ("error", "expected"),
     [
         ("OPENAI_API_KEY not set", "key_missing"),
-        ("HTTP error 429: too many requests", "quota"),
+        ("HTTP error 429: too many requests", "rate_limited"),
         ("insufficient_quota for this key", "quota"),
         ("Credit balance is too low", "quota"),
         ("HTTP error 404: model not found", "model_missing"),
@@ -86,6 +86,7 @@ def test_classify_live_failure_uses_contract_classes(error, expected: str) -> No
     [
         ("key_status_unknown", "key_missing"),
         ("quota_exhausted", "quota"),
+        ("rate_limited", "rate_limited"),
         ("unknown_model", "model_missing"),
         ("unreachable", "provider_dead"),
         ("unsupported_route", "unsupported_route"),

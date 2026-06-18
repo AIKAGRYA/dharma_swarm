@@ -372,6 +372,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         256_000,
         "Floor model via OpenRouter (deprioritised aggregator route)",
     ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "moonshotai/kimi-k2.6",
+        "Kimi K2.6 (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
+    ),
     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
     # The K2.6 floor the roster must SERVE. Live providers first: each rides
     # the Ollama-Cloud keyless route ahead of any paid aggregator.
@@ -392,6 +401,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ("code", "reasoning", "chinese"),
         256_000,
         "Floor — DeepSeek V4 Pro bulk-build lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "deepseek-ai/deepseek-v4-pro/flash",
+        "DeepSeek V4 Pro Flash (NIM)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Pro flash route via NVIDIA NIM hosted catalog",
     ),
     ModelSlot(
         ProviderType.SAMBANOVA,

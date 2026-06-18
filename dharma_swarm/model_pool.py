@@ -145,6 +145,10 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
 }
 _DEFAULT_RANK = 5
 
+_NESTED_ROUTE_LOGICAL_IDS = {
+    "deepseek-ai/deepseek-v4-pro/flash": "deepseek-v4-pro",
+}
+
 
 def _logical_id(slot: ModelSlot) -> str:
     """Collapse a provider-specific model_id to a stable logical model id.
@@ -164,6 +168,9 @@ def _logical_id(slot: ModelSlot) -> str:
         "DeepSeek-V4-Pro"             -> "deepseek-v4-pro"      (casefolded)
     """
     mid = slot.model_id
+    nested_id = _NESTED_ROUTE_LOGICAL_IDS.get(mid.casefold())
+    if nested_id is not None:
+        return nested_id
     # Drop a leading provider namespace (only the first "<vendor>/").
     base = mid.split("/")[-1]
     # Drop serving-grade suffixes that mark the SAME weights on a route.

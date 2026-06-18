@@ -462,6 +462,10 @@ class OpenRouterProvider(LLMProvider):
 class NVIDIANIMProvider(LLMProvider):
     """Provider backed by NVIDIA NIM's OpenAI-compatible endpoint."""
 
+    _RATE_LIMIT_MAX_RETRIES = 3
+    _RATE_LIMIT_BASE_DELAY_SECONDS = 0.75
+    _RATE_LIMIT_MAX_DELAY_SECONDS = 6.0
+
     capabilities = ProviderCapabilities(
         supports_streaming=False, supports_tools=True,
         max_context_tokens=128_000, provider_family="nvidia",
@@ -482,6 +486,7 @@ class NVIDIANIMProvider(LLMProvider):
         ).rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.NVIDIA_NIM)
         self._client: httpx.AsyncClient | None = None
+        self._rate_limit_semaphore = asyncio.Semaphore(1)
 
     @staticmethod
     def _build_messages(request: LLMRequest) -> list[dict[str, str]]:
@@ -511,6 +516,43 @@ class NVIDIANIMProvider(LLMProvider):
             await self._client.aclose()
             self._client = None
 
+    @staticmethod
+    def _retry_after_seconds(resp: httpx.Response) -> float | None:
+        raw = resp.headers.get("Retry-After")
+        if raw is None:
+            return None
+        try:
+            value = float(raw.strip())
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+
+    def _rate_limit_delay(self, resp: httpx.Response, attempt: int) -> float:
+        retry_after = self._retry_after_seconds(resp)
+        if retry_after is not None:
+            return min(retry_after, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+        backoff = self._RATE_LIMIT_BASE_DELAY_SECONDS * (2 ** attempt)
+        jitter = random.uniform(0.0, 0.25)
+        return min(backoff + jitter, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+
+    async def _post_chat_with_backoff(
+        self,
+        client: httpx.AsyncClient,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        async with self._rate_limit_semaphore:
+            for attempt in range(self._RATE_LIMIT_MAX_RETRIES + 1):
+                resp = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                )
+                if resp.status_code != 429 or attempt >= self._RATE_LIMIT_MAX_RETRIES:
+                    return resp
+                await asyncio.sleep(self._rate_limit_delay(resp, attempt))
+        raise RuntimeError("NVIDIA NIM request loop exited unexpectedly")
+
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
         payload = {
@@ -524,11 +566,7 @@ class NVIDIANIMProvider(LLMProvider):
             payload["tools"] = request.tools
 
         client = self._get_client()
-        resp = await client.post(
-            f"{self._base_url}/chat/completions",
-            json=payload,
-            headers=self._headers_or_raise(),
-        )
+        resp = await self._post_chat_with_backoff(client, payload, self._headers_or_raise())
         if resp.status_code != 200:
             raise RuntimeError(
                 f"NVIDIA NIM error {resp.status_code}: {resp.text[:300]}"

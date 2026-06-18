@@ -105,6 +105,105 @@ def test_live_call_matrix_failure_overrides_dkeys_live_route(
     assert opus.verification.error == "Credit balance is too low"
 
 
+def test_live_call_matrix_rate_limit_does_not_poison_successful_route(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(
+        tmp_path,
+        {
+            "ollama_cloud": _row("✓"),
+            "nvidia_nim": _row("✓"),
+        },
+    )
+    live_matrix = tmp_path / "live_call_matrix.json"
+    live_matrix.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "id": "minimax-m3",
+                        "actual_live_calls": [
+                            {
+                                "route": "nvidia_nim:minimaxai/minimax-m3",
+                                "status": "ok",
+                                "probe": "pong_exact",
+                                "started_at": "2026-06-18T03:41:11Z",
+                            },
+                            {
+                                "route": "nvidia_nim:minimaxai/minimax-m3",
+                                "status": "failed",
+                                "failure_class": "rate_limited",
+                                "probe": "json_schema",
+                                "started_at": "2026-06-18T03:41:12Z",
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_PATH_ENV, str(live_matrix))
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    minimax = {model.id: model for model in projection.models}["minimax-m3"]
+    by_route = {route.route: route for route in minimax.route_statuses}
+
+    assert minimax.available is True
+    assert "nvidia_nim:minimaxai/minimax-m3" in minimax.available_routes
+    assert by_route["nvidia_nim:minimaxai/minimax-m3"].status == "live_routable"
+    assert by_route["nvidia_nim:minimaxai/minimax-m3"].reason is None
+    assert minimax.verification.status == "verified"
+
+
+def test_live_call_matrix_rate_limited_route_stays_routable(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(
+        tmp_path,
+        {
+            "ollama_cloud": _row("✓"),
+            "nvidia_nim": _row("✓"),
+        },
+    )
+    live_matrix = tmp_path / "live_call_matrix.json"
+    live_matrix.write_text(
+        json.dumps(
+            {
+                "models": [
+                    {
+                        "id": "minimax-m3",
+                        "actual_live_call": {
+                            "route": "nvidia_nim:minimaxai/minimax-m3",
+                            "status": "failed",
+                            "failure_class": "rate_limited",
+                            "reason": "NVIDIA NIM error 429: Too Many Requests",
+                            "started_at": "2026-06-18T03:41:12Z",
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_PATH_ENV, str(live_matrix))
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    minimax = {model.id: model for model in projection.models}["minimax-m3"]
+    by_route = {route.route: route for route in minimax.route_statuses}
+
+    assert minimax.available is True
+    assert "nvidia_nim:minimaxai/minimax-m3" in minimax.available_routes
+    assert by_route["nvidia_nim:minimaxai/minimax-m3"].status == "live_routable"
+    assert by_route["nvidia_nim:minimaxai/minimax-m3"].reason is None
+    assert minimax.verification.status == "failed"
+    assert minimax.verification.error == "NVIDIA NIM error 429: Too Many Requests"
+
+
 def test_live_call_matrix_keeps_route_failed_when_later_case_passes(
     tmp_path: Path,
     monkeypatch,

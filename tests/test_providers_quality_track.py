@@ -474,6 +474,49 @@ async def test_nvidia_nim_error_status_raises(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_nvidia_nim_retries_transient_429(monkeypatch):
+    provider = NVIDIANIMProvider(api_key="k", base_url="https://nim.example/v1")
+    req = LLMRequest(model="x", messages=[{"role": "user", "content": "hello"}])
+    sleeps: list[float] = []
+
+    class _Resp:
+        def __init__(self, status_code: int, text: str = "", headers: dict[str, str] | None = None):
+            self.status_code = status_code
+            self.text = text
+            self.headers = headers or {}
+
+        @staticmethod
+        def json():
+            return {
+                "model": "nim-model",
+                "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
+                "usage": {"total_tokens": 1},
+            }
+
+    responses = [
+        _Resp(429, '{"status":429,"title":"Too Many Requests"}', {"Retry-After": "0"}),
+        _Resp(200),
+    ]
+
+    class _Client:
+        async def post(self, url, json, headers):
+            return responses.pop(0)
+
+    async def _sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr("dharma_swarm.providers.httpx.AsyncClient", lambda timeout: _Client())
+    monkeypatch.setattr("dharma_swarm.providers.asyncio.sleep", _sleep)
+
+    out = await provider.complete(req)
+
+    assert out.content == "ok"
+    assert out.model == "nim-model"
+    assert responses == []
+    assert sleeps == [0.0]
+
+
+@pytest.mark.asyncio
 async def test_ollama_complete_uses_chat_api(monkeypatch):
     provider = OllamaProvider(base_url="http://ollama.local", model="llama3.2")
     req = LLMRequest(

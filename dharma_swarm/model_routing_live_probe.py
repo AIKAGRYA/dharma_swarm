@@ -38,6 +38,7 @@ FAILURE_CLASSES = (
     "key_missing",
     "provider_dead",
     "model_missing",
+    "rate_limited",
     "quota",
     "unsupported_route",
     "timeout",
@@ -114,11 +115,10 @@ def classify_live_failure(error: Exception | str) -> str:
         or "api key missing" in text
     ):
         return "key_missing"
+    if "http error 429" in text or "too many requests" in text or "rate limit" in text:
+        return "rate_limited"
     if (
-        "http error 429" in text
-        or "too many requests" in text
-        or "rate limit" in text
-        or "insufficient_quota" in text
+        "insufficient_quota" in text
         or "exceeded your current quota" in text
         or "credit balance" in text
         or "billing hard limit" in text
@@ -174,7 +174,7 @@ def normalize_failure_class(reason: str | None) -> str:
         return reason
     if reason in {None, "", "key_status_unknown", "missing_config", "unverified"}:
         return "key_missing"
-    if reason in {"quota_exhausted", "billing_exhausted", "rate_limited", "insufficient_credits"}:
+    if reason in {"quota_exhausted", "billing_exhausted", "insufficient_credits"}:
         return "quota"
     if reason in {"unknown_model", "deprecated"}:
         return "model_missing"

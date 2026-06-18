@@ -60,18 +60,20 @@ def test_pool_routes_are_exactly_the_roster_literals():
 
 
 def test_pool_collapses_roster_slots_to_logical_entries():
-    """The roster has 42 slots that collapse to 30 logical pool entries.
+    """The roster has 44 slots that collapse to 30 logical pool entries.
     Guards against silent regroup drift.
 
-    The floor-demarcation work (2026-06-17) added 11 slots for the K2.6-floor
+    The floor-demarcation work (2026-06-17) added 13 slots for the K2.6-floor
     frontier the roster must SERVE: claude-opus-4.8 + claude-sonnet-4.6
     (CLAUDE_CODE Max-plan oauth), gpt-5.5 (CODEX + OPENAI), kimi-k2.7-code
     (Ollama), deepseek-v4-pro (Ollama + SambaNova + Fireworks -> ONE entry via
-    casefolded logical id), glm-5.1 (Ollama), minimax-m3 (Ollama + NIM). That is
-    11 new slots (31 -> 42) and 7 new logical entries (23 -> 30): claude-opus-4.8,
+    casefolded logical id), glm-5.1 (Ollama), minimax-m3 (Ollama + NIM). The
+    NVIDIA pass adds K2.6 and DeepSeek V4 Pro hosted NIM routes without adding
+    logical entries. That is 13 new slots (31 -> 44) and 7 new logical entries
+    (23 -> 30): claude-opus-4.8,
     claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
     minimax-m3. No sub-floor model was removed — they are marked, not deleted."""
-    assert len(EVOLUTION_ROSTER) == 42
+    assert len(EVOLUTION_ROSTER) == 44
     assert len(MODEL_POOL) == 30
 
 
@@ -299,15 +301,32 @@ def test_floor_frontier_models_present_and_above_floor():
 
 
 def test_deepseek_v4_pro_is_one_entry_live_provider_first():
-    """deepseek-v4-pro collapses ollama + sambanova + fireworks into ONE entry,
-    with the live keyless Ollama route first."""
+    """deepseek-v4-pro collapses Ollama, NIM, SambaNova, and Fireworks into ONE
+    entry, with the live keyless Ollama route first."""
     dv4 = get_entry("deepseek-v4-pro")
     assert dv4 is not None and not dv4.below_floor
     providers = {r.provider for r in dv4.routes}
     assert providers == {
         ProviderType.OLLAMA,
+        ProviderType.NVIDIA_NIM,
         ProviderType.SAMBANOVA,
         ProviderType.FIREWORKS,
     }
     # Live provider (Ollama Cloud) ranked first, dead/secondary after.
     assert dv4.routes[0].provider is ProviderType.OLLAMA
+    assert entry_for_model_id("deepseek-ai/deepseek-v4-pro/flash") is dv4
+
+
+def test_floor_nim_routes_cover_kimi_deepseek_and_minimax():
+    expected = {
+        "kimi-k2.6": "moonshotai/kimi-k2.6",
+        "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro/flash",
+        "minimax-m3": "minimaxai/minimax-m3",
+    }
+    for logical_id, model_id in expected.items():
+        entry = get_entry(logical_id)
+        assert entry is not None and not entry.below_floor
+        assert any(
+            route.provider is ProviderType.NVIDIA_NIM and route.model_id == model_id
+            for route in entry.routes
+        )
