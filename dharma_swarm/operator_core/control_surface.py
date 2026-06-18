@@ -52,7 +52,6 @@ from dharma_swarm.operator_core.control_surface_models import (
     _build_human_decision_context,
     _compute_display_hints,
     _needs_human_decision,
-    _utc_now_iso,
 )
 
 logger = logging.getLogger(__name__)

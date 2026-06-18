@@ -17,7 +17,7 @@ import random
 import shutil
 import time
 from abc import abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -42,6 +42,7 @@ from dharma_swarm.api_keys import (
 )
 from dharma_swarm.base_provider import BaseProvider, ProviderCapabilities
 from dharma_swarm.codex_cli import dgc_codex_exec_prefix
+from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.cost_tracker import _estimate_cost
 from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -52,6 +53,7 @@ from dharma_swarm.ollama_config import (
     OLLAMA_LOCAL_BASE_URL,
     build_ollama_headers,
     get_ollama_cloud_frontier_chain,
+    is_ollama_cloud_model,
     ollama_transport_mode,
     resolve_ollama_base_url,
     resolve_ollama_model,
@@ -85,6 +87,8 @@ from dharma_swarm.telemetry_plane import (
 )
 
 logger = logging.getLogger(__name__)
+
+KeyLivenessProvider = Callable[[], set[str] | None]
 
 
 class LLMProvider(BaseProvider):
@@ -459,6 +463,10 @@ class OpenRouterProvider(LLMProvider):
 class NVIDIANIMProvider(LLMProvider):
     """Provider backed by NVIDIA NIM's OpenAI-compatible endpoint."""
 
+    _RATE_LIMIT_MAX_RETRIES = 3
+    _RATE_LIMIT_BASE_DELAY_SECONDS = 0.75
+    _RATE_LIMIT_MAX_DELAY_SECONDS = 6.0
+
     capabilities = ProviderCapabilities(
         supports_streaming=False, supports_tools=True,
         max_context_tokens=128_000, provider_family="nvidia",
@@ -479,6 +487,7 @@ class NVIDIANIMProvider(LLMProvider):
         ).rstrip("/")
         self._default_model = default_model or canonical_default_model(ProviderType.NVIDIA_NIM)
         self._client: httpx.AsyncClient | None = None
+        self._rate_limit_semaphore = asyncio.Semaphore(1)
 
     @staticmethod
     def _build_messages(request: LLMRequest) -> list[dict[str, str]]:
@@ -508,6 +517,43 @@ class NVIDIANIMProvider(LLMProvider):
             await self._client.aclose()
             self._client = None
 
+    @staticmethod
+    def _retry_after_seconds(resp: httpx.Response) -> float | None:
+        raw = resp.headers.get("Retry-After")
+        if raw is None:
+            return None
+        try:
+            value = float(raw.strip())
+        except ValueError:
+            return None
+        return value if value >= 0 else None
+
+    def _rate_limit_delay(self, resp: httpx.Response, attempt: int) -> float:
+        retry_after = self._retry_after_seconds(resp)
+        if retry_after is not None:
+            return min(retry_after, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+        backoff = self._RATE_LIMIT_BASE_DELAY_SECONDS * (2 ** attempt)
+        jitter = random.uniform(0.0, 0.25)
+        return min(backoff + jitter, self._RATE_LIMIT_MAX_DELAY_SECONDS)
+
+    async def _post_chat_with_backoff(
+        self,
+        client: httpx.AsyncClient,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+    ) -> httpx.Response:
+        async with self._rate_limit_semaphore:
+            for attempt in range(self._RATE_LIMIT_MAX_RETRIES + 1):
+                resp = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                )
+                if resp.status_code != 429 or attempt >= self._RATE_LIMIT_MAX_RETRIES:
+                    return resp
+                await asyncio.sleep(self._rate_limit_delay(resp, attempt))
+        raise RuntimeError("NVIDIA NIM request loop exited unexpectedly")
+
     @jikoku_traced_provider
     async def complete(self, request: LLMRequest) -> LLMResponse:
         payload = {
@@ -521,11 +567,7 @@ class NVIDIANIMProvider(LLMProvider):
             payload["tools"] = request.tools
 
         client = self._get_client()
-        resp = await client.post(
-            f"{self._base_url}/chat/completions",
-            json=payload,
-            headers=self._headers_or_raise(),
-        )
+        resp = await self._post_chat_with_backoff(client, payload, self._headers_or_raise())
         if resp.status_code != 200:
             raise RuntimeError(
                 f"NVIDIA NIM error {resp.status_code}: {resp.text[:300]}"
@@ -987,6 +1029,12 @@ class OllamaProvider(LLMProvider):
         if self._transport_mode == "cloud_api":
             return await self._complete_openai_compat(model, messages, request)
 
+        # Keyless local transport cannot serve :cloud models (the local daemon
+        # proxies them to ollama.com and gets 401). Degrade to the local
+        # default so frontier-pinned agents stay functional without a key.
+        if is_ollama_cloud_model(model) and not (self._api_key or "").strip():
+            model = OLLAMA_DEFAULT_LOCAL_MODEL
+
         return await self._complete_native(model, messages, request)
 
     async def _complete_openai_compat(
@@ -1051,13 +1099,36 @@ class OllamaProvider(LLMProvider):
             f"Ollama cloud error after {len(attempts)} attempts: {last_error or 'unknown error'}"
         )
 
+    @staticmethod
+    def _native_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Native /api/chat requires tool_call arguments as objects, not JSON
+        strings — Ollama rejects string arguments with a 400 parse error."""
+        normalized: list[dict[str, Any]] = []
+        for msg in messages:
+            tool_calls = msg.get("tool_calls")
+            if not tool_calls:
+                normalized.append(msg)
+                continue
+            fixed_calls = []
+            for tc in tool_calls:
+                fn = dict(tc.get("function") or {})
+                args = fn.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        fn["arguments"] = json.loads(args) if args.strip() else {}
+                    except (ValueError, TypeError):
+                        fn["arguments"] = {}
+                fixed_calls.append({**tc, "function": fn})
+            normalized.append({**msg, "tool_calls": fixed_calls})
+        return normalized
+
     async def _complete_native(
         self, model: str, messages: list[dict[str, str]], request: LLMRequest,
     ) -> LLMResponse:
         """Local path: native Ollama /api/chat endpoint."""
         payload: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": self._native_messages(messages),
             "stream": False,
             "options": {
                 "temperature": request.temperature,
@@ -1843,11 +1914,13 @@ class ModelRouter:
         telemetry: TelemetryPlaneStore | None = None,
         telemetry_enabled: bool | None = None,
         telemetry_db_path: Path | None = None,
+        key_liveness_provider: KeyLivenessProvider | None = None,
     ) -> None:
         self._providers = providers
         self._policy_router = policy_router or ProviderPolicyRouter()
         self._retry_policy = retry_policy or RetryPolicy()
         self._breaker_registry = breaker_registry or CircuitBreakerRegistry()
+        self._key_liveness_provider = key_liveness_provider
         sticky_seconds_env = os.environ.get("DGC_ROUTER_STICKY_SECONDS")
         sticky_min_tokens_env = os.environ.get("DGC_ROUTER_STICKY_MIN_TOKENS")
         effective_sticky_seconds = (
@@ -2038,9 +2111,15 @@ class ModelRouter:
     @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
         body = response.content.strip().lower()
+        if not body:
+            return "empty_response"
         if body.startswith("timeout:"):
             return "provider_timeout"
-        if body.startswith("error:") or body.startswith("error (rc="):
+        if (
+            body.startswith("error:")
+            or body.startswith("error (rc=")
+            or body.startswith("error(rc=")
+        ):
             return "provider_error"
         # Three orthogonal failure classes (a quota exhaustion is not a
         # circuit failure, and a rate limit is neither):
@@ -2070,7 +2149,14 @@ class ModelRouter:
             "forbidden",
             "unauthorized",
         )
-        if len(body) < 300:
+        is_structured_error = (
+            body.startswith("{")
+            or body.startswith("[")
+            or '"error"' in body[:1200]
+            or "'error'" in body[:1200]
+            or "error code" in body[:1200]
+        )
+        if len(body) < 300 or is_structured_error:
             for marker in _RATE_LIMIT_MARKERS:
                 if marker in body:
                     return "rate_limited"
@@ -2096,7 +2182,51 @@ class ModelRouter:
         for provider in [decision.selected_provider, *decision.fallback_providers]:
             if provider in available and provider in self._providers and provider not in chain:
                 chain.append(provider)
-        return chain
+        return self._prune_dead_key_providers(
+            chain,
+            live_provider=self._key_liveness_provider,
+        )
+
+    @staticmethod
+    def _prune_dead_key_providers(
+        chain: list[ProviderType],
+        *,
+        live_provider: KeyLivenessProvider | None = None,
+    ) -> list[ProviderType]:
+        """Drop providers whose key is verifiably dead before the first attempt.
+
+        FAIL-OPEN: the key oracle returns ``None`` (unknown) on a stale/missing/
+        malformed status file — in that case we keep the chain unchanged and
+        preserve today's env-presence behaviour. If pruning would EMPTY the
+        chain (every routed provider is dead-keyed), we keep the UNFILTERED
+        chain and warn loudly rather than inflict a self-made outage.
+        """
+        if not chain:
+            return chain
+        try:
+            oracle = live_provider or live_providers
+            live = oracle()
+        except Exception:  # never let the oracle take down routing
+            logger.warning("key_oracle raised; keeping unfiltered chain", exc_info=True)
+            return chain
+        if live is None:
+            # Unknown liveness -> fail open, env-presence behaviour unchanged.
+            return chain
+        filtered = [p for p in chain if p.value in live]
+        if not filtered:
+            logger.warning(
+                "key_oracle: all routed providers have dead keys (%s); "
+                "keeping UNFILTERED chain to avoid a self-inflicted outage "
+                "(run `dkeys test`).",
+                [p.value for p in chain],
+            )
+            return chain
+        if len(filtered) != len(chain):
+            pruned = [p.value for p in chain if p.value not in live]
+            logger.info(
+                "key_oracle: pruned dead-key providers from chain: %s", pruned
+            )
+        return filtered
 
     @staticmethod
     def _session_id_from_context(route_request: ProviderRouteRequest) -> str | None:

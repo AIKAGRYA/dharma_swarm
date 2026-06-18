@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +15,37 @@ GO_SDK = REPO_ROOT / "tools" / "go_sdk"
 FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "go_adapters"
 
 
+def _go_toolchain_available() -> bool:
+    """True only when an installed Go toolchain satisfies go_sdk/go.mod.
+
+    The dedicated `go-adapter-contracts` CI job provisions the pinned Go
+    version (setup-go) and runs this file there. The general pytest matrix
+    does not provision Go, so the compile-and-run contract is skipped there
+    rather than failing on a missing toolchain (GOPROXY=off blocks the
+    automatic toolchain download).
+    """
+    go_bin = shutil.which("go")
+    if go_bin is None:
+        return False
+    try:
+        out = subprocess.run(
+            [go_bin, "version"], text=True, capture_output=True, check=False
+        ).stdout
+    except OSError:
+        return False
+    installed_match = re.search(r"go(\d+)\.(\d+)", out)
+    required_match = re.search(r"^go (\d+)\.(\d+)", (GO_SDK / "go.mod").read_text(), re.M)
+    if not installed_match or not required_match:
+        return False
+    installed = (int(installed_match.group(1)), int(installed_match.group(2)))
+    required = (int(required_match.group(1)), int(required_match.group(2)))
+    return installed >= required
+
+
+@pytest.mark.skipif(
+    not _go_toolchain_available(),
+    reason="Go toolchain matching go_sdk/go.mod unavailable; covered by the go-adapter-contracts CI job",
+)
 def test_go_adapter_contracts_pass_without_network() -> None:
     env = os.environ.copy()
     env.update(

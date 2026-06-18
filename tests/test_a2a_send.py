@@ -194,7 +194,11 @@ def test_main_secrets_missing(tmp_path, monkeypatch, capsys):
     )
     assert code == 3
     out = capsys.readouterr().out
-    assert "NATS_SECRETS_MISSING" in out
+    assert "a2a_send: <recorded>" in out
+    assert "packet_id=" not in out
+    assert "subject=" not in out
+    assert str(tmp_path) not in out
+    assert "receipt: <written>" in out
     receipts = list((tmp_path / "r").glob("*.json"))
     assert len(receipts) == 1
     body = json.loads(receipts[0].read_text(encoding="utf-8"))
@@ -210,6 +214,38 @@ def test_main_missing_file(tmp_path):
         ["--to", "devin", "--file", str(tmp_path / "nope.md"), "--receipt-dir", str(tmp_path)]
     )
     assert code == 2
+
+
+def test_main_json_console_redacts_subjects_and_paths(tmp_path, monkeypatch, capsys):
+    for name in list(os.environ):
+        if "NATS" in name:
+            monkeypatch.delenv(name, raising=False)
+    packet = _write_packet(tmp_path)
+    code = a2a_send.main(
+        [
+            "--to",
+            "devin",
+            "--file",
+            str(packet),
+            "--receipt-dir",
+            str(tmp_path / "r"),
+            "--json",
+        ]
+    )
+    assert code == 3
+    console_body = json.loads(capsys.readouterr().out)
+    assert console_body["packet_id"] == "<redacted>"
+    assert console_body["status"] == "<recorded>"
+    assert console_body["subject"] == "<redacted>"
+    assert console_body["ack_subject"] == "<redacted>"
+    assert console_body["reply_subject"] == "<redacted>"
+    assert console_body["file"] == "<redacted>"
+    assert console_body["receipt_path"] == "<written>"
+
+    receipts = list((tmp_path / "r").glob("*.json"))
+    assert len(receipts) == 1
+    stored_body = json.loads(receipts[0].read_text(encoding="utf-8"))
+    assert stored_body["subject"] == "dharma.a2a.devin"
 
 
 def test_main_nats_client_missing_is_specific(tmp_path, monkeypatch, capsys):
@@ -228,7 +264,12 @@ def test_main_nats_client_missing_is_specific(tmp_path, monkeypatch, capsys):
 
     assert code == 4
     out = capsys.readouterr().out
-    assert "NATS_CLIENT_MISSING" in out
+    assert "a2a_send: <recorded>" in out
+    assert "NATS_CLIENT_MISSING" not in out
+    assert "packet_id=" not in out
+    assert "subject=" not in out
+    assert str(tmp_path) not in out
+    assert "receipt: <written>" in out
     receipts = list((tmp_path / "r").glob("*.json"))
     assert len(receipts) == 1
     body = json.loads(receipts[0].read_text(encoding="utf-8"))

@@ -252,7 +252,7 @@ def _cmd_approve(args: argparse.Namespace) -> int:
         try:
             path.unlink()
         except OSError as e:
-            print(f"warning: failed to remove staged file {path}: {e}")
+            print(f"warning: failed to remove staged file <redacted>: {type(e).__name__}")
         print("approved → trusted layer")
     else:
         # Write back in place
@@ -340,8 +340,8 @@ def _cmd_verify(args: argparse.Namespace) -> int:
         rows = buckets[label]
         print(f"- {label:14s}: {len(rows)}")
         if args.show and rows:
-            for r in rows[: args.show]:
-                print(f"    {r}")
+            for idx in range(1, min(len(rows), args.show) + 1):
+                print(f"    <redacted atom path {idx}>")
             if len(rows) > args.show:
                 print(f"    (... {len(rows) - args.show} more)")
     print("\nlegend:")
@@ -359,9 +359,9 @@ def _cmd_status(_args: argparse.Namespace) -> int:
     trusted = list_trusted()
     quarantined = list_quarantine()
     print("# chetana status")
-    print(f"- staged    : {len(staged)} (root: {STAGING_ROOT})")
-    print(f"- trusted   : {len(trusted)} (root: {TRUSTED_DEFAULT})")
-    print(f"- quarantine: {len(quarantined)} (root: {QUARANTINE_ROOT})")
+    print(f"- staged    : {len(staged)}")
+    print(f"- trusted   : {len(trusted)}")
+    print(f"- quarantine: {len(quarantined)}")
     return 0
 
 
