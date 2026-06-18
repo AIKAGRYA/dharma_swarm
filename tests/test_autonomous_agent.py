@@ -21,6 +21,7 @@ from dharma_swarm.autonomous_agent import (
     _identity_from_registered_holon,
     cli_wake,
 )
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import ProviderType
 
 # Cross-lane drift guard: the TUI-alias model resolver ships on the
@@ -68,7 +69,7 @@ class TestAgentIdentity:
     def test_defaults(self):
         ident = AgentIdentity(name="test", role="general", system_prompt="hi")
         assert ident.name == "test"
-        assert ident.model == "claude-sonnet-4-20250514"
+        assert ident.model == canonical_default_model(ProviderType.ANTHROPIC)
         assert ident.provider == "anthropic"
         assert ident.max_turns == 25
         assert len(ident.allowed_tools) > 0

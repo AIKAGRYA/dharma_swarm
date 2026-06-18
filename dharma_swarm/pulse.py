@@ -28,6 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.api_keys import ANTHROPIC_API_KEY_ENV, env_has_value
+from dharma_swarm.claude_cli import (
+    resolve_claude_binary,
+    run_claude_headless as _run_claude_headless_impl,
+)
 from dharma_swarm.context import (
     read_agni_state,
     read_manifest,
@@ -40,10 +45,6 @@ from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
 from dharma_swarm.subconscious import SubconsciousStream
 from dharma_swarm.thread_manager import ThreadManager
 from dharma_swarm.telos_gates import check_with_reflective_reroute
-from dharma_swarm.claude_cli import (
-    resolve_claude_binary,
-    run_claude_headless as _run_claude_headless_impl,
-)
 from dharma_swarm.runtime_artifacts import append_pulse_log, freshest_pulse_log_path
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ def run_claude_headless(
     returns a SKIP message immediately to avoid blocking the daemon
     process in U state (uninterruptible sleep) on the failed subprocess.
     """
-    if bare and not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+    if bare and not env_has_value(ANTHROPIC_API_KEY_ENV):
         return (
             "SKIP: ANTHROPIC_API_KEY not set — "
             "claude bare mode unavailable. Set ANTHROPIC_API_KEY in .env "

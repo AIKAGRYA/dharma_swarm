@@ -8,11 +8,56 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import ProviderType
 
 
 def _normalize_text(value: str | None) -> str:
     return str(value or "").strip().lower()
+
+
+# ---------------------------------------------------------------------------
+# Pool projection (STEP of the model-pool consolidation)
+# ---------------------------------------------------------------------------
+#
+# A certified lane's ``default_models`` / ``model_aliases`` are RECOGNITION sets:
+# when a live agent registers with ``(provider, model)``, ``matches_provider_model``
+# checks the incoming model string against these. They used to be hand-typed
+# provider-specific id literals — exactly the drift the consolidation kills. They
+# are now DERIVED from a ``dharma_swarm.model_pool`` entry at the FLOOR model, so
+# the model-id strings live in exactly ONE place (the roster -> pool). The Kimi
+# lane rides the K2.6 floor entry (never the sub-floor K2.5 literal); the GLM lane
+# rides the pool's GLM entry.
+
+
+def _pool_default_model(pool_id: str, provider: ProviderType) -> str:
+    """The exact provider-specific model_id the pool serves for ``pool_id`` under
+    ``provider`` — the certified lane's default for that provider (drift-killer
+    source, never a literal). Raises at import if the pool has no such route, so a
+    lane can never silently point at a provider the floor entry does not serve."""
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:  # pragma: no cover - guarded by import-time construction
+        raise AssertionError(f"certified lane references unknown pool id {pool_id!r}")
+    for route in entry.routes:
+        if route.provider is provider:
+            return route.model_id
+    raise AssertionError(
+        f"pool entry {pool_id!r} has no {provider.value!r} route for a certified lane"
+    )
+
+
+def _pool_model_aliases(pool_id: str) -> dict[ProviderType, tuple[str, ...]]:
+    """Every (provider, model_id) the pool serves for ``pool_id``, grouped by
+    provider — the lane's recognition set, sourced FROM the pool at the floor."""
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:  # pragma: no cover - guarded by import-time construction
+        raise AssertionError(f"certified lane references unknown pool id {pool_id!r}")
+    grouped: dict[ProviderType, list[str]] = {}
+    for route in entry.routes:
+        grouped.setdefault(route.provider, [])
+        if route.model_id not in grouped[route.provider]:
+            grouped[route.provider].append(route.model_id)
+    return {provider: tuple(ids) for provider, ids in grouped.items()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +135,7 @@ CERTIFIED_LANES: tuple[CertifiedLane, ...] = (
         provider_order_env="DASHBOARD_GLM_PROVIDER_ORDER",
         default_provider_order=(ProviderType.OPENROUTER,),
         default_models={
-            ProviderType.OPENROUTER: "z-ai/glm-5",
+            ProviderType.OPENROUTER: _pool_default_model("glm-5", ProviderType.OPENROUTER),
         },
         model_envs={
             ProviderType.OPENROUTER: "DASHBOARD_GLM_MODEL",
@@ -101,24 +146,22 @@ CERTIFIED_LANES: tuple[CertifiedLane, ...] = (
             "ecosystem-synthesizer",
             "ecosystem_synthesizer",
         ),
-        model_aliases={
-            ProviderType.OPENROUTER: ("z-ai/glm-5",),
-            ProviderType.OLLAMA: ("glm-5:cloud",),
-            ProviderType.NVIDIA_NIM: ("zai-org/GLM-5",),
-        },
+        model_aliases=_pool_model_aliases("glm-5"),
     ),
     CertifiedLane(
         profile_id="kimi_k25_scout",
-        label="Kimi K2.5 Scout",
+        label="Kimi K2.6 Scout",
         accent="bengara",
         summary="Certified long-context scout for reconnaissance, evidence gathering, and operator-ready synthesis.",
         registration_id="lane:kimi-scout",
         codename="kimi-scout",
-        display_name="Kimi K2.5 Scout",
+        display_name="Kimi K2.6 Scout",
         provider_order_env="DASHBOARD_KIMI_PROVIDER_ORDER",
         default_provider_order=(ProviderType.OPENROUTER,),
         default_models={
-            ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
+            # K2.6 is the operator FLOOR; the lane rides the floor pool entry,
+            # never the sub-floor K2.5 literal.
+            ProviderType.OPENROUTER: _pool_default_model("kimi-k2.6", ProviderType.OPENROUTER),
         },
         model_envs={
             ProviderType.OPENROUTER: "DASHBOARD_KIMI_MODEL",
@@ -129,14 +172,7 @@ CERTIFIED_LANES: tuple[CertifiedLane, ...] = (
             "kimi-scout",
             "cyber-kimi25",
         ),
-        model_aliases={
-            ProviderType.OPENROUTER: (
-                "moonshotai/kimi-k2.5",
-                "moonshotai/kimi-k2.5-0127",
-            ),
-            ProviderType.OLLAMA: ("kimi-k2.5:cloud",),
-            ProviderType.NVIDIA_NIM: ("moonshotai/kimi-k2.5",),
-        },
+        model_aliases=_pool_model_aliases("kimi-k2.6"),
     ),
     CertifiedLane(
         profile_id="sonnet46_operator",

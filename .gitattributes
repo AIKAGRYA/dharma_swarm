@@ -12,3 +12,11 @@
 # queue) and the next push:main reconcile recomputes the authoritative value.
 docs/docops/AUTO_INVENTORY.md merge=union
 docs/governance/SOVEREIGN_MANIFEST.md merge=union
+
+# State dashboard (morning brief). This file is independently refreshed by multiple
+# agents/PRs in short windows. `merge=union` prevents a hard conflict block and
+# lets a merge proceed — the result may need a quick cleanup pass to remove
+# duplicate sections, but it never stops the PR from being mergeable.
+# The `docops-reconcile-main.yml` pattern (regenerate after merge) is the right
+# long-term model for this file if it grows further in churn.
+docs/state/LIVE_OPS_DASHBOARD.md merge=union

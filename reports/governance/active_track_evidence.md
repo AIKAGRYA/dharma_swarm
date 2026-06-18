@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-12T10:49:47+09:00 (schema v2)
+Generated: 2026-06-18T11:03:04+09:00 (schema v2)
 Active tracks: **6** (warn 5, max 10) — shippable 4
 
 ## Spine coverage
@@ -71,20 +71,30 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
   - ✗ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING
   - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
 
-## `orientation-graph-2026-06` — SHIPPABLE
+## `truth-graph-platform-2026-06` — SHIPPABLE
 
-- serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['scripts/governance/orientation_graph.py', 'tests/test_orientation_graph.py']
-- moves_vital_signs: ['quality_gates']
+- serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: ['orientation-graph-2026-06'] · conflicts_with: []
+- owned_surfaces: ['scripts/governance/orientation_graph.py', 'scripts/governance/truth_graph_nats_e2e_demo.py', 'scripts/governance/run_truth_graph_nats_e2e_demo.sh', 'tests/test_orientation_graph.py', 'tests/test_truth_graph_repo_context.py', 'dharma_swarm/a2a/task_receipt.py', 'dharma_swarm/a2a/agent_presence.py', 'tests/test_a2a_gate.py', 'tests/test_agent_registry_presence.py', 'reports/orientation/**']
+- moves_vital_signs: ['quality_gates', 'tool_coverage', 'memory_persistence']
 
   - ✓ `identity_owner_on_branch` (file_exists) — foundations/THE_ORGANISM.md present
   - ✓ `vision_owner_on_branch` (file_exists) — docs/vision_maps/NORTH_STAR.md present
-  - ✓ `orientation_graph_exists` (file_exists) — scripts/governance/orientation_graph.py present
-  - ✓ `orientation_packet_defined` (file_contains) — pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py
-  - ✓ `orientation_read_only_test` (file_contains) — pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py
-  - ✓ `onboard_identity_render` (file_contains) — pattern 'render_identity' found in scripts/governance/agent_onboard.py
-  - ✓ `make_orient_target` (file_contains) — pattern 'orient:' found in Makefile
-  - ✓ `megafile_points_at_north_star` (file_contains) — pattern 'NORTH_STAR.md' found in docs/MEGAFILE_INDEX.md
+  - ✓ `orientation_graph_owner_exists` (file_exists) — scripts/governance/orientation_graph.py present
+  - ✓ `expanded_orientation_packet_defined` (file_contains) — pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py
+  - ✓ `repo_context_writer_defined` (file_contains) — pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py
+  - ✓ `repo_context_hash_defined` (file_contains) — pattern 'context_hash' found in scripts/governance/orientation_graph.py
+  - ✓ `make_orient_writes_context` (file_contains) — pattern '--write-context' found in Makefile
+  - ✓ `orientation_default_read_only_test` (file_contains) — pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py
+  - ✓ `repo_context_test_exists` (file_contains) — pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py
+  - ✓ `a2a_receipt_gate_exists` (file_exists) — dharma_swarm/a2a/task_receipt.py present
+  - ✓ `a2a_receipt_schema_declared` (file_contains) — pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py
+  - ✓ `a2a_receipted_inbox_reader_defined` (file_contains) — pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py
+  - ✓ `agent_presence_projection_exists` (file_exists) — dharma_swarm/a2a/agent_presence.py present
+  - ✓ `agent_presence_stale_red` (file_contains) — pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py
+  - ✓ `nats_e2e_demo_exists` (file_exists) — scripts/governance/truth_graph_nats_e2e_demo.py present
+  - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
+  - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
+  - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
 
 ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
 
@@ -111,5 +121,5 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
 - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
-- **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).

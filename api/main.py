@@ -275,6 +275,7 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.manifest import router as manifest_router
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
+    from api.routers.model_pool import router as model_pool_router
     from api.routers.holon import router as holon_router
 
     api_app.include_router(holon_router)
@@ -294,6 +295,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(manifest_router)
     api_app.include_router(revenue_router)
     api_app.include_router(control_surface_router)
+    api_app.include_router(model_pool_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
     from api.routers.fleet import router as fleet_router

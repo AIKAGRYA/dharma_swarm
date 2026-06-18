@@ -51,9 +51,35 @@ class ModelTier(str, Enum):
     LOCAL = "local"        # Ollama — zero cost, variable speed
 
 
+# ---------------------------------------------------------------------------
+# THE POWER FLOOR — the unmistakable demarcation (operator word 2026-06-17:
+# "sub-floor models can exist just for real grunt work only but ONLY with a
+# very clear demarcation").
+#
+# The floor is Kimi K2.6-class. Models GREATER-THAN-OR-EQUAL to the floor serve
+# the REAL path (default chat brain, frontier, the model picker's main list).
+# Models BELOW the floor are old / weak / local weights that the K2.6 floor
+# banishes from the real path. They are kept ONLY for genuine grunt work and
+# MUST carry ``below_floor=True`` so the demarcation lives in the DATA, not in
+# prose — every consumer can read one boolean and never accidentally route a
+# sub-floor model onto the frontier.
+#
+# ``model_hierarchy`` and ``model_pool`` re-export :data:`MODEL_POWER_FLOOR` so
+# the documented line has exactly one home.
+# ---------------------------------------------------------------------------
+MODEL_POWER_FLOOR = "kimi-k2.6"
+
+
 @dataclass(frozen=True)
 class ModelSlot:
-    """A single model available for evolution proposals."""
+    """A single model available for evolution proposals.
+
+    ``below_floor`` is the operator's UNMISTAKABLE demarcation: ``True`` marks a
+    sub-floor (old / weak / genuinely-local) model that the :data:`MODEL_POWER_FLOOR`
+    (Kimi K2.6) banishes from the REAL path. Such a slot is kept for grunt work
+    ONLY — the pool carries the marker into :class:`~dharma_swarm.model_pool.ModelEntry`
+    and the default / frontier / picker projections skip it.
+    """
 
     provider: ProviderType
     model_id: str
@@ -62,6 +88,7 @@ class ModelSlot:
     strengths: tuple[str, ...] = ()  # e.g. ("code", "reasoning", "speed")
     max_context: int = 128_000
     notes: str = ""
+    below_floor: bool = False  # True == sub-floor, grunt-work-only (demarcation)
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +96,56 @@ class ModelSlot:
 # ---------------------------------------------------------------------------
 
 EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
+    # ══════════════════════════════════════════════════════════════════
+    # FLOOR FRONTIER — the REAL path (>= MODEL_POWER_FLOOR / Kimi K2.6).
+    # These serve the default chat brain, frontier work, and the model
+    # picker's main list. Live providers first (THE ONE WAY): claude_code
+    # oauth (Max plan), codex oauth, ollama_cloud, GLM-zai, deepseek,
+    # nvidia_nim, openai. openrouter + anthropic-API are DEAD — never a
+    # primary floor route. below_floor stays False (default).
+    # ══════════════════════════════════════════════════════════════════
+    # Default chat brain: a FLOOR Claude on the Max-plan oauth lane.
+    ModelSlot(
+        ProviderType.CLAUDE_CODE,
+        "claude-opus-4.8",
+        "Claude Opus 4.8 (Claude Max)",
+        ModelTier.FRONTIER,
+        ("reasoning", "code", "architecture"),
+        200_000,
+        "Floor default chat brain — Opus via Claude-Max oauth (THE ONE WAY)",
+    ),
+    ModelSlot(
+        ProviderType.CLAUDE_CODE,
+        "claude-sonnet-4.6",
+        "Claude Sonnet 4.6 (Claude Max)",
+        ModelTier.FRONTIER,
+        ("code", "reasoning", "speed"),
+        200_000,
+        "Floor fast-frontier Claude via Claude-Max oauth",
+    ),
+    # GPT-5.5 floor lane: codex oauth subscription (live) ahead of metered API.
+    ModelSlot(
+        ProviderType.CODEX,
+        "gpt-5.5",
+        "GPT-5.5 (Codex)",
+        ModelTier.FRONTIER,
+        ("code", "reasoning", "architecture"),
+        256_000,
+        "Floor GPT lane via codex oauth subscription (THE ONE WAY)",
+    ),
+    ModelSlot(
+        ProviderType.OPENAI,
+        "gpt-5.5",
+        "GPT-5.5 (direct)",
+        ModelTier.FRONTIER,
+        ("code", "reasoning", "architecture"),
+        256_000,
+        "Same weights via the OpenAI direct API (secondary route)",
+    ),
+    # ── Strong floor tier (Ollama Cloud frontier, keyless) ─────────────
     # ── Frontier tier ──────────────────────────────────────────────────
-    # Direct providers (used when ANTHROPIC_API_KEY / OPENAI_API_KEY are set)
+    # BELOW FLOOR — old direct/router Claude/GPT-4o weights. Kept for grunt
+    # work ONLY; the K2.6 floor banishes them from the real path.
     ModelSlot(
         ProviderType.ANTHROPIC,
         "claude-opus-4-20250514",
@@ -78,7 +153,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("reasoning", "code", "architecture"),
         200_000,
-        "Best for structural / architectural proposals",
+        "Sub-floor (old Opus 4) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.ANTHROPIC,
@@ -87,7 +163,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("code", "reasoning", "speed"),
         200_000,
-        "Fast frontier — great code quality at lower cost than Opus",
+        "Sub-floor (old Sonnet 4) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENAI,
@@ -96,6 +173,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("code", "reasoning"),
         128_000,
+        "Sub-floor (GPT-4o) — grunt work only",
+        below_floor=True,
     ),
     # Same frontier models via OpenRouter (when direct keys aren't set)
     ModelSlot(
@@ -105,7 +184,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("reasoning", "code", "architecture"),
         200_000,
-        "Opus via OpenRouter — main powerhouse model",
+        "Sub-floor (old Opus 4 via OpenRouter) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -114,7 +194,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("code", "reasoning", "speed"),
         200_000,
-        "Fast frontier via OpenRouter",
+        "Sub-floor (old Sonnet 4 via OpenRouter) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -123,6 +204,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FRONTIER,
         ("code", "reasoning"),
         128_000,
+        "Sub-floor (GPT-4o via OpenRouter) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -134,6 +217,7 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         "High-agency coding and technical synthesis via OpenRouter",
     ),
     # ── Strong tier (via OpenRouter) ───────────────────────────────────
+    # BELOW FLOOR — old/weak open-weight router lanes. Grunt work only.
     ModelSlot(
         ProviderType.OPENROUTER,
         "moonshotai/kimi-k2.5",
@@ -141,7 +225,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "long_context", "synthesis"),
         128_000,
-        "Strong semantic synthesis and long-context reasoning",
+        "Sub-floor (K2.5, superseded by K2.6 floor) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -150,7 +235,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "synthesis", "multilingual"),
         128_000,
-        "Reasoning-heavy research model with good multilingual depth",
+        "Sub-floor (GLM-5, superseded by GLM-5.1 floor) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -159,7 +245,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("code", "reasoning", "chinese"),
         128_000,
-        "Cutting-edge open model — rivals frontier at 10x lower cost",
+        "Sub-floor (DeepSeek V3) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -168,7 +255,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("code",),
         32_768,
-        "Specialist code model from Alibaba — not 70B, punches above weight",
+        "Sub-floor (Qwen 2.5 Coder 32B) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -186,6 +274,20 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("code", "reasoning"),
         128_000,
+        "Sub-floor (Mistral Large 2411) — grunt work only",
+        below_floor=True,
+    ),
+    # Gemini frontier-class lane via the OpenRouter aggregator. The TUI/openrouter
+    # adapter used to hand-type ``google/gemini-2.5-pro`` (sub-floor); the floor is
+    # gemini-3-pro, so the pool owns the route here and the surfaces project it.
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "google/gemini-3-pro",
+        "Gemini 3 Pro",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "multimodal"),
+        1_000_000,
+        "Gemini 3 class via OpenRouter — large-context multimodal reasoning lane",
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -194,7 +296,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("code", "reasoning"),
         128_000,
-        "Workhorse open model — current default",
+        "Sub-floor (Llama 3.3 70B) — grunt work only",
+        below_floor=True,
     ),
     # ── Fast tier (dedicated inference) ────────────────────────────────
     ModelSlot(
@@ -204,7 +307,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FAST,
         ("code", "speed"),
         128_000,
-        "NVIDIA-optimised inference — same model, faster",
+        "Sub-floor (Llama 3.3 70B NIM) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.NVIDIA_NIM,
@@ -213,7 +317,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "synthesis", "architecture"),
         128_000,
-        "Large NIM-hosted reasoning lane for high-stakes synthesis",
+        "Sub-floor (Llama 3.1 Nemotron) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER,
@@ -222,7 +327,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "code"),
         64_000,
-        "Deep reasoning model — excellent for complex refactors",
+        "Sub-floor (DeepSeek R1) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OLLAMA,
@@ -231,7 +337,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "long_context", "synthesis"),
         128_000,
-        "Cloud-hosted long-context semantic lane via Ollama",
+        "Sub-floor (K2.5, superseded by K2.6 floor) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OLLAMA,
@@ -240,9 +347,147 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.STRONG,
         ("reasoning", "synthesis", "multilingual"),
         128_000,
-        "Cloud-hosted reasoning lane via Ollama",
+        "Sub-floor (GLM-5, superseded by GLM-5.1 floor) — grunt work only",
+        below_floor=True,
+    ),
+    # K2.6 is the operator's floor model. Same weights served by Ollama Cloud
+    # (keyless cloud route) and OpenRouter (aggregator) — ONE logical model in
+    # the pool, best-route-first puts Ollama ahead of the flappy OpenRouter id
+    # that caused the kimi flapping bug the consolidation goal names.
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "kimi-k2.6:cloud",
+        "Kimi K2.6 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model — long-context semantic lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.OPENROUTER,
+        "moonshotai/kimi-k2.6",
+        "Kimi K2.6",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model via OpenRouter (deprioritised aggregator route)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "moonshotai/kimi-k2.6",
+        "Kimi K2.6 (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
+    ),
+    # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
+    # The K2.6 floor the roster must SERVE. Live providers first: each rides
+    # the Ollama-Cloud keyless route ahead of any paid aggregator.
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "kimi-k2.7-code:cloud",
+        "Kimi K2.7 Code (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "long_context", "code", "synthesis"),
+        256_000,
+        "Floor — next K2 generation, long-context coder lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "deepseek-v4-pro:cloud",
+        "DeepSeek V4 Pro (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Pro bulk-build lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "deepseek-ai/deepseek-v4-pro/flash",
+        "DeepSeek V4 Pro Flash (NIM)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Pro flash route via NVIDIA NIM hosted catalog",
+    ),
+    ModelSlot(
+        ProviderType.SAMBANOVA,
+        "DeepSeek-V4-Pro",
+        "DeepSeek V4 Pro (SambaNova)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Pro on SambaNova (secondary route)",
+    ),
+    ModelSlot(
+        ProviderType.FIREWORKS,
+        "accounts/fireworks/models/deepseek-v4-pro",
+        "DeepSeek V4 Pro (Fireworks)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Pro on Fireworks (secondary route)",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "glm-5.1:cloud",
+        "GLM 5.1 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis", "multilingual"),
+        256_000,
+        "Floor — GLM-5.1 reasoning lane via Ollama Cloud (GLM-zai live)",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "minimax-m3:cloud",
+        "MiniMax M3 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis"),
+        256_000,
+        "Floor — MiniMax M3 challenger lane via Ollama Cloud",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "minimaxai/minimax-m3",
+        "MiniMax M3 (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis"),
+        256_000,
+        "Floor — MiniMax M3 on NVIDIA NIM (secondary route)",
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "qwen3-coder:480b-cloud",
+        "Qwen3 Coder 480B (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning"),
+        256_000,
+        "Floor — high-capacity coder lane via Ollama Cloud",
+    ),
+    # ── BELOW FLOOR — superseded Ollama-cloud lanes. Grunt work only. ──
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "deepseek-v3.2:cloud",
+        "DeepSeek V3.2 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "chinese"),
+        128_000,
+        "Sub-floor (DeepSeek V3.2, superseded by V4 Pro) — grunt work only",
+        below_floor=True,
+    ),
+    ModelSlot(
+        ProviderType.OLLAMA,
+        "minimax-m2.7:cloud",
+        "MiniMax M2.7 (Ollama Cloud)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis"),
+        128_000,
+        "Sub-floor (MiniMax M2.7, superseded by M3) — grunt work only",
+        below_floor=True,
     ),
     # ── Free tier (OpenRouter free) ────────────────────────────────────
+    # All free-tier router lanes are BELOW FLOOR — grunt work only.
     ModelSlot(
         ProviderType.OPENROUTER_FREE,
         "meta-llama/llama-3.3-70b-instruct:free",
@@ -250,7 +495,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FREE,
         ("code",),
         128_000,
-        "Zero cost — good for restart/exploration spam",
+        "Sub-floor (Llama 3.3 70B free) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER_FREE,
@@ -259,6 +505,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FREE,
         ("speed",),
         8_192,
+        "Sub-floor (Gemma 3) — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OPENROUTER_FREE,
@@ -267,8 +515,10 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.FREE,
         ("code", "speed"),
         32_768,
+        "Sub-floor (Mistral Small 3.1) — grunt work only",
+        below_floor=True,
     ),
-    # ── Local tier (Ollama) ────────────────────────────────────────────
+    # ── Local tier (Ollama) — genuine LOCAL weights, all BELOW FLOOR ───
     ModelSlot(
         ProviderType.OLLAMA,
         "qwen2.5-coder:14b",
@@ -276,7 +526,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.LOCAL,
         ("code", "speed"),
         32_768,
-        "Local — zero cost, no network latency",
+        "Sub-floor LOCAL — zero cost, grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OLLAMA,
@@ -285,6 +536,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.LOCAL,
         ("code",),
         16_384,
+        "Sub-floor LOCAL — grunt work only",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OLLAMA,
@@ -293,6 +546,8 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ModelTier.LOCAL,
         ("speed",),
         128_000,
+        "Sub-floor LOCAL — grunt work only",
+        below_floor=True,
     ),
 )
 
@@ -313,6 +568,9 @@ _ENV_KEYS_FOR_PROVIDER: dict[ProviderType, str] = {
         ProviderType.SILICONFLOW,
         ProviderType.TOGETHER,
         ProviderType.FIREWORKS,
+        # SambaNova is a keyed secondary route (DeepSeek-V4-Pro floor fan-out),
+        # not a subscription lane — gate it on its API key, not keyless.
+        ProviderType.SAMBANOVA,
     )
 }
 

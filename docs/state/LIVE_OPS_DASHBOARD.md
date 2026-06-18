@@ -152,7 +152,7 @@ The 2026-06-15 onboard-doc-refresh audit identified one Anti-Slop Rule 1 violati
 
 - **`docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch.** 10 GitHub issues (#521, #523, #525, #527, #529, #531, #535, #537, plus #547 umbrella and #548 superseded-by-#582) reference it as their "Track" and "owner doc." The named `prod-readiness-top10` track does not exist in `ACTIVE_TRACK.yaml`. These issues are stranded — they describe real work but have no on-disk anchor and no live portfolio slot.
 
-**Resolution path (in flight in this same PR):** Comment-and-close the orphan issues, cross-referencing the live tracks/issues that subsume them (#582/#587 for module decomposition, BR-003 for apply gate, NEW-07 for trace_id, #607 for pytest gating).
+**Resolution path (separate follow-up PR):** Comment-and-close the orphan issues, cross-referencing the live tracks/issues that subsume them (#582/#587 for module decomposition, BR-003 for apply gate, NEW-07 for trace_id, #607 for pytest gating).
 
 ---
 
