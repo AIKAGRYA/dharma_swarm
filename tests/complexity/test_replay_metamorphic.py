@@ -24,8 +24,9 @@ This module pins down both halves precisely:
 
   * the positive metamorphic relation that holds (delivery-order invariance
     via canonical sort), and
-  * the exact boundary of the order-sensitivity (it is confined to the two
-    positional breadcrumbs; every semantic aggregate is reorder-invariant),
+  * the fixture-local boundary of the order-sensitivity (for ``BASE_TRACE``'s
+    unique reducer keys and preserved snapshot order, only the two positional
+    breadcrumbs differ),
 
 and keeps the "full reorder-invariance does not hold" result visible as a
 strict xfail finding rather than a silently-masked red test.
@@ -183,13 +184,13 @@ async def _hash_for(events: list[dict[str, Any]]) -> str:
 
 
 def _semantic_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Project out the two positional breadcrumbs.
+    """Project out the positional breadcrumbs for this fixture.
 
-    ``event_types`` (an ordered list of every event's type) and
-    ``final_timestamp`` (the last ``emitted_at`` in fold order) are the only
-    parts of the reconstructed state that depend on raw fold order. Everything
-    else is a semantic aggregate. Normalizing these two exposes whether the
-    *meaning* of the state is reorder-invariant.
+    Reducers such as ``runtime``, ``actions.last_by_name``, and
+    ``audits.by_gate.last_result`` are order-sensitive in general. ``BASE_TRACE``
+    avoids that ambiguity by using unique memory/action/audit keys and by
+    keeping both snapshots in one causal class, so this projection only needs
+    to normalize ``event_types`` and ``final_timestamp``.
     """
     return {**state, "event_types": sorted(state["event_types"]), "final_timestamp": ""}
 
@@ -217,13 +218,13 @@ async def test_replay_hash_invariant_under_delivery_reordering(seed: int) -> Non
 
 @pytest.mark.parametrize("seed", list(range(20)))
 async def test_raw_fold_order_sensitivity_is_isolated_to_breadcrumbs(seed: int) -> None:
-    """Boundary of the order-sensitivity: it is confined to the breadcrumbs.
+    """Fixture-local boundary: order-sensitivity is confined to breadcrumbs.
 
     Feeding the raw fold a causal-class-preserving reordering (no canonical
-    sort) can change the hash — but only via ``event_types`` and
-    ``final_timestamp``. Every semantic aggregate (runtime, memory, actions,
-    audits, counts) is reorder-invariant. If a future change leaks order
-    dependence into the semantics, this breaks.
+    sort) can change the hash, but for ``BASE_TRACE`` the unique reducer keys
+    and preserved snapshot order mean only ``event_types`` and
+    ``final_timestamp`` differ. If this fixture starts leaking order dependence
+    into the projected semantics, this breaks.
     """
     reordered = reorder_preserving_causal_class(BASE_TRACE, seed=seed)
     assert intra_class_order_preserved(BASE_TRACE, reordered)
@@ -231,8 +232,8 @@ async def test_raw_fold_order_sensitivity_is_isolated_to_breadcrumbs(seed: int) 
     base = await _replay_state(BASE_TRACE)
     perturbed = await _replay_state(reordered)
     assert _semantic_state(base) == _semantic_state(perturbed), (
-        f"Raw-fold reordering (seed={seed}) changed a semantic aggregate, not "
-        f"just the positional breadcrumbs."
+        f"Raw-fold reordering (seed={seed}) changed this fixture's projected "
+        f"semantics, not just the positional breadcrumbs."
     )
 
 
