@@ -249,11 +249,8 @@ def build_probe_plan(
     for model in projection.models:
         if selected_ids and model.id not in selected_ids:
             continue
-        live_route = next(
-            (route for route in model.route_statuses if route.status == "live_routable"),
-            None,
-        )
-        if live_route is None:
+        live_routes = [route for route in model.route_statuses if route.status == "live_routable"]
+        if not live_routes:
             skipped.append(
                 {
                     "logical_model_id": model.id,
@@ -266,33 +263,36 @@ def build_probe_plan(
                 }
             )
             continue
-        try:
-            provider = ProviderType(live_route.provider)
-        except ValueError:
-            skipped.append(
-                {
-                    "logical_model_id": model.id,
-                    "display_name": model.display_name,
-                    "status": "failed",
-                    "reason": f"unknown provider in route: {live_route.provider}",
-                    "failure_class": "routing_bug",
-                    "available_routes": list(model.available_routes),
-                    "routes": list(model.routes),
-                }
+        for live_route in live_routes:
+            try:
+                provider = ProviderType(live_route.provider)
+            except ValueError:
+                skipped.append(
+                    {
+                        "logical_model_id": model.id,
+                        "display_name": model.display_name,
+                        "status": "failed",
+                        "reason": f"unknown provider in route: {live_route.provider}",
+                        "failure_class": "routing_bug",
+                        "available_routes": list(model.available_routes),
+                        "routes": list(model.routes),
+                    }
+                )
+                continue
+            specs.append(
+                LiveProbeSpec(
+                    logical_model_id=model.id,
+                    display_name=model.display_name,
+                    provider=provider,
+                    model_id=live_route.model_id,
+                    route=live_route.route,
+                    rank=model.rank,
+                    max_context=model.max_context,
+                    strengths=tuple(model.strengths),
+                )
             )
-            continue
-        specs.append(
-            LiveProbeSpec(
-                logical_model_id=model.id,
-                display_name=model.display_name,
-                provider=provider,
-                model_id=live_route.model_id,
-                route=live_route.route,
-                rank=model.rank,
-                max_context=model.max_context,
-                strengths=tuple(model.strengths),
-            )
-        )
+            if limit is not None and len(specs) >= limit:
+                break
         if limit is not None and len(specs) >= limit:
             break
     return specs, skipped, projection_to_dict(projection)
@@ -334,6 +334,7 @@ def _looks_like_provider_error(content: str) -> bool:
         "error code:",
         "http error",
         "rate limit",
+        "credit balance",
         "insufficient_quota",
         "payment required",
         "api key",

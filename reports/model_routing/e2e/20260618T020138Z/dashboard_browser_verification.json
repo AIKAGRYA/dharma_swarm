@@ -1,0 +1,79 @@
+{
+  "schema_version": "dharma.dashboard_models_browser_verification.v1",
+  "generated_at": "2026-06-18T03:13:15Z",
+  "status": "passed_isolated_current_build",
+  "mode": "isolated_current_build",
+  "temporary_services": {
+    "api_url": "http://127.0.0.1:18420",
+    "dashboard_url": "http://127.0.0.1:13420",
+    "api_proxy_target": "http://127.0.0.1:18420"
+  },
+  "existing_launchd_services": {
+    "api_url": "http://127.0.0.1:8420",
+    "pool_status_http": 404,
+    "assessment": "stale_service_did_not_have_api_pool_routes"
+  },
+  "api_contract": {
+    "status_route": "/api/pool/top10/status",
+    "verify_route": "/api/pool/top10/verify",
+    "model_count": 12,
+    "available_count": 9,
+    "statuses": [
+      "live_routable",
+      "unavailable"
+    ],
+    "first_model": {
+      "id": "claude-opus-4.8",
+      "status": "live_routable"
+    },
+    "verify_response": {
+      "live_calls_attempted": false,
+      "skipped_count": 12,
+      "reason": "DHARMA_LIVE_MODEL_E2E=1 is required for live model calls."
+    }
+  },
+  "dashboard_contract": {
+    "route": "/dashboard/models",
+    "http_status": 200,
+    "html_bytes": 76259,
+    "visible_counts": {
+      "models": 12,
+      "available": "9/12",
+      "verified": "0/12"
+    }
+  },
+  "build_verification": {
+    "dependency_install": "npm --prefix dashboard ci --legacy-peer-deps",
+    "dependency_install_result": "passed",
+    "dependency_install_note": "npm audit reported 8 vulnerabilities: 1 low, 4 moderate, 3 high; not remediated in this routing task.",
+    "build_command": "env DHARMA_API_PROXY_URL=http://127.0.0.1:18420 npm --prefix dashboard run build",
+    "build_result": "passed"
+  },
+  "browser_verification": {
+    "in_app_browser": "failed: Node-backed browser bootstrap was killed by SIGKILL",
+    "playwright_mcp": "failed: Chrome launch was killed by SIGKILL",
+    "sandbox_cli": "failed: Chromium MachPortRendezvousServer permission denied inside sandbox",
+    "escalated_cli": "passed: npx --prefix dashboard playwright screenshot",
+    "visual_inspection": "Desktop full-page screenshot and downscaled mobile full-page preview were inspected; no obvious text overlap or blank rendering was observed."
+  },
+  "screenshots": [
+    {
+      "path": "reports/model_routing/e2e/20260618T020138Z/dashboard_models_1440.png",
+      "viewport": "1440x1000",
+      "dimensions": "1440x1000"
+    },
+    {
+      "path": "reports/model_routing/e2e/20260618T020138Z/dashboard_models_fullpage.png",
+      "viewport": "1440x1000",
+      "dimensions": "1440x3525",
+      "mode": "full_page"
+    },
+    {
+      "path": "reports/model_routing/e2e/20260618T020138Z/dashboard_models_mobile.png",
+      "viewport": "390x844",
+      "dimensions": "616x10054",
+      "mode": "mobile_full_page"
+    }
+  ],
+  "remaining_risk": "Superseded by dashboard_launchd_verification.json, which repointed launchd to the pinned worktree and verified the default 8420/3420 routes."
+}

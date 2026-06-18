@@ -3,7 +3,25 @@
   "counts": {
     "floor_operable": 9,
     "grunt_operable": 12,
-    "unroutable": 9
+    "unroutable": 9,
+    "key_oracle_floor_operable": 9,
+    "key_oracle_grunt_operable": 12,
+    "key_oracle_unroutable": 9,
+    "live_overlay_floor_available": 7,
+    "live_overlay_floor_unavailable": 5,
+    "live_receipt_failed_or_degraded_floor_models": 3
+  },
+  "direct_probe_receipt": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe.json",
+  "direct_probe_summary": {
+    "failed": 2,
+    "live_calls_attempted": 11,
+    "ok": 9,
+    "planned_routes": 11,
+    "profile": "pong",
+    "status": "failed",
+    "failure_class_counts": {
+      "quota": 2
+    }
   },
   "dkeys_status": {
     "last_test_ts": 1781749879.552326,
@@ -11,91 +29,91 @@
       "anthropic": {
         "cluster": "anthropic",
         "env_var": "ANTHROPIC_API_KEY",
-        "glyph": "\u2717",
+        "glyph": "✗",
         "http": 400,
         "status": "HTTP 400"
       },
       "claude_code": {
         "cluster": "anthropic",
         "env_var": "CLAUDE_CODE_OAUTH",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": null,
         "status": "Max plan (keychain oauth)"
       },
       "codex (openai-pro)": {
         "cluster": "openai",
         "env_var": "OPENAI_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": null,
         "status": "oauth present (chatgpt)"
       },
       "deepseek": {
         "cluster": "chinese_cluster",
         "env_var": "DEEPSEEK_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
       "gemini": {
         "cluster": "deepmind",
         "env_var": "GEMINI_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
       "groq": {
         "cluster": "groq",
         "env_var": "GROQ_API_KEY",
-        "glyph": "\u2717",
+        "glyph": "✗",
         "http": 403,
         "status": "HTTP 403 auth"
       },
       "kimi": {
         "cluster": "chinese_cluster",
         "env_var": "KIMI_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": null,
         "status": "kimi agent present"
       },
       "minimax": {
         "cluster": "chinese_cluster",
         "env_var": "MINIMAX_API_KEY",
-        "glyph": "\u00b7",
+        "glyph": "·",
         "http": null,
         "status": "no key"
       },
       "nvidia_nim": {
         "cluster": "nvidia",
         "env_var": "NVIDIA_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
       "ollama_cloud": {
         "cluster": "chinese_cluster",
         "env_var": "OLLAMA_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
       "openai": {
         "cluster": "openai",
         "env_var": "OPENAI_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
       "openrouter": {
         "cluster": "multi",
         "env_var": "OPENROUTER_API_KEY",
-        "glyph": "\u2717",
+        "glyph": "✗",
         "http": 404,
         "status": "HTTP 404"
       },
       "qwen": {
         "cluster": "qwen",
         "env_var": "QWEN_OAUTH",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": null,
         "status": "qwen CLI oauth present"
       },
@@ -104,12 +122,12 @@
         "env_var": "XAI_API_KEY",
         "glyph": "$",
         "http": 403,
-        "status": "valid \u00b7 funds=0"
+        "status": "valid · funds=0"
       },
       "zai_coding": {
         "cluster": "chinese_cluster",
         "env_var": "GLM_API_KEY",
-        "glyph": "\u2713",
+        "glyph": "✓",
         "http": 200,
         "status": "live"
       },
@@ -118,34 +136,47 @@
         "env_var": "GLM_API_KEY",
         "glyph": "$",
         "http": 429,
-        "status": "valid \u00b7 funds=0"
+        "status": "valid · funds=0"
       }
     },
     "summary": null
   },
-  "generated_at": "2026-06-18T02:31:47Z",
+  "generated_at": "2026-06-18T03:53:43Z",
   "head": "b575de89743c98ad246764bf259a99b9557a35ff",
-  "live_test_opt_in": {
-    "current_run_live_calls_attempted": false,
-    "env_var": "DHARMA_LIVE_MODEL_E2E",
-    "required_value": "1"
-  },
-  "direct_probe_receipt": {
-    "source_artifact": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe.json",
-    "mode": "dry-run",
-    "profile": "standard",
-    "planned_models": 9,
-    "skipped_models": 3,
-    "live_calls_attempted": 0
-  },
+  "live_test_opt_in": true,
   "mission_id": "20260618T020138Z",
   "models": [
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "failed",
+        "ok_routes": [],
+        "failed_routes": [
+          "claude_code:claude-opus-4.8"
+        ],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_claude_opus_quota.json"
+        ],
+        "failure_class": "quota",
+        "reason": "Credit balance is too low"
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 7455,
+          "failure_class": "quota",
+          "model_id": "claude-opus-4.8",
+          "probe": "pong_exact",
+          "provider": "claude_code",
+          "reason": "Credit balance is too low",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_claude_opus_quota.json",
+          "response_sha256": "2d261f78bd528eea493c197ee3fd6b424be3251d4e557faa3c1da9f86e0678a9",
+          "route": "claude_code:claude-opus-4.8",
+          "served_model": "claude-code",
+          "started_at": "2026-06-18T03:30:56Z",
+          "status": "failed"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -153,13 +184,15 @@
           "dkeys_row": {
             "cluster": "anthropic",
             "env_var": "CLAUDE_CODE_OAUTH",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": null,
             "status": "Max plan (keychain oauth)"
           },
           "model_id": "claude-opus-4.8",
           "provider": "claude_code",
-          "route": "claude_code:claude-opus-4.8"
+          "route": "claude_code:claude-opus-4.8",
+          "actual_live_status": "failed",
+          "actual_failure_class": "quota"
         }
       ],
       "below_floor": false,
@@ -173,16 +206,41 @@
         "claude_code:claude-opus-4.8"
       ],
       "lane": "floor",
-      "status": "live_routable",
+      "status": "unavailable",
       "tier": "FRONTIER",
-      "unavailable_reason": null
+      "unavailable_reason": "quota"
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "failed",
+        "ok_routes": [],
+        "failed_routes": [
+          "claude_code:claude-sonnet-4.6"
+        ],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_claude_sonnet_quota.json"
+        ],
+        "failure_class": "quota",
+        "reason": "Credit balance is too low"
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 7553,
+          "failure_class": "quota",
+          "model_id": "claude-sonnet-4.6",
+          "probe": "pong_exact",
+          "provider": "claude_code",
+          "reason": "Credit balance is too low",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_claude_sonnet_quota.json",
+          "response_sha256": "2d261f78bd528eea493c197ee3fd6b424be3251d4e557faa3c1da9f86e0678a9",
+          "route": "claude_code:claude-sonnet-4.6",
+          "served_model": "claude-code",
+          "started_at": "2026-06-18T03:33:51Z",
+          "status": "failed"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -190,13 +248,15 @@
           "dkeys_row": {
             "cluster": "anthropic",
             "env_var": "CLAUDE_CODE_OAUTH",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": null,
             "status": "Max plan (keychain oauth)"
           },
           "model_id": "claude-sonnet-4.6",
           "provider": "claude_code",
-          "route": "claude_code:claude-sonnet-4.6"
+          "route": "claude_code:claude-sonnet-4.6",
+          "actual_live_status": "failed",
+          "actual_failure_class": "quota"
         }
       ],
       "below_floor": false,
@@ -210,16 +270,212 @@
         "claude_code:claude-sonnet-4.6"
       ],
       "lane": "floor",
-      "status": "live_routable",
+      "status": "unavailable",
       "tier": "FRONTIER",
-      "unavailable_reason": null
+      "unavailable_reason": "quota"
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "codex:gpt-5.5",
+          "openai:gpt-5.5"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_gpt55_all_routes_pong.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 12080,
+          "model_id": "gpt-5.5",
+          "probe": "pong_exact",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_gpt55_all_routes_pong.json",
+          "response_sha256": "9597e5d74f44f182ebb56b65a79c6b1b84829735af1ff583d44c3384d8a0a45e",
+          "route": "codex:gpt-5.5",
+          "served_model": "codex",
+          "started_at": "2026-06-18T03:39:48Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1912,
+          "model_id": "gpt-5.5",
+          "probe": "pong_exact",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_gpt55_all_routes_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "openai:gpt-5.5",
+          "served_model": "gpt-5.5-2026-04-23",
+          "started_at": "2026-06-18T03:40:00Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 11891,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "codex:gpt-5.5",
+          "started_at": "2026-06-18T03:46:06Z",
+          "status": "ok",
+          "response_sha256": "9597e5d74f44f182ebb56b65a79c6b1b84829735af1ff583d44c3384d8a0a45e",
+          "response_preview": "PONG",
+          "served_model": "codex"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 12672,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "codex:gpt-5.5",
+          "started_at": "2026-06-18T03:46:18Z",
+          "status": "ok",
+          "response_sha256": "3f46074e7c375a7d239ac50a6029b8b450c944cca5e8d8938d577cd9d44a813a",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "codex"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 12331,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "codex:gpt-5.5",
+          "started_at": "2026-06-18T03:46:31Z",
+          "status": "ok",
+          "response_sha256": "88205dc0197f62724868b8e229ddef8c9f78a07dba532fb83ba2aeac2ec19855",
+          "response_preview": "323",
+          "served_model": "codex"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 11777,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "codex:gpt-5.5",
+          "started_at": "2026-06-18T03:46:43Z",
+          "status": "ok",
+          "response_sha256": "b58a3da5fde2680191877ec88a1aa7d06927cc3b30cdf0d0db8c39b488891576",
+          "response_preview": "37",
+          "served_model": "codex"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 12901,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "codex",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "codex:gpt-5.5",
+          "started_at": "2026-06-18T03:46:55Z",
+          "status": "ok",
+          "response_sha256": "d1506ef1f15407970a6914913925257e2a0e4d628d25790bd2f1e04a26a8860c",
+          "response_preview": "ルーティング正常",
+          "served_model": "codex"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2153,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "openai:gpt-5.5",
+          "started_at": "2026-06-18T03:47:08Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "gpt-5.5-2026-04-23"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1134,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "openai:gpt-5.5",
+          "started_at": "2026-06-18T03:47:10Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "gpt-5.5-2026-04-23"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1652,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "openai:gpt-5.5",
+          "started_at": "2026-06-18T03:47:11Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "gpt-5.5-2026-04-23"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1019,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "openai:gpt-5.5",
+          "started_at": "2026-06-18T03:47:13Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "gpt-5.5-2026-04-23"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1327,
+          "logical_model_id": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "openai",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "openai:gpt-5.5",
+          "started_at": "2026-06-18T03:47:14Z",
+          "status": "ok",
+          "response_sha256": "1db30612521a43d28e0909302ed0562ba1dd31b342070bfb14078ac4d9bf9fd9",
+          "response_preview": "ルーティングは正常",
+          "served_model": "gpt-5.5-2026-04-23"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -227,13 +483,14 @@
           "dkeys_row": {
             "cluster": "openai",
             "env_var": "OPENAI_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": null,
             "status": "oauth present (chatgpt)"
           },
           "model_id": "gpt-5.5",
           "provider": "codex",
-          "route": "codex:gpt-5.5"
+          "route": "codex:gpt-5.5",
+          "actual_live_status": "ok"
         },
         {
           "classification_detail": "dkeys_live",
@@ -241,13 +498,14 @@
           "dkeys_row": {
             "cluster": "openai",
             "env_var": "OPENAI_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "gpt-5.5",
           "provider": "openai",
-          "route": "openai:gpt-5.5"
+          "route": "openai:gpt-5.5",
+          "actual_live_status": "ok"
         }
       ],
       "below_floor": false,
@@ -268,10 +526,112 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "ollama:kimi-k2.6:cloud"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_kimi_k26_pong.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 3317,
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_kimi_k26_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:kimi-k2.6:cloud",
+          "served_model": "kimi-k2.6",
+          "started_at": "2026-06-18T03:33:10Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 4038,
+          "logical_model_id": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.6:cloud",
+          "started_at": "2026-06-18T03:47:15Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "kimi-k2.6"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2766,
+          "logical_model_id": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.6:cloud",
+          "started_at": "2026-06-18T03:47:19Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "kimi-k2.6"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 3173,
+          "logical_model_id": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.6:cloud",
+          "started_at": "2026-06-18T03:47:22Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "kimi-k2.6"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1879,
+          "logical_model_id": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.6:cloud",
+          "started_at": "2026-06-18T03:47:25Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "kimi-k2.6"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 8657,
+          "logical_model_id": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.6:cloud",
+          "started_at": "2026-06-18T03:47:27Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "kimi-k2.6"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -279,13 +639,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "kimi-k2.6:cloud",
           "provider": "ollama",
-          "route": "ollama:kimi-k2.6:cloud"
+          "route": "ollama:kimi-k2.6:cloud",
+          "actual_live_status": "ok"
         },
         {
           "classification_detail": "no_live_provider_key",
@@ -293,7 +654,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -319,10 +680,112 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "ollama:kimi-k2.7-code:cloud"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_kimi_k27_code_pong.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 1417,
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_kimi_k27_code_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "served_model": "kimi-k2.7-code",
+          "started_at": "2026-06-18T03:33:17Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1661,
+          "logical_model_id": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "started_at": "2026-06-18T03:47:35Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "kimi-k2.7-code"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1482,
+          "logical_model_id": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "started_at": "2026-06-18T03:47:37Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "kimi-k2.7-code"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1242,
+          "logical_model_id": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "started_at": "2026-06-18T03:47:39Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "kimi-k2.7-code"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1581,
+          "logical_model_id": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "started_at": "2026-06-18T03:47:40Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "kimi-k2.7-code"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1974,
+          "logical_model_id": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "started_at": "2026-06-18T03:47:41Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "kimi-k2.7-code"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -330,13 +793,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "kimi-k2.7-code:cloud",
           "provider": "ollama",
-          "route": "ollama:kimi-k2.7-code:cloud"
+          "route": "ollama:kimi-k2.7-code:cloud",
+          "actual_live_status": "ok"
         }
       ],
       "below_floor": false,
@@ -356,10 +820,112 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "ollama:deepseek-v4-pro:cloud"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_deepseek_v4_pro_pong.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 1358,
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_deepseek_v4_pro_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "served_model": "deepseek-v4-pro",
+          "started_at": "2026-06-18T03:33:34Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1406,
+          "logical_model_id": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "started_at": "2026-06-18T03:47:43Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "deepseek-v4-pro"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1241,
+          "logical_model_id": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "started_at": "2026-06-18T03:47:45Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "deepseek-v4-pro"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1249,
+          "logical_model_id": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "started_at": "2026-06-18T03:47:46Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "deepseek-v4-pro"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1370,
+          "logical_model_id": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "started_at": "2026-06-18T03:47:47Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "deepseek-v4-pro"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 9347,
+          "logical_model_id": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "started_at": "2026-06-18T03:47:49Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "deepseek-v4-pro"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -367,13 +933,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "deepseek-v4-pro:cloud",
           "provider": "ollama",
-          "route": "ollama:deepseek-v4-pro:cloud"
+          "route": "ollama:deepseek-v4-pro:cloud",
+          "actual_live_status": "ok"
         },
         {
           "classification_detail": "no_live_provider_key",
@@ -409,10 +976,112 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "ollama:glm-5.1:cloud"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_glm_51_pong.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 1756,
+          "model_id": "glm-5.1:cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_glm_51_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:glm-5.1:cloud",
+          "served_model": "glm-5.1",
+          "started_at": "2026-06-18T03:33:34Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1581,
+          "logical_model_id": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:glm-5.1:cloud",
+          "started_at": "2026-06-18T03:47:58Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "glm-5.1"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2402,
+          "logical_model_id": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:glm-5.1:cloud",
+          "started_at": "2026-06-18T03:48:00Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "glm-5.1"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1531,
+          "logical_model_id": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:glm-5.1:cloud",
+          "started_at": "2026-06-18T03:48:02Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "glm-5.1"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 3121,
+          "logical_model_id": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:glm-5.1:cloud",
+          "started_at": "2026-06-18T03:48:04Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "glm-5.1"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 4359,
+          "logical_model_id": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:glm-5.1:cloud",
+          "started_at": "2026-06-18T03:48:07Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "glm-5.1"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -420,13 +1089,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "glm-5.1:cloud",
           "provider": "ollama",
-          "route": "ollama:glm-5.1:cloud"
+          "route": "ollama:glm-5.1:cloud",
+          "actual_live_status": "ok"
         }
       ],
       "below_floor": false,
@@ -446,10 +1116,368 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "degraded",
+        "ok_routes": [
+          "ollama:minimax-m3:cloud"
+        ],
+        "failed_routes": [
+          "nvidia_nim:minimaxai/minimax-m3"
+        ],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_all_routes_pong.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json"
+        ],
+        "failure_class": "quota",
+        "reason": "NVIDIA NIM error 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 999,
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "pong_exact",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_all_routes_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "served_model": "minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:41:11Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 11290,
+          "model_id": "minimax-m3:cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_all_routes_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:minimax-m3:cloud",
+          "served_model": "minimax-m3",
+          "started_at": "2026-06-18T03:40:59Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 4114,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T03:48:11Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 3594,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T03:48:15Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2442,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T03:48:19Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2265,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T03:48:21Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 4015,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T03:48:23Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1076,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:48:27Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 60006,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:48:29Z",
+          "status": "failed",
+          "failure_class": "timeout",
+          "reason": "timeout"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1124,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:49:29Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 3953,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:49:30Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1330,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T03:49:34Z",
+          "status": "ok",
+          "response_sha256": "fd7951505ae40aeb7ccc227152a3fb0d27fa988e214d1ec2ca28bbcaed1c3631",
+          "response_preview": "ルーティングは正常です",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2072,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T04:02:19Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2606,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T04:02:21Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2250,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T04:02:24Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1361,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T04:02:26Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 7180,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "ollama:minimax-m3:cloud",
+          "started_at": "2026-06-18T04:02:28Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1018,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T04:02:35Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 22707,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T04:02:36Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1034,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T04:02:59Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "minimaxai/minimax-m3"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 191,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T04:03:00Z",
+          "status": "failed",
+          "failure_class": "quota",
+          "reason": "NVIDIA NIM error 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2014,
+          "logical_model_id": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "nvidia_nim",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "started_at": "2026-06-18T04:03:00Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "minimaxai/minimax-m3"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -457,13 +1485,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "minimax-m3:cloud",
           "provider": "ollama",
-          "route": "ollama:minimax-m3:cloud"
+          "route": "ollama:minimax-m3:cloud",
+          "actual_live_status": "ok"
         },
         {
           "classification_detail": "dkeys_live",
@@ -471,13 +1500,15 @@
           "dkeys_row": {
             "cluster": "nvidia",
             "env_var": "NVIDIA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "minimaxai/minimax-m3",
           "provider": "nvidia_nim",
-          "route": "nvidia_nim:minimaxai/minimax-m3"
+          "route": "nvidia_nim:minimaxai/minimax-m3",
+          "actual_live_status": "failed",
+          "actual_failure_class": "quota"
         }
       ],
       "below_floor": false,
@@ -498,10 +1529,112 @@
     },
     {
       "actual_live_call": {
-        "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
-        "status": "not_run"
+        "attempted": true,
+        "status": "ok",
+        "ok_routes": [
+          "ollama:qwen3-coder:480b-cloud"
+        ],
+        "failed_routes": [],
+        "receipt_paths": [
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_qwen3_coder_480b_cloud_pong.json"
+        ]
       },
+      "actual_live_calls": [
+        {
+          "attempted": true,
+          "elapsed_ms": 1130,
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "pong_exact",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_qwen3_coder_480b_cloud_pong.json",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "served_model": "qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:33:50Z",
+          "status": "ok"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 2068,
+          "logical_model_id": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "pong_exact",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:49:35Z",
+          "status": "ok",
+          "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+          "response_preview": "PONG",
+          "served_model": "qwen3-coder:480b-cloud"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1556,
+          "logical_model_id": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "json_schema",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:49:37Z",
+          "status": "ok",
+          "response_sha256": "5869b88b9ac52fded892563d06d0682060f69aa451e2d45f08174f523eab8092",
+          "response_preview": "{\"ok\":true,\"token\":\"MODEL_PROBE\"}",
+          "served_model": "qwen3-coder:480b-cloud"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1720,
+          "logical_model_id": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "code_reasoning",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:49:39Z",
+          "status": "ok",
+          "response_sha256": "3949ac1596ec77106a709a618bf5adcb19b77537ce8bcbdf54ff830169cdd084",
+          "response_preview": "323",
+          "served_model": "qwen3-coder:480b-cloud"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1526,
+          "logical_model_id": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "long_context",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:49:40Z",
+          "status": "ok",
+          "response_sha256": "7a61b53701befdae0eeeffaecc73f14e20b537bb0f8b91ad7c2936dc63562b25",
+          "response_preview": "37",
+          "served_model": "qwen3-coder:480b-cloud"
+        },
+        {
+          "attempted": true,
+          "elapsed_ms": 1761,
+          "logical_model_id": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "probe": "multilingual",
+          "profile": "full",
+          "provider": "ollama",
+          "receipt_path": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "started_at": "2026-06-18T03:49:42Z",
+          "status": "ok",
+          "response_sha256": "5c81925c2317372e87edc07ad52d33a0bb69f77994d3b307f3f2dd96f01651ea",
+          "response_preview": "ルーティング正常",
+          "served_model": "qwen3-coder:480b-cloud"
+        }
+      ],
       "all_routes": [
         {
           "classification_detail": "dkeys_live",
@@ -509,13 +1642,14 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
           "model_id": "qwen3-coder:480b-cloud",
           "provider": "ollama",
-          "route": "ollama:qwen3-coder:480b-cloud"
+          "route": "ollama:qwen3-coder:480b-cloud",
+          "actual_live_status": "ok"
         }
       ],
       "below_floor": false,
@@ -536,7 +1670,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -546,7 +1680,7 @@
           "dkeys_row": {
             "cluster": "anthropic",
             "env_var": "ANTHROPIC_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 400,
             "status": "HTTP 400"
           },
@@ -560,7 +1694,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -587,7 +1721,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -597,7 +1731,7 @@
           "dkeys_row": {
             "cluster": "anthropic",
             "env_var": "ANTHROPIC_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 400,
             "status": "HTTP 400"
           },
@@ -611,7 +1745,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -638,7 +1772,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -648,7 +1782,7 @@
           "dkeys_row": {
             "cluster": "openai",
             "env_var": "OPENAI_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -662,7 +1796,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -689,7 +1823,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -699,7 +1833,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -713,7 +1847,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -740,7 +1874,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -750,7 +1884,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -764,7 +1898,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -791,7 +1925,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -801,7 +1935,7 @@
           "dkeys_row": {
             "cluster": "nvidia",
             "env_var": "NVIDIA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -815,7 +1949,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -829,7 +1963,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -856,7 +1990,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -866,7 +2000,7 @@
           "dkeys_row": {
             "cluster": "nvidia",
             "env_var": "NVIDIA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -893,7 +2027,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -903,7 +2037,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -930,7 +2064,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -940,7 +2074,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -967,7 +2101,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -977,7 +2111,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -1004,7 +2138,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1014,7 +2148,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -1041,7 +2175,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1051,7 +2185,7 @@
           "dkeys_row": {
             "cluster": "chinese_cluster",
             "env_var": "OLLAMA_API_KEY",
-            "glyph": "\u2713",
+            "glyph": "✓",
             "http": 200,
             "status": "live"
           },
@@ -1078,7 +2212,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "provider_dead: no live route available for receipt-producing probe",
         "status": "not_run"
       },
       "all_routes": [
@@ -1088,7 +2222,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1113,7 +2247,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1123,7 +2257,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1148,7 +2282,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1158,7 +2292,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1183,7 +2317,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "provider_dead: no live route available for receipt-producing probe",
         "status": "not_run"
       },
       "all_routes": [
@@ -1193,7 +2327,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1218,7 +2352,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1228,7 +2362,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1253,7 +2387,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "provider_dead: no live route available for receipt-producing probe",
         "status": "not_run"
       },
       "all_routes": [
@@ -1263,7 +2397,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1288,7 +2422,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1298,7 +2432,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1323,7 +2457,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1333,7 +2467,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1358,7 +2492,7 @@
     {
       "actual_live_call": {
         "attempted": false,
-        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "reason": "below_power_floor: grunt-only model is not advertised on the default operator path; live probe scope is floor routes",
         "status": "not_run"
       },
       "all_routes": [
@@ -1368,7 +2502,7 @@
           "dkeys_row": {
             "cluster": "multi",
             "env_var": "OPENROUTER_API_KEY",
-            "glyph": "\u2717",
+            "glyph": "✗",
             "http": 404,
             "status": "HTTP 404"
           },
@@ -1393,8 +2527,49 @@
   ],
   "source_artifact": "reports/model_pool/e2e_20260618T113124.json",
   "verification_gaps": [
-    "No model completion probes have been run under DHARMA_LIVE_MODEL_E2E=1 for this mission yet.",
-    "dkeys proves provider/key liveness only; it does not prove model-id availability, schema behavior, or served-model identity."
+    "direct PONG live probe attempted 11 route calls: 9 ok, 2 Claude Code quota failures",
+    "direct full-profile live probe attempted 45 calls across 9 route specs: 44 ok, 1 NVIDIA NIM MiniMax JSON-schema timeout",
+    "Claude Opus 4.8 and Claude Sonnet 4.6 are demoted by live receipts from dkeys-live to unavailable/quota",
+    "MiniMax M3 remains available through Ollama while its NVIDIA NIM route is marked failed; initial full profile hit a JSON-schema timeout, and targeted retry reproduced route failure as 429/quota on long_context",
+    "live A2A model council passed 3/3 staged calls across Codex, OpenAI, and Ollama",
+    "repository closeout bundle passed after module-budget and DocOps inventory remediation"
   ],
-  "worktree": "/Users/dhyana/ds_model_pool"
+  "worktree": "/Users/dhyana/ds_model_pool",
+  "direct_full_probe_receipt": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_full.json",
+  "direct_full_probe_summary": {
+    "status": "failed",
+    "profile": "full",
+    "planned_route_specs": 9,
+    "skipped_models": 5,
+    "probe_cases_per_route": 5,
+    "live_calls_attempted": 45,
+    "ok": 44,
+    "failed": 1,
+    "failure_class_counts": {
+      "timeout": 1
+    }
+  },
+  "model_council_receipt": "reports/model_routing/e2e/20260618T020138Z/model_council_transcript.json",
+  "model_council_summary": {
+    "status": "passed",
+    "mode": "live",
+    "planned_agents": 3,
+    "completed_stages": 3,
+    "failed_stages": 0,
+    "live_calls_attempted": 3,
+    "unique_planned_providers": 3
+  },
+  "direct_minimax_retry_receipt": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe_minimax_m3_full_retry.json",
+  "direct_minimax_retry_summary": {
+    "status": "failed",
+    "profile": "full",
+    "planned_route_specs": 2,
+    "probe_cases_per_route": 5,
+    "live_calls_attempted": 10,
+    "ok": 9,
+    "failed": 1,
+    "failure_class_counts": {
+      "quota": 1
+    }
+  }
 }

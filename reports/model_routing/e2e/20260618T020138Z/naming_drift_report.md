@@ -81,9 +81,11 @@ It also defines forbidden aliases that match this mission's constraints:
 - `scattered model order`
 
 Conclusion: naming discipline is aligned by concept, but not physically
-registered inside the target routing worktree. The target worktree therefore
-uses the guard below as the enforceable drift gate until the Semantic Commons
-branch is reconciled.
+registered inside the target routing worktree. The target worktree now uses
+`docs/ops/MODEL_ROUTING_SEMANTIC_COMMONS_GUARD.md` plus
+`tests/test_model_key_routing_guard.py::test_semantic_commons_is_registered_or_branch_local_guarded`
+as the enforceable branch-local gate until the Semantic Commons branch is
+reconciled.
 
 ## Guarded Drift
 
@@ -92,6 +94,9 @@ branch is reconciled.
 - new model literals belong in approved registry/catalog files only
 - new provider key reads belong in `api_keys.py` or `runtime_provider.py`
 - feature code cannot silently add model strings or direct key reads
+- if target `docs/ontology/*` Semantic Commons files are absent, the
+  branch-local guard document must carry the routing concepts and forbidden
+  aliases listed in this report
 
 Canonical inventory source:
 
@@ -107,7 +112,13 @@ Approved model-literal registry files in the current guard include:
 - `dharma_swarm/router_v1.py`
 - `dharma_swarm/tui/model_routing.py`
 
-The guard currently passes as part of the final verification run.
+The guard currently passes as part of the final verification run:
+
+```bash
+pytest -q tests/test_model_key_routing_guard.py
+```
+
+Result: `3 passed`.
 
 ## Known Hardcoded Debt
 
@@ -155,11 +166,12 @@ table in this worktree:
 
 ## Required Follow-Up
 
-The remaining naming work is branch reconciliation, not new local drift:
+The remaining naming work is branch reconciliation and debt retirement, not new
+local drift:
 
 1. Reconcile `/Users/dhyana/dharma_swarm/docs/ontology/*` into the routing
-   consolidation branch, or add an explicit Semantic Commons registration guard
-   to this branch.
+   consolidation branch when the Semantic Commons branch lands. Until then,
+   this branch has an explicit guard document and test.
 2. Retire known debt from `tests/test_model_key_routing_guard.py` in small
    migrations, shrinking the baseline rather than expanding it.
 3. Promote model aliases from surface-local tables into the canonical model pool

@@ -40,6 +40,28 @@ KEY_REGISTRY_FILES = {
     "dharma_swarm/runtime_provider.py",
 }
 
+SEMANTIC_COMMONS_FILES = (
+    "docs/ontology/SEMANTIC_COMMONS.md",
+    "docs/ontology/semantic_aliases.yaml",
+    "docs/ontology/semantic_objects.yaml",
+)
+
+BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD = "docs/ops/MODEL_ROUTING_SEMANTIC_COMMONS_GUARD.md"
+
+SEMANTIC_COMMONS_REQUIRED_TERMS = (
+    "ModelKeyRouting",
+    "DKeysKeyStore",
+    "RuntimeProvider",
+    "ModelHierarchy",
+    "ProviderPolicyRouter",
+    "ModelRouter",
+    "RoutingMemory",
+    "parallel model routing layer",
+    "project .env keys",
+    "direct provider factory",
+    "scattered model order",
+)
+
 MODEL_LITERAL_RE = re.compile(
     r"(?:"
     r"claude-(?:opus|sonnet|haiku)[\w.-]*|"
@@ -343,3 +365,21 @@ def test_provider_key_reads_do_not_escape_key_registry() -> None:
         actual,
         KNOWN_RAW_KEY_READ_DEBT,
     )
+
+
+def test_semantic_commons_is_registered_or_branch_local_guarded() -> None:
+    semantic_commons_paths = [REPO_ROOT / rel for rel in SEMANTIC_COMMONS_FILES]
+    if all(path.exists() for path in semantic_commons_paths):
+        contents = "\n".join(path.read_text(encoding="utf-8") for path in semantic_commons_paths)
+        missing_terms = [term for term in SEMANTIC_COMMONS_REQUIRED_TERMS if term not in contents]
+        assert not missing_terms, f"Semantic Commons missing routing terms: {missing_terms}"
+        return
+
+    guard_path = REPO_ROOT / BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD
+    assert guard_path.exists(), (
+        "Semantic Commons files are absent in this worktree; add the ontology files "
+        f"or maintain {BRANCH_LOCAL_SEMANTIC_COMMONS_GUARD}."
+    )
+    guard = guard_path.read_text(encoding="utf-8")
+    missing_terms = [term for term in SEMANTIC_COMMONS_REQUIRED_TERMS if term not in guard]
+    assert not missing_terms, f"Branch-local Semantic Commons guard missing routing terms: {missing_terms}"

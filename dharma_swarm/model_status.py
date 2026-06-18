@@ -23,6 +23,7 @@ from dharma_swarm.models import ProviderType
 MODEL_STATUS_SCHEMA_VERSION = "dharma.model_status.v1"
 LIVE_MODEL_E2E_ENV = "DHARMA_LIVE_MODEL_E2E"
 PROFILE_PATH_ENV = "DHARMA_MODEL_PROFILE_PATH"
+LIVE_CALL_MATRIX_PATH_ENV = "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH"
 
 _PROFILE_FILE_NAME = "model_pool_profiles.json"
 
@@ -189,6 +190,63 @@ def _status_data() -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def _live_call_matrix_path() -> Path | None:
+    raw = os.getenv(LIVE_CALL_MATRIX_PATH_ENV)
+    if not raw:
+        return None
+    return Path(raw).expanduser()
+
+
+def _merge_live_result(
+    existing: dict[str, Any] | None,
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    if existing is None:
+        return candidate
+    existing_status = str(existing.get("status", "")).strip()
+    candidate_status = str(candidate.get("status", "")).strip()
+    if existing_status == "failed":
+        return candidate if candidate_status == "failed" else existing
+    if candidate_status == "failed":
+        return candidate
+    return candidate
+
+
+def _live_call_results(path: Path | None = None) -> dict[str, dict[str, Any]]:
+    target = path or _live_call_matrix_path()
+    if target is None:
+        return {}
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    results: dict[str, dict[str, Any]] = {}
+    models = data.get("models")
+    if not isinstance(models, list):
+        return results
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        actual = model.get("actual_live_call")
+        if not isinstance(actual, dict):
+            actual = None
+        actual_items: list[Any] = []
+        if actual is not None:
+            actual_items.append(actual)
+        actual_many = model.get("actual_live_calls")
+        if isinstance(actual_many, list):
+            actual_items.extend(actual_many)
+        for item in actual_items:
+            if not isinstance(item, dict):
+                continue
+            route = item.get("route")
+            if isinstance(route, str) and route:
+                results[route] = _merge_live_result(results.get(route), item)
+    return results
+
+
 def _provider_row_key(provider: ProviderType | str) -> str | None:
     provider_name = provider.value if isinstance(provider, ProviderType) else str(provider)
     mapping = getattr(key_oracle, "_PROVIDER_TO_ROW")
@@ -218,8 +276,31 @@ def _classify_route(
     *,
     live: set[str] | None,
     status_data: dict[str, Any] | None,
+    live_results: dict[str, dict[str, Any]],
 ) -> RouteStatus:
     route_id = f"{route.provider.value}:{route.model_id}"
+    live_result = live_results.get(route_id)
+    if live_result is not None:
+        result_status = str(live_result.get("status", "")).strip()
+        if result_status == "ok":
+            return RouteStatus(
+                provider=route.provider.value,
+                model_id=route.model_id,
+                route=route_id,
+                status="live_routable",
+                reason=None,
+                dkeys_row=_safe_row(_row_for_provider(route.provider, status_data)),
+            )
+        if result_status == "failed":
+            reason = str(live_result.get("failure_class") or "routing_bug")
+            return RouteStatus(
+                provider=route.provider.value,
+                model_id=route.model_id,
+                route=route_id,
+                status="unavailable",
+                reason=reason,
+                dkeys_row=_safe_row(_row_for_provider(route.provider, status_data)),
+            )
     if live is None:
         return RouteStatus(
             provider=route.provider.value,
@@ -291,7 +372,31 @@ def _dominant_reason(route_statuses: Iterable[RouteStatus]) -> str | None:
     return reasons[0]
 
 
-def _verification_for_model(model_id: str) -> ModelVerification:
+def _verification_for_model(
+    model_id: str,
+    route_statuses: Iterable[RouteStatus],
+    live_results: dict[str, dict[str, Any]],
+) -> ModelVerification:
+    for route_status in route_statuses:
+        live_result = live_results.get(route_status.route)
+        if live_result is None:
+            continue
+        verified_at = live_result.get("started_at") if isinstance(live_result.get("started_at"), str) else None
+        if live_result.get("status") == "ok":
+            preview = live_result.get("response_preview")
+            return ModelVerification(
+                status="verified",
+                verified_at=verified_at,
+                response_preview=preview if isinstance(preview, str) else None,
+                error=None,
+            )
+        error = live_result.get("reason") or live_result.get("error") or live_result.get("failure_class")
+        return ModelVerification(
+            status="failed",
+            verified_at=verified_at,
+            response_preview=None,
+            error=str(error) if error else "Live model-call receipt failed.",
+        )
     return ModelVerification(
         status="unverified",
         verified_at=None,
@@ -306,10 +411,11 @@ def _model_status(
     rank: int,
     live: set[str] | None,
     status_data: dict[str, Any] | None,
+    live_results: dict[str, dict[str, Any]],
     profiles: dict[str, dict[str, str | None]],
 ) -> ModelStatus:
     route_statuses = [
-        _classify_route(route, live=live, status_data=status_data)
+        _classify_route(route, live=live, status_data=status_data, live_results=live_results)
         for route in entry.routes
     ]
     available_routes = [
@@ -347,7 +453,7 @@ def _model_status(
         notes=_notes_for(entry, status=status, reason=reason),
         docs_url=_PROVIDER_URLS.get(provider, "https://docs.dharma.local/models"),
         provider_url=_PROVIDER_URLS.get(provider, "https://docs.dharma.local/models"),
-        verification=_verification_for_model(entry.id),
+        verification=_verification_for_model(entry.id, route_statuses, live_results),
     )
 
 
@@ -368,6 +474,7 @@ def project_model_status(
 ) -> ModelStatusProjection:
     live = key_oracle.live_providers()
     status_data = _status_data()
+    live_results = _live_call_results()
     profiles = load_profiles(profiles_path)
     selected = list(entries) if entries is not None else list(model_pool.all_entries())
     models = [
@@ -376,6 +483,7 @@ def project_model_status(
             rank=index,
             live=live,
             status_data=status_data,
+            live_results=live_results,
             profiles=profiles,
         )
         for index, entry in enumerate(selected, start=1)

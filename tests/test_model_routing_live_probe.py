@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from dharma_swarm.model_routing_live_probe import (
@@ -67,6 +69,7 @@ def _projection(model: ModelStatus) -> ModelStatusProjection:
         ("OPENAI_API_KEY not set", "key_missing"),
         ("HTTP error 429: too many requests", "quota"),
         ("insufficient_quota for this key", "quota"),
+        ("Credit balance is too low", "quota"),
         ("HTTP error 404: model not found", "model_missing"),
         ("HTTP error 400 invalid_request unsupported model", "unsupported_route"),
         ("all connection attempts failed", "provider_dead"),
@@ -107,6 +110,43 @@ def test_build_probe_plan_selects_first_live_route() -> None:
     assert len(specs) == 1
     assert specs[0].provider == ProviderType.OPENAI
     assert specs[0].model_id == "route-model"
+
+
+def test_build_probe_plan_selects_all_live_routes_for_model() -> None:
+    model = _model(
+        status="live_routable",
+        unavailable_reason=None,
+        route_status=RouteStatus(
+            provider=ProviderType.CODEX.value,
+            model_id="codex-model",
+            route="codex:codex-model",
+            status="live_routable",
+            reason=None,
+        ),
+    )
+    model = replace(
+        model,
+        route_statuses=[
+            model.route_statuses[0],
+            RouteStatus(
+                provider=ProviderType.OPENAI.value,
+                model_id="openai-model",
+                route="openai:openai-model",
+                status="live_routable",
+                reason=None,
+            ),
+        ],
+        available_routes=["codex:codex-model", "openai:openai-model"],
+        routes=["codex:codex-model", "openai:openai-model"],
+    )
+
+    specs, skipped, _projection_data = build_probe_plan(_projection(model))
+
+    assert skipped == []
+    assert [(spec.provider, spec.model_id) for spec in specs] == [
+        (ProviderType.CODEX, "codex-model"),
+        (ProviderType.OPENAI, "openai-model"),
+    ]
 
 
 def test_build_probe_plan_records_unavailable_reason() -> None:
