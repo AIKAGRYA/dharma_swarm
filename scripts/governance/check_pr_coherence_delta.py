@@ -101,6 +101,21 @@ _STOP_RE = re.compile(
     + r")(?:\*\*)?\s*:"
 )
 
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+
+
+def _strip_html_comments(text: str) -> str:
+    """Drop HTML comments before parsing fields.
+
+    Review bots edit the PR description and inject ``<!-- ... -->`` blocks
+    (e.g. Greptile's ``<!-- greptile_comment -->``). Without this, the last
+    field's value greedily sweeps those comments in and the gate rejects an
+    otherwise-valid block. Substance is preserved: a field whose only content
+    was a leftover template hint comment becomes empty and still fails.
+    """
+
+    return _HTML_COMMENT_RE.sub("", text)
+
 
 def extract_field(body: str, field: str) -> str | None:
     """Extract a single Coherence Delta field from a Markdown PR body.
@@ -108,6 +123,7 @@ def extract_field(body: str, field: str) -> str | None:
     Accepts any registered label alias for the field.
     """
 
+    body = _strip_html_comments(body)
     match = None
     for label in FIELD_ALIASES.get(field, (field,)):
         match = _label_pattern(label).search(body)
@@ -141,8 +157,6 @@ def validate_field(body: str, field: str) -> FieldResult:
         return FieldResult(field, value, False, "UNKNOWN requires a reason")
     if normalized in PLACEHOLDER_VALUES:
         return FieldResult(field, value, False, "placeholder value")
-    if "<!--" in value and "-->" in value:
-        return FieldResult(field, value, False, "comment placeholder left in value")
     return FieldResult(field, value, True)
 
 

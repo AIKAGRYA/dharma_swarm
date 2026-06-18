@@ -495,12 +495,12 @@ def model_hint_for_provider(
         if provider == ProviderType.OLLAMA and ollama_cloud:
             return _glm_floor_cloud()
         if provider == ProviderType.GROQ:
-            return "llama-3.3-70b-versatile"
+            return _model_pool.default_for_provider(ProviderType.GROQ)
         if provider == ProviderType.CEREBRAS:
-            return "llama-3.3-70b"
+            return "qwen-3-235b-a22b-instruct-2507"
         if provider == ProviderType.SILICONFLOW:
             return "Qwen/Qwen3-Coder-480B-A35B-Instruct"
         if provider == ProviderType.GOOGLE_AI:
-            return "gemini-2.5-flash"
+            return "gemini-2.5-pro"
 
     return effective_default_hint

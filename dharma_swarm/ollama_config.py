@@ -161,6 +161,12 @@ def resolve_ollama_model(
     return OLLAMA_DEFAULT_LOCAL_MODEL
 
 
+def is_ollama_cloud_model(model: str | None) -> bool:
+    """True if the model id targets Ollama Cloud (proxied by the local daemon)."""
+    name = (model or "").strip()
+    return name.endswith(":cloud") or name.endswith("-cloud")
+
+
 def build_ollama_headers(
     *,
     base_url: str | None = None,

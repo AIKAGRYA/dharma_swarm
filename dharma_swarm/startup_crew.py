@@ -10,8 +10,8 @@ no skill files found.
 
 Provider strategy:
   - OPENROUTER: All agents route through OpenRouter API (fast, no subprocess
-    overhead). Primary workers use llama-3.3-70b-instruct; support roles use
-    mistral-small-3.1-24b for speed/cost.
+    overhead). Per the model preference doctrine (model_hierarchy.py), every
+    seat gets the most powerful free model its lane offers.
   - CLAUDE_CODE/CODEX: Available as subprocess providers for tasks requiring
     full tool access (file editing, bash). Use spawn_agent() with those types.
   - ANTHROPIC/OPENAI: Available for direct API calls when keys are set.
@@ -54,6 +54,18 @@ def _cloud_id(pool_id: str) -> str:
                 return mid
     raise AssertionError(
         f"startup_crew references pool id {pool_id!r} with no Ollama-Cloud route"
+    )
+
+
+def _openrouter_free_id(pool_id: str) -> str:
+    """The OpenRouter-Free route id the pool serves for ``pool_id``."""
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for route in entry.routes:
+            if route.provider == ProviderType.OPENROUTER_FREE:
+                return route.model_id
+    raise AssertionError(
+        f"startup_crew references pool id {pool_id!r} with no OpenRouter-Free route"
     )
 
 MEMORY_SURVIVAL_INSTINCT = (
@@ -135,20 +147,20 @@ def _resolve_default_crew() -> list[dict]:
         ]
 
     if _has_openrouter_key():
-        # OpenRouter Free — diverse free models for error decorrelation
+        # OpenRouter Free — pool-sourced free routes for error decorrelation.
         return [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "meta-llama/llama-3.3-70b-instruct:free"},
+             "model": _openrouter_free_id("llama-3.3-70b-instruct")},
             {"name": "surgeon", "role": AgentRole.SURGEON,
              "thread": "alignment", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "qwen/qwen3-32b:free"},
+             "model": _openrouter_free_id("gemma-3-27b-it")},
             {"name": "architect", "role": AgentRole.ARCHITECT,
              "thread": "architectural", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "deepseek/deepseek-chat-v3-0324:free"},
+             "model": _openrouter_free_id("mistral-small-3.1-24b-instruct")},
             {"name": "validator", "role": AgentRole.VALIDATOR,
              "thread": "scaling", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "mistralai/mistral-small-3.1-24b-instruct:free"},
+             "model": DEFAULT_MODELS[ProviderType.OPENROUTER_FREE]},
         ]
 
     # No API keys — use Claude Code (authenticated via `claude` CLI)
