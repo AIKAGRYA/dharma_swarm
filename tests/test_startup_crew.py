@@ -201,7 +201,9 @@ async def test_spawn_cybernetics_crew_passes_provider_model_and_prompt():
     assert "MEMORY SURVIVAL INSTINCT" in glm_call["system_prompt"]
 
     assert kimi_call["provider_type"] == ProviderType.OLLAMA
-    assert kimi_call["model"] == "kimi-k2.5:cloud"
+    # Floor uplift: cyber-kimi25 rides the K2.6 FLOOR via the pool (was the
+    # sub-floor kimi-k2.5:cloud before the model-pool consolidation).
+    assert kimi_call["model"] == "kimi-k2.6:cloud"
 
     assert codex_call["provider_type"] == ProviderType.OLLAMA
     assert codex_call["model"] == "qwen3-coder:480b-cloud"

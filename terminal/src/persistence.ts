@@ -1676,29 +1676,32 @@ function writeRunVerificationSummaryFile(
   writeFileSync(runPath, JSON.stringify(payload, null, 2) + "\n");
 }
 
-function candidateSupervisorStateDirs(): string[] {
+function candidateSupervisorStateDirs(): Array<{stateDir: string; explicit: boolean}> {
   const explicit = SUPERVISOR_STATE_ENV_VARS.map((name) => process.env[name]?.trim() ?? "").filter(Boolean);
   if (explicit.length > 0) {
-    return explicit;
+    return explicit.map((stateDir) => ({stateDir, explicit: true}));
   }
   if (!existsSync(DEFAULT_SUPERVISOR_ROOT)) {
     return [];
   }
   return readdirSync(DEFAULT_SUPERVISOR_ROOT, {withFileTypes: true})
     .filter((entry) => entry.isDirectory())
-    .map((entry) => path.join(DEFAULT_SUPERVISOR_ROOT, entry.name, "state"));
+    .map((entry) => ({stateDir: path.join(DEFAULT_SUPERVISOR_ROOT, entry.name, "state"), explicit: false}));
 }
 
 export function resolveSupervisorStateDir(repoRoot = REPO_ROOT): string | null {
   const candidates = candidateSupervisorStateDirs()
-    .filter((stateDir) => existsSync(path.join(stateDir, "run.json")))
-    .map((stateDir) => {
+    .filter(({stateDir}) => existsSync(path.join(stateDir, "run.json")))
+    .map(({stateDir, explicit}) => {
       const run = readJsonFile(path.join(stateDir, "run.json"));
       const runRepoRoot = typeof run.repo_root === "string" ? run.repo_root : "";
       const updatedAt = typeof run.updated_at === "string" ? run.updated_at : "";
-      return {stateDir, runRepoRoot, updatedAt};
+      return {stateDir, explicit, runRepoRoot, updatedAt};
     })
-    .filter((candidate) => !candidate.runRepoRoot || path.resolve(candidate.runRepoRoot) === path.resolve(repoRoot));
+    .filter(
+      (candidate) =>
+        candidate.explicit || !candidate.runRepoRoot || path.resolve(candidate.runRepoRoot) === path.resolve(repoRoot),
+    );
 
   if (candidates.length === 0) {
     return null;

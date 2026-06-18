@@ -1,0 +1,65 @@
+{
+  "schema_version": "dharma.terminal_guardian_verification.v1",
+  "generated_at": "2026-06-18T03:19:15Z",
+  "status": "passed",
+  "scope": "terminal app dependency restoration, supervisor persistence override, compact terminal preflight",
+  "changed_files": [
+    "scripts/terminal_guardian_preflight.sh",
+    "terminal/bun.lock",
+    "terminal/src/persistence.ts"
+  ],
+  "dependency_restore": {
+    "command": "cd terminal && bun install",
+    "result": "passed",
+    "packages_installed": 217,
+    "lockfile": "terminal/bun.lock",
+    "warnings": [
+      "incorrect peer dependency \"ink@5.2.1\"",
+      "incorrect peer dependency \"react@18.3.1\""
+    ]
+  },
+  "behavior_fix": {
+    "file": "terminal/src/persistence.ts",
+    "summary": "Explicit DHARMA_TERMINAL_SUPERVISOR_STATE_DIR and DHARMA_TERMINAL_STATE_DIR values now bypass repo-root filtering; auto-discovered supervisor state directories remain repo-root filtered."
+  },
+  "verification": [
+    {
+      "command": "scripts/terminal_guardian_preflight.sh",
+      "result": "passed",
+      "details": "py_compile bridge, bun typecheck, protocol/route-policy tests, and 80x24 compact smoke passed"
+    },
+    {
+      "command": "cd terminal && bun test tests/persistence.test.ts",
+      "result": "44 pass, 0 fail"
+    },
+    {
+      "command": "cd terminal && bun run verify:command-routing",
+      "result": "325 pass, 0 fail"
+    },
+    {
+      "command": "cd terminal && bun run verify:control-surface",
+      "result": "77 pass, 0 fail"
+    },
+    {
+      "command": "cd terminal && bun run verify:repo-pane",
+      "result": "466 pass, 0 fail"
+    },
+    {
+      "command": "python3 -m py_compile dharma_swarm/terminal_bridge.py",
+      "result": "passed"
+    },
+    {
+      "command": "mcp__contextplus.run_static_analysis target_path=terminal/src/persistence.ts",
+      "result": "no TypeScript linter configured"
+    }
+  ],
+  "architecture_boundary": {
+    "categories": [
+      "session/persistence",
+      "protocol/event projection verification"
+    ],
+    "ui_state_changed": false,
+    "rendering_changed": false,
+    "legacy_textual_dependency_added": false
+  }
+}

@@ -27,6 +27,12 @@ import re
 from typing import TYPE_CHECKING, Mapping
 
 from dharma_swarm.models import LLMResponse, ProviderType
+from dharma_swarm.model_defaults import MODEL_POWER_FLOOR, default_for_provider
+
+# The documented power-floor line (Kimi K2.6-class). Re-exported here so the
+# provider-grain hierarchy and any caller that already imports model_hierarchy
+# read the SAME constant the pool/roster carry as ``below_floor`` demarcation.
+__all_floor__ = ("MODEL_POWER_FLOOR",)
 
 if TYPE_CHECKING:
     from dharma_swarm.resilience import CircuitBreakerRegistry
@@ -253,31 +259,19 @@ def provider_lane_role(provider: ProviderType) -> LaneRole:
 
 # ─── Default Models ──────────────────────────────────────────────────────
 # Default model per provider (used when request.model is empty).
-# Moved here from runtime_provider.py as the single source.
+#
+# STEP 3 of the model-pool consolidation: the per-provider default STRINGS now
+# live in exactly ONE place — ``model_pool._PROVIDER_DEFAULTS`` — and this dict
+# is a thin PROJECTION of the pool (``model_pool.default_for_provider``). This
+# file keeps the PROVIDER-grain authority (tiers, lane roles, priority tuples);
+# only the model-id literals moved to the pool. Every provider in
+# ``CANONICAL_SEED_ORDER`` is projected, so the seed-order coverage invariant
+# (``test_default_models_dict_matches_all_seed_order``) holds without literals.
 
 # Doctrine: the default per lane is the most powerful model the lane offers
 # at $0/near-$0 — see MODEL PREFERENCE DOCTRINE above the tier definitions.
 DEFAULT_MODELS: dict[ProviderType, str] = {
-    # Free tier — frontier
-    ProviderType.OLLAMA: "glm-5:cloud",                                   # GLM-5 744B
-    ProviderType.NVIDIA_NIM: "nvidia/llama-3.1-nemotron-ultra-253b-v1",   # Nemotron Ultra 253B
-    ProviderType.GROQ: "moonshotai/kimi-k2-instruct",                     # Kimi K2 1T MoE
-    ProviderType.CEREBRAS: "qwen-3-235b-a22b-instruct-2507",              # Qwen3 235B
-    ProviderType.SILICONFLOW: "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    ProviderType.SAMBANOVA: "DeepSeek-V3-0324",                           # DeepSeek V3 671B
-    ProviderType.TOGETHER: "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8",
-    ProviderType.FIREWORKS: "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
-    # Cheap tier
-    ProviderType.MISTRAL: "mistral-large-latest",
-    ProviderType.GOOGLE_AI: "gemini-2.5-pro",
-    ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    ProviderType.OPENROUTER_FREE: "nvidia/nemotron-3-super-120b-a12b:free",  # Nemotron 120B
-    # Paid tier
-    ProviderType.OPENROUTER: "moonshotai/kimi-k2.5",
-    ProviderType.OPENAI: "gpt-5",
-    ProviderType.ANTHROPIC: "claude-opus-4-6",
-    ProviderType.CLAUDE_CODE: "claude-opus-4-6",
-    ProviderType.CODEX: "gpt-5.4",
+    p: default_for_provider(p) for p in CANONICAL_SEED_ORDER
 }
 
 

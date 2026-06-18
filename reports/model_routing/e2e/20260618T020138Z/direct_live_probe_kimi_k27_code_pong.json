@@ -1,0 +1,110 @@
+{
+  "counts": {
+    "failed": 0,
+    "live_calls_attempted": 1,
+    "ok": 1,
+    "planned_models": 1,
+    "probe_cases_per_model": 1,
+    "skipped_models": 0
+  },
+  "failure_classes": [
+    "key_missing",
+    "provider_dead",
+    "model_missing",
+    "quota",
+    "unsupported_route",
+    "timeout",
+    "schema_failure",
+    "routing_bug"
+  ],
+  "generated_at": "2026-06-18T03:33:18Z",
+  "live_calls_enabled": true,
+  "live_env": "DHARMA_LIVE_MODEL_E2E",
+  "mode": "live",
+  "planned": [
+    {
+      "display_name": "Kimi K2.7 Code",
+      "logical_model_id": "kimi-k2.7-code",
+      "max_context": 256000,
+      "model_id": "kimi-k2.7-code:cloud",
+      "provider": "ollama",
+      "rank": 8,
+      "route": "ollama:kimi-k2.7-code:cloud",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "code",
+        "synthesis"
+      ]
+    }
+  ],
+  "profile": "pong",
+  "projection": {
+    "generated_at": "2026-06-18T03:33:17Z",
+    "live_providers": [
+      "anthropic",
+      "claude_code",
+      "codex",
+      "deepseek",
+      "google_ai",
+      "kimi",
+      "local",
+      "nvidia_nim",
+      "ollama",
+      "openai",
+      "qwen",
+      "zai_coding"
+    ],
+    "oracle_state": "fresh",
+    "schema_version": "dharma.model_status.v1"
+  },
+  "results": [
+    {
+      "display_name": "Kimi K2.7 Code",
+      "elapsed_ms": 1417,
+      "error": null,
+      "failure_class": null,
+      "live_call_attempted": true,
+      "logical_model_id": "kimi-k2.7-code",
+      "max_context": 256000,
+      "model_id": "kimi-k2.7-code:cloud",
+      "probe": "pong_exact",
+      "provider": "ollama",
+      "rank": 8,
+      "response_preview": "PONG",
+      "response_sha256": "95784973cc639977bff93619700168505cb8f7855e44fa643d34622a43706c87",
+      "route": "ollama:kimi-k2.7-code:cloud",
+      "runtime_config": {
+        "api_key_present": true,
+        "available": true,
+        "base_url": "https://ollama.com",
+        "binary_path": null,
+        "default_model": "kimi-k2.7-code:cloud",
+        "provider": "ollama",
+        "source": "env",
+        "timeout_seconds": null,
+        "transport_mode": "cloud_api",
+        "working_dir": null
+      },
+      "served_model": "kimi-k2.7-code",
+      "served_provider": null,
+      "started_at": "2026-06-18T03:33:17Z",
+      "status": "ok",
+      "stop_reason": "stop",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "code",
+        "synthesis"
+      ],
+      "usage": {
+        "completion_tokens": 45,
+        "prompt_tokens": 39,
+        "total_tokens": 84
+      }
+    }
+  ],
+  "schema_version": "dharma.model_routing_live_probe.v1",
+  "skipped": [],
+  "status": "passed"
+}
