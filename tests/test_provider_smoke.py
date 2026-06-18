@@ -199,7 +199,10 @@ def test_run_provider_smoke_stops_pack_on_provider_wide_failures(monkeypatch) ->
 
     assert payload["nvidia_nim"]["status"] == "missing_config"
     assert payload["openrouter"]["status"] == "insufficient_credits"
-    assert nim_calls == ["nvidia/llama-3.1-nemotron-ultra-253b-v1"]
+    # Smoke lead is the first nvidia/-native NIM id in pool order; after the
+    # 2026-06-18 expansion that is the live Nemotron-3 Ultra 550B (the dead
+    # nemotron-ultra-253b was removed).
+    assert nim_calls == ["nvidia/nemotron-3-ultra-550b-a55b"]
     assert openrouter_calls == ["moonshotai/kimi-k2.5"]
 
 

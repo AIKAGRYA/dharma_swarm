@@ -47,7 +47,8 @@ def test_top10_status_returns_canonical_floor_projection(
 
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload) == 12
+    # 21 floor entries after the NVIDIA bleeding-edge NIM expansion (2026-06-18).
+    assert len(payload) == 21
     assert {row["lane"] for row in payload} == {"floor"}
     kimi = next(row for row in payload if row["id"] == "kimi-k2.6")
     assert kimi["available"] is True
@@ -108,5 +109,6 @@ def test_verify_top10_is_not_an_implicit_live_call(
     payload = response.json()
     assert payload["ok_count"] == 0
     assert payload["live_calls_attempted"] is False
-    assert payload["skipped_count"] == 12
+    # 21 floor entries skipped (no live calls) after the 2026-06-18 NIM expansion.
+    assert payload["skipped_count"] == 21
     assert "DHARMA_LIVE_MODEL_E2E=1" in payload["reason"]

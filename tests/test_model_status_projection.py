@@ -53,7 +53,8 @@ def test_floor_status_projection_uses_dkeys_rows_without_live_calls(
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
 
     assert projection.oracle_state == "fresh"
-    assert len(projection.models) == 12
+    # 21 floor entries after the NVIDIA bleeding-edge NIM expansion (2026-06-18).
+    assert len(projection.models) == 21
     assert all(model.lane == "floor" for model in projection.models)
     by_id = {model.id: model for model in projection.models}
     assert by_id["claude-opus-4.8"].available is True

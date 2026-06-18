@@ -310,16 +310,14 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         "Sub-floor (Llama 3.3 70B NIM) — grunt work only",
         below_floor=True,
     ),
-    ModelSlot(
-        ProviderType.NVIDIA_NIM,
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
-        "Nemotron Ultra 253B (NIM)",
-        ModelTier.STRONG,
-        ("reasoning", "synthesis", "architecture"),
-        128_000,
-        "Sub-floor (Llama 3.1 Nemotron) — grunt work only",
-        below_floor=True,
-    ),
+    # REMOVED 2026-06-18: nvidia/llama-3.1-nemotron-ultra-253b-v1 returned
+    # HTTP 404 "Function not found for account" on a live receipt-grade probe
+    # with this account's NVIDIA key — the function is not provisioned for our
+    # account, so it is not a real route. The working Nemotron weights this
+    # account CAN serve are added as live floor/grunt routes below
+    # (nemotron-3-ultra-550b, nemotron-3-super-120b, nemotron-super-49b,
+    # nemotron-nano-9b). Keeping the 253b slot let the key-oracle advertise a
+    # dead route as routable until a contradicting receipt landed.
     ModelSlot(
         ProviderType.OPENROUTER,
         "deepseek/deepseek-r1",
@@ -404,12 +402,13 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     ),
     ModelSlot(
         ProviderType.NVIDIA_NIM,
-        "deepseek-ai/deepseek-v4-pro/flash",
-        "DeepSeek V4 Pro Flash (NIM)",
+        "deepseek-ai/deepseek-v4-pro",
+        "DeepSeek V4 Pro (NIM)",
         ModelTier.STRONG,
         ("code", "reasoning", "chinese"),
         256_000,
-        "Floor — DeepSeek V4 Pro flash route via NVIDIA NIM hosted catalog",
+        "Floor — DeepSeek V4 Pro on NVIDIA NIM (live receipt 2026-06-18). "
+        "Fixes the bogus 3-part id deepseek-ai/deepseek-v4-pro/flash (HTTP 404).",
     ),
     ModelSlot(
         ProviderType.SAMBANOVA,
@@ -439,6 +438,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         "Floor — GLM-5.1 reasoning lane via Ollama Cloud (GLM-zai live)",
     ),
     ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "z-ai/glm-5.1",
+        "GLM 5.1 (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis", "multilingual"),
+        256_000,
+        "Floor — GLM-5.1 on NVIDIA NIM (live receipt 2026-06-18, secondary route)",
+    ),
+    ModelSlot(
         ProviderType.OLLAMA,
         "minimax-m3:cloud",
         "MiniMax M3 (Ollama Cloud)",
@@ -455,6 +463,127 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ("reasoning", "synthesis"),
         256_000,
         "Floor — MiniMax M3 on NVIDIA NIM (secondary route)",
+    ),
+    # ══════════════════════════════════════════════════════════════════
+    # NVIDIA NIM bleeding-edge + NVIDIA-native lanes (live receipts
+    # 2026-06-18 against integrate.api.nvidia.com with this account's key).
+    # Operator directive: a WIDE, diverse selection of the bleeding edge and
+    # the models UNIQUE to NVIDIA's system (the Nemotron-3 family). Each id
+    # below returned HTTP 200 on a paced pong probe; ids that 404'd for this
+    # account (nemotron-ultra-253b, deepseek-v4-pro/flash, codestral-22b,
+    # gemma-3-12b) are deliberately NOT added.
+    # ══════════════════════════════════════════════════════════════════
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "deepseek-ai/deepseek-v4-flash",
+        "DeepSeek V4 Flash (NIM)",
+        ModelTier.FAST,
+        ("code", "reasoning", "speed", "chinese"),
+        256_000,
+        "Floor — DeepSeek V4 Flash fast frontier lane on NVIDIA NIM (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "qwen/qwen3.5-397b-a17b",
+        "Qwen3.5 397B (NIM)",
+        ModelTier.FRONTIER,
+        ("reasoning", "code", "chinese", "synthesis"),
+        256_000,
+        "Floor — Qwen3.5 397B MoE flagship on NVIDIA NIM (live, bleeding edge)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "qwen/qwen3-next-80b-a3b-instruct",
+        "Qwen3-Next 80B-A3B (NIM)",
+        ModelTier.FAST,
+        ("reasoning", "code", "speed"),
+        256_000,
+        "Floor — Qwen3-Next 80B (3B active MoE) fast lane on NVIDIA NIM (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "openai/gpt-oss-120b",
+        "GPT-OSS 120B (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "code", "synthesis"),
+        128_000,
+        "Floor — GPT-OSS 120B open-weight on NVIDIA NIM (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "nvidia/nemotron-3-ultra-550b-a55b",
+        "Nemotron-3 Ultra 550B (NIM)",
+        ModelTier.FRONTIER,
+        ("reasoning", "synthesis", "architecture"),
+        128_000,
+        "Floor — NVIDIA Nemotron-3 Ultra 550B MoE, NVIDIA-native frontier (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "nvidia/nemotron-3-super-120b-a12b",
+        "Nemotron-3 Super 120B (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "synthesis", "code"),
+        128_000,
+        "Floor — NVIDIA Nemotron-3 Super 120B MoE, NVIDIA-native (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "mistralai/mistral-large-3-675b-instruct-2512",
+        "Mistral Large 3 675B (NIM)",
+        ModelTier.FRONTIER,
+        ("reasoning", "code", "multilingual"),
+        128_000,
+        "Floor — Mistral Large 3 675B on NVIDIA NIM (live, bleeding edge)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "mistralai/mistral-medium-3.5-128b",
+        "Mistral Medium 3.5 128B (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "code", "multilingual"),
+        128_000,
+        "Floor — Mistral Medium 3.5 128B on NVIDIA NIM (live)",
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "meta/llama-4-maverick-17b-128e-instruct",
+        "Llama 4 Maverick (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "code", "multimodal"),
+        1_000_000,
+        "Floor — Llama 4 Maverick 128-expert MoE on NVIDIA NIM (live)",
+    ),
+    # ── NVIDIA NIM sub-floor (smaller/faster) — grunt work only ────────
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "openai/gpt-oss-20b",
+        "GPT-OSS 20B (NIM)",
+        ModelTier.FAST,
+        ("code", "speed"),
+        128_000,
+        "Sub-floor (GPT-OSS 20B) — fast grunt lane on NVIDIA NIM (live)",
+        below_floor=True,
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        "Nemotron Super 49B (NIM)",
+        ModelTier.STRONG,
+        ("reasoning", "code"),
+        128_000,
+        "Sub-floor (Nemotron Super 49B) — NVIDIA-native grunt lane (live)",
+        below_floor=True,
+    ),
+    ModelSlot(
+        ProviderType.NVIDIA_NIM,
+        "nvidia/nvidia-nemotron-nano-9b-v2",
+        "Nemotron Nano 9B (NIM)",
+        ModelTier.FAST,
+        ("speed", "code"),
+        128_000,
+        "Sub-floor (Nemotron Nano 9B) — fast NVIDIA-native grunt lane (live)",
+        below_floor=True,
     ),
     ModelSlot(
         ProviderType.OLLAMA,

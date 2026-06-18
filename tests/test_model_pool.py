@@ -73,8 +73,14 @@ def test_pool_collapses_roster_slots_to_logical_entries():
     (23 -> 30): claude-opus-4.8,
     claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
     minimax-m3. No sub-floor model was removed — they are marked, not deleted."""
-    assert len(EVOLUTION_ROSTER) == 44
-    assert len(MODEL_POOL) == 30
+    # NVIDIA bleeding-edge expansion (2026-06-18): removed the dead NIM route
+    # nvidia/llama-3.1-nemotron-ultra-253b-v1 (HTTP 404 for this account; -1 slot,
+    # -1 logical entry) and added 13 receipt-proven live NIM slots. Two join
+    # existing entries (deepseek-ai/deepseek-v4-pro fixes the bogus 3-part id;
+    # z-ai/glm-5.1 joins glm-5.1); 12 create new logical entries. Net: 44 -> 56
+    # slots, 30 -> 41 logical entries.
+    assert len(EVOLUTION_ROSTER) == 56
+    assert len(MODEL_POOL) == 41
 
 
 # --------------------------------------------------------------------------
@@ -242,8 +248,10 @@ def test_floor_and_grunt_partition_the_pool():
     assert len(floor) + len(grunt) == len(MODEL_POOL)
     assert all(not e.below_floor for e in floor)
     assert all(e.below_floor for e in grunt)
-    assert len(floor) == 12
-    assert len(grunt) == 18
+    # NVIDIA bleeding-edge expansion (2026-06-18): +9 floor NIM logical entries,
+    # +3 grunt NIM entries, -1 dead grunt (nemotron-ultra-253b removed).
+    assert len(floor) == 21
+    assert len(grunt) == 20
 
 
 def test_floor_path_has_a_claude_chat_brain():
@@ -273,7 +281,11 @@ def test_named_subfloor_models_are_grunt_only():
         "mistral-large-2411",
         "mistral-small-3.1-24b-instruct",
         "llama-3.3-70b-instruct",
-        "llama-3.1-nemotron-ultra-253b-v1",
+        # nvidia/llama-3.1-nemotron-ultra-253b-v1 removed 2026-06-18 (HTTP 404
+        # for this account) — replaced below by the live sub-floor NIM Nemotrons.
+        "gpt-oss-20b",
+        "llama-3.3-nemotron-super-49b-v1.5",
+        "nvidia-nemotron-nano-9b-v2",
         "gemma-3-27b-it",
         "qwen2.5-coder:14b",
         "deepseek-coder-v2:16b",
@@ -314,13 +326,15 @@ def test_deepseek_v4_pro_is_one_entry_live_provider_first():
     }
     # Live provider (Ollama Cloud) ranked first, dead/secondary after.
     assert dv4.routes[0].provider is ProviderType.OLLAMA
-    assert entry_for_model_id("deepseek-ai/deepseek-v4-pro/flash") is dv4
+    # The NIM route is the real 2-part id (the bogus 3-part deepseek-v4-pro/flash
+    # 404'd and was corrected 2026-06-18).
+    assert entry_for_model_id("deepseek-ai/deepseek-v4-pro") is dv4
 
 
 def test_floor_nim_routes_cover_kimi_deepseek_and_minimax():
     expected = {
         "kimi-k2.6": "moonshotai/kimi-k2.6",
-        "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro/flash",
+        "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro",
         "minimax-m3": "minimaxai/minimax-m3",
     }
     for logical_id, model_id in expected.items():
