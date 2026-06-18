@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.agent_memory import AgentMemoryBank
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import LLMResponse, Message, MessagePriority, ProviderType
 from dharma_swarm.runtime_provider import (
     create_runtime_provider,
@@ -35,6 +36,7 @@ from dharma_swarm.runtime_provider import (
 )
 
 logger = logging.getLogger(__name__)
+_DEFAULT_AGENT_MODEL = canonical_default_model(ProviderType.ANTHROPIC)
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +284,7 @@ class AgentIdentity:
     name: str
     role: str
     system_prompt: str
-    model: str = "claude-sonnet-4-20250514"
+    model: str = _DEFAULT_AGENT_MODEL
     provider: str = "anthropic"
     max_turns: int = 25
     allowed_tools: list[str] = field(default_factory=lambda: [
@@ -1332,7 +1334,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "verify claims, and produce research insights. You work in the dharma_swarm "
             "ecosystem alongside other agents."
         ),
-        model="claude-sonnet-4-20250514",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1348,7 +1350,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "You follow existing patterns, run tests after changes, and keep code clean. "
             "You work in the dharma_swarm ecosystem."
         ),
-        model="claude-sonnet-4-20250514",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1364,7 +1366,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "opportunities, potential partners, carbon market news, and strategic intelligence. "
             "You save findings to structured files and flag urgent items."
         ),
-        model="claude-sonnet-4-20250514",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1380,7 +1382,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "and correctness. You find bugs, weak arguments, and potential improvements. "
             "Constructively critical, always specific."
         ),
-        model="claude-sonnet-4-20250514",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1398,7 +1400,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "connections, and what wants to emerge. Bhed Gnan — knowing through "
             "separation of the knower from the known."
         ),
-        model="claude-sonnet-4-20250514",
+        model=_DEFAULT_AGENT_MODEL,
         allowed_tools=[
             "read_file", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",

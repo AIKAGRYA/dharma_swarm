@@ -10,8 +10,8 @@ no skill files found.
 
 Provider strategy:
   - OPENROUTER: All agents route through OpenRouter API (fast, no subprocess
-    overhead). Primary workers use llama-3.3-70b-instruct; support roles use
-    mistral-small-3.1-24b for speed/cost.
+    overhead). Per the model preference doctrine (model_hierarchy.py), every
+    seat gets the most powerful free model its lane offers.
   - CLAUDE_CODE/CODEX: Available as subprocess providers for tasks requiring
     full tool access (file editing, bash). Use spawn_agent() with those types.
   - ANTHROPIC/OPENAI: Available for direct API calls when keys are set.
@@ -24,9 +24,49 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Pool-sourced Ollama-Cloud ids (model-pool consolidation 2026-06)
+# ---------------------------------------------------------------------------
+# The cybernetics crew rides Ollama-Cloud routes. These used to be hand-typed
+# ``<name>:cloud`` literals (including the sub-floor ``kimi-k2.5:cloud``); they
+# are now DERIVED from the ONE model pool at the FLOOR, so the model-id strings
+# live in exactly one place and no sub-floor literal can survive here.
+#   kimi-k2.5:cloud  -> kimi-k2.6 (K2.6 FLOOR)
+#   glm-5 / deepseek-v3.2 / qwen3-coder: in-pool floor entries, kept.
+
+
+def _cloud_id(pool_id: str) -> str:
+    """The Ollama-Cloud route id the pool serves for ``pool_id``.
+
+    Raises at import if the pool has no Ollama-Cloud route for it — a crew row
+    can never silently reference a model outside the pool/floor.
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.endswith(":cloud") or mid.endswith("-cloud"):
+                return mid
+    raise AssertionError(
+        f"startup_crew references pool id {pool_id!r} with no Ollama-Cloud route"
+    )
+
+
+def _openrouter_free_id(pool_id: str) -> str:
+    """The OpenRouter-Free route id the pool serves for ``pool_id``."""
+    entry = _model_pool.get_entry(pool_id)
+    if entry is not None:
+        for route in entry.routes:
+            if route.provider == ProviderType.OPENROUTER_FREE:
+                return route.model_id
+    raise AssertionError(
+        f"startup_crew references pool id {pool_id!r} with no OpenRouter-Free route"
+    )
 
 MEMORY_SURVIVAL_INSTINCT = (
     "MEMORY SURVIVAL INSTINCT:\n"
@@ -82,35 +122,45 @@ def _resolve_default_crew() -> list[dict]:
     decorrelated errors — same model prompted differently does NOT suffice).
     """
     if _has_ollama_key():
-        # Ollama Cloud — diverse frontier models for error decorrelation
-        from dharma_swarm.ollama_config import OLLAMA_CLOUD_FRONTIER_MODELS
-        _models = OLLAMA_CLOUD_FRONTIER_MODELS  # glm-5, deepseek-v3.2, kimi-k2.5, minimax-m2.7, qwen3-coder
+        # Ollama Cloud — DIVERSE frontier models for error decorrelation. The
+        # chain is now derived from the ONE model pool (Ollama-Cloud routes,
+        # best-route-first); we hand each agent a DIFFERENT entry so the crew's
+        # errors decorrelate. Indices are spread, not pinned to a fixed model.
+        from dharma_swarm.ollama_config import (
+            OLLAMA_CLOUD_FRONTIER_MODELS,
+            OLLAMA_DEFAULT_CLOUD_MODEL,
+        )
+        _models = OLLAMA_CLOUD_FRONTIER_MODELS
+        # Spread picks across the chain; wrap if the pool is short so we never
+        # IndexError and still maximise distinctness for the four roles.
+        def _pick(i: int) -> str:
+            return _models[i % len(_models)] if _models else OLLAMA_DEFAULT_CLOUD_MODEL
         return [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
-             "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _models[0]},  # glm-5
+             "thread": "mechanistic", "provider": ProviderType.OLLAMA, "model": _pick(0)},
             {"name": "surgeon", "role": AgentRole.SURGEON,
-             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _models[2]},    # kimi-k2.5
+             "thread": "alignment", "provider": ProviderType.OLLAMA, "model": _pick(1)},
             {"name": "architect", "role": AgentRole.ARCHITECT,
-             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _models[1]}, # deepseek-v3.2
+             "thread": "architectural", "provider": ProviderType.OLLAMA, "model": _pick(2)},
             {"name": "validator", "role": AgentRole.VALIDATOR,
-             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _models[4]},       # qwen3-coder
+             "thread": "scaling", "provider": ProviderType.OLLAMA, "model": _pick(3)},
         ]
 
     if _has_openrouter_key():
-        # OpenRouter Free — diverse free models for error decorrelation
+        # OpenRouter Free — pool-sourced free routes for error decorrelation.
         return [
             {"name": "cartographer", "role": AgentRole.CARTOGRAPHER,
              "thread": "mechanistic", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "meta-llama/llama-3.3-70b-instruct:free"},
+             "model": _openrouter_free_id("llama-3.3-70b-instruct")},
             {"name": "surgeon", "role": AgentRole.SURGEON,
              "thread": "alignment", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "qwen/qwen3-32b:free"},
+             "model": _openrouter_free_id("gemma-3-27b-it")},
             {"name": "architect", "role": AgentRole.ARCHITECT,
              "thread": "architectural", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "deepseek/deepseek-chat-v3-0324:free"},
+             "model": _openrouter_free_id("mistral-small-3.1-24b-instruct")},
             {"name": "validator", "role": AgentRole.VALIDATOR,
              "thread": "scaling", "provider": ProviderType.OPENROUTER_FREE,
-             "model": "mistralai/mistral-small-3.1-24b-instruct:free"},
+             "model": DEFAULT_MODELS[ProviderType.OPENROUTER_FREE]},
         ]
 
     # No API keys — use Claude Code (authenticated via `claude` CLI)
@@ -134,7 +184,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.RESEARCHER,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "glm-5:cloud",
+        "model": _cloud_id("glm-5"),
         "system_prompt": (
             "You are CYBER-GLM5, the Variety Cartographer of the Cybernetics Directive. "
             "Map S2/S3/S4/S5 wiring, identify where governance variety is attenuated, "
@@ -146,7 +196,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.CARTOGRAPHER,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "kimi-k2.5:cloud",
+        "model": _cloud_id("kimi-k2.6"),  # K2.6 FLOOR (was sub-floor kimi-k2.5:cloud)
         "system_prompt": (
             "You are CYBER-KIMI25, the ecosystem mapper of the Cybernetics Directive. "
             "Trace cross-file, cross-module, and cross-ledger connections; make the "
@@ -158,7 +208,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.SURGEON,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "qwen3-coder:480b-cloud",
+        "model": _cloud_id("qwen3-coder:480b-cloud"),
         "system_prompt": (
             "You are CYBER-CODEX, the execution and wiring seat of the Cybernetics Directive. "
             "Prefer the smallest hot-path control improvement over broad subsystem invention. "
@@ -170,7 +220,7 @@ CYBERNETICS_CREW = [
         "role": AgentRole.ARCHITECT,
         "thread": "cybernetics",
         "provider": ProviderType.OLLAMA,
-        "model": "deepseek-v3.2:cloud",
+        "model": _cloud_id("deepseek-v3.2"),
         "system_prompt": (
             "You are CYBER-OPUS, the identity and architecture seat of the Cybernetics Directive. "
             "Hold telos, constitutional coherence, and the bounded mission shape. "

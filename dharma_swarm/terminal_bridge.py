@@ -51,9 +51,8 @@ from dharma_swarm.operator_core import (
     build_workspace_snapshot_payload,
 )
 from dharma_swarm.orientation_packet import DirectiveSummary, RuntimeStateSummary
-from dharma_swarm.provider_matrix import build_default_matrix_targets
+from dharma_swarm import model_status
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, OperatorAction, RuntimeStateStore, SessionEventRecord
-from dharma_swarm.models import ProviderType
 from dharma_swarm.tui import model_routing
 try:
     from dharma_swarm.tui.commands import system_commands as system_commands_module
@@ -79,20 +78,6 @@ def _json_default(value: object) -> object:
     if isinstance(value, set):
         return sorted(value)
     return str(value)
-
-def _bridge_provider_id(provider: ProviderType) -> str | None:
-    if provider == ProviderType.CODEX:
-        return "codex"
-    if provider in {ProviderType.ANTHROPIC, ProviderType.CLAUDE_CODE}:
-        return "claude"
-    if provider in {ProviderType.OPENROUTER, ProviderType.OPENROUTER_FREE}:
-        return "openrouter"
-    return None
-
-def _target_alias(model: str) -> str:
-    normalized = model.split("/")[-1].split(":")[0].strip().lower()
-    normalized = re.sub(r"[^a-z0-9.+-]+", "-", normalized)
-    return normalized.strip("-") or "model"
 
 class TerminalBridge:
     """Minimal stdio protocol server for a terminal frontend."""
@@ -1490,41 +1475,84 @@ class TerminalBridge:
 
     def _build_model_policy_summary(self, *, selected_provider: str, selected_model: str, strategy: str) -> dict[str, Any]:
         strategy = model_routing.resolve_strategy(strategy) or "responsive"
-        raw_targets = build_default_matrix_targets(profile="live25", include_unavailable=True)
+        projection = model_status.floor_model_status()
+        status_by_model_id: dict[str, Any] = {}
+        for projected in projection.models:
+            status_by_model_id[projected.id] = projected
+            for route_status in projected.route_statuses:
+                status_by_model_id[route_status.model_id] = projected
+
+        terminal_providers = self._available_provider_ids()
         seen_routes: set[tuple[str, str]] = set()
         targets: list[dict[str, Any]] = []
-        for target in raw_targets:
-            provider_id = _bridge_provider_id(target.provider)
-            if provider_id is None:
-                continue
-            route = (provider_id, target.model)
+        for target in model_routing.all_targets():
+            provider_id = target.provider_id
+            route = (provider_id, target.model_id)
             if route in seen_routes:
                 continue
             seen_routes.add(route)
-            alias = _target_alias(target.model)
-            lane_role = str(target.lane_role.value).replace("_", " ")
-            tier = str(target.tier)
-            availability = "ready" if bool(target.available) else "unavailable"
+            projected = status_by_model_id.get(target.model_id)
+            provider_values = {provider.value for provider in target.pool_providers}
+            route_statuses = (
+                [
+                    route_status
+                    for route_status in projected.route_statuses
+                    if route_status.provider in provider_values
+                ]
+                if projected is not None
+                else []
+            )
+            model_available = any(
+                route_status.status == "live_routable"
+                for route_status in route_statuses
+            )
+            adapter_available = provider_id in terminal_providers
+            selectable = model_available and adapter_available
+            if selectable:
+                route_state = "ready"
+                availability_reason = None
+            elif model_available and not adapter_available:
+                route_state = "unavailable"
+                availability_reason = "terminal_adapter_missing"
+            else:
+                route_state = "unavailable"
+                availability_reason = (
+                    getattr(projected, "unavailable_reason", None)
+                    or "no_live_route"
+                    if projected is not None
+                    else "model_status_missing"
+                )
             targets.append(
                 {
-                    "alias": alias,
+                    "alias": target.alias,
                     "provider": provider_id,
-                    "model": target.model,
-                    "label": f"{target.model} [{provider_id} | {lane_role} | {tier} | {availability}]",
-                    "lane_role": target.lane_role.value,
-                    "tier": tier,
-                    "available": bool(target.available),
-                    "availability_reason": target.availability_reason,
-                    "config_source": target.config_source,
+                    "model": target.model_id,
+                    "label": target.label,
+                    "route_id": f"{provider_id}:{target.model_id}",
+                    "route_state": route_state,
+                    "picker_visible": selectable,
+                    "selectable": selectable,
+                    "available": model_available,
+                    "availability_reason": availability_reason,
+                    "pool_id": getattr(projected, "id", None),
+                    "tier": getattr(projected, "tier", "unknown"),
+                    "lane": getattr(projected, "lane", "floor"),
+                    "status": getattr(projected, "status", "unavailable"),
+                    "available_routes": list(getattr(projected, "available_routes", [])),
                 }
             )
 
         selected_available = any(
             target["provider"] == selected_provider and target["model"] == selected_model
+            and bool(target.get("selectable"))
             for target in targets
         )
         if not selected_available and targets:
-            fallback_target = next((target for target in targets if target["provider"] == "codex"), targets[0])
+            selectable_targets = [target for target in targets if bool(target.get("selectable"))]
+            fallback_target = next(
+                (target for target in selectable_targets if target["provider"] == "codex"),
+                selectable_targets[0] if selectable_targets else targets[0],
+            )
             selected_provider = str(fallback_target["provider"])
             selected_model = str(fallback_target["model"])
 
@@ -1542,11 +1570,24 @@ class TerminalBridge:
                 "provider": str(target["provider"]),
                 "model": str(target["model"]),
                 "label": str(target["label"]),
+                "route_id": str(target["route_id"]),
+                "route_state": str(target["route_state"]),
+                "availability_reason": target.get("availability_reason"),
             }
             for target in targets
             if not (target["provider"] == selected_provider and target["model"] == selected_model)
+            and bool(target.get("selectable"))
         ][:6]
+        provider_counts: dict[str, int] = {}
+        for target in targets:
+            if not bool(target.get("selectable")):
+                continue
+            provider = str(target["provider"])
+            provider_counts[provider] = provider_counts.get(provider, 0) + 1
         return {
+            "schema_version": model_status.MODEL_STATUS_SCHEMA_VERSION,
+            "oracle_state": projection.oracle_state,
+            "live_providers": projection.live_providers,
             "selected_provider": selected_provider,
             "selected_model": selected_model,
             "selected_route": f"{selected_provider}:{selected_model}",
@@ -1560,6 +1601,10 @@ class TerminalBridge:
             "active_label": str(active_target["label"]) if active_target else selected_model,
             "fallback_chain": fallback_chain,
             "targets": targets,
+            "available_providers": [
+                {"id": provider, "model_count": count}
+                for provider, count in sorted(provider_counts.items())
+            ],
         }
 
     def _build_agent_routes(self) -> dict[str, Any]:
@@ -1959,6 +2004,15 @@ class TerminalBridge:
                 target = model_routing.target_by_index(int(arg))
             if target is None:
                 return f"Unknown model target: {arg or 'missing'}"
+            # Unroutable (zero live provider keys) => non-selectable. Refuse the
+            # switch instead of flapping onto a dead provider. FAIL-OPEN: a blind
+            # key oracle keeps every target selectable (today's behaviour).
+            if not model_routing.is_routable(target):
+                return (
+                    f"Model '{target.alias}' is unroutable "
+                    f"(no live key for {target.provider_id}). "
+                    f"Run `dkeys test` or pick a live model with /model list."
+                )
             return self._render_model_policy_text(
                 self._build_model_policy_summary(
                     selected_provider=target.provider_id,

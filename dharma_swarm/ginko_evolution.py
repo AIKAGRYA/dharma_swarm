@@ -37,6 +37,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.runtime_provider import complete_via_preferred_runtime_providers
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,27 @@ GINKO_DIR = Path(os.getenv("DHARMA_HOME", Path.home() / ".dharma")) / "ginko"
 AGENTS_DIR = GINKO_DIR / "agents"
 TOURNAMENT_HISTORY_PATH = GINKO_DIR / "tournament_history.jsonl"
 
-MUTATION_MODEL = "deepseek/deepseek-chat-v3-0324"
+
+def _pool_route_id(pool_id: str) -> str:
+    """Canonical OpenRouter-shaped model_id the pool serves for ``pool_id``.
+
+    Prefers a vendor-prefixed (``vendor/model``) route — the form the mutation
+    call dispatches over — falling back to the entry's first route. Raises at
+    import if the pool has no such entry, so no model-id literal can live here
+    and no sub-floor string can survive (model_pool consolidation 2026-06).
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:  # pragma: no cover - guarded by import-time construction
+        raise AssertionError(f"ginko_evolution references unknown pool id {pool_id!r}")
+    for route in entry.routes:
+        if "/" in route.model_id:
+            return route.model_id
+    return entry.model_ids[0]
+
+
+# DeepSeek Chat v3 — cheap, in-pool prompt-mutation model. Derived from the pool
+# (one model-id home) instead of a hand-typed ``deepseek/...`` literal.
+MUTATION_MODEL = _pool_route_id("deepseek-chat-v3-0324")
 
 # Fleet agent names (canonical order)
 FLEET_AGENTS = ["kimi", "deepseek", "nemotron", "glm", "sentinel", "scout"]

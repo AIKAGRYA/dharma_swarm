@@ -1,0 +1,23 @@
+{
+  "schema": "dharma_a2a_task_receipt.v1",
+  "claim": "WS2 extends make orient into one generated repo_context JSON/Markdown artifact with identity, tracks, lanes, agents, receipts, A2A, body state, and broken register.",
+  "evidence": [
+    {"kind": "path", "value": "scripts/governance/orientation_graph.py"},
+    {"kind": "path", "value": "reports/orientation/repo_context.json"},
+    {"kind": "path", "value": "reports/orientation/repo_context.md"},
+    {"kind": "command", "value": "time make orient"}
+  ],
+  "verdict": "verified",
+  "next_action": "Use reports/orientation/repo_context.json as first-token machine context for agents.",
+  "files_changed": [
+    "scripts/governance/orientation_graph.py",
+    "Makefile",
+    "reports/orientation/repo_context.json",
+    "reports/orientation/repo_context.md",
+    "tests/test_orientation_graph.py",
+    "tests/test_truth_graph_repo_context.py",
+    "reports/orientation/receipts/tg001_ws2_repo_context.json"
+  ],
+  "mission_id": "tg-001",
+  "workstream": "WS2"
+}

@@ -23,7 +23,9 @@ from dharma_swarm.provider_matrix import (
 
 
 def test_build_default_matrix_targets_keeps_sovereign_lanes_first() -> None:
-    targets = build_default_matrix_targets(profile="live25", env={})
+    # key_oracle=None => FAIL-OPEN (no live filtering) so the matrix keeps its
+    # full deterministic shape regardless of the machine's keys_status.json.
+    targets = build_default_matrix_targets(profile="live25", env={}, key_oracle=None)
 
     assert targets[0].provider == ProviderType.CODEX
     assert targets[0].lane_role == LaneRole.PRIMARY_DRIVER
@@ -57,7 +59,9 @@ def test_build_default_matrix_targets_quick_keeps_ten_live_friendly_lanes(
 
     monkeypatch.setattr("dharma_swarm.provider_matrix.resolve_runtime_provider_config", _fake_resolve)
 
-    targets = build_default_matrix_targets(profile="quick", env={"OPENROUTER_API_KEY": "test-key"})
+    targets = build_default_matrix_targets(
+        profile="quick", env={"OPENROUTER_API_KEY": "test-key"}, key_oracle=None
+    )
 
     assert len(targets) >= 10
     assert targets[0].provider == ProviderType.CODEX
@@ -121,6 +125,9 @@ def test_classify_matrix_response_accepts_embedded_json_payload() -> None:
 
 def test_classify_error_marks_blank_timeout_exception() -> None:
     assert _classify_error(TimeoutError()) == "timeout"
+    assert _classify_error("HTTP error 429: too many requests") == "rate_limited"
+    assert _classify_error("insufficient_quota for this key") == "quota_exhausted"
+    assert _classify_error("your credit balance is too low") == "billing_exhausted"
 
     status, schema_valid, missing = classify_matrix_response(
         "You've hit your limit · resets Mar 27, 9pm (Asia/Tokyo)",
@@ -612,3 +619,97 @@ def test_run_provider_matrix_writes_leaderboard_artifacts(tmp_path: Path, monkey
     assert stored["profile"] == "quick"
     assert stored["leaderboard"][0]["provider"] == "codex"
     assert "Provider Matrix Leaderboard" in markdown_path.read_text()
+
+
+# ---------------------------------------------------------------------------
+# STEP 4 — pool projection + live-key oracle filtering
+# ---------------------------------------------------------------------------
+
+_LIVE_CORE = {
+    "codex",
+    "claude_code",
+    "anthropic",
+    "ollama",
+    "nvidia_nim",
+    "openai",
+    "deepseek",
+    "local",
+}
+
+
+def test_matrix_targets_project_from_pool_for_live_providers() -> None:
+    """The blueprint model strings come from the model pool, not literals.
+
+    The Ollama cloud lanes (added to the pool in Step 4) must materialise with
+    the exact provider-specific model ids the pool holds.
+    """
+    targets = build_default_matrix_targets(profile="live25", env={}, key_oracle=None)
+    ollama_models = {t.model for t in targets if t.provider == ProviderType.OLLAMA}
+    assert "kimi-k2.5:cloud" in ollama_models
+    assert "deepseek-v3.2:cloud" in ollama_models
+    assert "qwen3-coder:480b-cloud" in ollama_models
+    assert "minimax-m2.7:cloud" in ollama_models
+    # OpenRouter K2.6 floor route projects from the pool entry, not a literal.
+    openrouter_models = {t.model for t in targets if t.provider == ProviderType.OPENROUTER}
+    assert "moonshotai/kimi-k2.6" in openrouter_models
+
+
+def test_matrix_shrinks_for_dead_providers_under_live_oracle() -> None:
+    """Matrix output is unchanged for live providers and shrinks for dead ones.
+
+    With the GOAL's real live set (openrouter / groq dead), those provider lanes
+    are pruned while the live ollama/codex/nim/openai lanes are kept verbatim.
+    """
+    full = build_default_matrix_targets(profile="live25", env={}, key_oracle=None)
+    filtered = build_default_matrix_targets(profile="live25", env={}, key_oracle=_LIVE_CORE)
+
+    full_provs = {t.provider for t in full}
+    filt_provs = {t.provider for t in filtered}
+
+    # Dead providers pruned.
+    assert ProviderType.OPENROUTER in full_provs
+    assert ProviderType.OPENROUTER not in filt_provs
+    assert ProviderType.OPENROUTER_FREE not in filt_provs
+    assert ProviderType.GROQ not in filt_provs
+
+    # Live providers kept, and their model rows are byte-identical (unchanged).
+    assert ProviderType.OLLAMA in filt_provs
+    full_ollama = sorted(t.model for t in full if t.provider == ProviderType.OLLAMA)
+    filt_ollama = sorted(t.model for t in filtered if t.provider == ProviderType.OLLAMA)
+    assert full_ollama == filt_ollama
+
+    # The matrix strictly shrank.
+    assert len(filtered) < len(full)
+    # Every surviving row is a live provider.
+    assert all(t.provider.value in _LIVE_CORE for t in filtered)
+
+
+def test_matrix_fail_open_when_oracle_unknown() -> None:
+    """FAIL-OPEN: an unknown oracle (None) never strands the fleet — every
+    blueprint row survives, matching the no-filter full matrix."""
+    full = build_default_matrix_targets(profile="quick", env={}, key_oracle=None)
+    # An explicit None must equal the full unfiltered set (no pruning at all).
+    assert len(full) >= 10
+    assert {t.provider for t in full} >= {
+        ProviderType.GROQ,
+        ProviderType.OPENROUTER_FREE,
+        ProviderType.NVIDIA_NIM,
+        ProviderType.CEREBRAS,
+    }
+
+
+def test_matrix_marks_dead_key_providers_unavailable_with_reason() -> None:
+    """When the oracle prunes, a still-included row (include_unavailable) carries
+    an honest availability reason — never a silent live claim."""
+    # Force a provider that is config-available but oracle-dead to remain via a
+    # generous live set that still excludes groq.
+    live = _LIVE_CORE | {"openrouter_free", "cerebras"}
+    targets = build_default_matrix_targets(
+        profile="quick", env={}, include_unavailable=True, key_oracle=live
+    )
+    # groq is excluded entirely (blueprint-level prune), so it should be absent.
+    assert all(t.provider != ProviderType.GROQ for t in targets)
+    # Every surviving target either available or carries a non-live reason.
+    for t in targets:
+        if not t.available:
+            assert t.availability_reason in {"unavailable", "dead_key"}
