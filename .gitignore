@@ -109,3 +109,6 @@ tools/evidence_ingestor_go/evidence_ingestor_go
 reports/capital_lab/goal_a_12h/session_logs/*.log
 _proof_state/
 prove_loop1_spine_ollama.py
+
+reports/model_routing/e2e/
+reports/model_pool/
