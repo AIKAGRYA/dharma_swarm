@@ -405,7 +405,12 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
     assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
-    artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
+    artifact_count = 0
+    for _ in range(20):
+        artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
+        if artifact_count >= 1:
+            break
+        await asyncio.sleep(0.05)
     assert artifact_count >= 1
     with sqlite3.connect(runtime_db_path) as db:
         artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
