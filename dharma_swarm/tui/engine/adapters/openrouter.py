@@ -8,6 +8,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.api_keys import OPENROUTER_API_KEY_ENV, env_value
 from dharma_swarm.model_hierarchy import DEFAULT_MODELS
 from dharma_swarm.models import ProviderType
@@ -20,6 +21,24 @@ OPENROUTER_CAPABILITIES = (
     | Capability.COST_TRACKING
     | Capability.CANCEL
 )
+
+
+def _gemini_openrouter_id() -> str:
+    """The Gemini OpenRouter route id, sourced from the ONE pool at the FLOOR.
+
+    The Gemini lane used to hand-type the sub-floor ``google/gemini-2.5-pro``;
+    the floor is gemini-3-pro, owned by the pool. We project its OpenRouter
+    (``google/...``) route so the model-id literal lives only in the pool.
+    """
+    entry = _model_pool.get_entry("gemini-3-pro")
+    if entry is not None:
+        for mid in entry.model_ids:
+            if mid.startswith("google/"):
+                return mid
+    raise AssertionError("model_pool has no google/ route for the gemini-3-pro floor")
+
+
+_GEMINI_OPENROUTER_ID = _gemini_openrouter_id()
 
 
 class OpenRouterAdapter(ProviderAdapter):
@@ -47,9 +66,9 @@ class OpenRouterAdapter(ProviderAdapter):
                 display_name="Codex 5.4 (OpenRouter)",
                 capabilities=OPENROUTER_CAPABILITIES,
             ),
-            "google/gemini-2.5-pro": ModelProfile(
+            _GEMINI_OPENROUTER_ID: ModelProfile(
                 provider_id=self.provider_id,
-                model_id="google/gemini-2.5-pro",
+                model_id=_GEMINI_OPENROUTER_ID,
                 display_name="Gemini 3 class (OpenRouter)",
                 capabilities=OPENROUTER_CAPABILITIES,
             ),

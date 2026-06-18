@@ -116,6 +116,15 @@ Audit questions:
 - Does this AI-generated issue or PR include reproduction steps, affected version, and minimal concrete trace?
 - Is review burden lower after this change than before it?
 
+## Cluster R - Quality Ratchet
+
+### QL-R1 - Quality ratchet regression
+A repo-wide quality counter moved against its permitted direction: debt counters (undefined names, over-budget modules, silent exception swallows, spine bypasses) may only fall; asset counters (property-test files, enforced hygiene patterns) may only rise. Baselines live in docs/governance/hygiene/ratchet_baselines.json and tighten automatically on green runs.
+
+Audit questions:
+- Did this change move any ratchet counter against its direction, and if intentional, was the baseline edit reviewed as a deliberate loosening?
+- Did an improving change commit the tightened ratchet_baselines.json alongside the improvement so the gain is banked?
+
 ## Cluster A - Test Theater
 
 ### VC-A1 - Happy-path tunnel vision

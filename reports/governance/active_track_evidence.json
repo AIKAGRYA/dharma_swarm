@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-12T10:49:47+09:00",
+  "generated_at": "2026-06-18T11:03:04+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -469,30 +469,43 @@
       ]
     },
     {
-      "id": "orientation-graph-2026-06",
-      "name": "Orientation Graph \u2014 whole-system view served on token one",
+      "id": "truth-graph-platform-2026-06",
+      "name": "Truth Graph Platform v1 \u2014 repo context + receipted A2A presence",
       "status": "ACTIVE",
       "serves": "substrate-nativeness",
       "complements": [
-        "runtime-truth-reconciliation-2026-06"
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
       ],
-      "depends_on": [],
+      "depends_on": [
+        "orientation-graph-2026-06"
+      ],
       "conflicts_with": [],
       "owned_surfaces": [
         "scripts/governance/orientation_graph.py",
-        "tests/test_orientation_graph.py"
+        "scripts/governance/truth_graph_nats_e2e_demo.py",
+        "scripts/governance/run_truth_graph_nats_e2e_demo.sh",
+        "tests/test_orientation_graph.py",
+        "tests/test_truth_graph_repo_context.py",
+        "dharma_swarm/a2a/task_receipt.py",
+        "dharma_swarm/a2a/agent_presence.py",
+        "tests/test_a2a_gate.py",
+        "tests/test_agent_registry_presence.py",
+        "reports/orientation/**"
       ],
       "moves_vital_signs": [
-        "quality_gates"
+        "quality_gates",
+        "tool_coverage",
+        "memory_persistence"
       ],
-      "verified_at": "2026-06-11",
+      "verified_at": "2026-06-12",
       "ttl_days": 21,
-      "owner": "@devin",
+      "owner": "@codex",
       "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 6,
-        "total": 6
+        "passed": 15,
+        "total": 15
       },
       "criteria": [
         {
@@ -508,40 +521,100 @@
           "detail": "docs/vision_maps/NORTH_STAR.md present"
         },
         {
-          "id": "orientation_graph_exists",
+          "id": "orientation_graph_owner_exists",
           "kind": "file_exists",
           "passed": true,
           "detail": "scripts/governance/orientation_graph.py present"
         },
         {
-          "id": "orientation_packet_defined",
+          "id": "expanded_orientation_packet_defined",
           "kind": "file_contains",
           "passed": true,
           "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py"
         },
         {
-          "id": "orientation_read_only_test",
+          "id": "repo_context_writer_defined",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py"
+        },
+        {
+          "id": "repo_context_hash_defined",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py"
+        },
+        {
+          "id": "make_orient_writes_context",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern '--write-context' found in Makefile"
+        },
+        {
+          "id": "orientation_default_read_only_test",
           "kind": "file_contains",
           "passed": true,
           "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py"
         },
         {
-          "id": "onboard_identity_render",
+          "id": "repo_context_test_exists",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern 'render_identity' found in scripts/governance/agent_onboard.py"
+          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py"
         },
         {
-          "id": "make_orient_target",
-          "kind": "file_contains",
+          "id": "a2a_receipt_gate_exists",
+          "kind": "file_exists",
           "passed": true,
-          "detail": "pattern 'orient:' found in Makefile"
+          "detail": "dharma_swarm/a2a/task_receipt.py present"
         },
         {
-          "id": "megafile_points_at_north_star",
+          "id": "a2a_receipt_schema_declared",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern 'NORTH_STAR.md' found in docs/MEGAFILE_INDEX.md"
+          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py"
+        },
+        {
+          "id": "a2a_receipted_inbox_reader_defined",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py"
+        },
+        {
+          "id": "agent_presence_projection_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/a2a/agent_presence.py present"
+        },
+        {
+          "id": "agent_presence_stale_red",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py"
+        },
+        {
+          "id": "nats_e2e_demo_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present"
+        },
+        {
+          "id": "nats_e2e_shell_wrapper_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present"
+        },
+        {
+          "id": "a2a_gate_tests_exist",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py"
+        },
+        {
+          "id": "registry_presence_tests_exist",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
         }
       ]
     },
@@ -682,8 +755,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:orientation-graph-2026-06",
-      "message": "[orientation-graph-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-shippable:truth-graph-platform-2026-06",
+      "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     },
     {

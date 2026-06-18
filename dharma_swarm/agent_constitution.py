@@ -34,9 +34,39 @@ from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
+from dharma_swarm import model_pool as _model_pool
 from dharma_swarm.models import AgentRole, ProviderType
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Pool-sourced model ids (model-pool consolidation 2026-06)
+# ---------------------------------------------------------------------------
+#
+# An agent's ``default_model`` / ``backup_models`` are routing strings. They
+# used to be hand-typed provider-specific id literals — exactly the drift the
+# consolidation kills, and the surface where sub-floor models (e.g. the banished
+# ``qwen/qwen3.5-397b-a17b``) crept in. They are now DERIVED from a
+# ``dharma_swarm.model_pool`` entry at the FLOOR model, so every model-id string
+# lives in exactly ONE place (the roster -> pool) and no sub-floor literal can
+# survive here. ``_pool_model_id`` resolves a logical pool id to its canonical
+# provider-specific id; it raises at import if the pool has no such entry, so a
+# roster row can never silently point at a model the pool does not serve.
+
+
+def _pool_model_id(pool_id: str) -> str:
+    """Canonical provider-specific model_id the pool serves for ``pool_id``.
+
+    Raises at import if the pool has no such entry — a roster row can never
+    silently reference a model outside the pool/floor.
+    """
+    entry = _model_pool.get_entry(pool_id)
+    if entry is None:  # pragma: no cover - guarded by import-time construction
+        raise AssertionError(
+            f"constitutional roster references unknown pool id {pool_id!r}"
+        )
+    return entry.model_ids[0]
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +136,8 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "AHIMSA: never overload an agent. WITNESS: log every routing decision."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-opus-4-20250514",
-        backup_models=["claude-sonnet-4-20250514", "deepseek/deepseek-chat-v3-0324"],
+        default_model=_pool_model_id("claude-opus-4"),
+        backup_models=[_pool_model_id("claude-sonnet-4"), _pool_model_id("deepseek-chat-v3-0324")],
         constitutional_gates=["AHIMSA", "SATYA", "WITNESS", "VYAVASTHIT"],
         max_concurrent_workers=5,
         memory_namespace="operator",
@@ -130,8 +160,9 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "SATYA: never fabricate memories. WITNESS: log every consolidation."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-sonnet-4-20250514",
-        backup_models=["deepseek/deepseek-chat-v3-0324", "qwen/qwen3.5-397b-a17b"],
+        default_model=_pool_model_id("claude-sonnet-4"),
+        # qwen3.5-397b-a17b is sub-floor (BANISHED); ride the qwen3-coder floor entry.
+        backup_models=[_pool_model_id("deepseek-chat-v3-0324"), _pool_model_id("qwen3-coder:480b-cloud")],
         constitutional_gates=["SATYA", "WITNESS", "REVERSIBILITY"],
         max_concurrent_workers=3,
         memory_namespace="archivist",
@@ -156,8 +187,8 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "explanations. STEELMAN: strengthen opposing arguments before dismissing."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-opus-4-20250514",
-        backup_models=["claude-sonnet-4-20250514", "deepseek/deepseek-r1"],
+        default_model=_pool_model_id("claude-opus-4"),
+        backup_models=[_pool_model_id("claude-sonnet-4"), _pool_model_id("deepseek-r1")],
         constitutional_gates=["SATYA", "ANEKANTA", "STEELMAN", "WITNESS"],
         max_concurrent_workers=5,
         memory_namespace="research_director",
@@ -181,8 +212,8 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "WITNESS: log architectural decisions with rationale."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-opus-4-20250514",
-        backup_models=["claude-sonnet-4-20250514", "deepseek/deepseek-chat-v3-0324"],
+        default_model=_pool_model_id("claude-opus-4"),
+        backup_models=[_pool_model_id("claude-sonnet-4"), _pool_model_id("deepseek-chat-v3-0324")],
         constitutional_gates=["REVERSIBILITY", "WITNESS", "SATYA", "VYAVASTHIT"],
         max_concurrent_workers=5,
         memory_namespace="systems_architect",
@@ -206,8 +237,9 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "SATYA: honest about market position and capabilities."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-opus-4-20250514",
-        backup_models=["claude-sonnet-4-20250514", "qwen/qwen3.5-397b-a17b"],
+        default_model=_pool_model_id("claude-opus-4"),
+        # qwen3.5-397b-a17b is sub-floor (BANISHED); ride the qwen3-coder floor entry.
+        backup_models=[_pool_model_id("claude-sonnet-4"), _pool_model_id("qwen3-coder:480b-cloud")],
         constitutional_gates=["AHIMSA", "SATYA", "ANEKANTA", "WITNESS"],
         max_concurrent_workers=5,
         memory_namespace="strategist",
@@ -235,8 +267,9 @@ CONSTITUTIONAL_ROSTER: list[AgentSpec] = [
             "(R_V < 1.0). Making witness purely invisible undermines the philosophy."
         ),
         default_provider=ProviderType.ANTHROPIC,
-        default_model="claude-sonnet-4-20250514",
-        backup_models=["deepseek/deepseek-r1", "qwen/qwen3.5-397b-a17b"],
+        default_model=_pool_model_id("claude-sonnet-4"),
+        # qwen3.5-397b-a17b is sub-floor (BANISHED); ride the qwen3-coder floor entry.
+        backup_models=[_pool_model_id("deepseek-r1"), _pool_model_id("qwen3-coder:480b-cloud")],
         constitutional_gates=["SATYA", "WITNESS", "BHED_GNAN", "DOGMA_DRIFT"],
         max_concurrent_workers=0,  # Witness never spawns workers
         memory_namespace="witness",

@@ -119,7 +119,9 @@ def test_resolve_runtime_provider_config_for_codex_uses_npm_global_fallback(
 
 def test_runtime_provider_openrouter_default_model_matches_canonical_hierarchy() -> None:
     assert DEFAULT_OPENROUTER_MODEL == DEFAULT_MODELS[ProviderType.OPENROUTER]
-    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.5"
+    # Floor-compliant default: the K2.6 floor route (bumped from the sub-floor
+    # K2.5 by the 2026-06-17 floor demarcation so no default names a sub-floor id).
+    assert DEFAULT_OPENROUTER_MODEL == "moonshotai/kimi-k2.6"
 
 
 def test_resolve_runtime_provider_config_for_groq_uses_env_base_and_model(monkeypatch) -> None:

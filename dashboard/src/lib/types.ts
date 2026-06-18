@@ -217,6 +217,14 @@ export interface ModelVerificationOut {
   error?: string | null;
 }
 
+export interface RouteStatusOut {
+  provider: string;
+  model_id: string;
+  route: string;
+  status: string;
+  reason?: string | null;
+}
+
 export interface TopModelOut {
   id: string;
   rank: number;
@@ -228,8 +236,13 @@ export interface TopModelOut {
   max_context: number;
   strengths: string[];
   available: boolean;
+  status?: string;
+  unavailable_reason?: string | null;
+  lane?: string;
+  below_floor?: boolean;
   available_routes?: string[];
   routes?: string[];
+  route_statuses?: RouteStatusOut[];
   notes?: string | null;
   docs_url?: string;
   provider_url?: string;
@@ -244,6 +257,9 @@ export interface ModelProfileOut {
 export interface VerifyTop10Out {
   verified_at: string;
   ok_count: number;
+  skipped_count?: number;
+  live_calls_attempted?: boolean;
+  reason?: string;
 }
 
 // ---------------------------------------------------------------------------

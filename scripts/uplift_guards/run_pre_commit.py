@@ -21,6 +21,7 @@ from scripts.uplift_guards import (
     check_mismatch_adjacency,
     check_no_secrets,
 )
+from scripts.uplift_guards.check_no_model_literals import check_no_model_literals
 from scripts.uplift_guards.check_spine_ownership import check_spine_ownership
 
 
@@ -80,6 +81,7 @@ GUARDS = [
     ("mismatch-adjacency", check_mismatch_adjacency),
     ("assurance-diff", check_assurance_diff),
     ("spine-ownership", check_spine_ownership),
+    ("no-model-literals", check_no_model_literals),
 ]
 
 
