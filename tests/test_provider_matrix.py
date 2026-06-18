@@ -125,6 +125,9 @@ def test_classify_matrix_response_accepts_embedded_json_payload() -> None:
 
 def test_classify_error_marks_blank_timeout_exception() -> None:
     assert _classify_error(TimeoutError()) == "timeout"
+    assert _classify_error("HTTP error 429: too many requests") == "rate_limited"
+    assert _classify_error("insufficient_quota for this key") == "quota_exhausted"
+    assert _classify_error("your credit balance is too low") == "billing_exhausted"
 
     status, schema_valid, missing = classify_matrix_response(
         "You've hit your limit · resets Mar 27, 9pm (Asia/Tokyo)",

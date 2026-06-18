@@ -34,6 +34,10 @@ class _ContentProvider:
         yield self.content
 
 
+def _fail_open_key_liveness() -> set[str] | None:
+    return None
+
+
 def _route_request(task_id: str) -> ProviderRouteRequest:
     return ProviderRouteRequest(
         action_name="summarize_notes",
@@ -83,12 +87,26 @@ def _pin_chain(router: ModelRouter, first: ProviderType, second: ProviderType) -
         ("403 Forbidden", "access_denied"),
         ("timeout: upstream", "provider_timeout"),
         ("error: upstream broke", "provider_error"),
+        ("ERROR(rc=1): subprocess failed", "provider_error"),
+        ("", "empty_response"),
         ("a normal completion answer", None),
     ],
 )
 def test_response_failure_classes_are_separated(body: str, expected: str | None) -> None:
     response = LLMResponse(content=body, model="m", usage={})
     assert ModelRouter._response_indicates_failure(response) == expected
+
+
+def test_long_structured_error_body_keeps_specific_failure_class() -> None:
+    body = (
+        '{"error":{"message":"You exceeded your current quota, please check your plan",'
+        '"details":"'
+        + ("x" * 700)
+        + '"}}'
+    )
+    response = LLMResponse(content=body, model="m", usage={})
+
+    assert ModelRouter._response_indicates_failure(response) == "quota_exhausted"
 
 
 @pytest.mark.parametrize(
@@ -114,7 +132,8 @@ async def test_rate_limited_falls_through_without_fast_tripping_breaker() -> Non
         {
             ProviderType.OPENAI: limited,
             ProviderType.OPENROUTER: healthy,
-        }
+        },
+        key_liveness_provider=_fail_open_key_liveness,
     )
     _pin_chain(router, ProviderType.OPENAI, ProviderType.OPENROUTER)
 
@@ -138,7 +157,8 @@ async def test_quota_exhausted_fast_trips_breaker_open() -> None:
         {
             ProviderType.OPENAI: exhausted,
             ProviderType.OPENROUTER: healthy,
-        }
+        },
+        key_liveness_provider=_fail_open_key_liveness,
     )
     _pin_chain(router, ProviderType.OPENAI, ProviderType.OPENROUTER)
 

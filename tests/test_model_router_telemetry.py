@@ -44,12 +44,17 @@ class _FailingProvider:
         yield ""
 
 
+def _fail_open_key_liveness() -> set[str] | None:
+    return None
+
+
 @pytest.mark.asyncio
 async def test_model_router_success_writes_telemetry_records(tmp_path) -> None:
     telemetry = TelemetryPlaneStore(tmp_path / "runtime.db")
     router = ModelRouter(
         {ProviderType.OPENAI: _DummyProvider("ok")},
         telemetry=telemetry,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     decision, response = await router.complete_for_task(
@@ -125,6 +130,7 @@ async def test_model_router_fallback_success_marks_fallback_in_telemetry(tmp_pat
             ProviderType.ANTHROPIC: _DummyProvider("frontier"),
         },
         telemetry=telemetry,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     decision, response = await router.complete_for_task(
@@ -186,6 +192,7 @@ async def test_model_router_total_failure_writes_failed_completion_telemetry(tmp
     router = ModelRouter(
         {ProviderType.OPENAI: _FailingProvider()},
         telemetry=telemetry,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     with pytest.raises(RuntimeError, match="All providers failed"):

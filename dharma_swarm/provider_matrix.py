@@ -117,6 +117,12 @@ def _classify_error(exc: Exception | str) -> str:
         return "missing_config"
     if "unauthorized" in text or "401" in text:
         return "auth_failed"
+    if "http error 429" in text or "too many requests" in text or "rate limit" in text:
+        return "rate_limited"
+    if "credit balance" in text or "billing hard limit" in text:
+        return "billing_exhausted"
+    if "insufficient_quota" in text or "exceeded your current quota" in text:
+        return "quota_exhausted"
     if "404" in text or "no endpoints found" in text:
         return "unknown_model"
     if "connection refused" in text or "all connection attempts failed" in text:

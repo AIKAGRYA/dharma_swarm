@@ -17,7 +17,7 @@ import random
 import shutil
 import time
 from abc import abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -86,6 +86,8 @@ from dharma_swarm.telemetry_plane import (
 )
 
 logger = logging.getLogger(__name__)
+
+KeyLivenessProvider = Callable[[], set[str] | None]
 
 
 class LLMProvider(BaseProvider):
@@ -1844,11 +1846,13 @@ class ModelRouter:
         telemetry: TelemetryPlaneStore | None = None,
         telemetry_enabled: bool | None = None,
         telemetry_db_path: Path | None = None,
+        key_liveness_provider: KeyLivenessProvider | None = None,
     ) -> None:
         self._providers = providers
         self._policy_router = policy_router or ProviderPolicyRouter()
         self._retry_policy = retry_policy or RetryPolicy()
         self._breaker_registry = breaker_registry or CircuitBreakerRegistry()
+        self._key_liveness_provider = key_liveness_provider
         sticky_seconds_env = os.environ.get("DGC_ROUTER_STICKY_SECONDS")
         sticky_min_tokens_env = os.environ.get("DGC_ROUTER_STICKY_MIN_TOKENS")
         effective_sticky_seconds = (
@@ -2039,9 +2043,15 @@ class ModelRouter:
     @staticmethod
     def _response_indicates_failure(response: LLMResponse) -> str | None:
         body = response.content.strip().lower()
+        if not body:
+            return "empty_response"
         if body.startswith("timeout:"):
             return "provider_timeout"
-        if body.startswith("error:") or body.startswith("error (rc="):
+        if (
+            body.startswith("error:")
+            or body.startswith("error (rc=")
+            or body.startswith("error(rc=")
+        ):
             return "provider_error"
         # Three orthogonal failure classes (a quota exhaustion is not a
         # circuit failure, and a rate limit is neither):
@@ -2071,7 +2081,14 @@ class ModelRouter:
             "forbidden",
             "unauthorized",
         )
-        if len(body) < 300:
+        is_structured_error = (
+            body.startswith("{")
+            or body.startswith("[")
+            or '"error"' in body[:1200]
+            or "'error'" in body[:1200]
+            or "error code" in body[:1200]
+        )
+        if len(body) < 300 or is_structured_error:
             for marker in _RATE_LIMIT_MARKERS:
                 if marker in body:
                     return "rate_limited"
@@ -2097,10 +2114,17 @@ class ModelRouter:
         for provider in [decision.selected_provider, *decision.fallback_providers]:
             if provider in available and provider in self._providers and provider not in chain:
                 chain.append(provider)
-        return self._prune_dead_key_providers(chain)
+        return self._prune_dead_key_providers(
+            chain,
+            live_provider=self._key_liveness_provider,
+        )
 
     @staticmethod
-    def _prune_dead_key_providers(chain: list[ProviderType]) -> list[ProviderType]:
+    def _prune_dead_key_providers(
+        chain: list[ProviderType],
+        *,
+        live_provider: KeyLivenessProvider | None = None,
+    ) -> list[ProviderType]:
         """Drop providers whose key is verifiably dead before the first attempt.
 
         FAIL-OPEN: the key oracle returns ``None`` (unknown) on a stale/missing/
@@ -2112,7 +2136,8 @@ class ModelRouter:
         if not chain:
             return chain
         try:
-            live = live_providers()
+            oracle = live_provider or live_providers
+            live = oracle()
         except Exception:  # never let the oracle take down routing
             logger.warning("key_oracle raised; keeping unfiltered chain", exc_info=True)
             return chain

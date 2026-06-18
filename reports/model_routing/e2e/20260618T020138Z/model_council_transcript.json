@@ -1,0 +1,152 @@
+{
+  "a2a": {
+    "a2a_path": "local_in_process",
+    "a2a_server_tasks": {},
+    "registered_cards": []
+  },
+  "counts": {
+    "completed_stages": 0,
+    "failed_stages": 0,
+    "live_calls_attempted": 0,
+    "planned_agents": 3,
+    "skipped_models": 3,
+    "unique_planned_providers": 3
+  },
+  "final_artifact": {
+    "content_preview": "",
+    "content_sha256": null,
+    "status": "not_available"
+  },
+  "generated_at": "2026-06-18T03:01:51Z",
+  "live_calls_enabled": false,
+  "live_env": "DHARMA_LIVE_MODEL_E2E",
+  "mode": "dry-run",
+  "planned_agents": [
+    {
+      "agent_name": "model-council-draft",
+      "capability": "model_council_draft",
+      "route": {
+        "display_name": "Claude Opus 4.8",
+        "logical_model_id": "claude-opus-4.8",
+        "max_context": 200000,
+        "model_id": "claude-opus-4.8",
+        "provider": "claude_code",
+        "rank": 1,
+        "route": "claude_code:claude-opus-4.8",
+        "strengths": [
+          "reasoning",
+          "code",
+          "architecture"
+        ]
+      },
+      "stage": "draft"
+    },
+    {
+      "agent_name": "model-council-critique",
+      "capability": "model_council_critique",
+      "route": {
+        "display_name": "GPT-5.5",
+        "logical_model_id": "gpt-5.5",
+        "max_context": 256000,
+        "model_id": "gpt-5.5",
+        "provider": "codex",
+        "rank": 3,
+        "route": "codex:gpt-5.5",
+        "strengths": [
+          "code",
+          "reasoning",
+          "architecture"
+        ]
+      },
+      "stage": "critique"
+    },
+    {
+      "agent_name": "model-council-synthesis",
+      "capability": "model_council_synthesis",
+      "route": {
+        "display_name": "Kimi K2.6",
+        "logical_model_id": "kimi-k2.6",
+        "max_context": 256000,
+        "model_id": "kimi-k2.6:cloud",
+        "provider": "ollama",
+        "rank": 7,
+        "route": "ollama:kimi-k2.6:cloud",
+        "strengths": [
+          "reasoning",
+          "long_context",
+          "synthesis"
+        ]
+      },
+      "stage": "synthesis"
+    }
+  ],
+  "projection": {
+    "generated_at": "2026-06-18T03:01:51Z",
+    "live_providers": [
+      "anthropic",
+      "claude_code",
+      "codex",
+      "deepseek",
+      "google_ai",
+      "kimi",
+      "local",
+      "nvidia_nim",
+      "ollama",
+      "openai",
+      "qwen",
+      "zai_coding"
+    ],
+    "oracle_state": "fresh",
+    "schema_version": "dharma.model_status.v1"
+  },
+  "provider_call_log": [],
+  "requirements": {
+    "different_providers_when_available": true,
+    "min_models": 3,
+    "stages": [
+      "draft",
+      "critique",
+      "synthesis"
+    ],
+    "transport": "DharmaSwarm A2A local control plane"
+  },
+  "schema_version": "dharma.model_council_e2e.v1",
+  "skipped_models": [
+    {
+      "available_routes": [],
+      "display_name": "GPT-5 Codex",
+      "failure_class": "provider_dead",
+      "logical_model_id": "gpt-5-codex",
+      "reason": "provider_dead",
+      "routes": [
+        "openrouter:openai/gpt-5-codex"
+      ],
+      "status": "unavailable"
+    },
+    {
+      "available_routes": [],
+      "display_name": "Qwen 3 235B",
+      "failure_class": "provider_dead",
+      "logical_model_id": "qwen3-235b-a22b",
+      "reason": "provider_dead",
+      "routes": [
+        "openrouter:qwen/qwen3-235b-a22b"
+      ],
+      "status": "unavailable"
+    },
+    {
+      "available_routes": [],
+      "display_name": "Gemini 3 Pro",
+      "failure_class": "provider_dead",
+      "logical_model_id": "gemini-3-pro",
+      "reason": "provider_dead",
+      "routes": [
+        "openrouter:google/gemini-3-pro"
+      ],
+      "status": "unavailable"
+    }
+  ],
+  "status": "planned",
+  "topic": "Assess whether DharmaSwarm model routing is ready to advertise current floor models.",
+  "transcript": []
+}

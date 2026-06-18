@@ -19,6 +19,7 @@ import pytest
 from dharma_swarm import key_oracle
 from dharma_swarm.key_oracle import live_providers
 from dharma_swarm.models import ProviderType
+from dharma_swarm.provider_policy import ProviderRouteDecision, RoutePath
 from dharma_swarm.providers import ModelRouter
 
 
@@ -203,6 +204,39 @@ def test_prune_oracle_none_keeps_unfiltered(monkeypatch) -> None:
     _patch_oracle(monkeypatch, None)
     out = ModelRouter._prune_dead_key_providers(chain)
     assert out == chain
+
+
+def test_prune_injected_oracle_none_keeps_unfiltered() -> None:
+    chain = [ProviderType.OPENROUTER, ProviderType.OPENAI]
+    out = ModelRouter._prune_dead_key_providers(
+        chain,
+        live_provider=lambda: None,
+    )
+    assert out == chain
+
+
+def test_provider_chain_uses_injected_oracle() -> None:
+    router = ModelRouter(
+        {
+            ProviderType.OPENROUTER: object(),
+            ProviderType.OPENAI: object(),
+        },
+        key_liveness_provider=lambda: {"openai", "local"},
+    )
+    decision = ProviderRouteDecision(
+        path=RoutePath.REFLEX,
+        selected_provider=ProviderType.OPENROUTER,
+        selected_model_hint=None,
+        fallback_providers=[ProviderType.OPENAI],
+        fallback_model_hints=[],
+        confidence=1.0,
+        requires_human=False,
+        reasons=["test"],
+    )
+
+    out = router._provider_chain(decision)
+
+    assert out == [ProviderType.OPENAI]
 
 
 def test_prune_oracle_raises_keeps_unfiltered(monkeypatch) -> None:

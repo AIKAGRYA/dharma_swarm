@@ -1,0 +1,1400 @@
+{
+  "branch": "model-routing/consolidation-2026-06",
+  "counts": {
+    "floor_operable": 9,
+    "grunt_operable": 12,
+    "unroutable": 9
+  },
+  "dkeys_status": {
+    "last_test_ts": 1781749879.552326,
+    "safe_rows": {
+      "anthropic": {
+        "cluster": "anthropic",
+        "env_var": "ANTHROPIC_API_KEY",
+        "glyph": "\u2717",
+        "http": 400,
+        "status": "HTTP 400"
+      },
+      "claude_code": {
+        "cluster": "anthropic",
+        "env_var": "CLAUDE_CODE_OAUTH",
+        "glyph": "\u2713",
+        "http": null,
+        "status": "Max plan (keychain oauth)"
+      },
+      "codex (openai-pro)": {
+        "cluster": "openai",
+        "env_var": "OPENAI_API_KEY",
+        "glyph": "\u2713",
+        "http": null,
+        "status": "oauth present (chatgpt)"
+      },
+      "deepseek": {
+        "cluster": "chinese_cluster",
+        "env_var": "DEEPSEEK_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "gemini": {
+        "cluster": "deepmind",
+        "env_var": "GEMINI_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "groq": {
+        "cluster": "groq",
+        "env_var": "GROQ_API_KEY",
+        "glyph": "\u2717",
+        "http": 403,
+        "status": "HTTP 403 auth"
+      },
+      "kimi": {
+        "cluster": "chinese_cluster",
+        "env_var": "KIMI_API_KEY",
+        "glyph": "\u2713",
+        "http": null,
+        "status": "kimi agent present"
+      },
+      "minimax": {
+        "cluster": "chinese_cluster",
+        "env_var": "MINIMAX_API_KEY",
+        "glyph": "\u00b7",
+        "http": null,
+        "status": "no key"
+      },
+      "nvidia_nim": {
+        "cluster": "nvidia",
+        "env_var": "NVIDIA_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "ollama_cloud": {
+        "cluster": "chinese_cluster",
+        "env_var": "OLLAMA_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "openai": {
+        "cluster": "openai",
+        "env_var": "OPENAI_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "openrouter": {
+        "cluster": "multi",
+        "env_var": "OPENROUTER_API_KEY",
+        "glyph": "\u2717",
+        "http": 404,
+        "status": "HTTP 404"
+      },
+      "qwen": {
+        "cluster": "qwen",
+        "env_var": "QWEN_OAUTH",
+        "glyph": "\u2713",
+        "http": null,
+        "status": "qwen CLI oauth present"
+      },
+      "xai": {
+        "cluster": "xai",
+        "env_var": "XAI_API_KEY",
+        "glyph": "$",
+        "http": 403,
+        "status": "valid \u00b7 funds=0"
+      },
+      "zai_coding": {
+        "cluster": "chinese_cluster",
+        "env_var": "GLM_API_KEY",
+        "glyph": "\u2713",
+        "http": 200,
+        "status": "live"
+      },
+      "zai_global": {
+        "cluster": "chinese_cluster",
+        "env_var": "GLM_API_KEY",
+        "glyph": "$",
+        "http": 429,
+        "status": "valid \u00b7 funds=0"
+      }
+    },
+    "summary": null
+  },
+  "generated_at": "2026-06-18T02:31:47Z",
+  "head": "b575de89743c98ad246764bf259a99b9557a35ff",
+  "live_test_opt_in": {
+    "current_run_live_calls_attempted": false,
+    "env_var": "DHARMA_LIVE_MODEL_E2E",
+    "required_value": "1"
+  },
+  "direct_probe_receipt": {
+    "source_artifact": "reports/model_routing/e2e/20260618T020138Z/direct_live_probe.json",
+    "mode": "dry-run",
+    "profile": "standard",
+    "planned_models": 9,
+    "skipped_models": 3,
+    "live_calls_attempted": 0
+  },
+  "mission_id": "20260618T020138Z",
+  "models": [
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "anthropic",
+            "env_var": "CLAUDE_CODE_OAUTH",
+            "glyph": "\u2713",
+            "http": null,
+            "status": "Max plan (keychain oauth)"
+          },
+          "model_id": "claude-opus-4.8",
+          "provider": "claude_code",
+          "route": "claude_code:claude-opus-4.8"
+        }
+      ],
+      "below_floor": false,
+      "display": "Claude Opus 4.8",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "claude-opus-4.8",
+      "key_oracle_live_routes": [
+        "claude_code:claude-opus-4.8"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "FRONTIER",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "anthropic",
+            "env_var": "CLAUDE_CODE_OAUTH",
+            "glyph": "\u2713",
+            "http": null,
+            "status": "Max plan (keychain oauth)"
+          },
+          "model_id": "claude-sonnet-4.6",
+          "provider": "claude_code",
+          "route": "claude_code:claude-sonnet-4.6"
+        }
+      ],
+      "below_floor": false,
+      "display": "Claude Sonnet 4.6",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "claude-sonnet-4.6",
+      "key_oracle_live_routes": [
+        "claude_code:claude-sonnet-4.6"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "FRONTIER",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "openai",
+            "env_var": "OPENAI_API_KEY",
+            "glyph": "\u2713",
+            "http": null,
+            "status": "oauth present (chatgpt)"
+          },
+          "model_id": "gpt-5.5",
+          "provider": "codex",
+          "route": "codex:gpt-5.5"
+        },
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "openai",
+            "env_var": "OPENAI_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "gpt-5.5",
+          "provider": "openai",
+          "route": "openai:gpt-5.5"
+        }
+      ],
+      "below_floor": false,
+      "display": "GPT-5.5",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "gpt-5.5",
+      "key_oracle_live_routes": [
+        "codex:gpt-5.5",
+        "openai:gpt-5.5"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "FRONTIER",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "kimi-k2.6:cloud",
+          "provider": "ollama",
+          "route": "ollama:kimi-k2.6:cloud"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "moonshotai/kimi-k2.6",
+          "provider": "openrouter",
+          "route": "openrouter:moonshotai/kimi-k2.6"
+        }
+      ],
+      "below_floor": false,
+      "display": "Kimi K2.6",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "kimi-k2.6",
+      "key_oracle_live_routes": [
+        "ollama:kimi-k2.6:cloud"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "kimi-k2.7-code:cloud",
+          "provider": "ollama",
+          "route": "ollama:kimi-k2.7-code:cloud"
+        }
+      ],
+      "below_floor": false,
+      "display": "Kimi K2.7 Code",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "kimi-k2.7-code",
+      "key_oracle_live_routes": [
+        "ollama:kimi-k2.7-code:cloud"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "deepseek-v4-pro:cloud",
+          "provider": "ollama",
+          "route": "ollama:deepseek-v4-pro:cloud"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": null,
+          "model_id": "DeepSeek-V4-Pro",
+          "provider": "sambanova",
+          "route": "sambanova:DeepSeek-V4-Pro"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": null,
+          "model_id": "accounts/fireworks/models/deepseek-v4-pro",
+          "provider": "fireworks",
+          "route": "fireworks:accounts/fireworks/models/deepseek-v4-pro"
+        }
+      ],
+      "below_floor": false,
+      "display": "DeepSeek V4 Pro",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "deepseek-v4-pro",
+      "key_oracle_live_routes": [
+        "ollama:deepseek-v4-pro:cloud"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "glm-5.1:cloud",
+          "provider": "ollama",
+          "route": "ollama:glm-5.1:cloud"
+        }
+      ],
+      "below_floor": false,
+      "display": "GLM 5.1",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "glm-5.1",
+      "key_oracle_live_routes": [
+        "ollama:glm-5.1:cloud"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "minimax-m3:cloud",
+          "provider": "ollama",
+          "route": "ollama:minimax-m3:cloud"
+        },
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "nvidia",
+            "env_var": "NVIDIA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "minimaxai/minimax-m3",
+          "provider": "nvidia_nim",
+          "route": "nvidia_nim:minimaxai/minimax-m3"
+        }
+      ],
+      "below_floor": false,
+      "display": "MiniMax M3",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "minimax-m3",
+      "key_oracle_live_routes": [
+        "ollama:minimax-m3:cloud",
+        "nvidia_nim:minimaxai/minimax-m3"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "qwen3-coder:480b-cloud",
+          "provider": "ollama",
+          "route": "ollama:qwen3-coder:480b-cloud"
+        }
+      ],
+      "below_floor": false,
+      "display": "Qwen3 Coder 480B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "qwen3-coder:480b-cloud",
+      "key_oracle_live_routes": [
+        "ollama:qwen3-coder:480b-cloud"
+      ],
+      "lane": "floor",
+      "status": "live_routable",
+      "tier": "STRONG",
+      "unavailable_reason": null
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "anthropic",
+            "env_var": "ANTHROPIC_API_KEY",
+            "glyph": "\u2717",
+            "http": 400,
+            "status": "HTTP 400"
+          },
+          "model_id": "claude-opus-4-20250514",
+          "provider": "anthropic",
+          "route": "anthropic:claude-opus-4-20250514"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "anthropic/claude-opus-4",
+          "provider": "openrouter",
+          "route": "openrouter:anthropic/claude-opus-4"
+        }
+      ],
+      "below_floor": true,
+      "display": "Claude Opus 4",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "claude-opus-4",
+      "key_oracle_live_routes": [
+        "anthropic:claude-opus-4-20250514"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "FRONTIER",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "anthropic",
+            "env_var": "ANTHROPIC_API_KEY",
+            "glyph": "\u2717",
+            "http": 400,
+            "status": "HTTP 400"
+          },
+          "model_id": "claude-sonnet-4-20250514",
+          "provider": "anthropic",
+          "route": "anthropic:claude-sonnet-4-20250514"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "anthropic/claude-sonnet-4",
+          "provider": "openrouter",
+          "route": "openrouter:anthropic/claude-sonnet-4"
+        }
+      ],
+      "below_floor": true,
+      "display": "Claude Sonnet 4",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "claude-sonnet-4",
+      "key_oracle_live_routes": [
+        "anthropic:claude-sonnet-4-20250514"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "FRONTIER",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "openai",
+            "env_var": "OPENAI_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "gpt-4o",
+          "provider": "openai",
+          "route": "openai:gpt-4o"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "openai/gpt-4o",
+          "provider": "openrouter",
+          "route": "openrouter:openai/gpt-4o"
+        }
+      ],
+      "below_floor": true,
+      "display": "GPT-4o",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "gpt-4o",
+      "key_oracle_live_routes": [
+        "openai:gpt-4o"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "FRONTIER",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "kimi-k2.5:cloud",
+          "provider": "ollama",
+          "route": "ollama:kimi-k2.5:cloud"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "moonshotai/kimi-k2.5",
+          "provider": "openrouter",
+          "route": "openrouter:moonshotai/kimi-k2.5"
+        }
+      ],
+      "below_floor": true,
+      "display": "Kimi K2.5",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "kimi-k2.5",
+      "key_oracle_live_routes": [
+        "ollama:kimi-k2.5:cloud"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "glm-5:cloud",
+          "provider": "ollama",
+          "route": "ollama:glm-5:cloud"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "z-ai/glm-5",
+          "provider": "openrouter",
+          "route": "openrouter:z-ai/glm-5"
+        }
+      ],
+      "below_floor": true,
+      "display": "GLM 5",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "glm-5",
+      "key_oracle_live_routes": [
+        "ollama:glm-5:cloud"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "nvidia",
+            "env_var": "NVIDIA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "meta/llama-3.3-70b-instruct",
+          "provider": "nvidia_nim",
+          "route": "nvidia_nim:meta/llama-3.3-70b-instruct"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "meta-llama/llama-3.3-70b-instruct",
+          "provider": "openrouter",
+          "route": "openrouter:meta-llama/llama-3.3-70b-instruct"
+        },
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "meta-llama/llama-3.3-70b-instruct:free",
+          "provider": "openrouter_free",
+          "route": "openrouter_free:meta-llama/llama-3.3-70b-instruct:free"
+        }
+      ],
+      "below_floor": true,
+      "display": "Llama 3.3 70B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "llama-3.3-70b-instruct",
+      "key_oracle_live_routes": [
+        "nvidia_nim:meta/llama-3.3-70b-instruct"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "nvidia",
+            "env_var": "NVIDIA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+          "provider": "nvidia_nim",
+          "route": "nvidia_nim:nvidia/llama-3.1-nemotron-ultra-253b-v1"
+        }
+      ],
+      "below_floor": true,
+      "display": "Nemotron Ultra 253B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "llama-3.1-nemotron-ultra-253b-v1",
+      "key_oracle_live_routes": [
+        "nvidia_nim:nvidia/llama-3.1-nemotron-ultra-253b-v1"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "deepseek-v3.2:cloud",
+          "provider": "ollama",
+          "route": "ollama:deepseek-v3.2:cloud"
+        }
+      ],
+      "below_floor": true,
+      "display": "DeepSeek V3.2",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "deepseek-v3.2",
+      "key_oracle_live_routes": [
+        "ollama:deepseek-v3.2:cloud"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "minimax-m2.7:cloud",
+          "provider": "ollama",
+          "route": "ollama:minimax-m2.7:cloud"
+        }
+      ],
+      "below_floor": true,
+      "display": "MiniMax M2.7",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "minimax-m2.7",
+      "key_oracle_live_routes": [
+        "ollama:minimax-m2.7:cloud"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "STRONG",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "qwen2.5-coder:14b",
+          "provider": "ollama",
+          "route": "ollama:qwen2.5-coder:14b"
+        }
+      ],
+      "below_floor": true,
+      "display": "Qwen 2.5 Coder 14B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "qwen2.5-coder:14b",
+      "key_oracle_live_routes": [
+        "ollama:qwen2.5-coder:14b"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "LOCAL",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "deepseek-coder-v2:16b",
+          "provider": "ollama",
+          "route": "ollama:deepseek-coder-v2:16b"
+        }
+      ],
+      "below_floor": true,
+      "display": "DeepSeek Coder V2 16B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "deepseek-coder-v2:16b",
+      "key_oracle_live_routes": [
+        "ollama:deepseek-coder-v2:16b"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "LOCAL",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "dkeys_live",
+          "dkeys_classification": "live_routable",
+          "dkeys_row": {
+            "cluster": "chinese_cluster",
+            "env_var": "OLLAMA_API_KEY",
+            "glyph": "\u2713",
+            "http": 200,
+            "status": "live"
+          },
+          "model_id": "llama3.2",
+          "provider": "ollama",
+          "route": "ollama:llama3.2"
+        }
+      ],
+      "below_floor": true,
+      "display": "Llama 3.2",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "llama3.2",
+      "key_oracle_live_routes": [
+        "ollama:llama3.2"
+      ],
+      "lane": "grunt",
+      "status": "grunt_only",
+      "tier": "LOCAL",
+      "unavailable_reason": "below_power_floor"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "openai/gpt-5-codex",
+          "provider": "openrouter",
+          "route": "openrouter:openai/gpt-5-codex"
+        }
+      ],
+      "below_floor": false,
+      "display": "GPT-5 Codex",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "gpt-5-codex",
+      "key_oracle_live_routes": [],
+      "lane": "floor",
+      "status": "unavailable",
+      "tier": "FRONTIER",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "deepseek/deepseek-chat-v3-0324",
+          "provider": "openrouter",
+          "route": "openrouter:deepseek/deepseek-chat-v3-0324"
+        }
+      ],
+      "below_floor": true,
+      "display": "DeepSeek V3",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "deepseek-chat-v3-0324",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "qwen/qwen-2.5-coder-32b-instruct",
+          "provider": "openrouter",
+          "route": "openrouter:qwen/qwen-2.5-coder-32b-instruct"
+        }
+      ],
+      "below_floor": true,
+      "display": "Qwen 2.5 Coder 32B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "qwen-2.5-coder-32b-instruct",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "qwen/qwen3-235b-a22b",
+          "provider": "openrouter",
+          "route": "openrouter:qwen/qwen3-235b-a22b"
+        }
+      ],
+      "below_floor": false,
+      "display": "Qwen 3 235B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "qwen3-235b-a22b",
+      "key_oracle_live_routes": [],
+      "lane": "floor",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "mistralai/mistral-large-2411",
+          "provider": "openrouter",
+          "route": "openrouter:mistralai/mistral-large-2411"
+        }
+      ],
+      "below_floor": true,
+      "display": "Mistral Large",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "mistral-large-2411",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "google/gemini-3-pro",
+          "provider": "openrouter",
+          "route": "openrouter:google/gemini-3-pro"
+        }
+      ],
+      "below_floor": false,
+      "display": "Gemini 3 Pro",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "gemini-3-pro",
+      "key_oracle_live_routes": [],
+      "lane": "floor",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "deepseek/deepseek-r1",
+          "provider": "openrouter",
+          "route": "openrouter:deepseek/deepseek-r1"
+        }
+      ],
+      "below_floor": true,
+      "display": "DeepSeek R1",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "deepseek-r1",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "STRONG",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "google/gemma-3-27b-it:free",
+          "provider": "openrouter_free",
+          "route": "openrouter_free:google/gemma-3-27b-it:free"
+        }
+      ],
+      "below_floor": true,
+      "display": "Gemma 3 27B",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "gemma-3-27b-it",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "FREE",
+      "unavailable_reason": "provider_dead"
+    },
+    {
+      "actual_live_call": {
+        "attempted": false,
+        "reason": "live model calls require DHARMA_LIVE_MODEL_E2E=1 and a receipt-producing probe",
+        "status": "not_run"
+      },
+      "all_routes": [
+        {
+          "classification_detail": "no_live_provider_key",
+          "dkeys_classification": "not_live",
+          "dkeys_row": {
+            "cluster": "multi",
+            "env_var": "OPENROUTER_API_KEY",
+            "glyph": "\u2717",
+            "http": 404,
+            "status": "HTTP 404"
+          },
+          "model_id": "mistralai/mistral-small-3.1-24b-instruct:free",
+          "provider": "openrouter_free",
+          "route": "openrouter_free:mistralai/mistral-small-3.1-24b-instruct:free"
+        }
+      ],
+      "below_floor": true,
+      "display": "Mistral Small 3.1",
+      "evidence": {
+        "evidence_type": "dkeys_status_plus_model_pool_dry_run",
+        "source_artifact": "reports/model_pool/e2e_20260618T113124.json"
+      },
+      "id": "mistral-small-3.1-24b-instruct",
+      "key_oracle_live_routes": [],
+      "lane": "grunt",
+      "status": "unavailable",
+      "tier": "FREE",
+      "unavailable_reason": "provider_dead"
+    }
+  ],
+  "source_artifact": "reports/model_pool/e2e_20260618T113124.json",
+  "verification_gaps": [
+    "No model completion probes have been run under DHARMA_LIVE_MODEL_E2E=1 for this mission yet.",
+    "dkeys proves provider/key liveness only; it does not prove model-id availability, schema behavior, or served-model identity."
+  ],
+  "worktree": "/Users/dhyana/ds_model_pool"
+}

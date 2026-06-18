@@ -1,0 +1,1841 @@
+{
+  "branch": "model-routing/consolidation-2026-06",
+  "counts": {
+    "floor_entries": 12,
+    "grunt_entries": 18,
+    "known_model_literal_debt_occurrences": 69,
+    "known_raw_key_read_debt_occurrences": 22,
+    "model_entries": 30,
+    "providers": 10,
+    "roster_slots": 42,
+    "routes": 42
+  },
+  "entries": [
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "code",
+        "architecture"
+      ],
+      "context": 200000,
+      "display": "Claude Opus 4.8",
+      "id": "claude-opus-4.8",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "claude-opus-4.8",
+          "model_id": "claude-opus-4.8",
+          "provider": "claude_code"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "code",
+        "reasoning",
+        "speed"
+      ],
+      "context": 200000,
+      "display": "Claude Sonnet 4.6",
+      "id": "claude-sonnet-4.6",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "claude-sonnet-4.6",
+          "model_id": "claude-sonnet-4.6",
+          "provider": "claude_code"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "context": 256000,
+      "display": "GPT-5.5",
+      "id": "gpt-5.5",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "provider": "codex"
+        },
+        {
+          "canonical_identity": "gpt-5.5",
+          "model_id": "gpt-5.5",
+          "provider": "openai"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "code",
+        "architecture"
+      ],
+      "context": 200000,
+      "display": "Claude Opus 4",
+      "id": "claude-opus-4",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "claude-opus-4",
+          "model_id": "claude-opus-4-20250514",
+          "provider": "anthropic"
+        },
+        {
+          "canonical_identity": "claude-opus-4",
+          "model_id": "anthropic/claude-opus-4",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "reasoning",
+        "speed"
+      ],
+      "context": 200000,
+      "display": "Claude Sonnet 4",
+      "id": "claude-sonnet-4",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "claude-sonnet-4",
+          "model_id": "claude-sonnet-4-20250514",
+          "provider": "anthropic"
+        },
+        {
+          "canonical_identity": "claude-sonnet-4",
+          "model_id": "anthropic/claude-sonnet-4",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "reasoning"
+      ],
+      "context": 128000,
+      "display": "GPT-4o",
+      "id": "gpt-4o",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "gpt-4o",
+          "model_id": "gpt-4o",
+          "provider": "openai"
+        },
+        {
+          "canonical_identity": "gpt-4o",
+          "model_id": "openai/gpt-4o",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "context": 200000,
+      "display": "GPT-5 Codex",
+      "id": "gpt-5-codex",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "gpt-5-codex",
+          "model_id": "openai/gpt-5-codex",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "frontier"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "context": 128000,
+      "display": "Kimi K2.5",
+      "id": "kimi-k2.5",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "kimi-k2.5",
+          "model_id": "kimi-k2.5:cloud",
+          "provider": "ollama"
+        },
+        {
+          "canonical_identity": "kimi-k2.5",
+          "model_id": "moonshotai/kimi-k2.5",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "synthesis",
+        "multilingual"
+      ],
+      "context": 128000,
+      "display": "GLM 5",
+      "id": "glm-5",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "glm-5",
+          "model_id": "glm-5:cloud",
+          "provider": "ollama"
+        },
+        {
+          "canonical_identity": "glm-5",
+          "model_id": "z-ai/glm-5",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "context": 128000,
+      "display": "DeepSeek V3",
+      "id": "deepseek-chat-v3-0324",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "deepseek-chat-v3-0324",
+          "model_id": "deepseek/deepseek-chat-v3-0324",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code"
+      ],
+      "context": 32768,
+      "display": "Qwen 2.5 Coder 32B",
+      "id": "qwen-2.5-coder-32b-instruct",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "qwen-2.5-coder-32b-instruct",
+          "model_id": "qwen/qwen-2.5-coder-32b-instruct",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "code",
+        "chinese"
+      ],
+      "context": 128000,
+      "display": "Qwen 3 235B",
+      "id": "qwen3-235b-a22b",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "qwen3-235b-a22b",
+          "model_id": "qwen/qwen3-235b-a22b",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "reasoning"
+      ],
+      "context": 128000,
+      "display": "Mistral Large",
+      "id": "mistral-large-2411",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "mistral-large-2411",
+          "model_id": "mistralai/mistral-large-2411",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "long_context",
+        "multimodal"
+      ],
+      "context": 1000000,
+      "display": "Gemini 3 Pro",
+      "id": "gemini-3-pro",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "gemini-3-pro",
+          "model_id": "google/gemini-3-pro",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "speed",
+        "reasoning"
+      ],
+      "context": 128000,
+      "display": "Llama 3.3 70B",
+      "id": "llama-3.3-70b-instruct",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "llama-3.3-70b-instruct",
+          "model_id": "meta/llama-3.3-70b-instruct",
+          "provider": "nvidia_nim"
+        },
+        {
+          "canonical_identity": "llama-3.3-70b-instruct",
+          "model_id": "meta-llama/llama-3.3-70b-instruct",
+          "provider": "openrouter"
+        },
+        {
+          "canonical_identity": "llama-3.3-70b-instruct",
+          "model_id": "meta-llama/llama-3.3-70b-instruct:free",
+          "provider": "openrouter_free"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "synthesis",
+        "architecture"
+      ],
+      "context": 128000,
+      "display": "Nemotron Ultra 253B",
+      "id": "llama-3.1-nemotron-ultra-253b-v1",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "llama-3.1-nemotron-ultra-253b-v1",
+          "model_id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+          "provider": "nvidia_nim"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "code"
+      ],
+      "context": 64000,
+      "display": "DeepSeek R1",
+      "id": "deepseek-r1",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "deepseek-r1",
+          "model_id": "deepseek/deepseek-r1",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "context": 256000,
+      "display": "Kimi K2.6",
+      "id": "kimi-k2.6",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "kimi-k2.6",
+          "model_id": "kimi-k2.6:cloud",
+          "provider": "ollama"
+        },
+        {
+          "canonical_identity": "kimi-k2.6",
+          "model_id": "moonshotai/kimi-k2.6",
+          "provider": "openrouter"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "long_context",
+        "code",
+        "synthesis"
+      ],
+      "context": 256000,
+      "display": "Kimi K2.7 Code",
+      "id": "kimi-k2.7-code",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "kimi-k2.7-code",
+          "model_id": "kimi-k2.7-code:cloud",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "context": 256000,
+      "display": "DeepSeek V4 Pro",
+      "id": "deepseek-v4-pro",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "deepseek-v4-pro",
+          "model_id": "deepseek-v4-pro:cloud",
+          "provider": "ollama"
+        },
+        {
+          "canonical_identity": "deepseek-v4-pro",
+          "model_id": "DeepSeek-V4-Pro",
+          "provider": "sambanova"
+        },
+        {
+          "canonical_identity": "deepseek-v4-pro",
+          "model_id": "accounts/fireworks/models/deepseek-v4-pro",
+          "provider": "fireworks"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "synthesis",
+        "multilingual"
+      ],
+      "context": 256000,
+      "display": "GLM 5.1",
+      "id": "glm-5.1",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "glm-5.1",
+          "model_id": "glm-5.1:cloud",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "reasoning",
+        "synthesis"
+      ],
+      "context": 256000,
+      "display": "MiniMax M3",
+      "id": "minimax-m3",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "minimax-m3",
+          "model_id": "minimax-m3:cloud",
+          "provider": "ollama"
+        },
+        {
+          "canonical_identity": "minimax-m3",
+          "model_id": "minimaxai/minimax-m3",
+          "provider": "nvidia_nim"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": false,
+      "caps": [
+        "code",
+        "reasoning"
+      ],
+      "context": 256000,
+      "display": "Qwen3 Coder 480B",
+      "id": "qwen3-coder:480b-cloud",
+      "lane": "floor",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "qwen3-coder:480b-cloud",
+          "model_id": "qwen3-coder:480b-cloud",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "context": 128000,
+      "display": "DeepSeek V3.2",
+      "id": "deepseek-v3.2",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "deepseek-v3.2",
+          "model_id": "deepseek-v3.2:cloud",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "reasoning",
+        "synthesis"
+      ],
+      "context": 128000,
+      "display": "MiniMax M2.7",
+      "id": "minimax-m2.7",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "minimax-m2.7",
+          "model_id": "minimax-m2.7:cloud",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "strong"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "speed"
+      ],
+      "context": 8192,
+      "display": "Gemma 3 27B",
+      "id": "gemma-3-27b-it",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "gemma-3-27b-it",
+          "model_id": "google/gemma-3-27b-it:free",
+          "provider": "openrouter_free"
+        }
+      ],
+      "tier": "free"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "speed"
+      ],
+      "context": 32768,
+      "display": "Mistral Small 3.1",
+      "id": "mistral-small-3.1-24b-instruct",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "mistral-small-3.1-24b-instruct",
+          "model_id": "mistralai/mistral-small-3.1-24b-instruct:free",
+          "provider": "openrouter_free"
+        }
+      ],
+      "tier": "free"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code",
+        "speed"
+      ],
+      "context": 32768,
+      "display": "Qwen 2.5 Coder 14B",
+      "id": "qwen2.5-coder:14b",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "qwen2.5-coder:14b",
+          "model_id": "qwen2.5-coder:14b",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "local"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "code"
+      ],
+      "context": 16384,
+      "display": "DeepSeek Coder V2 16B",
+      "id": "deepseek-coder-v2:16b",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "deepseek-coder-v2:16b",
+          "model_id": "deepseek-coder-v2:16b",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "local"
+    },
+    {
+      "aliases": [],
+      "below_floor": true,
+      "caps": [
+        "speed"
+      ],
+      "context": 128000,
+      "display": "Llama 3.2",
+      "id": "llama3.2",
+      "lane": "grunt",
+      "route_status_owner": "dharma_swarm.model_pool + dharma_swarm.key_oracle.live_providers",
+      "routes": [
+        {
+          "canonical_identity": "llama3.2",
+          "model_id": "llama3.2",
+          "provider": "ollama"
+        }
+      ],
+      "tier": "local"
+    }
+  ],
+  "generated_at": "2026-06-18T02:06:03Z",
+  "hardcoded_debt": {
+    "model_literal_debt": [
+      {
+        "count": 1,
+        "file": "dharma_swarm/assurance/agents.py",
+        "literal": "claude-opus-4-20250514"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/assurance/agents.py",
+        "literal": "claude-sonnet-4-20250514"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/daemon_config.py",
+        "literal": "anthropic/claude-sonnet-4"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/dharma_context_mcp.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/llm_burn.py",
+        "literal": "glm-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/llm_burn.py",
+        "literal": "kimi-k2.5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/llm_burn.py",
+        "literal": "minimax-m2.7"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/master_prompt_engineer.py",
+        "literal": "anthropic/claude-3.5-sonnet"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/master_prompt_engineer.py",
+        "literal": "claude-sonnet-4-20250514"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/models.py",
+        "literal": "claude-sonnet-4-20250514"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/orchestrate_live.py",
+        "literal": "deepseek/deepseek-chat-v3-0324:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/orchestrate_live.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/orchestrate_live.py",
+        "literal": "qwen/qwen3-4b:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/orchestrate_live.py",
+        "literal": "qwen/qwen3-coder:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/orchestrate_live.py",
+        "literal": "qwen/qwen3-next-80b-a3b-instruct:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/startup_crew.py",
+        "literal": "deepseek/deepseek-chat-v3-0324:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/startup_crew.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/startup_crew.py",
+        "literal": "mistralai/mistral-small-3.1-24b-instruct:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/startup_crew.py",
+        "literal": "qwen/qwen3-32b:free"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/subconscious_hum.py",
+        "literal": "claude-sonnet-4-20250514"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/terminal_adapters/claude.py",
+        "literal": "claude-haiku-4-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/terminal_adapters/claude.py",
+        "literal": "claude-opus-4"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/terminal_adapters/claude.py",
+        "literal": "claude-opus-4-6"
+      },
+      {
+        "count": 2,
+        "file": "dharma_swarm/terminal_adapters/claude.py",
+        "literal": "claude-sonnet-4-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/terminal_adapters/claude.py",
+        "literal": "claude-sonnet-4-6"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/terminal_bridge.py",
+        "literal": "glm-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/tui/engine/adapters/claude.py",
+        "literal": "claude-haiku-4-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/tui/engine/adapters/claude.py",
+        "literal": "claude-opus-4"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/tui/engine/adapters/claude.py",
+        "literal": "claude-opus-4-6"
+      },
+      {
+        "count": 2,
+        "file": "dharma_swarm/tui/engine/adapters/claude.py",
+        "literal": "claude-sonnet-4-5"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/tui/engine/adapters/claude.py",
+        "literal": "claude-sonnet-4-6"
+      },
+      {
+        "count": 2,
+        "file": "dharma_swarm/tui/engine/adapters/codex.py",
+        "literal": "gpt-5.4"
+      },
+      {
+        "count": 1,
+        "file": "dharma_swarm/tui/engine/adapters/openrouter.py",
+        "literal": "openai/gpt-5-codex"
+      },
+      {
+        "count": 1,
+        "file": "scripts/demos/demo_jikoku.py",
+        "literal": "claude-opus-4"
+      },
+      {
+        "count": 1,
+        "file": "scripts/full_stack_smoke.py",
+        "literal": "deepseek/deepseek-chat-v3-0324"
+      },
+      {
+        "count": 1,
+        "file": "scripts/full_stack_smoke.py",
+        "literal": "google/gemini-2.5-flash"
+      },
+      {
+        "count": 1,
+        "file": "scripts/full_stack_smoke.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct"
+      },
+      {
+        "count": 1,
+        "file": "scripts/full_stack_smoke.py",
+        "literal": "mistralai/mistral-small-3.1-24b-instruct"
+      },
+      {
+        "count": 1,
+        "file": "scripts/full_stack_smoke.py",
+        "literal": "qwen/qwen3-30b-a3b"
+      },
+      {
+        "count": 1,
+        "file": "scripts/lattice_test.py",
+        "literal": "google/gemini-2.5-flash"
+      },
+      {
+        "count": 1,
+        "file": "scripts/lattice_test.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct"
+      },
+      {
+        "count": 1,
+        "file": "scripts/lattice_test.py",
+        "literal": "qwen/qwen3-30b-a3b"
+      },
+      {
+        "count": 1,
+        "file": "scripts/launch_singularity_research.py",
+        "literal": "claude-opus-4-6"
+      },
+      {
+        "count": 1,
+        "file": "scripts/live_fanout.py",
+        "literal": "anthropic/claude-sonnet-4"
+      },
+      {
+        "count": 2,
+        "file": "scripts/live_genome_test.py",
+        "literal": "anthropic/claude-sonnet-4"
+      },
+      {
+        "count": 1,
+        "file": "scripts/live_test.py",
+        "literal": "anthropic/claude-sonnet-4"
+      },
+      {
+        "count": 1,
+        "file": "scripts/mirror_test.py",
+        "literal": "google/gemini-2.5-flash"
+      },
+      {
+        "count": 1,
+        "file": "scripts/onboard_cybernetics_stewards.py",
+        "literal": "deepseek-v3.2:cloud"
+      },
+      {
+        "count": 1,
+        "file": "scripts/onboard_cybernetics_stewards.py",
+        "literal": "glm-5:cloud"
+      },
+      {
+        "count": 1,
+        "file": "scripts/onboard_cybernetics_stewards.py",
+        "literal": "kimi-k2.5:cloud"
+      },
+      {
+        "count": 1,
+        "file": "scripts/onboard_cybernetics_stewards.py",
+        "literal": "qwen3-coder:480b-cloud"
+      },
+      {
+        "count": 1,
+        "file": "scripts/organism_council.py",
+        "literal": "glm-5:cloud"
+      },
+      {
+        "count": 1,
+        "file": "scripts/organism_with_intelligence.py",
+        "literal": "google/gemini-2.0-flash-001"
+      },
+      {
+        "count": 1,
+        "file": "scripts/organism_with_intelligence.py",
+        "literal": "meta-llama/llama-3.3-70b-instruct"
+      },
+      {
+        "count": 1,
+        "file": "scripts/organism_with_intelligence.py",
+        "literal": "mistralai/mistral-small-2501"
+      },
+      {
+        "count": 1,
+        "file": "scripts/organism_with_intelligence.py",
+        "literal": "qwen/qwen-2.5-72b-instruct"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/capability_profile_loop.py",
+        "literal": "deepseek-v4-pro"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/capability_profile_loop.py",
+        "literal": "glm-4.6"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/forge_swarm_evolution_arena_v0_measurement_runner.py",
+        "literal": "deepseek-v3.1:671b"
+      },
+      {
+        "count": 2,
+        "file": "scripts/runtime/forge_swarm_evolution_arena_v0_measurement_runner.py",
+        "literal": "glm-5.1"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/forge_swarm_evolution_arena_v0_measurement_runner.py",
+        "literal": "gpt-5.1"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/forge_swarm_evolution_arena_v0_taskpack_builder.py",
+        "literal": "gemini-2.5-pro"
+      },
+      {
+        "count": 1,
+        "file": "scripts/runtime/forge_swarm_evolution_arena_v0_taskpack_builder.py",
+        "literal": "gpt-5.5"
+      },
+      {
+        "count": 1,
+        "file": "scripts/system_integration_probe.py",
+        "literal": "glm-5:cloud"
+      }
+    ],
+    "model_literal_guard_file": "tests/test_model_key_routing_guard.py",
+    "raw_key_read_debt": [
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "dharma_swarm/tui_legacy.py",
+        "key_name": "MOONSHOT_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "dharma_swarm/tui_legacy.py",
+        "key_name": "OLLAMA_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/allout_autopilot.py",
+        "key_name": "NGC_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/allout_autopilot.py",
+        "key_name": "NVIDIA_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/allout_autopilot.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/demos/demo_jikoku.py",
+        "key_name": "ANTHROPIC_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/dgc_max_stress.py",
+        "key_name": "NGC_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/dgc_max_stress.py",
+        "key_name": "NVIDIA_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 2,
+        "file": "scripts/dgc_max_stress.py",
+        "key_name": "OPENAI_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 2,
+        "file": "scripts/dgc_max_stress.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/lattice_test.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/live_fanout.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/live_genome_test.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/live_organism_run.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/live_test.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/mirror_test.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.environ.get",
+        "count": 1,
+        "file": "scripts/organism_with_intelligence.py",
+        "key_name": "OPENROUTER_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/strange_loop.py",
+        "key_name": "NGC_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/strange_loop.py",
+        "key_name": "NVIDIA_API_KEY"
+      },
+      {
+        "access": "os.getenv",
+        "count": 1,
+        "file": "scripts/strange_loop.py",
+        "key_name": "OPENROUTER_API_KEY"
+      }
+    ]
+  },
+  "head": "b575de89743c98ad246764bf259a99b9557a35ff",
+  "mission_id": "20260618T020138Z",
+  "provider_defaults": {
+    "anthropic": "claude-opus-4-6",
+    "cerebras": "qwen-3-235b-a22b-instruct-2507",
+    "chutes": "deepseek-ai/DeepSeek-R1",
+    "claude_code": "claude-opus-4-6",
+    "codex": "gpt-5.4",
+    "fireworks": "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct",
+    "google_ai": "gemini-2.5-flash",
+    "groq": "qwen/qwen3-32b",
+    "mistral": "mistral-small-latest",
+    "nvidia_nim": "meta/llama-3.3-70b-instruct",
+    "ollama": "glm-5.1:cloud",
+    "openai": "gpt-5",
+    "openrouter": "moonshotai/kimi-k2.6",
+    "openrouter_free": "meta-llama/llama-3.3-70b-instruct:free",
+    "sambanova": "Meta-Llama-3.3-70B-Instruct",
+    "siliconflow": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+    "together": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
+  },
+  "roster_slots": [
+    {
+      "below_floor": false,
+      "display_name": "Claude Opus 4.8 (Claude Max)",
+      "logical_id": "claude-opus-4.8",
+      "max_context": 200000,
+      "model_id": "claude-opus-4.8",
+      "notes": "Floor default chat brain \u2014 Opus via Claude-Max oauth (THE ONE WAY)",
+      "provider": "claude_code",
+      "strengths": [
+        "reasoning",
+        "code",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Claude Sonnet 4.6 (Claude Max)",
+      "logical_id": "claude-sonnet-4.6",
+      "max_context": 200000,
+      "model_id": "claude-sonnet-4.6",
+      "notes": "Floor fast-frontier Claude via Claude-Max oauth",
+      "provider": "claude_code",
+      "strengths": [
+        "code",
+        "reasoning",
+        "speed"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": false,
+      "display_name": "GPT-5.5 (Codex)",
+      "logical_id": "gpt-5.5",
+      "max_context": 256000,
+      "model_id": "gpt-5.5",
+      "notes": "Floor GPT lane via codex oauth subscription (THE ONE WAY)",
+      "provider": "codex",
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": false,
+      "display_name": "GPT-5.5 (direct)",
+      "logical_id": "gpt-5.5",
+      "max_context": 256000,
+      "model_id": "gpt-5.5",
+      "notes": "Same weights via the OpenAI direct API (secondary route)",
+      "provider": "openai",
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Claude Opus 4 (direct)",
+      "logical_id": "claude-opus-4",
+      "max_context": 200000,
+      "model_id": "claude-opus-4-20250514",
+      "notes": "Sub-floor (old Opus 4) \u2014 grunt work only",
+      "provider": "anthropic",
+      "strengths": [
+        "reasoning",
+        "code",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Claude Sonnet 4 (direct)",
+      "logical_id": "claude-sonnet-4",
+      "max_context": 200000,
+      "model_id": "claude-sonnet-4-20250514",
+      "notes": "Sub-floor (old Sonnet 4) \u2014 grunt work only",
+      "provider": "anthropic",
+      "strengths": [
+        "code",
+        "reasoning",
+        "speed"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "GPT-4o (direct)",
+      "logical_id": "gpt-4o",
+      "max_context": 128000,
+      "model_id": "gpt-4o",
+      "notes": "Sub-floor (GPT-4o) \u2014 grunt work only",
+      "provider": "openai",
+      "strengths": [
+        "code",
+        "reasoning"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Claude Opus 4",
+      "logical_id": "claude-opus-4",
+      "max_context": 200000,
+      "model_id": "anthropic/claude-opus-4",
+      "notes": "Sub-floor (old Opus 4 via OpenRouter) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "code",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Claude Sonnet 4",
+      "logical_id": "claude-sonnet-4",
+      "max_context": 200000,
+      "model_id": "anthropic/claude-sonnet-4",
+      "notes": "Sub-floor (old Sonnet 4 via OpenRouter) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning",
+        "speed"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "GPT-4o",
+      "logical_id": "gpt-4o",
+      "max_context": 128000,
+      "model_id": "openai/gpt-4o",
+      "notes": "Sub-floor (GPT-4o via OpenRouter) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": false,
+      "display_name": "GPT-5 Codex",
+      "logical_id": "gpt-5-codex",
+      "max_context": 200000,
+      "model_id": "openai/gpt-5-codex",
+      "notes": "High-agency coding and technical synthesis via OpenRouter",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning",
+        "architecture"
+      ],
+      "tier": "frontier"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Kimi K2.5",
+      "logical_id": "kimi-k2.5",
+      "max_context": 128000,
+      "model_id": "moonshotai/kimi-k2.5",
+      "notes": "Sub-floor (K2.5, superseded by K2.6 floor) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "GLM 5",
+      "logical_id": "glm-5",
+      "max_context": 128000,
+      "model_id": "z-ai/glm-5",
+      "notes": "Sub-floor (GLM-5, superseded by GLM-5.1 floor) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "synthesis",
+        "multilingual"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "DeepSeek V3",
+      "logical_id": "deepseek-chat-v3-0324",
+      "max_context": 128000,
+      "model_id": "deepseek/deepseek-chat-v3-0324",
+      "notes": "Sub-floor (DeepSeek V3) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Qwen 2.5 Coder 32B",
+      "logical_id": "qwen-2.5-coder-32b-instruct",
+      "max_context": 32768,
+      "model_id": "qwen/qwen-2.5-coder-32b-instruct",
+      "notes": "Sub-floor (Qwen 2.5 Coder 32B) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Qwen 3 235B (MoE)",
+      "logical_id": "qwen3-235b-a22b",
+      "max_context": 128000,
+      "model_id": "qwen/qwen3-235b-a22b",
+      "notes": "Massive MoE \u2014 deep reasoning with efficient inference",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "code",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Mistral Large",
+      "logical_id": "mistral-large-2411",
+      "max_context": 128000,
+      "model_id": "mistralai/mistral-large-2411",
+      "notes": "Sub-floor (Mistral Large 2411) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Gemini 3 Pro",
+      "logical_id": "gemini-3-pro",
+      "max_context": 1000000,
+      "model_id": "google/gemini-3-pro",
+      "notes": "Gemini 3 class via OpenRouter \u2014 large-context multimodal reasoning lane",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "multimodal"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Llama 3.3 70B",
+      "logical_id": "llama-3.3-70b-instruct",
+      "max_context": 128000,
+      "model_id": "meta-llama/llama-3.3-70b-instruct",
+      "notes": "Sub-floor (Llama 3.3 70B) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "code",
+        "reasoning"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Llama 3.3 70B (NIM)",
+      "logical_id": "llama-3.3-70b-instruct",
+      "max_context": 128000,
+      "model_id": "meta/llama-3.3-70b-instruct",
+      "notes": "Sub-floor (Llama 3.3 70B NIM) \u2014 grunt work only",
+      "provider": "nvidia_nim",
+      "strengths": [
+        "code",
+        "speed"
+      ],
+      "tier": "fast"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Nemotron Ultra 253B (NIM)",
+      "logical_id": "llama-3.1-nemotron-ultra-253b-v1",
+      "max_context": 128000,
+      "model_id": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+      "notes": "Sub-floor (Llama 3.1 Nemotron) \u2014 grunt work only",
+      "provider": "nvidia_nim",
+      "strengths": [
+        "reasoning",
+        "synthesis",
+        "architecture"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "DeepSeek R1",
+      "logical_id": "deepseek-r1",
+      "max_context": 64000,
+      "model_id": "deepseek/deepseek-r1",
+      "notes": "Sub-floor (DeepSeek R1) \u2014 grunt work only",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "code"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Kimi K2.5 (Ollama Cloud)",
+      "logical_id": "kimi-k2.5",
+      "max_context": 128000,
+      "model_id": "kimi-k2.5:cloud",
+      "notes": "Sub-floor (K2.5, superseded by K2.6 floor) \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "GLM 5 (Ollama Cloud)",
+      "logical_id": "glm-5",
+      "max_context": 128000,
+      "model_id": "glm-5:cloud",
+      "notes": "Sub-floor (GLM-5, superseded by GLM-5.1 floor) \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "synthesis",
+        "multilingual"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Kimi K2.6 (Ollama Cloud)",
+      "logical_id": "kimi-k2.6",
+      "max_context": 256000,
+      "model_id": "kimi-k2.6:cloud",
+      "notes": "Floor model \u2014 long-context semantic lane via Ollama Cloud",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Kimi K2.6",
+      "logical_id": "kimi-k2.6",
+      "max_context": 256000,
+      "model_id": "moonshotai/kimi-k2.6",
+      "notes": "Floor model via OpenRouter (deprioritised aggregator route)",
+      "provider": "openrouter",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Kimi K2.7 Code (Ollama Cloud)",
+      "logical_id": "kimi-k2.7-code",
+      "max_context": 256000,
+      "model_id": "kimi-k2.7-code:cloud",
+      "notes": "Floor \u2014 next K2 generation, long-context coder lane via Ollama Cloud",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "long_context",
+        "code",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "DeepSeek V4 Pro (Ollama Cloud)",
+      "logical_id": "deepseek-v4-pro",
+      "max_context": 256000,
+      "model_id": "deepseek-v4-pro:cloud",
+      "notes": "Floor \u2014 DeepSeek V4 Pro bulk-build lane via Ollama Cloud",
+      "provider": "ollama",
+      "strengths": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "DeepSeek V4 Pro (SambaNova)",
+      "logical_id": "deepseek-v4-pro",
+      "max_context": 256000,
+      "model_id": "DeepSeek-V4-Pro",
+      "notes": "Floor \u2014 DeepSeek V4 Pro on SambaNova (secondary route)",
+      "provider": "sambanova",
+      "strengths": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "DeepSeek V4 Pro (Fireworks)",
+      "logical_id": "deepseek-v4-pro",
+      "max_context": 256000,
+      "model_id": "accounts/fireworks/models/deepseek-v4-pro",
+      "notes": "Floor \u2014 DeepSeek V4 Pro on Fireworks (secondary route)",
+      "provider": "fireworks",
+      "strengths": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "GLM 5.1 (Ollama Cloud)",
+      "logical_id": "glm-5.1",
+      "max_context": 256000,
+      "model_id": "glm-5.1:cloud",
+      "notes": "Floor \u2014 GLM-5.1 reasoning lane via Ollama Cloud (GLM-zai live)",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "synthesis",
+        "multilingual"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "MiniMax M3 (Ollama Cloud)",
+      "logical_id": "minimax-m3",
+      "max_context": 256000,
+      "model_id": "minimax-m3:cloud",
+      "notes": "Floor \u2014 MiniMax M3 challenger lane via Ollama Cloud",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "MiniMax M3 (NIM)",
+      "logical_id": "minimax-m3",
+      "max_context": 256000,
+      "model_id": "minimaxai/minimax-m3",
+      "notes": "Floor \u2014 MiniMax M3 on NVIDIA NIM (secondary route)",
+      "provider": "nvidia_nim",
+      "strengths": [
+        "reasoning",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": false,
+      "display_name": "Qwen3 Coder 480B (Ollama Cloud)",
+      "logical_id": "qwen3-coder:480b-cloud",
+      "max_context": 256000,
+      "model_id": "qwen3-coder:480b-cloud",
+      "notes": "Floor \u2014 high-capacity coder lane via Ollama Cloud",
+      "provider": "ollama",
+      "strengths": [
+        "code",
+        "reasoning"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "DeepSeek V3.2 (Ollama Cloud)",
+      "logical_id": "deepseek-v3.2",
+      "max_context": 128000,
+      "model_id": "deepseek-v3.2:cloud",
+      "notes": "Sub-floor (DeepSeek V3.2, superseded by V4 Pro) \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "code",
+        "reasoning",
+        "chinese"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "MiniMax M2.7 (Ollama Cloud)",
+      "logical_id": "minimax-m2.7",
+      "max_context": 128000,
+      "model_id": "minimax-m2.7:cloud",
+      "notes": "Sub-floor (MiniMax M2.7, superseded by M3) \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "reasoning",
+        "synthesis"
+      ],
+      "tier": "strong"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Llama 3.3 70B (free)",
+      "logical_id": "llama-3.3-70b-instruct",
+      "max_context": 128000,
+      "model_id": "meta-llama/llama-3.3-70b-instruct:free",
+      "notes": "Sub-floor (Llama 3.3 70B free) \u2014 grunt work only",
+      "provider": "openrouter_free",
+      "strengths": [
+        "code"
+      ],
+      "tier": "free"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Gemma 3 27B (free)",
+      "logical_id": "gemma-3-27b-it",
+      "max_context": 8192,
+      "model_id": "google/gemma-3-27b-it:free",
+      "notes": "Sub-floor (Gemma 3) \u2014 grunt work only",
+      "provider": "openrouter_free",
+      "strengths": [
+        "speed"
+      ],
+      "tier": "free"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Mistral Small 3.1 (free)",
+      "logical_id": "mistral-small-3.1-24b-instruct",
+      "max_context": 32768,
+      "model_id": "mistralai/mistral-small-3.1-24b-instruct:free",
+      "notes": "Sub-floor (Mistral Small 3.1) \u2014 grunt work only",
+      "provider": "openrouter_free",
+      "strengths": [
+        "code",
+        "speed"
+      ],
+      "tier": "free"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Qwen 2.5 Coder 14B (local)",
+      "logical_id": "qwen2.5-coder:14b",
+      "max_context": 32768,
+      "model_id": "qwen2.5-coder:14b",
+      "notes": "Sub-floor LOCAL \u2014 zero cost, grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "code",
+        "speed"
+      ],
+      "tier": "local"
+    },
+    {
+      "below_floor": true,
+      "display_name": "DeepSeek Coder V2 16B (local)",
+      "logical_id": "deepseek-coder-v2:16b",
+      "max_context": 16384,
+      "model_id": "deepseek-coder-v2:16b",
+      "notes": "Sub-floor LOCAL \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "code"
+      ],
+      "tier": "local"
+    },
+    {
+      "below_floor": true,
+      "display_name": "Llama 3.2 (local)",
+      "logical_id": "llama3.2",
+      "max_context": 128000,
+      "model_id": "llama3.2",
+      "notes": "Sub-floor LOCAL \u2014 grunt work only",
+      "provider": "ollama",
+      "strengths": [
+        "speed"
+      ],
+      "tier": "local"
+    }
+  ],
+  "semantic_commons": {
+    "required_action": "reconcile ontology files or add an explicit Semantic Commons registration guard in ds_model_pool",
+    "sibling_files": {
+      "docs/ontology/SEMANTIC_COMMONS.md": {
+        "exists": true,
+        "sha256": "d97fff7449754a29e234894ac4c3f702a2368b0003742653e8b8d7fc0ac40540"
+      },
+      "docs/ontology/semantic_aliases.yaml": {
+        "exists": true,
+        "sha256": "21971911d16e8c8e4458e4557c447d26687101757702b993d8d9823eb6e2690d"
+      },
+      "docs/ontology/semantic_objects.yaml": {
+        "exists": true,
+        "sha256": "dc11eee31e2effcb03e3ea6f1aeb9e6090e6025a0363326c31b2622df785d35c"
+      }
+    },
+    "sibling_semantic_source": "/Users/dhyana/dharma_swarm",
+    "status": "incomplete_in_target_worktree",
+    "target_worktree_files": {
+      "docs/ontology/SEMANTIC_COMMONS.md": {
+        "exists": false,
+        "sha256": null
+      },
+      "docs/ontology/semantic_aliases.yaml": {
+        "exists": false,
+        "sha256": null
+      },
+      "docs/ontology/semantic_objects.yaml": {
+        "exists": false,
+        "sha256": null
+      }
+    }
+  },
+  "source_of_truth": {
+    "key_status": "dkeys -> ~/.dharma/keys_status.json -> dharma_swarm.key_oracle.live_providers",
+    "model_entries": "dharma_swarm/model_pool.py::MODEL_POOL",
+    "provider_defaults": "dharma_swarm/model_defaults.py::_PROVIDER_DEFAULTS",
+    "roster_seed": "dharma_swarm/evolution_roster.py::EVOLUTION_ROSTER",
+    "runtime_door": "dharma_swarm.runtime_provider.resolve_runtime_provider_config -> create_runtime_provider"
+  },
+  "worktree": "/Users/dhyana/ds_model_pool"
+}

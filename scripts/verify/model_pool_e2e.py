@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Model-pool E2E verifier — proves every operable model answers via the TUI.
+"""Model-pool TUI consumer verifier for the canonical model pool.
 
 The consolidation made ``dharma_swarm/model_pool.py`` the single source of truth
 for every model + its routes, and ``key_oracle`` the single source of liveness.
-This harness closes the loop the operator asked for: enumerate the OPERABLE
-models (≥1 live route per the live key set), then — in ``--live`` mode — drive
-the real Helm TUI to ``/model set`` each one, probe it, screenshot the frame,
-cross-check the Python door, and record one artifact.
+This harness checks that the real Helm TUI consumes that state. The primary
+live-call proof harness is ``scripts/verify/model_routing_live_probe.py``; this
+script must remain a secondary surface check, not the source of routing truth.
 
 Modes
 -----
@@ -14,8 +13,8 @@ Modes
 the pool + live keys and write the table. Safe, fast, CI-able.
 
 ``--live``: drive ``ds tui`` (DS_TUI_ROOT defaults to this worktree) in a tmux
-pane. For each operable entry: ``/model set <alias>`` → probe ``Reply with
-exactly: PONG <id>`` → capture frame + screenshot → record operable/failed.
+pane. For each operable floor entry: ``/model set <alias>`` → probe ``Reply with
+exactly: PONG <id>`` → capture frame + screenshot → record surface behavior.
 Needs live keys; operator-run by design. NEVER fabricates a reply — a silent or
 errored turn is recorded as failed, never as a pass.
 
@@ -39,6 +38,7 @@ from dharma_swarm.key_oracle import live_providers  # noqa: E402
 from dharma_swarm.model_pool import all_entries, best_live_route, live_routes  # noqa: E402
 
 OUT_DIR = REPO_ROOT / "reports" / "model_pool"
+LIVE_E2E_ENV = "DHARMA_LIVE_MODEL_E2E"
 
 
 def _enumerate(oracle: set[str] | None) -> tuple[list[dict], list[dict]]:
@@ -130,6 +130,7 @@ def _drive_live(operable: list[dict], *, height: int, width: int, probe_timeout:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--dry-run", action="store_true", help="enumerate only; accepted for explicitness")
     ap.add_argument("--live", action="store_true", help="drive the real TUI (needs live keys)")
     ap.add_argument("--no-refresh", action="store_true", help="skip `dkeys test`")
     ap.add_argument("--height", type=int, default=40)
@@ -137,8 +138,18 @@ def main() -> int:
     ap.add_argument("--probe-timeout", type=int, default=60)
     args = ap.parse_args()
 
-    if not args.no_refresh:
+    live_enabled = os.environ.get(LIVE_E2E_ENV) == "1"
+    if args.live and not live_enabled:
+        print(f"refusing live model E2E: set {LIVE_E2E_ENV}=1 to opt in")
+        return 2
+    if args.dry_run and args.live:
+        print("--dry-run and --live are mutually exclusive")
+        return 2
+
+    if not args.no_refresh and live_enabled:
         _refresh_keys()
+    elif not args.no_refresh:
+        print(f"skipping `dkeys test`; set {LIVE_E2E_ENV}=1 to refresh live key status")
     oracle = live_providers()
     operable, unroutable = _enumerate(oracle)
 

@@ -31,15 +31,16 @@ from dharma_swarm.telemetry_plane import (
 
 def test_model_hierarchy_exposes_primary_driver_and_support_lane_contract() -> None:
     assert PRIMARY_DRIVER_LANES == (
-        ProviderType.CODEX,
         ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
+        ProviderType.OLLAMA,
         ProviderType.ANTHROPIC,
     )
     assert PRIMARY_TOOLING_PRIORITY[:2] == (
-        ProviderType.CODEX,
         ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
     )
-    assert PRIMARY_REASONING_PRIORITY[0] == ProviderType.ANTHROPIC
+    assert PRIMARY_REASONING_PRIORITY[0] == ProviderType.CLAUDE_CODE
     assert ProviderType.OPENROUTER in DELEGATED_RESEARCH_PRIORITY
     assert ProviderType.OLLAMA in DELEGATED_RESEARCH_PRIORITY
     assert ProviderType.NVIDIA_NIM in DELEGATED_RESEARCH_PRIORITY
@@ -149,8 +150,8 @@ def test_provider_policy_prefers_tooling_lanes_when_requested() -> None:
         ],
     )
 
-    assert decision.selected_provider == ProviderType.CODEX
-    assert decision.selected_model_hint == "codex"
+    assert decision.selected_provider == ProviderType.CLAUDE_CODE
+    assert decision.selected_model_hint == "claude-opus-4-6"
 
 
 def test_provider_policy_prefers_japanese_quality_lanes() -> None:
@@ -490,13 +491,18 @@ class _CountingFailingProvider:
         yield ""
 
 
+def _fail_open_key_liveness() -> set[str] | None:
+    return None
+
+
 @pytest.mark.asyncio
 async def test_model_router_complete_for_task_uses_policy_selection() -> None:
     router = ModelRouter(
         {
             ProviderType.OPENROUTER_FREE: _DummyProvider("cheap"),
             ProviderType.ANTHROPIC: _DummyProvider("frontier"),
-        }
+        },
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     decision, response = await router.complete_for_task(
@@ -535,6 +541,7 @@ async def test_model_router_complete_for_task_falls_back_cross_provider() -> Non
             jitter_seconds=0.0,
             max_delay_seconds=0.0,
         ),
+        key_liveness_provider=_fail_open_key_liveness,
     )
     decision, response = await router.complete_for_task(
         ProviderRouteRequest(
@@ -566,7 +573,8 @@ async def test_model_router_complete_for_task_uses_language_enrichment() -> None
             ProviderType.OPENROUTER_FREE: _DummyProvider("cheap"),
             ProviderType.OPENROUTER: _DummyProvider("jp-quality"),
             ProviderType.ANTHROPIC: _DummyProvider("frontier"),
-        }
+        },
+        key_liveness_provider=_fail_open_key_liveness,
     )
     decision, response = await router.complete_for_task(
         ProviderRouteRequest(
@@ -602,6 +610,7 @@ async def test_model_router_session_affinity_keeps_provider_sticky() -> None:
         },
         sticky_min_tokens=1,
         sticky_session_seconds=300.0,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     first_decision, _ = await router.complete_for_task(
@@ -665,6 +674,7 @@ async def test_model_router_canary_routes_to_canary_provider() -> None:
         canary_percent=100.0,
         canary_provider=ProviderType.ANTHROPIC,
         canary_model_hint="claude-sonnet-4-6",
+        key_liveness_provider=_fail_open_key_liveness,
     )
     decision, response = await router.complete_for_task(
         ProviderRouteRequest(
@@ -703,6 +713,7 @@ async def test_model_router_learning_reorders_after_failures() -> None:
         ),
         learning_enabled=True,
         learning_alpha=1.0,
+        key_liveness_provider=_fail_open_key_liveness,
     )
 
     first_decision, first_response = await router.complete_for_task(
