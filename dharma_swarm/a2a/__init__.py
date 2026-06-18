@@ -25,11 +25,15 @@ Core components:
 """
 
 from dharma_swarm.a2a.agent_card import (
+    A2A_INBOX_ROUTE_ALIAS,
+    A2AInboxRoute,
     AgentCard,
     AgentCapability,
     AgentSkill,
     CardRegistry,
     SecurityScheme,
+    a2a_inbox_subject,
+    resolve_agent_uid,
 )
 from dharma_swarm.a2a.a2a_server import (
     A2AArtifact,
@@ -57,10 +61,14 @@ from dharma_swarm.a2a.task_receipt import (
 
 __all__ = [
     "AgentCard",
+    "A2A_INBOX_ROUTE_ALIAS",
+    "A2AInboxRoute",
     "AgentCapability",
     "AgentSkill",
     "CardRegistry",
     "SecurityScheme",
+    "a2a_inbox_subject",
+    "resolve_agent_uid",
     "A2AArtifact",
     "A2AExtension",
     "A2AMessage",

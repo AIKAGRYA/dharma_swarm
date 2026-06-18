@@ -51,6 +51,11 @@ from scripts.runtime.pr_merge_control import (  # noqa: E402
     stamp,
     utc_now,
 )
+from dharma_swarm.a2a.agent_card import (  # noqa: E402
+    A2A_INBOX_ROUTE_ALIAS,
+    a2a_inbox_subject,
+    resolve_agent_uid,
+)
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash  # noqa: E402
 from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore  # noqa: E402
 from dharma_swarm.spine.identity import ExecutionIdentity  # noqa: E402
@@ -69,26 +74,19 @@ ACK_TIER_PUBLISH_ACCEPTED = "PUBLISH_ACCEPTED"
 ACK_TIER_CORE_FLUSH_ONLY = "CORE_FLUSH_ONLY"
 ACK_TIER_HANDLER_ACKED = "HANDLER_ACKED"
 ROUTE_A2A = "a2a"
-ROUTE_AGENT_INBOX = "agent-inbox"
-
-AGENT_UID_ALIASES = {
-    "devin": "devin-roaming-2987d222",
-    "hermes": "hermes-m5",
-}
+ROUTE_AGENT_INBOX = A2A_INBOX_ROUTE_ALIAS
 
 
 def _validate_subject_token(token: str, *, label: str) -> str:
+    return resolve_agent_uid(token) if label == "agent uid" else _validate_a2a_token(token, label=label)
+
+
+def _validate_a2a_token(token: str, *, label: str) -> str:
     cleaned = (token or "").strip()
     forbidden = {".", "*", ">", "/", "\\"}
     if not cleaned or any(char.isspace() or char in forbidden for char in cleaned):
         raise ValueError(f"invalid {label} for NATS subject: {cleaned!r}")
     return cleaned
-
-
-def resolve_agent_uid(to: str, *, agent_uid: str = "") -> str:
-    return _validate_subject_token(
-        agent_uid or AGENT_UID_ALIASES.get(to, to), label="agent uid"
-    )
 
 
 def subject_for_route(to: str, *, route: str, agent_uid: str = "") -> tuple[str, str]:
@@ -98,7 +96,7 @@ def subject_for_route(to: str, *, route: str, agent_uid: str = "") -> tuple[str,
         return subject, _a2a_target_for_subject(subject)
     if route == ROUTE_AGENT_INBOX:
         resolved_uid = resolve_agent_uid(to, agent_uid=agent_uid)
-        return f"dharma.agent.{resolved_uid}.inbox", resolved_uid
+        return a2a_inbox_subject(resolved_uid), resolved_uid
     raise ValueError(f"unsupported A2A send route: {route}")
 
 

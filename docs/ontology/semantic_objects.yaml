@@ -1,0 +1,37 @@
+schema_version: dharma.semantic_objects.v1
+objects:
+  A2ACard:
+    kind: runtime_object
+    owner: dharma_swarm.a2a.agent_card.AgentCard
+    description: Agent discovery and capability card.
+    required_fields:
+      - name
+      - agent_uid
+      - supported_interfaces
+    required_internal_route: A2AInboxRoute
+  AgentUID:
+    kind: identifier
+    description: Stable durable agent identifier used in internal NATS subjects.
+    subject_token_rules:
+      forbidden_chars:
+        - "."
+        - "*"
+        - ">"
+        - "/"
+        - "\\"
+      whitespace_allowed: false
+  NATSSubstrate:
+    kind: transport_substrate
+    description: Internal live fleet transport backed by NATS/JetStream.
+    external_edge: false
+  A2AInboxRoute:
+    kind: route_binding
+    alias: agent-inbox
+    substrate: NATSSubstrate
+    subject_template: dharma.agent.<agent_uid>.inbox
+    ack_subject_template: dharma.agent.<agent_uid>.inbox.ack.<packet_id>
+    reply_subject_template: dharma.agent.<agent_uid>.inbox.reply.<packet_id>
+    implemented_by:
+      sender: scripts/runtime/a2a_send.py
+      bridge: scripts/runtime/a2a_inbox_bridge.py
+      card_resolver: dharma_swarm/a2a/agent_card.py

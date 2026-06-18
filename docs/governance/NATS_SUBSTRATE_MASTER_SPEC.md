@@ -223,6 +223,9 @@ The sender keeps `--route a2a` as a compatibility path for
 `dharma.agent.<agent_uid>.inbox` and records `route` plus `target_uid` in the
 receipt. Known aliases may resolve display handles such as `hermes` to stable
 UIDs such as `hermes-m5`; callers may pass `--agent-uid` for explicit routing.
+In Semantic Commons this internal binding is `A2AInboxRoute` with alias
+`agent-inbox`, carried on every standardized `A2ACard` as the
+`NATSSubstrate` contact route.
 
 The CLI fallback can prove at most `PUBLISH_ACCEPTED`. It cannot claim
 `HANDLER_ACKED` or `DOMAIN_RECEIPTED`, because it does not own the target
