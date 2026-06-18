@@ -59,7 +59,7 @@ def test_daemon_config_defaults():
     assert cfg.crown_jewel_threshold == 0.85
     assert len(cfg.threads) == 5
     assert cfg.rotation_mode == "sequential"
-    assert cfg.quiet_hours == [2, 3, 4, 5]
+    assert cfg.quiet_hours == []  # default: no quiet hours, swarm runs 24/7
 
 
 def test_thread_prompts_complete():

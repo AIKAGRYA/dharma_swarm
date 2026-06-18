@@ -15,7 +15,6 @@ This command does NOT own any fact. It projects from the existing owners:
     custody    -> docs/docops/assertions.yaml (canonical_guard.registered) + git
     liveness   -> live ops census receipt (scripts/runtime/live_ops_census.py)
     broken     -> docs/state/BROKEN_REGISTER.md
-    loops      -> committed loop-closure run reports (reports/loop_closure/**)
 
 Doctrine line that must hold (same as the reconciliation track's):
     Read models project truth from owners; they do not become authority.
@@ -23,22 +22,31 @@ Doctrine line that must hold (same as the reconciliation track's):
 Usage:
     python3 scripts/governance/orientation_graph.py          # human view
     python3 scripts/governance/orientation_graph.py --json   # machine packet
-    make orient
+    make orient                                             # writes repo_context artifacts
 
-Write behavior: never writes. Exit code: always 0 (informational).
+Write behavior: default and --json never write; --write-context writes only
+reports/orientation/repo_context.{json,md}. Exit code: always 0
+(informational).
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.a2a.agent_presence import list_agent_presence
 
 ORGANISM_DOC = REPO_ROOT / "foundations/THE_ORGANISM.md"
 NORTH_STAR_DOC = REPO_ROOT / "docs/vision_maps/NORTH_STAR.md"
@@ -47,7 +55,12 @@ PORTFOLIO = REPO_ROOT / "docs/governance/VENTURE_CELL_PORTFOLIO.yaml"
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 ASSERTIONS = REPO_ROOT / "docs/docops/assertions.yaml"
 BROKEN_REGISTER = REPO_ROOT / "docs/state/BROKEN_REGISTER.md"
-LOOP_CLOSURE_DIR = REPO_ROOT / "reports/loop_closure"
+REPO_CONTEXT_DIR = REPO_ROOT / "reports/orientation"
+REPO_CONTEXT_JSON = REPO_CONTEXT_DIR / "repo_context.json"
+REPO_CONTEXT_MD = REPO_CONTEXT_DIR / "repo_context.md"
+A2A_BUS = Path.home() / ".dharma/a2a_bus"
+DEPLOY_RECEIPT = Path.home() / ".dharma/ops/deploy_receipt.json"
+LANE_MAP = Path.home() / ".dharma/ops/parallel_lane_map.json"
 
 
 def _census_receipt_path() -> Path | None:
@@ -116,14 +129,51 @@ class BrokenItem:
 
 
 @dataclass
-class LoopClosure:
-    report: str
+class Loop1Closure:
+    """Loop 1 (provider chain + dispatch) closure proof, projected read-only
+    from the latest delegation_runs receipt. LIVE only when that receipt
+    carries a non-empty provider AND model — the spine dispatch actually
+    recorded which brain answered. Owner of the fact: runtime_state's
+    delegation_runs.receipt_json; this view never writes."""
+    live: bool
     provider: str = ""
-    tasks_completed: int = 0
-    tasks_requested: int = 0
-    dispatch_dropoffs: int = 0
-    evidence_receipts: int = 0
-    closed: bool = False
+    model: str = ""
+    detail: str = ""
+
+
+@dataclass
+class Lane:
+    path: str
+    branch: str
+    head: str = ""
+    status: str = ""
+
+
+@dataclass
+class BodyState:
+    receipt: str
+    status: str = ""
+    worktree: str = ""
+    old_sha: str = ""
+    new_sha: str = ""
+    observed_at: str = ""
+    note: str = ""
+
+
+@dataclass
+class A2ABusState:
+    root: str
+    inbox_files: int
+    quarantine_files: int
+    node_registry: str = ""
+    task_log: str = ""
+    nats_e2e_receipt: str = ""
+
+
+@dataclass
+class ReceiptTail:
+    path: str
+    modified_at: str
 
 
 @dataclass
@@ -134,7 +184,13 @@ class OrientationPacket:
     custody: CustodyReport
     liveness: Liveness
     broken: list[BrokenItem]
-    loop_closure: LoopClosure | None = None
+    loop1: Loop1Closure
+    lanes: list[Lane] = field(default_factory=list)
+    agents: list[dict[str, Any]] = field(default_factory=list)
+    receipts_tail: list[ReceiptTail] = field(default_factory=list)
+    a2a_bus: A2ABusState | None = None
+    body: BodyState | None = None
+    context_hash: str = ""
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -232,7 +288,7 @@ def build_liveness() -> Liveness:
         if not isinstance(surface, dict):
             continue
         surfaces.append({
-            "id": str(surface.get("surface_id", "")),
+            "id": str(surface.get("surface_id") or surface.get("id") or ""),
             "label": str(surface.get("label", "")),
             "status": str(surface.get("status", "")),
         })
@@ -268,47 +324,295 @@ def build_broken() -> list[BrokenItem]:
     return [i for i in items if i.status not in {"FIXED", "CLOSED"}]
 
 
-def build_loop_closure() -> LoopClosure | None:
-    """Latest committed Loop 1 closure run report (scripts/loop1_closure_run.py)."""
-    if not LOOP_CLOSURE_DIR.exists():
-        return None
-    reports = sorted(LOOP_CLOSURE_DIR.glob("*/loop1_closure_run*.json"))
-    if not reports:
-        return None
-    path = reports[-1]
+def _runtime_db_path() -> Any:
+    """Resolve the runtime-state db path from its owner (runtime_state),
+    not a hardcoded literal. Borrows the owner's DEFAULT_RUNTIME_DB constant."""
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
+        return DEFAULT_RUNTIME_DB
     except Exception:
-        return LoopClosure(report=f"unreadable report at {path}")
-    completed = int(payload.get("tasks_completed", 0))
-    requested = int(payload.get("tasks_requested", 0))
-    dropoffs = int(payload.get("dispatch_dropoffs", 0))
-    receipts = len(payload.get("evidence_receipts") or {})
+        return Path.home() / ".dharma" / "state" / "runtime.db"
+
+
+
+def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
+    """Project Loop 1 closure from the latest delegation_runs receipt.
+
+    LIVE only when the most recent receipt (by started_at, then rowid) carries
+    a non-empty provider AND model. This view owns nothing — it reads the
+    receipt_json column the spine dispatch writes (runtime_state owner)."""
+    import sqlite3
+
+    path = Path(db_path) if db_path is not None else _runtime_db_path()
+    if not Path(path).exists():
+        return Loop1Closure(live=False, detail=f"no runtime db at {path}")
     try:
-        report_ref = str(path.relative_to(REPO_ROOT))
-    except ValueError:
-        report_ref = str(path)
-    return LoopClosure(
-        report=report_ref,
-        provider=str(payload.get("provider", "")),
-        tasks_completed=completed,
-        tasks_requested=requested,
-        dispatch_dropoffs=dropoffs,
-        evidence_receipts=receipts,
-        closed=bool(requested and completed == requested and dropoffs == 0 and receipts),
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except Exception:
+        try:
+            conn = sqlite3.connect(str(path))
+        except Exception as exc:  # pragma: no cover - defensive
+            return Loop1Closure(live=False, detail=f"db unreadable: {exc}")
+    try:
+        row = conn.execute(
+            "SELECT receipt_json FROM delegation_runs "
+            "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
+            "ORDER BY started_at DESC, rowid DESC LIMIT 1"
+        ).fetchone()
+    except Exception as exc:
+        conn.close()
+        return Loop1Closure(live=False, detail=f"delegation_runs query failed: {exc}")
+    conn.close()
+    if not row or not row[0]:
+        return Loop1Closure(live=False, detail="no persisted EvidenceReceipt yet")
+    try:
+        blob = json.loads(row[0])
+    except Exception:
+        return Loop1Closure(live=False, detail="latest receipt_json unparseable")
+    provider = str(blob.get("provider", "") or "")
+    model = str(blob.get("model", "") or "")
+    live = bool(provider and model)
+    detail = (
+        "latest dispatch receipt carries provider+model"
+        if live
+        else "latest receipt missing provider and/or model"
+    )
+    return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
+
+
+def build_lanes() -> list[Lane]:
+    """Project parallel lane state from the ops lane map or git worktrees."""
+    lanes: list[Lane] = []
+    if LANE_MAP.exists():
+        try:
+            payload = json.loads(LANE_MAP.read_text(encoding="utf-8"))
+        except Exception:
+            payload = {}
+        raw_lanes = payload.get("lanes") if isinstance(payload, dict) else None
+        if isinstance(raw_lanes, list):
+            for item in raw_lanes:
+                if not isinstance(item, dict):
+                    continue
+                lanes.append(Lane(
+                    path=str(item.get("path") or item.get("worktree") or ""),
+                    branch=str(item.get("branch") or ""),
+                    head=str(item.get("head") or item.get("sha") or ""),
+                    status=str(item.get("status") or ""),
+                ))
+    if lanes:
+        return [_stable_lane(lane) for lane in lanes]
+
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:
+        return []
+    current: dict[str, str] = {}
+    for line in result.stdout.splitlines() + [""]:
+        if not line.strip():
+            if current:
+                lanes.append(_stable_lane(Lane(
+                    path=current.get("worktree", ""),
+                    branch=current.get("branch", "").removeprefix("refs/heads/") or "(detached)",
+                    head=current.get("HEAD", ""),
+                )))
+                current = {}
+            continue
+        key, _, value = line.partition(" ")
+        current[key] = value
+    return lanes
+
+
+def _stable_lane(lane: Lane) -> Lane:
+    """Avoid repo_context churn from moving lane SHAs."""
+    try:
+        if Path(lane.path).resolve() == REPO_ROOT.resolve():
+            return Lane(
+                path=lane.path,
+                branch=lane.branch,
+                head="CURRENT_CHECKOUT",
+                status=lane.status,
+            )
+    except OSError:
+        pass
+    if lane.head:
+        return Lane(
+            path=lane.path,
+            branch=lane.branch,
+            head="LIVE_HEAD",
+            status=lane.status,
+        )
+    return lane
+
+
+def build_agents() -> list[dict[str, Any]]:
+    agents: list[dict[str, Any]] = []
+    for agent in list_agent_presence():
+        payload = agent.to_dict()
+        payload.pop("age_hours", None)
+        agents.append(payload)
+    return agents
+
+
+def build_receipts_tail(limit: int = 8) -> list[ReceiptTail]:
+    roots = [
+        Path.home() / ".dharma/ds_goals",
+        Path.home() / ".dharma/a2a_bus/inboxes",
+        Path.home() / ".dharma/onboarding",
+        REPO_CONTEXT_DIR,
+    ]
+    candidates: list[Path] = []
+    for root in roots:
+        if root == REPO_CONTEXT_DIR:
+            nats_receipt = root / "nats_e2e_receipt.json"
+            if nats_receipt.exists():
+                candidates.append(nats_receipt)
+        elif root.exists():
+            candidates.extend(p for p in root.rglob("*") if p.is_file() and p.suffix in {".json", ".jsonl"})
+    candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
+    tail: list[ReceiptTail] = []
+    for path in candidates[:limit]:
+        tail.append(ReceiptTail(path=str(path), modified_at=_mtime_iso(path)))
+    return tail
+
+
+def build_a2a_bus_state() -> A2ABusState:
+    inbox_root = A2A_BUS / "inboxes"
+    quarantine_root = A2A_BUS / "quarantine"
+    inbox_files = _count_files(inbox_root)
+    quarantine_files = _count_files(quarantine_root)
+    node_registry = Path.home() / ".dharma/a2a/nodes.json"
+    task_log = Path.home() / ".dharma/a2a/task_log.jsonl"
+    nats_receipt = REPO_CONTEXT_DIR / "nats_e2e_receipt.json"
+    return A2ABusState(
+        root=str(A2A_BUS),
+        inbox_files=inbox_files,
+        quarantine_files=quarantine_files,
+        node_registry=str(node_registry) if node_registry.exists() else "",
+        task_log=str(task_log) if task_log.exists() else "",
+        nats_e2e_receipt=str(nats_receipt) if nats_receipt.exists() else "",
+    )
+
+
+def build_body_state() -> BodyState:
+    if not DEPLOY_RECEIPT.exists():
+        return BodyState(receipt=str(DEPLOY_RECEIPT), status="missing")
+    try:
+        payload = json.loads(DEPLOY_RECEIPT.read_text(encoding="utf-8"))
+    except Exception:
+        return BodyState(receipt=str(DEPLOY_RECEIPT), status="unreadable")
+    return BodyState(
+        receipt=str(DEPLOY_RECEIPT),
+        status=str(payload.get("status") or ""),
+        worktree=str(payload.get("worktree") or ""),
+        old_sha=str(payload.get("old_sha") or ""),
+        new_sha=str(payload.get("new_sha") or ""),
+        observed_at=str(payload.get("observed_at") or ""),
+        note=str(payload.get("note") or ""),
     )
 
 
 def build_packet() -> OrientationPacket:
-    return OrientationPacket(
+    packet = OrientationPacket(
         identity=build_identity(),
         organs=build_organs(),
         tracks=build_tracks(),
         custody=build_custody(),
         liveness=build_liveness(),
         broken=build_broken(),
-        loop_closure=build_loop_closure(),
+        loop1=build_loop1_closure(),
+        lanes=build_lanes(),
+        agents=build_agents(),
+        receipts_tail=build_receipts_tail(),
+        a2a_bus=build_a2a_bus_state(),
+        body=build_body_state(),
     )
+    payload = asdict(packet)
+    payload.pop("context_hash", None)
+    packet.context_hash = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+    return packet
+
+
+def write_repo_context(packet: OrientationPacket) -> tuple[Path, Path]:
+    REPO_CONTEXT_DIR.mkdir(parents=True, exist_ok=True)
+    data = asdict(packet)
+    REPO_CONTEXT_JSON.write_text(
+        json.dumps(data, indent=2, sort_keys=True, ensure_ascii=True) + "\n",
+        encoding="utf-8",
+    )
+    REPO_CONTEXT_MD.write_text(_repo_context_markdown(packet), encoding="utf-8")
+    return REPO_CONTEXT_JSON, REPO_CONTEXT_MD
+
+
+def _repo_context_markdown(packet: OrientationPacket) -> str:
+    lines = [
+        "# Repo Context",
+        "",
+        "Projection from existing owners. This file owns no facts.",
+        "",
+        f"- context_hash: `{packet.context_hash}`",
+        f"- identity: {packet.identity.one_line}",
+        f"- active_tracks: {len(packet.tracks)}",
+        f"- lanes: {len(packet.lanes)}",
+        f"- agents: {len(packet.agents)}",
+        f"- receipts_tail: {len(packet.receipts_tail)}",
+        f"- loop1_live: {packet.loop1.live}",
+        "",
+        "## Tracks",
+    ]
+    for track in packet.tracks:
+        lines.append(f"- `{track.id}` [{track.status}] serves `{track.serves}` owner `{track.owner}`")
+    lines.append("")
+    lines.append("## Agents")
+    for agent in packet.agents:
+        lines.append(
+            f"- `{agent['agent_uid']}` status={agent['status']} "
+            f"heartbeat={agent['heartbeat_status']} last_seen={agent['last_seen_at'] or '(none)'}"
+        )
+    lines.append("")
+    lines.append("## A2A")
+    if packet.a2a_bus is not None:
+        lines.append(f"- root: `{packet.a2a_bus.root}`")
+        lines.append(f"- inbox_files: {packet.a2a_bus.inbox_files}")
+        lines.append(f"- quarantine_files: {packet.a2a_bus.quarantine_files}")
+        if packet.a2a_bus.nats_e2e_receipt:
+            lines.append(f"- nats_e2e_receipt: `{packet.a2a_bus.nats_e2e_receipt}`")
+    lines.append("")
+    lines.append("## Body")
+    if packet.body is not None:
+        lines.append(f"- status: `{packet.body.status}`")
+        lines.append(f"- worktree: `{packet.body.worktree}`")
+        lines.append(f"- old_sha: `{packet.body.old_sha}`")
+        lines.append(f"- new_sha: `{packet.body.new_sha}`")
+        lines.append(f"- note: {packet.body.note}")
+    lines.append("")
+    lines.append("## Broken Register")
+    for item in packet.broken:
+        lines.append(f"- `{item.id}` [{item.status}] {item.title}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _count_files(path: Path) -> int:
+    if not path.exists():
+        return 0
+    return sum(1 for item in path.rglob("*") if item.is_file())
+
+
+def _mtime_iso(path: Path) -> str:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat()
+    except OSError:
+        return ""
 
 
 def _section(title: str) -> None:
@@ -350,20 +654,17 @@ def render(packet: OrientationPacket) -> None:
     for surface in packet.liveness.surfaces:
         print(f"  [{surface['status']:<8}] {surface['id']} — {surface['label']}")
 
+    _section("LOOP 1 CLOSURE — owner: delegation_runs.receipt_json (read-only)")
+    c = packet.loop1
+    print(f"  Loop 1 (provider chain + dispatch): {'LIVE' if c.live else 'NOT LIVE'}")
+    if c.provider or c.model:
+        print(f"    latest receipt: provider={c.provider!r} model={c.model!r}")
+    if c.detail:
+        print(f"    {c.detail}")
+
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:
         print(f"  [{item.status}] {item.id} — {item.title}")
-
-    _section("LOOP 1 CLOSURE — owner: committed closure run report (read-only)")
-    closure = packet.loop_closure
-    if closure is None:
-        print("  no committed closure run — run scripts/loop1_closure_run.py")
-    else:
-        verdict = "CLOSED" if closure.closed else "NOT CLOSED"
-        print(f"  [{verdict}] {closure.tasks_completed}/{closure.tasks_requested} tasks "
-              f"completed via {closure.provider or '?'} "
-              f"(dropoffs={closure.dispatch_dropoffs}, receipts={closure.evidence_receipts})")
-        print(f"  Report: {closure.report}")
 
     print()
     print("  Depth: make onboard (state) · docs/MEGAFILE_INDEX.md (maps)")
@@ -375,8 +676,16 @@ def main(argv: list[str] | None = None) -> int:
         description="Render the whole organism at once from its owners.")
     parser.add_argument("--json", action="store_true", dest="as_json",
                         help="print the machine packet JSON to stdout")
+    parser.add_argument("--write-context", action="store_true",
+                        help="write reports/orientation/repo_context.{json,md}")
     args = parser.parse_args(argv)
     packet = build_packet()
+    if args.write_context:
+        json_path, md_path = write_repo_context(packet)
+        render(packet)
+        print(f"  Wrote: {json_path}")
+        print(f"  Wrote: {md_path}")
+        return 0
     if args.as_json:
         print(json.dumps(asdict(packet), sort_keys=True, indent=1))
     else:

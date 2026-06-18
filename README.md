@@ -27,23 +27,29 @@ It combines a Python orchestration core, a FastAPI backend, a Next.js dashboard,
 ## Common Commands
 
 ```bash
-make xray
-make compile
-make test-smoke
-make test-all
-make dashboard-lint
-make dashboard-build
+make help              # full curated target list
+make onboard           # mandatory first command for any agent or operator
+make install           # pip install -e .[dev]
+make test-fast         # fast subset of pytest
+make test              # full pytest suite
+make lint              # ruff
+make hygiene-audit     # non-blocking vibe-code hygiene scan
+make hygiene-check     # verify hygiene catalogue / generated docs integrity
+make docops-integrity  # machine-verifiable documentation checks
+make governance-all    # full governance suite
 ```
+
+See `make help` for the complete, authoritative target list — it is regenerated alongside the Makefile and never drifts.
 
 ## What The Inventory Says
 
-Use the built-in static inventory pass to get a current snapshot:
+For a current static snapshot of the repo (module/test counts, hotspots, coupling, language mix), run the DocOps inventory pass:
 
 ```bash
-make xray
+make docops-report
 ```
 
-That report is the fastest way to answer:
+The generated JSON/Markdown reports under `docs/docops/` answer:
 
 - how many Python modules and tests exist
 - which files are the largest hotspots

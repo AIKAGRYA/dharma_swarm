@@ -20,30 +20,9 @@ def test_packet_has_all_axes():
     packet = og.build_packet()
     data = og.asdict(packet)
     assert set(data) == {"identity", "organs", "tracks", "custody",
-                         "liveness", "broken", "loop_closure"}
-
-
-def test_loop_closure_axis_reads_committed_report(tmp_path):
-    report = {
-        "provider": "ollama",
-        "tasks_requested": 2,
-        "tasks_completed": 2,
-        "dispatch_dropoffs": 0,
-        "evidence_receipts": {"r1": "ok", "r2": "ok"},
-    }
-    run_dir = tmp_path / "2026-06-11"
-    run_dir.mkdir()
-    (run_dir / "loop1_closure_run.json").write_text(json.dumps(report))
-    original = og.LOOP_CLOSURE_DIR
-    og.LOOP_CLOSURE_DIR = tmp_path
-    try:
-        closure = og.build_loop_closure()
-    finally:
-        og.LOOP_CLOSURE_DIR = original
-    assert closure is not None
-    assert closure.closed
-    assert closure.tasks_completed == 2
-    assert closure.evidence_receipts == 2
+                         "liveness", "broken", "loop1", "lanes", "agents",
+                         "receipts_tail", "a2a_bus", "body",
+                         "context_hash"}
 
 
 def test_identity_serves_the_one_line():

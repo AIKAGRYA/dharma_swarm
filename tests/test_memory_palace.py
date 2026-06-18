@@ -9,6 +9,7 @@ Tests cover:
 """
 
 import asyncio
+import importlib.util
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -21,6 +22,15 @@ from dharma_swarm.memory_palace import (
     PalaceResponse,
     PalaceResult,
     _LanceDBAdapter,
+)
+
+# lancedb is an optional dependency (not in the [dev] extras). The adapter
+# degrades gracefully when it is absent, so tests that assert the connected
+# success path only run when lancedb is actually importable.
+_LANCEDB_AVAILABLE = importlib.util.find_spec("lancedb") is not None
+_requires_lancedb = pytest.mark.skipif(
+    not _LANCEDB_AVAILABLE,
+    reason="lancedb optional dependency not installed",
 )
 
 
@@ -49,12 +59,14 @@ def _run(coro):
 class TestLanceDBAdapter:
     """Direct tests for the _LanceDBAdapter wrapper."""
 
+    @_requires_lancedb
     def test_connect_creates_db(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
             adapter = _LanceDBAdapter(db_path=db_path)
             assert adapter.connected is True
 
+    @_requires_lancedb
     def test_upsert_and_count(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
@@ -74,6 +86,7 @@ class TestLanceDBAdapter:
             assert ok is False
             assert adapter.count() == 0
 
+    @_requires_lancedb
     def test_search_returns_results(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "lance_test"
@@ -96,6 +109,7 @@ class TestLanceDBAdapter:
             results = adapter.search("anything")
             assert results == []
 
+    @_requires_lancedb
     def test_cross_session_persistence(self):
         """Content indexed in one adapter instance can be retrieved by another
         pointing to the same db_path — the key cross-session test."""
@@ -153,6 +167,7 @@ class TestLanceDBAdapter:
 # ===========================================================================
 
 
+@_requires_lancedb
 class TestMemoryPalaceLanceDB:
     """Tests for MemoryPalace with LanceDB integration (Phase 4)."""
 
