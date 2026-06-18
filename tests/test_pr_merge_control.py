@@ -943,3 +943,212 @@ def test_gate_blocks_backup_reviewer_without_written_reason(tmp_path, monkeypatc
     assert gate["decision"] == "BLOCKED"
     assert "backup reviewer requires --backup-reviewer-reason" in gate["blockers"]
     assert gate["backup_review_policy"]["status"] == "missing_reason"
+
+
+def _advisory_thread(login):
+    return {
+        "isResolved": False,
+        "isOutdated": False,
+        "comments": {"nodes": [{"author": {"login": login}, "body": "summary"}]},
+    }
+
+
+_BOT_PR_BODY = """
+- Organ touched: `docs/governance/spine_adoption_metric.json`
+- Declared-vs-actual gap closed: the automated metric snapshot is refreshed.
+- Proof that re-reads the map: the generator re-reads the spine adoption owner.
+- New drift introduced: none; this is a trusted automation refresh.
+"""
+
+
+def test_thread_is_advisory_only_classifies_greptile_solo_thread():
+    assert prc.thread_is_advisory_only(_advisory_thread("greptile-apps")) is True
+    assert prc.thread_is_advisory_only(_advisory_thread("johnvincentshrader")) is False
+    # A thread with any non-advisory participant is never advisory-only.
+    mixed = {
+        "comments": {
+            "nodes": [
+                {"author": {"login": "greptile-apps"}},
+                {"author": {"login": "johnvincentshrader"}},
+            ]
+        }
+    }
+    assert prc.thread_is_advisory_only(mixed) is False
+    # An empty/authorless thread is conservatively treated as blocking.
+    assert prc.thread_is_advisory_only({"comments": {"nodes": []}}) is False
+
+
+def test_gate_waives_required_reviewers_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    # No reviewer receipts written on purpose: a bot-pr must merge without them.
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: {"ok": True, "unresolved": [], "unresolved_count": 0})
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["required_reviewers"] == []
+    assert gate["bot_pr"]["is_bot_pr"] is True
+    assert any("waived required reviewer receipts" in w for w in gate["warnings"])
+    assert not any("receipt" in b for b in gate["blockers"])
+
+
+def test_gate_ignores_advisory_bot_threads_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    threads = {
+        "ok": True,
+        "unresolved": [_advisory_thread("greptile-apps")],
+        "unresolved_count": 1,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "MERGE_CANDIDATE"
+    assert gate["review_threads"]["blocking_unresolved_count"] == 0
+    assert not any("unresolved review threads" in b for b in gate["blockers"])
+    assert any("advisory review thread" in w for w in gate["warnings"])
+
+
+def test_gate_still_blocks_non_advisory_threads_for_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    threads = {
+        "ok": True,
+        # Greptile's solo thread is advisory; a human thread is a real request.
+        "unresolved": [_advisory_thread("greptile-apps"), _advisory_thread("johnvincentshrader")],
+        "unresolved_count": 2,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "REVIEW_REQUIRED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [{"name": "bot-pr"}],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["review_threads"]["blocking_unresolved_count"] == 1
+    assert "1 unresolved review threads" in gate["blockers"]
+
+
+def test_gate_does_not_waive_threads_for_non_bot_pr(tmp_path, monkeypatch):
+    out_dir = tmp_path / "packet"
+    out_dir.mkdir()
+    prc.write_json(out_dir / "FACTS.json", {"risk": {"level": "LOW"}})
+    # Fully reviewed PR; the only blocker is an advisory greptile thread, which
+    # must STILL block because the PR is not labelled bot-pr.
+    _write_approve_review(out_dir, "codex")
+    _write_approve_review(out_dir, "claude")
+    threads = {
+        "ok": True,
+        "unresolved": [_advisory_thread("greptile-apps")],
+        "unresolved_count": 1,
+    }
+    monkeypatch.setattr(
+        prc,
+        "fetch_pr_view",
+        lambda _pr: {
+            "isDraft": False,
+            "mergeable": "MERGEABLE",
+            "reviewDecision": "APPROVED",
+            "statusCheckRollup": _ci_required_success_rollup(),
+            "labels": [],
+            "body": _BOT_PR_BODY,
+        },
+    )
+    monkeypatch.setattr(prc, "fetch_review_threads", lambda _pr, _repo: threads)
+    monkeypatch.setattr(prc, "repo_name", lambda: "owner/repo")
+
+    gate = prc.build_gate(
+        argparse.Namespace(
+            pr=12,
+            packet_dir=str(out_dir),
+            state_root=str(tmp_path),
+            allow_pending=False,
+            human_approved=False,
+            allow_backup_reviewer=False,
+            backup_reviewers="backup_opus",
+            backup_reviewer_reason="",
+            required_reviewers="codex,claude",
+        )
+    )
+
+    assert gate["decision"] == "BLOCKED"
+    assert gate["bot_pr"]["is_bot_pr"] is False
+    assert "1 unresolved review threads" in gate["blockers"]
