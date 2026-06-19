@@ -30,10 +30,46 @@ jobs:
           set -euo pipefail
           python3 --version
           python3 -m compileall -q scripts/governance/module_diet_census.py
-          python3 scripts/governance/module_diet_census.py --format markdown --output module-diet-census.md
           python3 scripts/governance/module_diet_census.py --format json --output module-diet-census.json
           python3 scripts/governance/module_diet_census.py --baseline-top-level-count 406 --fail-on-top-level-growth --format markdown >/tmp/module-diet-baseline.md
-          echo "# Module Diet Census" >> "$GITHUB_STEP_SUMMARY"
-          cat module-diet-census.md >> "$GITHUB_STEP_SUMMARY"
-          echo "===== module-diet-census.md ====="
-          cat module-diet-census.md
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('module-diet-census.json').read_text())
+          rows = data['rows']
+          summary = data['summary']
+          print('===== SUMMARY =====')
+          print(json.dumps(summary, indent=2, sort_keys=True))
+
+          def show(title, selected, limit=20):
+              print(f'===== {title} =====')
+              if not selected:
+                  print('none')
+                  return
+              for row in selected[:limit]:
+                  families = ','.join(row.get('duplicate_families') or []) or '-'
+                  reasons = ','.join(row.get('reasons') or []) or '-'
+                  print(
+                      f"{row['path']} | class={row['classification']} | "
+                      f"lines={row['lines']} | imported_by={row['imported_by_count']} | "
+                      f"families={families} | reasons={reasons}"
+                  )
+
+          show('DEAD_CANDIDATES', sorted(
+              [r for r in rows if r['classification'] == 'DEAD_CANDIDATE'],
+              key=lambda r: (-r['lines'], r['path'])
+          ), 40)
+          show('SEED_OR_DEAD_CANDIDATES_TOP40', sorted(
+              [r for r in rows if r['classification'] == 'SEED_OR_DEAD_CANDIDATE'],
+              key=lambda r: (-r['lines'], r['path'])
+          ), 40)
+          show('DUPLICATE_REVIEW_TOP40', sorted(
+              [r for r in rows if 'DUPLICATE' in r['classification']],
+              key=lambda r: (','.join(r.get('duplicate_families') or []), -r['lines'], r['path'])
+          ), 40)
+          show('LARGE_FILES_TOP30', sorted(
+              [r for r in rows if r['lines'] > 1000],
+              key=lambda r: (-r['lines'], r['path'])
+          ), 30)
+          PY
