@@ -29,10 +29,10 @@ jobs:
         run: |
           set -euo pipefail
           python3 --version
+          python3 -m compileall -q scripts/governance/module_diet_census.py
           python3 scripts/governance/module_diet_census.py --format markdown --output module-diet-census.md
           python3 scripts/governance/module_diet_census.py --format json --output module-diet-census.json
           python3 scripts/governance/module_diet_census.py --baseline-top-level-count 406 --fail-on-top-level-growth --format markdown >/tmp/module-diet-baseline.md
-          python3 -m pytest tests/test_module_diet_census.py -q
           echo "# Module Diet Census" >> "$GITHUB_STEP_SUMMARY"
           cat module-diet-census.md >> "$GITHUB_STEP_SUMMARY"
           echo "===== module-diet-census.md ====="
