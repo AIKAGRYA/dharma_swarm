@@ -1,0 +1,37 @@
+name: module-diet-census
+
+on:
+  push:
+    branches:
+      - gpt55/module-diet-census-20260619
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/governance/module_diet_census.py"
+      - "tests/test_module_diet_census.py"
+      - ".github/workflows/module-diet-census.yml"
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run module diet census
+        run: |
+          python3 scripts/governance/module_diet_census.py --format markdown --output module-diet-census.md
+          python3 scripts/governance/module_diet_census.py --format json --output module-diet-census.json
+          python3 scripts/governance/module_diet_census.py --baseline-top-level-count 406 --fail-on-top-level-growth --format markdown >/tmp/module-diet-baseline.md
+          python3 -m pytest tests/test_module_diet_census.py -q
+          cat module-diet-census.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: module-diet-census
+          path: |
+            module-diet-census.md
+            module-diet-census.json
