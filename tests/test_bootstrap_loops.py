@@ -89,6 +89,23 @@ def _runtime_delegation_statuses(db_path: Path) -> list[str]:
     return [str(row[0]) for row in rows]
 
 
+async def _wait_for_runtime_delegation_statuses(
+    db_path: Path,
+    expected: list[str],
+    *,
+    timeout_s: float = 2.0,
+) -> list[str]:
+    """Wait for background delegation status flushes before asserting them."""
+    deadline = asyncio.get_running_loop().time() + timeout_s
+    while True:
+        statuses = _runtime_delegation_statuses(db_path)
+        if statuses == expected:
+            return statuses
+        if asyncio.get_running_loop().time() >= deadline:
+            return statuses
+        await asyncio.sleep(0.01)
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Signal Bus round-trip (Loop 1 backbone — every loop uses signal bus)
 # ---------------------------------------------------------------------------
@@ -422,7 +439,10 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "session_events") >= 3
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
+    assert await _wait_for_runtime_delegation_statuses(
+        runtime_db_path,
+        ["completed"],
+    ) == ["completed"]
     artifact_count = await _wait_for_runtime_table_count(
         runtime_db_path,
         "artifact_records",
