@@ -83,6 +83,21 @@ def test_bronze_reingest_same_signal_is_noop(tmp_path: Path) -> None:
     assert len(ledger.read_text(encoding="utf-8").splitlines()) == 1
 
 
+def test_bronze_source_type_uses_parsed_host_not_url_substring(tmp_path: Path) -> None:
+    state = tmp_path / ".dharma"
+    row = {
+        "title": "Host spoof attempt",
+        "url": "https://attacker.example/read?next=https://arxiv.org/abs/2601.00001",
+        "description": "The allowed host appears only in untrusted URL data.",
+    }
+
+    result = ingest_rows_to_bronze([row], state_dir=state)
+
+    assert result.queued_receipts == 0
+    assert result.boundary_written == 0
+    assert result.errors == ("unsupported_source_type:unknown",)
+
+
 def test_fetch_hn_algolia_rows_uses_sanctioned_public_api(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

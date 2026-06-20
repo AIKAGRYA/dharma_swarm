@@ -152,7 +152,10 @@ async def test_evolution_sandbox_pipeline(tmp_dharma):
     proposal = await engine.propose(
         component="test.py",
         change_type="mutation",
-        description="Improve error handling",
+        description=(
+            "Improve error handling mechanism while preserving witness awareness "
+            "and feedback resilience."
+        ),
     )
     assert proposal.predicted_fitness > 0
 

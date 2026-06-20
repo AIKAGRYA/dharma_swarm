@@ -14,7 +14,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 from urllib.request import Request, urlopen
 
 from dharma_swarm.daemon_config import dharma_state_dir
@@ -295,12 +295,12 @@ def _canonical_source_type(row: dict[str, Any]) -> str:
         str(row.get(key) or "")
         for key in ("source", "raw_source", "source_type", "fetch_method")
     ).lower()
-    url = str(row.get("url") or row.get("source_url") or "").lower()
+    url = str(row.get("url") or row.get("source_url") or "")
     if "operator_drop" in raw or raw.strip() in {"operator", "manual"}:
         return "operator_drop"
-    if "hacker" in raw or "hn_algolia" in raw or "news.ycombinator.com" in url:
+    if "hacker" in raw or "hn_algolia" in raw or _is_hacker_news_url(url):
         return "hacker_news"
-    if "arxiv" in raw or "arxiv.org" in url:
+    if "arxiv" in raw or _is_arxiv_url(url):
         return "arxiv"
     return raw.split()[0] if raw.split() else ""
 
@@ -633,6 +633,22 @@ def _string_list(value: Any) -> list[str]:
 
 def _is_http_url(value: str) -> bool:
     return value.startswith("https://") or value.startswith("http://")
+
+
+def _url_hostname(value: str) -> str:
+    try:
+        return (urlparse(value).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+
+
+def _is_hacker_news_url(value: str) -> bool:
+    return _url_hostname(value) == "news.ycombinator.com"
+
+
+def _is_arxiv_url(value: str) -> bool:
+    host = _url_hostname(value)
+    return host == "arxiv.org" or host.endswith(".arxiv.org")
 
 
 def _short_hash(value: str, *, length: int = 16) -> str:
