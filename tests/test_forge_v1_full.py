@@ -59,6 +59,8 @@ def test_evolution_improves_and_curve_is_monotone():
     assert curve[-1] >= curve[0]
     assert out["archive_size"] > 12
     assert 0.0 <= out["swarm_pass_at_1"] <= 1.0
+    assert out["final_lift_ci"]["n"] == len(TASKS)
+    assert out["ship_swarm"] == (out["final_lift_ci"]["lower"] > 0)
 
 
 # --- L3: ablation + ledger ---

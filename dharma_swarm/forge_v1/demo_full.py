@@ -48,8 +48,11 @@ def main() -> dict:
     print(f"\nL2  best evolved swarm: {out['best_config']}")
     print(f"      swarm    pass@1 = {out['swarm_pass_at_1']:.3f}")
     print(f"      champion pass@1 = {out['champion_pass_at_1']:.3f}   (best-of-N, single model)")
+    ci = out["final_lift_ci"]
     print(f"      swarm_lift      = {out['final_swarm_lift']:+.3f}   "
           f"({'SHIP swarm' if out['ship_swarm'] else 'freeze swarm, ship best-of-N'})")
+    print(f"      paired CI       = [{ci['lower']:+.3f}, {ci['upper']:+.3f}]   "
+          "ship requires lower > 0")
     print(f"\nL3  ablation (did each coordination edge earn its tokens?):")
     print("    " + json.dumps(abl).replace("{", "{\n      ").replace(", ", ",\n      "))
     print(f"\n    archive: {out['archive_size']} configs  ->  {LEDGER_DIR / 'archive.jsonl'}")

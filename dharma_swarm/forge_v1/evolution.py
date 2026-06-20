@@ -80,6 +80,7 @@ def evolve(tasks, champion, budget, generations=20, seed=0,
         "swarm_pass_at_1": round(report["swarm_pass_at_1"], 4),
         "champion_pass_at_1": round(report["champion_pass_at_1"], 4),
         "final_swarm_lift": round(report["swarm_lift"], 4),
+        "final_lift_ci": report["paired_bootstrap_ci"],
         "ship_swarm": report["ship_swarm"],
         "archive_size": len(archive),
     }

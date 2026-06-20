@@ -7,9 +7,11 @@ import pytest
 
 from dharma_swarm.forge_v1.fixtures import ADD_TASK, DEMO_TASKS
 from dharma_swarm.forge_v1.harness import (
+    ArmResult,
     BudgetExhausted,
     TokenBroker,
     best_of_n,
+    paired_bootstrap_ci,
     run_scoreboard,
     verify,
 )
@@ -77,6 +79,13 @@ def test_best_of_n_budget_changes_outcome():
     assert loose.samples == 3
 
 
+def test_paired_bootstrap_ci_preserves_task_pairing():
+    ci = paired_bootstrap_ci([1.0, 0.0, -1.0], samples=50, seed=1)
+    assert ci["n"] == 3
+    assert ci["mean"] == 0.0
+    assert ci["lower"] <= ci["mean"] <= ci["upper"]
+
+
 # --- scoreboard end-to-end (THE test) ---
 def test_scoreboard_negative_when_swarm_worse():
     rep = run_scoreboard(
@@ -88,6 +97,7 @@ def test_scoreboard_negative_when_swarm_worse():
     assert rep["champion_pass_at_1"] == 1.0
     assert rep["swarm_pass_at_1"] == 0.0
     assert rep["swarm_lift"] == -1.0
+    assert rep["paired_bootstrap_ci"]["upper"] < 0
     assert rep["status"] == "measured_negative_or_zero"
     assert rep["ship_swarm"] is False
 
@@ -100,4 +110,20 @@ def test_scoreboard_positive_when_swarm_better():
         budget=5000,
     )
     assert rep["swarm_lift"] == 1.0
+    assert rep["paired_bootstrap_ci"]["lower"] > 0
     assert rep["ship_swarm"] is True
+
+
+def test_scoreboard_positive_lift_does_not_ship_without_ci_power():
+    def champion(_task, _broker):
+        return ArmResult(passed=False, samples=1, tokens=0)
+
+    def swarm(task, _broker):
+        return ArmResult(passed=task.name == "add-minus-bug", samples=1, tokens=0)
+
+    rep = run_scoreboard(DEMO_TASKS, champion, swarm, budget=5000)
+
+    assert rep["swarm_lift"] == 0.5
+    assert rep["paired_bootstrap_ci"]["lower"] == 0.0
+    assert rep["status"] == "positive_lift_ci_not_cleared"
+    assert rep["ship_swarm"] is False

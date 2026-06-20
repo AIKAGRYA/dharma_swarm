@@ -19,6 +19,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
@@ -198,23 +199,77 @@ def run_arm(arm: Arm, tasks: list[RepairTask], budget: int) -> dict:
 
 
 def run_scoreboard(
-    tasks: list[RepairTask], champion: Arm, swarm: Arm, budget: int
+    tasks: list[RepairTask],
+    champion: Arm,
+    swarm: Arm,
+    budget: int,
+    *,
+    ci_samples: int = 1000,
+    ci_seed: int = 0,
 ) -> dict:
     """Both arms at EQUAL budget on the SAME tasks. swarm_lift =
     pass@1(swarm) - pass@1(champion). An honest negative is a valid result:
-    freeze the swarm, ship best-of-N."""
+    freeze the swarm, ship best-of-N. Ship requires a paired bootstrap CI lower
+    bound above zero, not merely positive raw lift."""
     champ = run_arm(champion, tasks, budget)
     swrm = run_arm(swarm, tasks, budget)
     lift = swrm["pass_at_1"] - champ["pass_at_1"]
+    diffs = [
+        (1.0 if s["passed"] else 0.0) - (1.0 if c["passed"] else 0.0)
+        for c, s in zip(champ["per_task"], swrm["per_task"])
+    ]
+    ci = paired_bootstrap_ci(diffs, samples=ci_samples, seed=ci_seed)
+    ship = ci["lower"] > 0
+    if ship:
+        status = "positive_lift_ci_cleared"
+    elif lift > 0:
+        status = "positive_lift_ci_not_cleared"
+    else:
+        status = "measured_negative_or_zero"
     return {
         "budget_per_task": budget,
         "n_tasks": len(tasks),
         "champion_pass_at_1": champ["pass_at_1"],
         "swarm_pass_at_1": swrm["pass_at_1"],
         "swarm_lift": lift,
-        # real version gates on a paired bootstrap-CI lower bound > 0, not raw lift
-        "ship_swarm": lift > 0,
-        "status": "positive_lift" if lift > 0 else "measured_negative_or_zero",
+        "paired_bootstrap_ci": ci,
+        "ship_swarm": ship,
+        "status": status,
         "champion": champ,
         "swarm": swrm,
+    }
+
+
+def paired_bootstrap_ci(
+    paired_diffs: list[float],
+    *,
+    samples: int = 1000,
+    seed: int = 0,
+    alpha: float = 0.05,
+) -> dict:
+    """Bootstrap the paired per-task lift distribution.
+
+    Each element is one task's swarm outcome minus champion outcome, so pairing
+    preserves task difficulty. The real Forge ship rule is CI lower > 0.
+    """
+    n = len(paired_diffs)
+    if n == 0:
+        return {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0}
+    mean = sum(paired_diffs) / n
+    if samples <= 0:
+        return {"n": n, "mean": mean, "lower": mean, "upper": mean}
+
+    rng = random.Random(seed)
+    means = []
+    for _ in range(samples):
+        draw = [paired_diffs[rng.randrange(n)] for _ in range(n)]
+        means.append(sum(draw) / n)
+    means.sort()
+    lo_i = max(0, min(samples - 1, int((alpha / 2) * samples)))
+    hi_i = max(0, min(samples - 1, int((1 - alpha / 2) * samples)))
+    return {
+        "n": n,
+        "mean": mean,
+        "lower": means[lo_i],
+        "upper": means[hi_i],
     }
