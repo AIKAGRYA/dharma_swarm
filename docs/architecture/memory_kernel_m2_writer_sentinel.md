@@ -129,13 +129,13 @@ the enclosing function contains write/schema SQL.
 Current repo snapshot:
 
 ```text
-registered writer specs: 52
+registered writer specs: 58
 present registered writers: 52
 registered writer targets missing from surface registry: 0
-AST-scanned Python files: 711
-likely memory-like writes discovered: 121
-registered discoveries: 63
-unregistered discoveries: 58
+AST-scanned Python files: 935
+likely memory-like writes discovered: 137
+registered discoveries: 80
+unregistered discoveries: 57
 action-required discoveries: 0
 ```
 
@@ -143,13 +143,13 @@ The raw unregistered discovery count is no longer the only queue.  The current
 triage split is:
 
 ```text
-registered_memory_writer: 63
+registered_memory_writer: 80
 memory_writer_needs_spec: 0
 surface_needs_registry: 0
-read_write_helper: 3
-operational_state: 28
-generated_artifact: 21
-test_or_experiment: 6
+read_write_helper: 0
+operational_state: 30
+generated_artifact: 19
+test_or_experiment: 8
 ```
 
 The immediate action queue is `memory_writer_needs_spec +
