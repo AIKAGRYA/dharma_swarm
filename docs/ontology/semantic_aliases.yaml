@@ -12,6 +12,22 @@ aliases:
   agent_uid:
     canonical: AgentUID
     kind: identifier_alias
+  "parallel model routing layer":
+    canonical: ModelKeyRouting
+    kind: deprecated_alias
+    status: forbidden
+  "project .env keys":
+    canonical: DKeysKeyStore
+    kind: deprecated_alias
+    status: forbidden
+  "direct provider factory":
+    canonical: RuntimeProvider
+    kind: deprecated_alias
+    status: forbidden
+  "scattered model order":
+    canonical: ModelHierarchy
+    kind: deprecated_alias
+    status: forbidden
 agent_uid_aliases:
   codex: codex_composer
   opus: opus_composer
