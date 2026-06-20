@@ -58,6 +58,24 @@ def _runtime_table_count(db_path: Path, table: str) -> int:
     return int(row[0] if row else 0)
 
 
+async def _wait_for_runtime_table_count(
+    db_path: Path,
+    table: str,
+    min_count: int,
+    *,
+    timeout_s: float = 2.0,
+) -> int:
+    """Wait for background runtime producers before asserting their rows."""
+    deadline = asyncio.get_running_loop().time() + timeout_s
+    while True:
+        count = _runtime_table_count(db_path, table)
+        if count >= min_count:
+            return count
+        if asyncio.get_running_loop().time() >= deadline:
+            return count
+        await asyncio.sleep(0.01)
+
+
 def _runtime_delegation_statuses(db_path: Path) -> list[str]:
     if not db_path.exists():
         return []
@@ -405,7 +423,11 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
     assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
-    artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
+    artifact_count = await _wait_for_runtime_table_count(
+        runtime_db_path,
+        "artifact_records",
+        1,
+    )
     assert artifact_count >= 1
     with sqlite3.connect(runtime_db_path) as db:
         artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
