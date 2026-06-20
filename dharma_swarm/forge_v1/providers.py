@@ -13,12 +13,78 @@ Backends:
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 
 from .harness import Candidate, RepairTask
 
 _PATCH_RE = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
+
+
+def _provider_for_model(model_id: str):
+    """Resolve a live dharma_swarm provider + concrete model id for `model_id`.
+
+    Returns (provider, model_id). Routes by the model-id prefix to the right
+    ProviderType, then goes through the canonical runtime_provider path
+    (resolve_runtime_provider_config -> create_runtime_provider). Keeping the
+    routing here means PoolCompletion.__init__ stays a one-liner.
+    """
+    from dharma_swarm.api_keys import bootstrap_runtime_env
+    from dharma_swarm.model_hierarchy import ProviderType
+    from dharma_swarm.runtime_provider import (
+        create_runtime_provider,
+        resolve_runtime_provider_config,
+    )
+
+    # Make keys from ~/.dharma/agent_keys.env visible (idempotent, no overwrite).
+    bootstrap_runtime_env()
+
+    mid = (model_id or "").strip().lower()
+    if mid.startswith("gpt") or mid.startswith("o1") or mid.startswith("o3"):
+        provider_type = ProviderType.OPENAI
+    elif mid.startswith("claude") or mid.startswith("opus") or mid.startswith("sonnet"):
+        provider_type = ProviderType.ANTHROPIC
+    elif mid.startswith("gemini"):
+        provider_type = ProviderType.GOOGLE_AI
+    elif mid.endswith(":cloud") or mid.startswith("glm") or mid.startswith("kimi"):
+        provider_type = ProviderType.OLLAMA  # Ollama Cloud frontier chain
+    elif mid.startswith("meta/") or mid.startswith("nvidia/") or "llama" in mid:
+        provider_type = ProviderType.NVIDIA_NIM
+    elif "/" in mid:  # e.g. moonshotai/kimi-k2.5 -> OpenRouter
+        provider_type = ProviderType.OPENROUTER
+    else:
+        provider_type = ProviderType.OPENAI
+
+    # Pass model only when the caller named a concrete id; otherwise let the
+    # provider config supply its canonical default (e.g. gemini-2.5-flash).
+    pass_model = model_id if mid not in ("", "default") else None
+    config = resolve_runtime_provider_config(provider_type, model=pass_model)
+    if not config.available:
+        raise RuntimeError(
+            f"PoolCompletion(model={model_id}) resolved provider "
+            f"{provider_type.value} but no live key/config is available "
+            "(run `dkeys` to confirm the key)."
+        )
+    provider = create_runtime_provider(config)
+    # config.default_model carries the resolved concrete id (e.g. 'gpt-5').
+    return provider, (config.default_model or model_id)
+
+
+def _usage_tokens(usage: dict) -> int:
+    """Sum prompt+completion tokens across both naming conventions.
+
+    OpenAI-family providers report prompt_tokens/completion_tokens; Anthropic
+    reports input_tokens/output_tokens. Total over whichever pair is present.
+    """
+    if not usage:
+        return 0
+    inp = usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0
+    out = usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0
+    total = inp + out
+    if total == 0:  # last resort: a provider that only reports total
+        total = usage.get("total_tokens", 0) or 0
+    return int(total)
 
 
 class FakeCompletion:
@@ -38,27 +104,32 @@ class FakeCompletion:
 
 
 class PoolCompletion:
-    """LIVE backend (the flip). Calls the real dharma_swarm model pool. Kept as an
-    explicit, honest stub: it refuses to pretend to be live so an offline run can
-    never silently spend money. Wire `complete` to runtime_provider /
-    model_pool when going live."""
+    """LIVE backend (the flip). Calls a real frontier model through dharma_swarm's
+    canonical provider stack (runtime_provider.resolve/create -> provider.complete).
+    This is where real tokens are spent — offline runs use FakeCompletion.
 
-    def __init__(self, model_id: str = "gpt-5.5"):
+    __init__ resolves the right provider for `model_id` (gpt* -> OpenAI,
+    claude/opus/sonnet -> Anthropic, vendor/model -> OpenRouter) and refuses to
+    construct if no live key is available, so a live run never silently no-ops.
+    complete() is SYNC (the harness interface) but provider.complete is ASYNC, so
+    we bridge with asyncio.run.
+    """
+
+    def __init__(self, model_id: str = "gpt-5"):
         self.model_id = model_id
+        self._provider, self._wire_model = _provider_for_model(model_id)
 
     def complete(self, prompt: str) -> tuple[str, int]:
-        try:
-            from dharma_swarm import runtime_provider  # noqa: F401  (presence check)
-        except Exception as exc:  # pragma: no cover
-            raise RuntimeError(
-                f"PoolCompletion(model={self.model_id}) is the live swap-in but "
-                f"dharma_swarm.runtime_provider is not importable here: {exc}"
-            )
-        raise NotImplementedError(
-            "PoolCompletion is the documented LIVE swap-in. Wire its body to the "
-            f"real pool call for {self.model_id} (this is where real tokens are "
-            "spent). Offline runs use FakeCompletion / QualityModel."
+        from dharma_swarm.models import LLMRequest
+
+        request = LLMRequest(
+            model=self._wire_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
+            temperature=0.2,
         )
+        response = asyncio.run(self._provider.complete(request))
+        return response.content or "", _usage_tokens(response.usage)
 
 
 @dataclass
