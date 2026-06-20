@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
 
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.frontier_council import run_full_supply_chain
 from dharma_swarm.world_radar.bronze import (
     ingest_hn_algolia_to_bronze,
     ingest_operator_drops_to_bronze,
@@ -40,6 +42,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     bronze_hn.add_argument("--limit", type=int, default=1)
     bronze_hn.add_argument("--timeout-s", type=int, default=10)
     bronze_hn.add_argument("--state-dir", default="")
+    full_chain = sub.add_parser(
+        "run-full-chain",
+        help="consume one Bronze boundary through verifier, sandbox, and archive",
+    )
+    full_chain.add_argument("--boundary-path", required=True)
+    full_chain.add_argument("--state-dir", default="")
+    full_chain.add_argument("--timeout-s", type=int, default=30)
+    full_chain.add_argument(
+        "--sandbox-command",
+        nargs=argparse.REMAINDER,
+        default=[],
+        help="argv for the no-shell sandbox command; must be the final option",
+    )
     args = parser.parse_args(argv)
     if args.cmd == "drop":
         path = append_operator_drop(
@@ -64,6 +79,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             query=args.query,
             state_dir=Path(args.state_dir).expanduser() if args.state_dir else None,
             limit=args.limit,
+            timeout_s=args.timeout_s,
+        )
+        print(json.dumps(result.__dict__, sort_keys=True))
+        return 0 if result.ok else 1
+    if args.cmd == "run-full-chain":
+        sandbox_command = tuple(args.sandbox_command or ())
+        if sandbox_command and sandbox_command[0] == "--":
+            sandbox_command = sandbox_command[1:]
+        result = run_full_supply_chain(
+            Path(args.boundary_path).expanduser(),
+            state_dir=Path(args.state_dir).expanduser() if args.state_dir else None,
+            sandbox_command=sandbox_command
+            or (sys.executable, "-m", "compileall", "-q", "dharma_swarm/frontier_council.py"),
+            sandbox_cwd=Path.cwd(),
             timeout_s=args.timeout_s,
         )
         print(json.dumps(result.__dict__, sort_keys=True))

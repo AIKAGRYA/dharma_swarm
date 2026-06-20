@@ -90,3 +90,31 @@ objects:
       - content_hash
       - guardrails
       - not_applied
+  FrontierCouncilVerifierReceipt:
+    kind: verifier_receipt
+    owner: dharma_swarm.frontier_council
+    track: loop-closure-2026-06
+    description: Receipt emitted after consuming a Bronze verifier-boundary item; chooses halt or one scorable task without apply authority.
+    required_fields:
+      - schema_version
+      - verifier_receipt_id
+      - verifier_interface
+      - source_boundary_id
+      - source_receipt_id
+      - content_hash
+      - decision
+      - guardrails
+  IntelligenceSupplyChainArchiveReceipt:
+    kind: archive_receipt
+    owner: dharma_swarm.frontier_council
+    track: loop-closure-2026-06
+    description: Full-chain lineage receipt tying signal, raw receipt, boundary, verifier receipt, sandbox result, and no-change archive decision.
+    required_fields:
+      - schema_version
+      - archive_receipt_id
+      - status
+      - content_hash
+      - lineage
+      - decision
+      - sandbox_passed
+      - not_applied
