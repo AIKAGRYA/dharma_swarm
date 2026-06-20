@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, apiPath } from "@/lib/api";
 import type {
   A2ASendCardsPayload,
   AgentOpsCardsPayload,
@@ -13,6 +14,8 @@ import type {
 } from "@/lib/types";
 
 export type { ControlSurfaceRow, ControlSurfaceSummary };
+
+const CONTROL_SURFACE_ROWS_QUERY_KEY = ["control-surface-rows"] as const;
 
 function unwrapControlSurfaceEnvelope<T>(payload: T | ControlSurfaceEnvelope<T>): T {
   if (
@@ -26,9 +29,37 @@ function unwrapControlSurfaceEnvelope<T>(payload: T | ControlSurfaceEnvelope<T>)
   return payload as T;
 }
 
+function useControlSurfaceRowsStream(enabled = true) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined" || typeof EventSource === "undefined") {
+      return;
+    }
+
+    const source = new EventSource(apiPath("/api/control-surface/stream"));
+    source.onmessage = (event) => {
+      try {
+        const rows = JSON.parse(event.data) as ControlSurfaceRow[];
+        if (Array.isArray(rows)) {
+          queryClient.setQueryData(CONTROL_SURFACE_ROWS_QUERY_KEY, rows);
+        }
+      } catch {
+        // Malformed stream payloads should not break the cockpit; polling remains active.
+      }
+    };
+    source.onerror = () => {
+      // Keep polling as the compatibility path when SSE is unavailable or unauthorized.
+      source.close();
+    };
+
+    return () => source.close();
+  }, [enabled, queryClient]);
+}
+
 export function useControlSurfaceRows() {
   const { data, isLoading, error, refetch } = useQuery<ControlSurfaceRow[]>({
-    queryKey: ["control-surface-rows"],
+    queryKey: CONTROL_SURFACE_ROWS_QUERY_KEY,
     queryFn: async () => {
       const payload = await apiFetch<
         ControlSurfaceRow[] | ControlSurfaceEnvelope<ControlSurfaceRow[]>
@@ -37,6 +68,7 @@ export function useControlSurfaceRows() {
     },
     refetchInterval: 15_000,
   });
+  useControlSurfaceRowsStream(true);
 
   return {
     rows: data ?? [],
