@@ -31,6 +31,8 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
         "dharma_swarm/api_key_audit.py",
         "dharma_swarm/autonomous_agent.py",
         "dharma_swarm/consolidation.py",
+        "dharma_swarm/holon_bridge.py",  # live holon bridge provider boundary
+        "dharma_swarm/operator_core/living_agent_kernel_provider_worker.py",  # explicit live-provider worker tier
         "dharma_swarm/provider_matrix.py",
         "dharma_swarm/provider_smoke.py",
         "dharma_swarm/runtime_provider.py",
@@ -77,7 +79,12 @@ def test_dashboard_chat_bypass_remains_inventoried() -> None:
 def test_autonomous_agent_exposes_model_router_and_codex_stays_direct() -> None:
     src = (REPO_ROOT / "dharma_swarm/autonomous_agent.py").read_text(encoding="utf-8")
     assert "def __init__(self, identity: AgentIdentity, *, model_router:" in src
-    assert src.count("await self._model_router.complete_for_task(") == 1
+    assert src.count("await self._model_router.complete_for_task(") == 2
+    for lane in ("_call_anthropic", "_call_openrouter"):
+        lane_start = src.index(f"async def {lane}")
+        lane_end = src.find("\n    async def ", lane_start + 1)
+        lane_block = src[lane_start:lane_end] if lane_end != -1 else src[lane_start:]
+        assert lane_block.count("await self._model_router.complete_for_task(") == 1
     codex_start = src.index("async def _call_codex")
     nxt = src.find("\n    async def ", codex_start + 1)
     codex_block = src[codex_start:nxt] if nxt != -1 else src[codex_start:]
