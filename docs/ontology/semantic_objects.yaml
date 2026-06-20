@@ -35,6 +35,34 @@ objects:
       sender: scripts/runtime/a2a_send.py
       bridge: scripts/runtime/a2a_inbox_bridge.py
       card_resolver: dharma_swarm/a2a/agent_card.py
+  ModelKeyRouting:
+    kind: governance_contract
+    owner: dharma_swarm.model_routing
+    description: One-way contract that keeps provider keys and model selection behind canonical routing surfaces.
+  DKeysKeyStore:
+    kind: secret_store
+    owner: dharma_swarm.api_keys
+    description: Durable key material source; feature code must not read project-local provider secrets directly.
+  RuntimeProvider:
+    kind: runtime_adapter
+    owner: dharma_swarm.runtime_provider.RuntimeProvider
+    description: Runtime provider adapter selected by policy rather than scattered model literals.
+  ModelHierarchy:
+    kind: routing_catalog
+    owner: dharma_swarm.model_hierarchy
+    description: Canonical model tier and fallback catalog.
+  ProviderPolicyRouter:
+    kind: policy_router
+    owner: dharma_swarm.model_routing.ProviderPolicyRouter
+    description: Policy layer that chooses allowed providers for a task and context.
+  ModelRouter:
+    kind: routing_facade
+    owner: dharma_swarm.model_routing.ModelRouter
+    description: Public model routing facade used by callers instead of direct provider factories.
+  RoutingMemory:
+    kind: routing_receipt_layer
+    owner: dharma_swarm.model_routing
+    description: Receipt and memory layer for routing decisions and drift checks.
   IntelligenceSupplyChainRawReceipt:
     kind: evidence_receipt
     owner: dharma_swarm.world_radar.bronze

@@ -315,7 +315,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1025** | find . -name "*.md" -type f |
-| Markdown total lines | **241,690** | wc -l across all .md |
+| Markdown total lines | **241,706** | wc -l across all .md |
 | Total Python modules | **741** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **399 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |

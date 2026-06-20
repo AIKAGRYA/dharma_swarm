@@ -130,7 +130,7 @@ active_tracks:
     name: Runtime Truth Reconciliation — operator-visible truth packets
     status: ACTIVE
     opened_at: "2026-06-04"
-    verified_at: "2026-06-04"
+    verified_at: "2026-06-20"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
