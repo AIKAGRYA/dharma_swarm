@@ -75,7 +75,21 @@ class RepairTask:
     test_args: list[str]           # argv after the python exe, e.g. ["test_x.py"]
 
 
+_VERIFY_CACHE: dict = {}
+
+
 def verify(task: RepairTask, candidate: dict[str, str] | None) -> bool:
+    """Deterministic memo around _verify_uncached: an identical (task, patch) maps
+    to the same result, so the evolution loop can re-score configs cheaply. The
+    key includes the full patch content, so genuinely different (real) patches
+    never falsely hit."""
+    key = (task.name, tuple(sorted((candidate or {}).items())))
+    if key not in _VERIFY_CACHE:
+        _VERIFY_CACHE[key] = _verify_uncached(task, candidate)
+    return _VERIFY_CACHE[key]
+
+
+def _verify_uncached(task: RepairTask, candidate: dict[str, str] | None) -> bool:
     """Apply `candidate` to an ISOLATED copy of the task, restore the gold test,
     run it, and return pass/fail from the test EXIT CODE. Docker-like isolation
     via a fresh temp dir; the gold test is restored last so a patch cannot edit
