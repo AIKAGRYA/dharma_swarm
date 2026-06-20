@@ -29,7 +29,7 @@
 ### Runtime Truth Reconciliation — operator-visible truth packets
 
 **Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-04 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-20 (TTL 14 days)
 **Relations:** complements: runtime-truth-nats-2026-06
 **Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
 **Moves vital signs:** quality_gates, memory_persistence
