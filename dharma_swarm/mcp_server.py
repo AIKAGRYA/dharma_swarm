@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import AgentRole, TaskPriority
 from dharma_swarm.runtime_state import RuntimeStateStore
 from dharma_swarm.spine.identity import ExecutionIdentity
+
+logger = logging.getLogger(__name__)
 
 
 def _runtime_db_path(state_dir: str) -> Path:
@@ -65,6 +68,46 @@ def create_mcp_server(state_dir: str = ".dharma"):
             _swarm = SwarmManager(state_dir=state_dir)
             await _swarm.init()
         return _swarm
+
+    async def _record_mcp_intent(
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        payload: dict[str, Any],
+    ) -> None:
+        try:
+            await runtime_store.record_execution_identity(
+                identity,
+                source="mcp_server.call_tool",
+                metadata={"tool": payload.get("tool", "")},
+            )
+            await runtime_store.record_side_effect_intent(identity, side_effect_key, payload=payload)
+        except Exception:
+            logger.warning(
+                "MCP side-effect intent receipt failed for %s",
+                payload.get("tool", "unknown"),
+                exc_info=True,
+            )
+
+    async def _record_mcp_complete(
+        identity: ExecutionIdentity,
+        side_effect_key: str,
+        *,
+        status: str,
+        payload: dict[str, Any],
+    ) -> None:
+        try:
+            await runtime_store.record_side_effect_complete(
+                identity,
+                side_effect_key,
+                status=status,
+                payload=payload,
+            )
+        except Exception:
+            logger.warning(
+                "MCP side-effect completion receipt failed for %s",
+                payload.get("tool", "unknown"),
+                exc_info=True,
+            )
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -236,23 +279,18 @@ def create_mcp_server(state_dir: str = ".dharma"):
         )
         side_effect_key = f"mcp_tool:{name}:{identity.run_id}"
         payload = _receipt_payload(name, arguments)
-        await runtime_store.record_execution_identity(
-            identity,
-            source="mcp_server.call_tool",
-            metadata={"tool": name},
-        )
-        await runtime_store.record_side_effect_intent(identity, side_effect_key, payload=payload)
+        await _record_mcp_intent(identity, side_effect_key, payload)
         try:
             result = await _dispatch_tool(name, arguments)
         except Exception as exc:
-            await runtime_store.record_side_effect_complete(
+            await _record_mcp_complete(
                 identity,
                 side_effect_key,
                 status="failed",
                 payload={**payload, "error_type": type(exc).__name__},
             )
             raise
-        await runtime_store.record_side_effect_complete(
+        await _record_mcp_complete(
             identity,
             side_effect_key,
             status="completed",
