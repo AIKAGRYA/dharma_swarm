@@ -35,3 +35,30 @@ objects:
       sender: scripts/runtime/a2a_send.py
       bridge: scripts/runtime/a2a_inbox_bridge.py
       card_resolver: dharma_swarm/a2a/agent_card.py
+  IntelligenceSupplyChainRawReceipt:
+    kind: evidence_receipt
+    owner: dharma_swarm.world_radar.bronze
+    track: loop-closure-2026-06
+    description: Content-addressed Bronze receipt for a sanctioned external signal treated as untrusted data.
+    required_fields:
+      - schema_version
+      - receipt_id
+      - content_hash
+      - source_url
+      - fetch_method
+      - license
+      - prov
+      - instruction_policy
+  FrontierCouncilBoundarySignal:
+    kind: verifier_boundary
+    owner: dharma_swarm.world_radar.bronze
+    track: loop-closure-2026-06
+    description: Meet-point artifact handed to the decorrelated frontier council; not a verifier verdict or apply permission.
+    required_fields:
+      - schema_version
+      - boundary_id
+      - verifier_interface
+      - source_receipt_id
+      - content_hash
+      - guardrails
+      - not_applied
