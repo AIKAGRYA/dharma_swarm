@@ -15,6 +15,23 @@ logging.basicConfig(level=logging.INFO, format="%(name)s: %(message)s")
 logger = logging.getLogger("e2e_boot")
 
 
+class _DeterministicBootProvider:
+    """Small local provider so this smoke test never calls live model routes."""
+
+    async def complete(self, request):
+        from dharma_swarm.models import LLMResponse
+
+        return LLMResponse(
+            content=(
+                "Boot smoke task completed with deterministic local evidence. "
+                "The dispatch path reached an agent, produced a result, and can "
+                "settle without requiring live provider credentials."
+            ),
+            model=getattr(request, "model", None) or "boot-smoke",
+            usage={"total_tokens": 24},
+        )
+
+
 @pytest.fixture
 def state_dir(tmp_path):
     d = tmp_path / ".dharma_e2e"
@@ -23,13 +40,19 @@ def state_dir(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_full_lifecycle_boot(state_dir):
+async def test_full_lifecycle_boot(state_dir, monkeypatch):
     """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
     from dharma_swarm.swarm import SwarmManager
     from pathlib import Path
 
+    async def _noop_deferred_startup(self):
+        return None
+
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
     logger.info("=== PHASE 1: Init SwarmManager ===")
     swarm = SwarmManager(state_dir=state_dir)
+    swarm._router = _DeterministicBootProvider()
     await swarm.init()
 
     # Verify agents spawned (correct attr: _agent_pool)
@@ -135,12 +158,18 @@ async def test_full_lifecycle_boot(state_dir):
 
 
 @pytest.mark.asyncio
-async def test_custom_task_dispatch(state_dir):
+async def test_custom_task_dispatch(state_dir, monkeypatch):
     """Create a custom task and verify it flows through the pipeline."""
     from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import TaskPriority
 
+    async def _noop_deferred_startup(self):
+        return None
+
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
     swarm = SwarmManager(state_dir=state_dir)
+    swarm._router = _DeterministicBootProvider()
     await swarm.init()
 
     task = await swarm._task_board.create(
