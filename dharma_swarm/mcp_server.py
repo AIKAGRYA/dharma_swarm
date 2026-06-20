@@ -7,9 +7,36 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import AgentRole, TaskPriority
+from dharma_swarm.runtime_state import RuntimeStateStore
+from dharma_swarm.spine.identity import ExecutionIdentity
+
+
+def _runtime_db_path(state_dir: str) -> Path:
+    """Resolve the RuntimeStateStore path for the MCP surface.
+
+    `state_dir` historically points at the swarm state root. Accepting a direct
+    db path keeps tests and local tools able to inject a hermetic runtime store
+    without adding a second authority surface.
+    """
+    root = Path(state_dir).expanduser()
+    if root.suffix == ".db":
+        return root
+    if root.name == "state":
+        return root / "runtime.db"
+    return root / "state" / "runtime.db"
+
+
+def _receipt_payload(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Keep MCP receipts useful without copying user/tool payload bodies."""
+    return {
+        "surface": "mcp_server",
+        "tool": tool_name,
+        "argument_keys": sorted(str(key) for key in arguments),
+    }
 
 
 def create_mcp_server(state_dir: str = ".dharma"):
@@ -29,6 +56,7 @@ def create_mcp_server(state_dir: str = ".dharma"):
 
     server = Server("dharma-swarm")
     _swarm = None
+    runtime_store = RuntimeStateStore(_runtime_db_path(state_dir), include_memory_plane=False)
 
     async def _get_swarm():
         nonlocal _swarm
@@ -134,8 +162,7 @@ def create_mcp_server(state_dir: str = ".dharma"):
             ),
         ]
 
-    @server.call_tool()
-    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+    async def _dispatch_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         swarm = await _get_swarm()
 
         if name == "swarm_status":
@@ -198,5 +225,39 @@ def create_mcp_server(state_dir: str = ".dharma"):
             return [TextContent(type="text", text=json.dumps(summary, indent=2, default=str))]
 
         return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
+    @server.call_tool()
+    async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
+        identity = ExecutionIdentity.new(
+            task_id=f"mcp:{name}",
+            agent_id="mcp-server",
+            session_id="mcp",
+            metadata={"surface": "mcp_server", "tool": name},
+        )
+        side_effect_key = f"mcp_tool:{name}:{identity.run_id}"
+        payload = _receipt_payload(name, arguments)
+        await runtime_store.record_execution_identity(
+            identity,
+            source="mcp_server.call_tool",
+            metadata={"tool": name},
+        )
+        await runtime_store.record_side_effect_intent(identity, side_effect_key, payload=payload)
+        try:
+            result = await _dispatch_tool(name, arguments)
+        except Exception as exc:
+            await runtime_store.record_side_effect_complete(
+                identity,
+                side_effect_key,
+                status="failed",
+                payload={**payload, "error_type": type(exc).__name__},
+            )
+            raise
+        await runtime_store.record_side_effect_complete(
+            identity,
+            side_effect_key,
+            status="completed",
+            payload={**payload, "content_count": len(result)},
+        )
+        return result
 
     return server
