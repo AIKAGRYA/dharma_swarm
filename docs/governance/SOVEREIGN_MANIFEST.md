@@ -307,15 +307,15 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **748** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **749** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **406 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
-| Test files | **727** | find tests -name "*.py" -type f |
-| Test functions | **11,695 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python LOC | **311,627** | wc -l across dharma_swarm Python modules |
+| Test files | **729** | find tests -name "*.py" -type f |
+| Test functions | **11,728 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1027** | find . -name "*.md" -type f |
-| Markdown total lines | **242,067** | wc -l across all .md |
+| Markdown files | **1025** | find . -name "*.md" -type f |
+| Markdown total lines | **241,690** | wc -l across all .md |
 | Total Python modules | **741** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **399 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
