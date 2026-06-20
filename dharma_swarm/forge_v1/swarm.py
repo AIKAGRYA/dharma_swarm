@@ -57,12 +57,17 @@ class SwarmConfig:
         return f"n={len(self.proposers)};gate={int(self.verify_gate)};{sorted(self.proposers)}"
 
 
-def build_arm(config: SwarmConfig):
-    """A coordinated swarm Arm: each proposer offers a patch; with the verify-gate
-    the arm keeps the first verifier-passing one (selection across decorrelated
-    competences); without it, it submits the first proposer's patch unchecked.
-    All calls share ONE TokenBroker (equal-budget honesty)."""
-    models = config.models()
+def build_arm_from_models(models: list, verify_gate: bool = True):
+    """L2.5 — a coordinated swarm Arm over a list of PRE-BUILT models (real
+    `providers.LiveModel`s OR offline stubs — anything with
+    `.propose(task, idx) -> Candidate`). Each proposer offers a patch; with the
+    verify-gate the arm keeps the first verifier-passing one (selection across
+    decorrelated proposers); without it, it submits the first proposer's patch
+    unchecked. All calls share ONE TokenBroker (equal-budget honesty).
+
+    This is how the swarm goes LIVE: pass e.g.
+    `[LiveModel(PoolCompletion("gemini-2.5-flash")), LiveModel(PoolCompletion("glm-5.1"))]`
+    as `models`, against a best-of-N champion on the single best model."""
 
     def arm(task: RepairTask, broker: TokenBroker) -> ArmResult:
         samples = 0
@@ -75,7 +80,7 @@ def build_arm(config: SwarmConfig):
                 break
             samples += 1
             last = cand
-            if config.verify_gate:
+            if verify_gate:
                 if verify(task, cand.patch):
                     return ArmResult(True, samples, broker.spent)
             else:
@@ -85,3 +90,10 @@ def build_arm(config: SwarmConfig):
         return ArmResult(passed, samples, broker.spent)
 
     return arm
+
+
+def build_arm(config: SwarmConfig):
+    """Build a coordinated swarm Arm from a config (offline genome -> QualityModels).
+    Delegates to build_arm_from_models; the real-model path is the SAME arm with
+    LiveModels instead of QualityModels."""
+    return build_arm_from_models(config.models(), config.verify_gate)
