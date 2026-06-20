@@ -5,9 +5,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from dharma_swarm.memory_kernel.writers import (
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dharma_swarm.memory_kernel.writers import (  # noqa: E402
     DiscoveredWriteStatus,
     DiscoveryTriageCategory,
     MemoryWriterSentinel,

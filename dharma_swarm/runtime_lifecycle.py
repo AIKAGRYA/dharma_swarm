@@ -160,10 +160,15 @@ class RuntimeLifecycle:
             }
         store = self._runtime_state_store()
         if store is not None:
-            store.record_execution_identity_sync(
-                identity,
-                source="runtime_lifecycle",
-            )
+            try:
+                store.record_execution_identity_sync(
+                    identity,
+                    source="runtime_lifecycle",
+                )
+            except Exception:
+                if require:
+                    raise
+                logger.debug("Runtime execution identity recording failed", exc_info=True)
         elif require:
             raise MissingExecutionIdentity("RuntimeStateStore is required on this path")
         return identity.require_for_dispatch()

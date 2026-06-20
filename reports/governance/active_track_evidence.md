@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-18T11:03:04+09:00 (schema v2)
+Generated: 2026-06-20T11:09:25+09:00 (schema v2)
 Active tracks: **6** (warn 5, max 10) — shippable 4
 
 ## Spine coverage
@@ -57,7 +57,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
 
-## `loop-closure-2026-06` — 3/5
+## `loop-closure-2026-06` — 4/5
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
@@ -68,7 +68,7 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
   - ✓ `phase0_dossier_exists` (file_exists) — reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present
   - ✓ `phase0_fresh_status_table` (file_contains) — pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
   - ✓ `one_wire_invariant_stated` (file_contains) — pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-  - ✗ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING
+  - ✓ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present
   - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
 
 ## `truth-graph-platform-2026-06` — SHIPPABLE
@@ -120,6 +120,6 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
+- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 4/5 completion criteria pass.
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).

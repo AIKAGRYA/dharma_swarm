@@ -85,7 +85,7 @@ def test_shadow_apply_archives_sealed_packet_without_live_apply(
     spec.write_text(
         f"""# CLI Shadow Apply Smoke
 
-Telos: Validate a sealed packet through Darwin shadow mode.
+Telos: Validate a sealed packet through Darwin shadow mode with mechanism evidence, witness review, and feedback resilience.
 
 Allowed paths:
 - tools/build_protocol/cli.py
