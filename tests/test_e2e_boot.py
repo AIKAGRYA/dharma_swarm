@@ -39,28 +39,47 @@ def state_dir(tmp_path):
     return str(d)
 
 
-@pytest.mark.asyncio
-async def test_full_lifecycle_boot(state_dir, monkeypatch):
-    """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
+async def _boot_smoke_swarm(state_dir, monkeypatch):
+    from dharma_swarm.models import AgentRole, ProviderType
     from dharma_swarm.swarm import SwarmManager
-    from pathlib import Path
 
-    async def _noop_deferred_startup(self):
-        return None
-
-    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
-    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
-    logger.info("=== PHASE 1: Init SwarmManager ===")
+    monkeypatch.setenv("DHARMA_READ_ONLY_BOOT", "1")
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
     swarm = SwarmManager(state_dir=state_dir)
     swarm._router = _DeterministicBootProvider()
     await swarm.init()
+    swarm._telos_substrate_seeded = True
+    await swarm.spawn_agent(
+        name="e2e-smoke",
+        role=AgentRole.GENERAL,
+        model="boot-smoke",
+        provider_type=ProviderType.CLAUDE_CODE,
+        thread="mechanistic",
+    )
+    return swarm
 
-    # Verify agents spawned (correct attr: _agent_pool)
+
+@pytest.mark.asyncio
+async def test_full_lifecycle_boot(state_dir, monkeypatch):
+    """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
+    from dharma_swarm.models import TaskPriority
+    from pathlib import Path
+
+    logger.info("=== PHASE 1: Init SwarmManager ===")
+    swarm = await _boot_smoke_swarm(state_dir, monkeypatch)
+
+    # Verify explicit smoke agent is available (correct attr: _agent_pool)
     pool = swarm._agent_pool
     agents = getattr(pool, 'agents', getattr(pool, '_agents', {}))
     agent_count = len(agents)
-    logger.info(f"Agents spawned: {agent_count}")
-    assert agent_count > 0, "No agents were spawned on init"
+    logger.info(f"Agents available: {agent_count}")
+    assert agent_count == 1, "Smoke harness should expose exactly one agent"
+
+    await swarm.create_task(
+        title="E2E Boot: lifecycle task",
+        description="Verify one deterministic task can dispatch through the boot path.",
+        priority=TaskPriority.HIGH,
+    )
 
     # Verify task board has tasks
     tasks = await swarm._task_board.get_ready_tasks()
@@ -76,7 +95,7 @@ async def test_full_lifecycle_boot(state_dir, monkeypatch):
     dispatched_total = tick_result.get("dispatched", 0)
     settled_total = tick_result.get("settled", 0)
 
-    for i in range(12):
+    for i in range(6):
         tick_result = await swarm.tick()
         dispatched_total += tick_result.get("dispatched", 0)
         settled_total += tick_result.get("settled", 0)
@@ -160,31 +179,26 @@ async def test_full_lifecycle_boot(state_dir, monkeypatch):
 @pytest.mark.asyncio
 async def test_custom_task_dispatch(state_dir, monkeypatch):
     """Create a custom task and verify it flows through the pipeline."""
-    from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import TaskPriority
 
-    async def _noop_deferred_startup(self):
-        return None
+    swarm = await _boot_smoke_swarm(state_dir, monkeypatch)
 
-    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
-    monkeypatch.setattr(SwarmManager, "_complete_deferred_startup", _noop_deferred_startup)
-    swarm = SwarmManager(state_dir=state_dir)
-    swarm._router = _DeterministicBootProvider()
-    await swarm.init()
-
-    task = await swarm._task_board.create(
+    task = await swarm.create_task(
         title="E2E Smoke: echo test",
         description="Respond with: DHARMA SWARM ALIVE",
         priority=TaskPriority.HIGH,
-        created_by="e2e_test",
     )
     logger.info(f"Created task {task.id}")
 
-    for i in range(15):
-        result = await swarm.tick()
+    updated = task
+    for _ in range(8):
+        await swarm.tick()
+        updated = await swarm._task_board.get(task.id)
+        status = str(getattr(updated, 'status', 'unknown')).lower()
+        if status != 'pending':
+            break
         await asyncio.sleep(0.05)
 
-    updated = await swarm._task_board.get(task.id)
     status = str(getattr(updated, 'status', 'unknown')).lower()
     result_text = getattr(updated, 'result', None)
     logger.info(f"Task {task.id}: status={status}, result={result_text}")
