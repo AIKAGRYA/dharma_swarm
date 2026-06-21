@@ -1,0 +1,51 @@
+{
+  "check": "frontier_council_replay",
+  "stage": "seeing-organ Stage 1 \u2014 Frontier Council verifier",
+  "checked_count": 4,
+  "passed": true,
+  "failures": [],
+  "all_receipts_no_authority": true,
+  "cases": [
+    {
+      "case": "two_decorrelated_supports",
+      "expected": "corroborated",
+      "verdict": "corroborated",
+      "corroboration_count": 3,
+      "source_family_count": 2,
+      "no_action_authority": true,
+      "dispatch_authority": false,
+      "passed": true
+    },
+    {
+      "case": "high_quality_refutation",
+      "expected": "refuted",
+      "verdict": "refuted",
+      "corroboration_count": 0,
+      "source_family_count": 0,
+      "no_action_authority": true,
+      "dispatch_authority": false,
+      "passed": true
+    },
+    {
+      "case": "single_family_only",
+      "expected": "insufficient",
+      "verdict": "insufficient",
+      "corroboration_count": 0,
+      "source_family_count": 1,
+      "no_action_authority": true,
+      "dispatch_authority": false,
+      "passed": true
+    },
+    {
+      "case": "poisoned_high_risk",
+      "expected": "quarantined",
+      "verdict": "quarantined",
+      "corroboration_count": 0,
+      "source_family_count": 0,
+      "no_action_authority": true,
+      "dispatch_authority": false,
+      "passed": true
+    }
+  ],
+  "observed_at": "2026-06-21T14:52:12.889328Z"
+}

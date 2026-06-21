@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T14:44:47+00:00",
+  "generated_at": "2026-06-21T14:53:31+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 8,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 5
+    "shippable": 6
   },
   "spine_objectives": [
     {
@@ -875,10 +875,10 @@
       "verified_at": "2026-06-21",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": false,
+      "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 5,
+        "passed": 6,
         "total": 6
       },
       "criteria": [
@@ -921,8 +921,8 @@
         {
           "id": "frontier_council_verifier_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "dharma_swarm/world_radar/frontier_council.py MISSING"
+          "passed": true,
+          "detail": "dharma_swarm/world_radar/frontier_council.py present"
         }
       ]
     }
@@ -990,8 +990,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:seeing-organ-2026-06",
-      "message": "[seeing-organ-2026-06] 5/6 completion criteria pass.",
+      "check": "track-shippable:seeing-organ-2026-06",
+      "message": "[seeing-organ-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     }
   ]
