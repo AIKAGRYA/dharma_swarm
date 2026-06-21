@@ -86,6 +86,12 @@ async def _await_delegation_status(
         if expected in _runtime_delegation_statuses(db_path):
             return
         await asyncio.sleep(0.05)
+    # Don't fall through silently: a timeout here means the orchestrator never
+    # recorded the status, which is a distinct failure from a wrong status.
+    pytest.fail(
+        f"timed out after {timeout}s waiting for delegation status {expected!r}; "
+        f"last seen: {_runtime_delegation_statuses(db_path)}"
+    )
 
 
 # ---------------------------------------------------------------------------
