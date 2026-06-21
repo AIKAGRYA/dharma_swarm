@@ -12,9 +12,16 @@ dispatch_dropoff occurrences, and stigmergy hot paths (the ADAPT half of
 Loop 1 — routing in tick N+1 reads outcomes of tick N).
 
 Usage:
+    # Throwaway smoke/load run (sandbox tempdir — NOT witnessed by make orient):
     .venv/bin/python scripts/loop1_closure_run.py --tasks 3
     .venv/bin/python scripts/loop1_closure_run.py --tasks 100 --agents 3 \
         --timeout-per-task 240 --report reports/loop_closure/run.json
+
+    # Real closure run (writes to the canonical runtime.db make orient reads,
+    # so a green run flips loop1_live). Needs a reachable provider/key:
+    .venv/bin/python scripts/loop1_closure_run.py --canonical \
+        --provider openrouter --model z-ai/glm-4.6 --tasks 1
+    # then: make orient   →   "Loop 1 (provider chain + dispatch): LIVE"
 """
 
 from __future__ import annotations
@@ -31,6 +38,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 os.environ.setdefault("DHARMA_SPINE_DISPATCH", "1")
+
+# Load the keystore the same way the live runtime entrypoints do. As a
+# standalone process this script does not inherit the daemon's bootstrap, so
+# without this the provider chain sees "<PROVIDER>_API_KEY not set" even when
+# the key is wired in ~/.dharma/agent_keys.env — the dispatch then dead-letters
+# and Loop 1 cannot close. Keys are read only through the api_keys front door.
+from dharma_swarm import api_keys as _api_keys
+
+_api_keys.bootstrap_runtime_env()
 
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus
 
@@ -50,10 +66,39 @@ def _task_spec(index: int) -> tuple[str, str]:
     return (f"loop1-closure-{index + 1:04d}", prompt)
 
 
+def _canonical_state_dir() -> Path:
+    """The state dir whose runtime.db `make orient` actually reads, sourced
+    ONLY from the owner (runtime_state.DEFAULT_RUNTIME_DB), never a hardcoded
+    ~/.dharma literal. SwarmManager(state_dir=X) writes to X/state/runtime.db;
+    orient reads DEFAULT_RUNTIME_DB, so the canonical state_dir is its
+    grandparent. If the owner is unimportable there is no canonical path to
+    speak of — surface that rather than guessing one."""
+    from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+
+    return Path(DEFAULT_RUNTIME_DB).resolve().parent.parent
+
+
+def _resolve_state_dir(args: argparse.Namespace) -> tuple[str, bool]:
+    """Return (state_dir, is_canonical). A closure is only WITNESSED by
+    `make orient` when its receipt lands in the canonical runtime.db. The
+    default tempdir is a sandbox orient never reads — closing there reproduces
+    the Phase 1b "NOT CLOSED" verdict (receipt written to a lane-local DB)."""
+    canonical = _canonical_state_dir()
+    if args.canonical:
+        if args.state_dir:
+            raise SystemExit("--canonical and --state-dir are mutually exclusive")
+        return str(canonical), True
+    if args.state_dir:
+        chosen = Path(args.state_dir).resolve()
+        return args.state_dir, chosen == canonical
+    return tempfile.mkdtemp(prefix="loop1-closure-"), False
+
+
 async def run(args: argparse.Namespace) -> dict:
     from dharma_swarm.swarm import SwarmManager
 
-    state_dir = args.state_dir or tempfile.mkdtemp(prefix="loop1-closure-")
+    state_dir, is_canonical = _resolve_state_dir(args)
+    args._is_canonical = is_canonical
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
 
@@ -140,6 +185,7 @@ async def run(args: argparse.Namespace) -> dict:
         "ticks": ticks,
         "stigmergy_hot_paths": hot_paths,
         "state_dir": str(state_dir),
+        "canonical_state": bool(getattr(args, "_is_canonical", False)),
         "tasks": tasks_out,
     }
     await swarm.shutdown()
@@ -154,7 +200,18 @@ def main() -> int:
     parser.add_argument("--model", default="llama3.2")
     parser.add_argument("--timeout-per-task", type=float, default=300.0)
     parser.add_argument("--tick-sleep", type=float, default=1.0)
-    parser.add_argument("--state-dir", default=None)
+    parser.add_argument(
+        "--state-dir",
+        default=None,
+        help="explicit state dir (sandbox unless it equals the canonical one)",
+    )
+    parser.add_argument(
+        "--canonical",
+        action="store_true",
+        help="write to the canonical runtime.db that `make orient` reads, so a "
+        "successful closure flips loop1_live. Use this for the real closure run; "
+        "omit it (sandbox tempdir) for throwaway smoke/load runs.",
+    )
     parser.add_argument("--report", default=None, help="write JSON report here")
     args = parser.parse_args()
 
@@ -170,6 +227,15 @@ def main() -> int:
         and bool(report["evidence_receipts"])
     )
     print(f"\nLOOP1_CLOSED={'yes' if closed else 'no'}")
+    if closed and not report["canonical_state"]:
+        # The exact Phase 1b footgun: a green closure in a sandbox DB that
+        # `make orient` never reads. Say so loudly — this is NOT witnessed.
+        print(
+            "WARNING: closed in a SANDBOX state dir — this receipt is NOT in the "
+            "canonical runtime.db, so `make orient` will still report loop1_live "
+            "False. Re-run with --canonical to witness the closure.",
+            file=sys.stderr,
+        )
     return 0 if closed else 1
 
 

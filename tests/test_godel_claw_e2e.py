@@ -152,7 +152,13 @@ async def test_evolution_sandbox_pipeline(tmp_dharma):
     proposal = await engine.propose(
         component="test.py",
         change_type="mutation",
-        description="Improve error handling",
+        # Spans all three anekanta frames (mechanistic / phenomenological /
+        # systems) so the epistemological-diversity gate passes honestly.
+        description=(
+            "Improve error handling in the computation layer mechanism, "
+            "preserving the observer's awareness of failure modes while "
+            "strengthening system-level feedback and resilience."
+        ),
     )
     assert proposal.predicted_fitness > 0
 

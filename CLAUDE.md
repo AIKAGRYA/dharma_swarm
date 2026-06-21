@@ -485,4 +485,6 @@ Historical model-routing notes now live at [`docs/_archive/2026-04/MODEL_ROUTING
 
 See [`CYBERNETIC_LOOP_MAP.md`](CYBERNETIC_LOOP_MAP.md) for every feedback loop's sense→act→evaluate→adapt path, current closure status, and verification commands.
 
+Before writing or debugging any code that runs a `Proposal` through `DarwinEngine.gate_check` / the telos gatekeeper (evolution, self-mod, `mutation`/`sealed_packet` proposals, or tests thereof), read [`docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md`](docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md). WS4 hard-rejects a self-mod proposal on any Tier-C advisory `REVIEW`, so a proposal must clear the whole Tier-C battery at once. Use `tests/evolution_gate_helpers.py` to build passing proposals and `scripts/diagnostics/proposal_gate_probe.py` to map which gates a candidate trips (BR-021).
+
 Historical agent identity notes now live at [`docs/_archive/2026-04/AGENT_IDENTITY_UNIFICATION.md`](docs/_archive/2026-04/AGENT_IDENTITY_UNIFICATION.md). Treat that file as stale context only; verify current agent creation and identity behavior directly against code before changing that surface.
