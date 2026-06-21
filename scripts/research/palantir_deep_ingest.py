@@ -36,6 +36,10 @@ from dharma_swarm.palantir_pilot import (  # noqa: E402
 
 _CARDER_PATH = REPO_ROOT / "scripts" / "research" / "palantir_public_source_cards.py"
 _spec = importlib.util.spec_from_file_location("_ppsc_deep", str(_CARDER_PATH))
+if _spec is None or _spec.loader is None:
+    raise ModuleNotFoundError(
+        f"cannot load source-card module from {_CARDER_PATH} — file missing or unreadable"
+    )
 carder = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(carder)
 
@@ -134,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.limit > 0:
         urls = urls[: args.limit]
 
-    done = skipped = failed = written = total_prose = 0
+    skipped = failed = written = total_prose = 0
     failures: list[dict[str, str]] = []
     for url in urls:
         slug = slugify(urlparse(url).path.strip("/") or url)
@@ -159,7 +163,6 @@ def main(argv: list[str] | None = None) -> int:
         card_path.write_text(card, encoding="utf-8")
         written += 1
         total_prose += sum(len(p) for p in paragraphs)
-        done += 1
         if args.delay:
             time.sleep(args.delay)
 

@@ -1472,3 +1472,9 @@ def test_answer_packet_preserves_learn_boundary(tmp_path):
 
     assert any("learn.palantir.com/page/course-catalog" in item for item in packet["limitations"])
     assert packet["source_boundary"].startswith("Public-source workspace synthesis")
+    # Integrity: once deep-ingest stores page prose, the boundary must NOT keep
+    # claiming "no full page/course body storage" — it must own the deep-card
+    # corpus (public prose) while still excluding Learn/course bodies.
+    assert "no full page/course body storage" not in packet["source_boundary"]
+    assert "deep-card prose" in packet["source_boundary"]
+    assert "Learn/course body" in packet["source_boundary"]

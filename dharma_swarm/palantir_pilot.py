@@ -797,7 +797,7 @@ def index_workspace_to_memory_plane(
         "source_urls_indexed": source_urls,
         "pruned_wiki_documents": pruned_wiki_documents,
         "source_kinds": list(DATABASE_SOURCE_KINDS),
-        "storage_boundary": "URLs, metadata, original wiki notes, and summaries only; no full page/course mirroring",
+        "storage_boundary": "URLs, metadata, original wiki notes, summaries, and deep-card prose from robots-allowed public www.palantir.com pages; no Learn/course bodies and no private-tenant material",
         "index_stats": index.stats(),
     }
 
@@ -914,8 +914,9 @@ def build_query_packet(
         "query": query,
         "observed_at": _utc_now(now),
         "source_boundary": (
-            "Local search over source metadata and original wiki notes only; "
-            "no private Palantir material and no full page/course body storage."
+            "Local search over source metadata, original wiki notes, and deep-card prose "
+            "from robots-allowed public www.palantir.com pages; no private Palantir "
+            "material and no Learn/course body storage."
         ),
         "latest_source_index": str(index_path) if index_path else "",
         "indexed_url_count": int(payload.get("url_count") or 0) if isinstance(payload, dict) else 0,
@@ -1137,8 +1138,9 @@ def build_answer_packet_from_query_packet(
         "answer": " ".join(answer_lines),
         "confidence": confidence,
         "source_boundary": (
-            "Public-source workspace synthesis over URL metadata and original wiki notes only; "
-            "no private Palantir material and no full page/course body storage."
+            "Public-source workspace synthesis over URL metadata, original wiki notes, and "
+            "deep-card prose from robots-allowed public www.palantir.com pages; no private "
+            "Palantir material and no Learn/course body storage."
         ),
         "source_citations": [
             {
