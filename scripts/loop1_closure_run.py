@@ -59,15 +59,14 @@ def _task_spec(index: int) -> tuple[str, str]:
 
 def _canonical_state_dir() -> Path:
     """The state dir whose runtime.db `make orient` actually reads, sourced
-    from the owner (runtime_state.DEFAULT_RUNTIME_DB), never a hardcoded
-    literal. SwarmManager(state_dir=X) writes to X/state/runtime.db; orient
-    reads DEFAULT_RUNTIME_DB, so the canonical state_dir is its grandparent."""
-    try:
-        from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
+    ONLY from the owner (runtime_state.DEFAULT_RUNTIME_DB), never a hardcoded
+    ~/.dharma literal. SwarmManager(state_dir=X) writes to X/state/runtime.db;
+    orient reads DEFAULT_RUNTIME_DB, so the canonical state_dir is its
+    grandparent. If the owner is unimportable there is no canonical path to
+    speak of — surface that rather than guessing one."""
+    from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB
 
-        return Path(DEFAULT_RUNTIME_DB).resolve().parent.parent
-    except Exception:
-        return Path.home() / ".dharma"
+    return Path(DEFAULT_RUNTIME_DB).resolve().parent.parent
 
 
 def _resolve_state_dir(args: argparse.Namespace) -> tuple[str, bool]:
