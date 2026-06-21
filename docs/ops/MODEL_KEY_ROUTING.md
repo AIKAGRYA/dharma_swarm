@@ -14,6 +14,38 @@
 - **Anthropic/Claude → Max plan:** an Anthropic request auto-routes to the `claude_code` CLI (Claude Max subscription, flat-fee). Escape hatch: `DHARMA_FORCE_ANTHROPIC_API=1` forces the raw API.
 - **Live-fallback:** if a provider has no live key, resolution/wake falls back to the best available provider — **never block on a dead brain.**
 
+## Egress — the third leg (a key alone is not enough)
+
+Keys + the resolver get you a *configured* model. To actually *reach* it the
+runtime environment's **network egress allowlist** must include the provider's
+API host. If it doesn't, the call dies with a 403 from the environment's egress
+proxy (NOT the code, NOT the key):
+
+```
+PermissionDeniedError: Host not in allowlist: api.z.ai.
+Add this host to your network egress settings to allow access.
+```
+
+**Principle: more hosts allowed = more models reachable = more freedom.** Allow
+the provider hosts generously; the gate that matters is the telos gate, not the
+network. The hosts are **derived from the provider registry** (never hand-kept),
+so they stay correct as providers are added:
+
+```bash
+python3 scripts/ops/provider_egress_hosts.py          # one host per line
+python3 scripts/ops/provider_egress_hosts.py --json    # {"hosts": [...], "special": {...}}
+```
+
+Procedure: add the listed hosts to **this environment's** egress settings (its
+network policy — chosen when the environment is created; see
+https://code.claude.com/docs/en/claude-code-on-the-web). It cannot be changed
+from inside a session. Special cases the script also notes: `claude_code`
+(Anthropic Max) runs as a CLI subprocess with no HTTP egress host (force the
+metered API with `DHARMA_FORCE_ANTHROPIC_API=1` → `api.anthropic.com`); `ollama`
+is a local daemon; Moonshot/DeepSeek/Perplexity ride OpenRouter today
+(`openrouter.ai`). When a model "won't run" and the key is present, check egress
+**before** assuming a code or key fault.
+
 ## The four rules that keep it one-way forever
 1. **Never hardcode a model string** (e.g. `"claude-sonnet-4-…"`) in a module. Ask the resolver / `model_hierarchy`.
 2. **Never read a provider key** except through `api_keys.py`.
