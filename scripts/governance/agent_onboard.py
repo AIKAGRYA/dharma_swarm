@@ -1285,6 +1285,41 @@ def render_hygiene_system() -> None:
                 print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
 
 
+def render_spine_bypass() -> None:
+    """Surface live spine bypass count — projects from spine_bypass_report.py.
+
+    Reads only; never modifies any owner file. Always exits 0. Skips
+    gracefully if the bypass report script is unavailable or fails.
+    """
+    section("SPINE BYPASS SITES (adoption track signal)")
+    bypass_script = REPO_ROOT / "scripts/governance/spine_bypass_report.py"
+    if not bypass_script.exists():
+        print("  (spine_bypass_report.py not found — skipping)")
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, str(bypass_script), "--json"],
+            capture_output=True, text=True, timeout=15, cwd=REPO_ROOT,
+        )
+        data = json.loads(result.stdout)
+    except Exception as exc:
+        print(f"  (could not run spine_bypass_report: {exc})")
+        return
+
+    summary = data.get("summary", {})
+    intentional = summary.get("intentional", 0)
+    unknown = summary.get("unknown", 0)
+    adopted = summary.get("spine-adopted", 0)
+    total_bypass = intentional + unknown
+
+    status = "✅" if unknown == 0 else "⚠️"
+    print(f"  {status} Spine bypass sites: {total_bypass} total "
+          f"({adopted} adopted, {intentional} intentional, {unknown} unknown)")
+    if unknown > 0:
+        print(f"  → {unknown} unclassified bypass(es) — drain before shipping adoption track")
+    print("  Full map: python3 scripts/governance/spine_bypass_report.py")
+
+
 def render_model_key_routing() -> None:
     section("MODEL & KEY ROUTING — THE ONE WAY")
     print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
@@ -1520,6 +1555,7 @@ def main(argv: list[str] | None = None) -> int:
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
+    render_spine_bypass()
     rows = render_runtime_truth(evidence, track)
     prs = render_pr_hygiene(net=net)
     render_hygiene_system()
