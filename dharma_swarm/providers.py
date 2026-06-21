@@ -688,6 +688,11 @@ class _SubprocessProvider(LLMProvider):
     def _build_env(self) -> dict[str, str]:
         env = {**os.environ, "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
         env.pop("CLAUDECODE", None)  # Allow nesting
+        # Remote/web hosts inject this to stream partials to the parent session;
+        # it forces `--include-partial-messages`, which is invalid with the
+        # `--output-format text` headless args below and breaks every nested
+        # subprocess agent in a Claude Code on the web session. Drop it.
+        env.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
         return env
 
     @jikoku_traced_provider
