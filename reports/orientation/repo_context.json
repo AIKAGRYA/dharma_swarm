@@ -1,168 +1,88 @@
 {
   "a2a_bus": {
-    "inbox_files": 32296,
-    "nats_e2e_receipt": "/Users/dhyana/ds_codex_truthgraph/reports/orientation/nats_e2e_receipt.json",
-    "node_registry": "/Users/dhyana/.dharma/a2a/nodes.json",
+    "inbox_files": 0,
+    "nats_e2e_receipt": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/orientation/nats_e2e_receipt.json",
+    "node_registry": "",
     "quarantine_files": 0,
-    "root": "/Users/dhyana/.dharma/a2a_bus",
-    "task_log": "/Users/dhyana/.dharma/a2a/task_log.jsonl"
+    "root": "/home/ubuntu/.dharma/a2a_bus",
+    "task_log": "/home/ubuntu/.dharma/a2a/task_log.jsonl"
   },
   "agents": [
     {
-      "agent_uid": "claude-opus",
-      "callsign": "claude-opus",
-      "harness": "claude",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-27T14:20:09.955207+00:00",
-      "model": "",
-      "source_path": "a2a_bus/agents.json",
-      "status": "missing"
-    },
-    {
-      "agent_uid": "codex-hardening-smoke",
-      "callsign": "codex-hardening-smoke",
-      "harness": "hermes",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-27T13:37:51.273892+00:00",
-      "model": "",
-      "source_path": "a2a_bus/agents.json",
-      "status": "missing"
-    },
-    {
       "agent_uid": "codex_composer",
       "callsign": "codex_composer",
-      "harness": "codex_cli_tmux",
+      "harness": "",
       "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-30T06:17:34.588435+00:00",
-      "model": "openai/gpt-5.5",
-      "source_path": "/Users/dhyana/.dharma/agents/codex_composer/living_agent.json",
-      "status": "active"
+      "last_seen_at": "",
+      "model": "",
+      "source_path": "/home/ubuntu/.dharma/agents/codex_composer",
+      "status": "missing"
     },
     {
       "agent_uid": "devin-roaming-2987d222",
       "callsign": "devin-roaming-2987d222",
-      "harness": "devin_cognition_labs",
+      "harness": "",
       "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-30T06:17:34.588435+00:00",
-      "model": "cognition/devin",
-      "source_path": "/Users/dhyana/.dharma/agents/devin-roaming-2987d222/living_agent.json",
-      "status": "active"
-    },
-    {
-      "agent_uid": "drishti",
-      "callsign": "drishti",
-      "harness": "inner-circle",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-22T11:10:36.925440+00:00",
+      "last_seen_at": "",
       "model": "",
-      "source_path": "a2a_bus/agents.json",
+      "source_path": "/home/ubuntu/.dharma/agents/devin-roaming-2987d222",
       "status": "missing"
     },
     {
       "agent_uid": "fable_5_cursor",
-      "callsign": "fable-5-cursor",
-      "harness": "cursor_ide",
+      "callsign": "fable_5_cursor",
+      "harness": "",
       "heartbeat_status": "RED",
-      "last_seen_at": "2026-06-11T02:18:24.328568+00:00",
-      "model": "anthropic/claude-fable-5",
-      "source_path": "/Users/dhyana/.dharma/agents/fable_5_cursor/living_agent.json",
-      "status": "starting"
+      "last_seen_at": "",
+      "model": "",
+      "source_path": "/home/ubuntu/.dharma/agents/fable_5_cursor",
+      "status": "missing"
     },
     {
       "agent_uid": "fable_composer",
       "callsign": "fable_composer",
-      "harness": "claude_code_headless",
+      "harness": "",
       "heartbeat_status": "RED",
-      "last_seen_at": "2026-06-11T02:20:00.000000+00:00",
-      "model": "claude-fable-5",
-      "source_path": "/Users/dhyana/.dharma/agents/fable_composer/identity.json",
-      "status": "session_alive_standing_loop_pending"
-    },
-    {
-      "agent_uid": "fleet-coordinator",
-      "callsign": "fleet-coordinator",
-      "harness": "hermes",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-27T14:23:54.749154+00:00",
+      "last_seen_at": "",
       "model": "",
-      "source_path": "a2a_bus/agents.json",
+      "source_path": "/home/ubuntu/.dharma/agents/fable_composer",
       "status": "missing"
     },
     {
       "agent_uid": "hermes-m5",
       "callsign": "hermes-m5",
-      "harness": "hermes",
+      "harness": "",
       "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-30T06:17:34.588435+00:00",
+      "last_seen_at": "",
       "model": "",
-      "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
-      "status": "active"
-    },
-    {
-      "agent_uid": "karya",
-      "callsign": "karya",
-      "harness": "inner-circle",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-22T11:10:36.949347+00:00",
-      "model": "",
-      "source_path": "a2a_bus/agents.json",
-      "status": "missing"
-    },
-    {
-      "agent_uid": "opus_composer",
-      "callsign": "opus_composer",
-      "harness": "claude-code",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-31T07:28:21.642040+00:00",
-      "model": "anthropic/claude-opus-4-7",
-      "source_path": "/Users/dhyana/.dharma/agents/opus_composer/living_agent.json",
-      "status": "degraded"
-    },
-    {
-      "agent_uid": "qwen_code",
-      "callsign": "qwen-code",
-      "harness": "qwen_code_cli",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-06-06T04:16:42.237752+00:00",
-      "model": "alibaba/qwen-code-runtime",
-      "source_path": "/Users/dhyana/.dharma/agents/qwen_code/living_agent.json",
-      "status": "active_evidence_only"
-    },
-    {
-      "agent_uid": "smriti",
-      "callsign": "smriti",
-      "harness": "inner-circle",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-22T11:10:36.973156+00:00",
-      "model": "",
-      "source_path": "a2a_bus/agents.json",
-      "status": "missing"
-    },
-    {
-      "agent_uid": "viveka",
-      "callsign": "viveka",
-      "harness": "inner-circle",
-      "heartbeat_status": "RED",
-      "last_seen_at": "2026-05-22T11:10:36.902218+00:00",
-      "model": "",
-      "source_path": "a2a_bus/agents.json",
+      "source_path": "/home/ubuntu/.dharma/agents/hermes-m5",
       "status": "missing"
     }
   ],
   "body": {
-    "new_sha": "799f304002",
-    "note": "canonical worktree dirty (7 files) \u2014 manual review required",
-    "observed_at": "2026-06-12T04:46:33Z",
-    "old_sha": "26681ef9e6",
-    "receipt": "/Users/dhyana/.dharma/ops/deploy_receipt.json",
-    "status": "blocked",
-    "worktree": "/Users/dhyana/dharma_swarm_main"
+    "new_sha": "",
+    "note": "",
+    "observed_at": "",
+    "old_sha": "",
+    "receipt": "/home/ubuntu/.dharma/ops/deploy_receipt.json",
+    "status": "missing",
+    "worktree": ""
   },
   "broken": [
     {
       "id": "BR-003",
       "status": "PARTIAL",
       "title": "Apply gate present but closed (self-evolution loop)"
+    },
+    {
+      "id": "BR-021",
+      "status": "WORKAROUND",
+      "title": "WS4 Tier-C battery hard-rejects terse evolution-test proposals"
+    },
+    {
+      "id": "BR-022",
+      "status": "OPEN",
+      "title": "Center of gravity is inward: outward edge unowned + governance rent uninstrumented"
     },
     {
       "id": "BR-004",
@@ -225,13 +145,13 @@
       "title": "`BUILD_SESSION_ENTRYPOINT.md` exists on origin/main, missing from current checkout"
     }
   ],
-  "context_hash": "91d5393aadc01afd174b0abf959bbe2d671c884b5824f33091c19a5e0cce02e6",
+  "context_hash": "cc70c555f1229ef88f42309352fbe8fd3c8a4bda5e1c05f5d20bcdd9028fa0f9",
   "custody": {
     "missing": [
       "AGENTS.md"
     ],
-    "present": 94,
-    "registered_total": 95
+    "present": 106,
+    "registered_total": 107
   },
   "identity": {
     "missing_sources": [],
@@ -245,176 +165,76 @@
   },
   "lanes": [
     {
-      "branch": "qwen/spine-adoption",
+      "branch": "devin/1782031573-soften-governance-gates",
       "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_swarm",
-      "status": ""
-    },
-    {
-      "branch": "codex/pr570-orientation-fixes",
-      "head": "LIVE_HEAD",
-      "path": "/private/tmp/dharma-pr570-review-e4ac48f3",
+      "path": "/home/ubuntu/repos/dharma-swarm",
       "status": ""
     },
     {
       "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/private/tmp/dharma_swarm_pr577_codex_review",
+      "path": "/home/ubuntu/pr-conflict-checks/origin-main-current",
       "status": ""
     },
     {
       "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/private/tmp/ds-pr574-review",
+      "path": "/home/ubuntu/pr-conflict-checks/pr629",
       "status": ""
     },
     {
       "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/private/tmp/ds-pr585-review",
+      "path": "/home/ubuntu/pr-conflict-checks/pr640",
       "status": ""
     },
     {
       "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/private/tmp/helm-theme-proto",
+      "path": "/home/ubuntu/pr-conflict-checks/pr647",
       "status": ""
     },
     {
-      "branch": "helm/worldclass-20260612",
+      "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_helm_build",
+      "path": "/home/ubuntu/pr-conflict-checks/pr648",
       "status": ""
     },
     {
-      "branch": "cashclaw/revenue-hydra-v1",
-      "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_swarm_cashclaw",
-      "status": ""
-    },
-    {
-      "branch": "organ/03-seat",
-      "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_swarm_live",
-      "status": ""
-    },
-    {
-      "branch": "holon/spine-v1",
-      "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_swarm_main",
-      "status": ""
-    },
-    {
-      "branch": "runtime/main-live-20260511",
-      "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/dharma_swarm_main_cutover",
-      "status": ""
-    },
-    {
-      "branch": "codex/truth-graph-v1",
+      "branch": "devin/full-swarm-e2e-test-20260621",
       "head": "CURRENT_CHECKOUT",
-      "path": "/Users/dhyana/ds_codex_truthgraph",
+      "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621",
       "status": ""
     },
     {
       "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/ds_lane_rescue_split",
+      "path": "/home/ubuntu/pr-work/pr629-current",
       "status": ""
     },
     {
-      "branch": "fable/loop1-trunk-delegated",
+      "branch": "(detached)",
       "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/ds_loop1_trunk",
+      "path": "/home/ubuntu/pr-work/system-main-current",
       "status": ""
     },
     {
-      "branch": "feat/trust-gate-scoreboard",
+      "branch": "main",
       "head": "LIVE_HEAD",
-      "path": "/Users/dhyana/ds_trust_gate",
+      "path": "/home/ubuntu/repos/dharma-swarm-main-check",
       "status": ""
     }
   ],
   "liveness": {
-    "generated_at": "2026-06-04T17:27:52Z",
-    "receipt": "/Users/dhyana/.dharma/ops/live_process_census.json",
-    "surfaces": [
-      {
-        "id": "substrate.dharma_daemon",
-        "label": "Dharma daemon",
-        "status": "live"
-      },
-      {
-        "id": "substrate.dharma_cron",
-        "label": "Dharma cron daemon",
-        "status": "stopped"
-      },
-      {
-        "id": "transport.nats",
-        "label": "Local NATS JetStream",
-        "status": "live"
-      },
-      {
-        "id": "transport.a2a_bridge",
-        "label": "NATS A2A bridge",
-        "status": "stopped"
-      },
-      {
-        "id": "evidence.a2a_mirrors",
-        "label": "A2A filesystem mirrors",
-        "status": "live"
-      },
-      {
-        "id": "evidence.nats_receipts",
-        "label": "NATS receipts and logs",
-        "status": "live"
-      },
-      {
-        "id": "external.hermes_a2a",
-        "label": "Hermes A2A server",
-        "status": "live"
-      },
-      {
-        "id": "dashboard.local",
-        "label": "Dashboard API and web",
-        "status": "live"
-      },
-      {
-        "id": "tmux.cockpit",
-        "label": "Canonical tmux cockpit",
-        "status": "stopped"
-      },
-      {
-        "id": "mission.forge_reality_arena",
-        "label": "Forge Reality Arena Hydra",
-        "status": "stopped"
-      },
-      {
-        "id": "revenue.cashclaw_gate",
-        "label": "Revenue / CashClaw gate",
-        "status": "blocked"
-      },
-      {
-        "id": "remote.agni",
-        "label": "AGNI remote watcher / trading",
-        "status": "stale"
-      },
-      {
-        "id": "agent.merge_master_mike",
-        "label": "Merge Master Mike",
-        "status": "stopped"
-      },
-      {
-        "id": "terminal.tui",
-        "label": "Terminal TUI",
-        "status": "stopped"
-      },
-      {
-        "id": "load.colima_openclaw",
-        "label": "Colima / OpenClaw VM",
-        "status": "stopped"
-      }
-    ]
+    "generated_at": "",
+    "receipt": "no census receipt \u2014 run python3 scripts/runtime/live_ops_census.py --write",
+    "surfaces": []
+  },
+  "loop1": {
+    "detail": "no persisted EvidenceReceipt yet",
+    "live": false,
+    "model": "",
+    "provider": ""
   },
   "organs": [
     {
@@ -456,40 +276,16 @@
   ],
   "receipts_tail": [
     {
-      "modified_at": "2026-06-12T04:59:54.369894+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/ack_from_fleet_loop_c_receipt_collab:novel.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:59:54.365633+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/ack_from_fleet_loop_c_claimed_collab:novel.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:59:54.360840+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/ack_from_fleet_loop_c_receipt_ts-bb486356_.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:59:54.356022+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/ack_from_fleet_loop_c_codex_a2a_lifecycle_.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:59:54.350764+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/ack_from_fleet_loop_c_codex_conjunction_li.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:58:10.907236+00:00",
-      "path": "/Users/dhyana/ds_codex_truthgraph/reports/orientation/nats_e2e_receipt.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:51:39.655067+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/f3cd741638088a53.json"
-    },
-    {
-      "modified_at": "2026-06-12T04:51:39.653656+00:00",
-      "path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/f0a03b8137879768.json"
+      "modified_at": "2026-06-21T13:46:20.090728+00:00",
+      "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/orientation/nats_e2e_receipt.json"
     }
   ],
   "tracks": [
     {
+      "complements": [
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [],
       "id": "runtime-truth-reconciliation-2026-06",
       "owned_surfaces": [
         "dharma_swarm/operator_core/**",
@@ -501,6 +297,10 @@
       "status": "ACTIVE"
     },
     {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
       "id": "runtime-truth-nats-2026-06",
       "owned_surfaces": [
         "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
@@ -512,6 +312,28 @@
       "status": "ACTIVE"
     },
     {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [],
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "owned_surfaces": [
+        "dharma_swarm/spine/**",
+        "dharma_swarm/a2a/a2a_bridge.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/agent_runner.py",
+        "scripts/uplift_guards/check_spine_ownership.py"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
       "id": "loop-closure-2026-06",
       "owned_surfaces": [
         "reports/loop_closure/**",
@@ -522,6 +344,13 @@
       "status": "ACTIVE"
     },
     {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [
+        "orientation-graph-2026-06"
+      ],
       "id": "truth-graph-platform-2026-06",
       "owned_surfaces": [
         "scripts/governance/orientation_graph.py",
@@ -536,6 +365,49 @@
         "reports/orientation/**"
       ],
       "owner": "@codex",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06"
+      ],
+      "depends_on": [
+        "runtime-truth-spine-adoption-2026-06"
+      ],
+      "id": "composer-holon-spine-longrun-2026-06",
+      "owned_surfaces": [
+        "docs/sovereign_holons/**",
+        "reports/sovereign_holons/**",
+        "dharma_swarm/holon_*.py",
+        "scripts/holon_*.py",
+        "tests/test_holon_*.py"
+      ],
+      "owner": "@AmitabhainArunachala",
+      "serves": "substrate-nativeness",
+      "status": "ACTIVE"
+    },
+    {
+      "complements": [
+        "runtime-truth-spine-adoption-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "id": "provider-routing-consolidation-2026-06",
+      "owned_surfaces": [
+        "dharma_swarm/providers.py",
+        "dharma_swarm/provider_policy.py",
+        "dharma_swarm/model_hierarchy.py",
+        "dharma_swarm/model_pool.py",
+        "dharma_swarm/model_defaults.py",
+        "dharma_swarm/runtime_provider.py",
+        "dharma_swarm/router_v1.py",
+        "dharma_swarm/smart_router.py",
+        "dharma_swarm/decision_router.py",
+        "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
+      ],
+      "owner": "@AmitabhainArunachala",
       "serves": "substrate-nativeness",
       "status": "ACTIVE"
     }

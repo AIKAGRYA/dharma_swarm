@@ -1,0 +1,74 @@
+### memory_kernel_write_receipt_smoke
+command: make memory-kernel-write-receipt-smoke
+--- output ---
+PYTHONPATH=. python3 scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
+{
+  "allowed_receipt": {
+    "artifact_record_only": true,
+    "created_at": "2026-06-21T14:05:22Z",
+    "digest": "3d8c1a6bb8c80006af3e21656ab0ef3ca979353cc63467549e7bdb734fb1a07c",
+    "mutation_performed": false,
+    "policy_decision": {
+      "append_only": true,
+      "direct_mutation_blocked": false,
+      "outcome": "allow",
+      "reasons": [
+        "append_only_receipt_or_proposal_allowed"
+      ],
+      "target_surface": "memory_kernel.write_receipts"
+    },
+    "receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165",
+    "request": {
+      "proposed_operation": "append_proposal",
+      "reason": "record governed proposal receipt without mutating memory",
+      "reviewer_state": "human_approved",
+      "source_atom_ids": [
+        "memory_atom:write-receipt-smoke"
+      ],
+      "target_surface": "memory_kernel.write_receipts"
+    },
+    "rollback_reference": "memory_kernel_write_rollback:89e45ffb8dd06190e22ba594",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  },
+  "denied_receipt": {
+    "artifact_record_only": true,
+    "created_at": "2026-06-21T14:05:22Z",
+    "digest": "49eaf9d5ab1d9107045547b035fc7da9c2dc462c61c2d8e27061a0e2152fa964",
+    "mutation_performed": false,
+    "policy_decision": {
+      "append_only": false,
+      "direct_mutation_blocked": true,
+      "outcome": "deny",
+      "reasons": [
+        "operation_not_append_only",
+        "direct_memory_or_canon_mutation_blocked"
+      ],
+      "target_surface": "canon.primary"
+    },
+    "receipt_id": "memory_kernel_write_receipt:49eaf9d5ab1d9107045547b0",
+    "request": {
+      "proposed_operation": "update",
+      "reason": "direct canon mutation should be denied",
+      "reviewer_state": "human_approved",
+      "source_atom_ids": [
+        "memory_atom:direct-mutation-smoke"
+      ],
+      "target_surface": "canon.primary"
+    },
+    "rollback_reference": "memory_kernel_write_rollback:2512ebe4f3d8c85ed6c57c4f",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  },
+  "status": {
+    "allowed_receipt_count": 1,
+    "blockers": [],
+    "denied_direct_mutation_count": 1,
+    "denied_receipt_count": 1,
+    "immutable_log": true,
+    "latest_allowed_receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165",
+    "ready": true,
+    "receipt_count": 2,
+    "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  }
+}
+--- exit_code: 0

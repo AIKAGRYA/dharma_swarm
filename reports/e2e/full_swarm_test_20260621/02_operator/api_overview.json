@@ -1,0 +1,22 @@
+{
+  "http_status": 200,
+  "raw": "{\"status\":\"ok\",\"data\":{\"agent_count\":14,\"task_count\":4,\"tasks_pending\":4,\"tasks_running\":0,\"tasks_completed\":0,\"tasks_failed\":0,\"mean_fitness\":0.0,\"uptime_seconds\":66.09562065599994,\"health_status\":\"unknown\",\"stigmergy_density\":0,\"evolution_entries\":0},\"error\":\"\",\"timestamp\":\"2026-06-21T13:51:58.041231\"}",
+  "json": {
+    "status": "ok",
+    "data": {
+      "agent_count": 14,
+      "task_count": 4,
+      "tasks_pending": 4,
+      "tasks_running": 0,
+      "tasks_completed": 0,
+      "tasks_failed": 0,
+      "mean_fitness": 0.0,
+      "uptime_seconds": 66.09562065599994,
+      "health_status": "unknown",
+      "stigmergy_density": 0,
+      "evolution_entries": 0
+    },
+    "error": "",
+    "timestamp": "2026-06-21T13:51:58.041231"
+  }
+}

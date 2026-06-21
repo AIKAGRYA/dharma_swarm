@@ -1,0 +1,10 @@
+[
+  {
+    "pid": 82888,
+    "cmd": "python -m uvicorn api.main:app --host 127.0.0.1 --port 8420"
+  },
+  {
+    "pid": 83437,
+    "cmd": "bash -lc pgrep -af 'uvicorn api.main:app' || true"
+  }
+]

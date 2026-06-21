@@ -1,0 +1,6 @@
+### make_verify_corral
+command: make verify-corral
+--- output ---
+python3 scripts/governance/verify_corral_findings.py
+corral directory not present: /home/ubuntu/pr-work/full-swarm-e2e-20260621/DE_BUG_CORRAL
+--- exit_code: 0

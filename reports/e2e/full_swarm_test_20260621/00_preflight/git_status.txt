@@ -1,0 +1,5 @@
+### git_status
+command: git status --short
+--- output ---
+?? reports/e2e/
+--- exit_code: 0

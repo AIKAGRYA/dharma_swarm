@@ -1,0 +1,20 @@
+{
+  "http_status": 200,
+  "raw": "{\"schema_version\":\"0.2.0\",\"request_id\":\"c686ce4a-d99e-41d3-b149-bfc99259a7bd\",\"generated_at\":\"2026-06-21T13:51:59.107181+00:00\",\"source_errors\":[],\"freshness_window\":\"\",\"data\":{\"receipt_root\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/send_receipts\",\"bridge_receipt_root\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/inbox_bridge_receipts\",\"domain_reply_receipt_root\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/domain_reply_receipts\",\"reply_receipt_root\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/reply_receipts\",\"target\":null,\"card_count\":0,\"cards\":[]}}",
+  "json": {
+    "schema_version": "0.2.0",
+    "request_id": "c686ce4a-d99e-41d3-b149-bfc99259a7bd",
+    "generated_at": "2026-06-21T13:51:59.107181+00:00",
+    "source_errors": [],
+    "freshness_window": "",
+    "data": {
+      "receipt_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/send_receipts",
+      "bridge_receipt_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/inbox_bridge_receipts",
+      "domain_reply_receipt_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/domain_reply_receipts",
+      "reply_receipt_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/a2a/reply_receipts",
+      "target": null,
+      "card_count": 0,
+      "cards": []
+    }
+  }
+}

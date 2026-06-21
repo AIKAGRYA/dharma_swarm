@@ -1,0 +1,150 @@
+{
+  "commands_task_empty": {
+    "path": "/api/commands/task",
+    "method": "POST",
+    "http_status": 422,
+    "elapsed_ms": null,
+    "json": {
+      "detail": [
+        {
+          "type": "missing",
+          "loc": [
+            "body",
+            "title"
+          ],
+          "msg": "Field required",
+          "input": {}
+        }
+      ]
+    },
+    "raw": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"title\"],\"msg\":\"Field required\",\"input\":{}}]}",
+    "error": "HTTP Error 422: Unprocessable Entity"
+  },
+  "commands_task_bad_type": {
+    "path": "/api/commands/task",
+    "method": "POST",
+    "http_status": 422,
+    "elapsed_ms": null,
+    "json": {
+      "detail": [
+        {
+          "type": "string_type",
+          "loc": [
+            "body",
+            "title"
+          ],
+          "msg": "Input should be a valid string",
+          "input": 123
+        },
+        {
+          "type": "string_type",
+          "loc": [
+            "body",
+            "description"
+          ],
+          "msg": "Input should be a valid string",
+          "input": null
+        }
+      ]
+    },
+    "raw": "{\"detail\":[{\"type\":\"string_type\",\"loc\":[\"body\",\"title\"],\"msg\":\"Input should be a valid string\",\"input\":123},{\"type\":\"string_type\",\"loc\":[\"body\",\"description\"],\"msg\":\"Input should be a valid string\",\"input\":null}]}",
+    "error": "HTTP Error 422: Unprocessable Entity"
+  },
+  "opportunities_dispatch_missing_id": {
+    "path": "/api/opportunities/dispatch",
+    "method": "POST",
+    "http_status": 200,
+    "elapsed_ms": 217.6,
+    "json": {
+      "results": [
+        {
+          "stage": "scope",
+          "task_id": "task_7918fba198214c09",
+          "claim_id": "claim_d296184f25584d96",
+          "run_id": "run_eee989878b734066",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        },
+        {
+          "stage": "validate",
+          "task_id": "task_3ba918cd48ab442a",
+          "claim_id": "claim_bed44084e85d4fc1",
+          "run_id": "run_402ab6324ca44262",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        },
+        {
+          "stage": "deep_research",
+          "task_id": "task_9285f56268e14d0c",
+          "claim_id": "claim_d8bb7550367d4f8c",
+          "run_id": "run_cf6afc3f75fd46e8",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        },
+        {
+          "stage": "capability",
+          "task_id": "task_f64d5777ac8e493f",
+          "claim_id": "claim_50f25a8b3180442f",
+          "run_id": "run_1a3dd1e21a5f46a8",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        },
+        {
+          "stage": "mvp",
+          "task_id": "task_4ff17e4ec6ee4d9a",
+          "claim_id": "claim_8bd36b955e1d42f4",
+          "run_id": "run_ba84d0ac061e428f",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        },
+        {
+          "stage": "first_artifact",
+          "task_id": "task_8b2929c7283b4c20",
+          "claim_id": "claim_4a30725cff144796",
+          "run_id": "run_a76adaa89c124f4f",
+          "proposal_id": "",
+          "success": true,
+          "error": ""
+        }
+      ]
+    },
+    "raw": "{\"results\":[{\"stage\":\"scope\",\"task_id\":\"task_7918fba198214c09\",\"claim_id\":\"claim_d296184f25584d96\",\"run_id\":\"run_eee989878b734066\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"validate\",\"task_id\":\"task_3ba918cd48ab442a\",\"claim_id\":\"claim_bed44084e85d4fc1\",\"run_id\":\"run_402ab6324ca44262\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"deep_research\",\"task_id\":\"task_9285f56268e14d0c\",\"claim_id\":\"claim_d8bb7550367d4f8c\",\"run_id\":\"run_cf6afc3f75fd46e8\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"capability\",\"task_id\":\"task_f64d5777ac8e493f\",\"claim_id\":\"claim_50f25a8b3180442f\",\"run_id\":\"run_1a3dd1e21a5f46a8\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"mvp\",\"task_id\":\"task_4ff17e4ec6ee4d9a\",\"claim_id\":\"claim_8bd36b955e1d42f4\",\"run_id\":\"run_ba84d0ac061e428f\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"first_artifact\",\"task_id\":\"task_8b2929c7283b4c20\",\"claim_id\":\"claim_4a30725cff144796\",\"run_id\":\"run_a76adaa89c124f4f\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"}]}"
+  },
+  "opportunities_refill_missing_id": {
+    "path": "/api/opportunities/refill",
+    "method": "POST",
+    "http_status": 422,
+    "elapsed_ms": null,
+    "json": {
+      "detail": [
+        {
+          "type": "float_parsing",
+          "loc": [
+            "body",
+            "estimated_value_usd"
+          ],
+          "msg": "Input should be a valid number, unable to parse string as a number",
+          "input": "bad"
+        }
+      ]
+    },
+    "raw": "{\"detail\":[{\"type\":\"float_parsing\",\"loc\":[\"body\",\"estimated_value_usd\"],\"msg\":\"Input should be a valid number, unable to parse string as a number\",\"input\":\"bad\"}]}",
+    "error": "HTTP Error 422: Unprocessable Entity"
+  },
+  "control_surface_bad_lookup": {
+    "path": "/api/control-surface/rows/not-a-real-row",
+    "method": "GET",
+    "http_status": 404,
+    "elapsed_ms": null,
+    "json": {
+      "detail": "row 'not-a-real-row' not found"
+    },
+    "raw": "{\"detail\":\"row 'not-a-real-row' not found\"}",
+    "error": "HTTP Error 404: Not Found"
+  }
+}

@@ -1,0 +1,17 @@
+### make_nats_substrate_contract
+command: make nats-substrate-contract
+--- output ---
+PYTHONPATH=. python3 scripts/governance/check_nats_substrate_contract.py
+NATS_CONTRACT_OK docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+pytest -q \
+	tests/test_nats_live_contact.py \
+	tests/test_nats_transport.py \
+	tests/test_a2a_send.py \
+	tests/test_a2a_inbox_bridge.py \
+	tests/test_a2a_inbox_bridge_tmux_scripts.py \
+	tests/test_a2a_domain_reply_worker.py \
+	tests/test_a2a_reply_capture.py \
+	--tb=line
+.......................................................                  [100%]
+55 passed in 4.26s
+--- exit_code: 0

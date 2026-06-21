@@ -2,50 +2,47 @@
 
 Projection from existing owners. This file owns no facts.
 
-- context_hash: `91d5393aadc01afd174b0abf959bbe2d671c884b5824f33091c19a5e0cce02e6`
+- context_hash: `cc70c555f1229ef88f42309352fbe8fd3c8a4bda5e1c05f5d20bcdd9028fa0f9`
 - identity: dharma_swarm is a self-evolving emergent organism (Krishna); its outward action against the world's brokenness (Arjuna) flows from — and is only valid when rooted in — its inward coherence.
-- active_tracks: 4
-- lanes: 15
-- agents: 14
-- receipts_tail: 8
+- active_tracks: 7
+- lanes: 10
+- agents: 5
+- receipts_tail: 1
+- loop1_live: False
 
 ## Tracks
 - `runtime-truth-reconciliation-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@AmitabhainArunachala`
 - `runtime-truth-nats-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@codex`
+- `runtime-truth-spine-adoption-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@AmitabhainArunachala`
 - `loop-closure-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@AmitabhainArunachala`
 - `truth-graph-platform-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@codex`
+- `composer-holon-spine-longrun-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@AmitabhainArunachala`
+- `provider-routing-consolidation-2026-06` [ACTIVE] serves `substrate-nativeness` owner `@AmitabhainArunachala`
 
 ## Agents
-- `claude-opus` status=missing heartbeat=RED last_seen=2026-05-27T14:20:09.955207+00:00
-- `codex-hardening-smoke` status=missing heartbeat=RED last_seen=2026-05-27T13:37:51.273892+00:00
-- `codex_composer` status=active heartbeat=RED last_seen=2026-05-30T06:17:34.588435+00:00
-- `devin-roaming-2987d222` status=active heartbeat=RED last_seen=2026-05-30T06:17:34.588435+00:00
-- `drishti` status=missing heartbeat=RED last_seen=2026-05-22T11:10:36.925440+00:00
-- `fable_5_cursor` status=starting heartbeat=RED last_seen=2026-06-11T02:18:24.328568+00:00
-- `fable_composer` status=session_alive_standing_loop_pending heartbeat=RED last_seen=2026-06-11T02:20:00.000000+00:00
-- `fleet-coordinator` status=missing heartbeat=RED last_seen=2026-05-27T14:23:54.749154+00:00
-- `hermes-m5` status=active heartbeat=RED last_seen=2026-05-30T06:17:34.588435+00:00
-- `karya` status=missing heartbeat=RED last_seen=2026-05-22T11:10:36.949347+00:00
-- `opus_composer` status=degraded heartbeat=RED last_seen=2026-05-31T07:28:21.642040+00:00
-- `qwen_code` status=active_evidence_only heartbeat=RED last_seen=2026-06-06T04:16:42.237752+00:00
-- `smriti` status=missing heartbeat=RED last_seen=2026-05-22T11:10:36.973156+00:00
-- `viveka` status=missing heartbeat=RED last_seen=2026-05-22T11:10:36.902218+00:00
+- `codex_composer` status=missing heartbeat=RED last_seen=(none)
+- `devin-roaming-2987d222` status=missing heartbeat=RED last_seen=(none)
+- `fable_5_cursor` status=missing heartbeat=RED last_seen=(none)
+- `fable_composer` status=missing heartbeat=RED last_seen=(none)
+- `hermes-m5` status=missing heartbeat=RED last_seen=(none)
 
 ## A2A
-- root: `/Users/dhyana/.dharma/a2a_bus`
-- inbox_files: 32296
+- root: `/home/ubuntu/.dharma/a2a_bus`
+- inbox_files: 0
 - quarantine_files: 0
-- nats_e2e_receipt: `/Users/dhyana/ds_codex_truthgraph/reports/orientation/nats_e2e_receipt.json`
+- nats_e2e_receipt: `/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/orientation/nats_e2e_receipt.json`
 
 ## Body
-- status: `blocked`
-- worktree: `/Users/dhyana/dharma_swarm_main`
-- old_sha: `26681ef9e6`
-- new_sha: `799f304002`
-- note: canonical worktree dirty (7 files) — manual review required
+- status: `missing`
+- worktree: ``
+- old_sha: ``
+- new_sha: ``
+- note: 
 
 ## Broken Register
 - `BR-003` [PARTIAL] Apply gate present but closed (self-evolution loop)
+- `BR-021` [WORKAROUND] WS4 Tier-C battery hard-rejects terse evolution-test proposals
+- `BR-022` [OPEN] Center of gravity is inward: outward edge unowned + governance rent uninstrumented
 - `BR-004` [PARTIAL] Cron split-brain (repo vs live)
 - `BR-005` [PARTIAL] Algedonic stream in degenerate steady-state
 - `BR-009` [OPEN] Roadmap is contested (3 docs claim primacy)

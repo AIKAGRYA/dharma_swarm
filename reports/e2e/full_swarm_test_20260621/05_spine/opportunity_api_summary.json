@@ -1,0 +1,16 @@
+{
+  "stages": {
+    "stages": [
+      "scope",
+      "validate",
+      "deep_research",
+      "capability",
+      "mvp",
+      "first_artifact"
+    ]
+  },
+  "dispatch_http": 200,
+  "dispatch_repeat_http": 200,
+  "refill_http": 200,
+  "malformed_http": 200
+}

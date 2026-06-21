@@ -1,0 +1,80 @@
+      "registered": 81,
+      "unregistered": 58
+    },
+    "by_triage": {
+      "generated_artifact": 20,
+      "operational_state": 30,
+      "registered_memory_writer": 81,
+      "test_or_experiment": 8
+    },
+    "discovered_write_count": 139,
+    "parse_error_count": 0,
+    "policy_denied_count": 5,
+    "registered_discovery_count": 81,
+    "scanned_file_count": 968,
+    "top_unregistered_sources": [
+      {
+        "count": 3,
+        "source_path": "dharma_swarm/guardian_crew.py"
+      },
+      {
+        "count": 2,
+        "source_path": "dharma_swarm/codex_overnight.py"
+      },
+      {
+        "count": 2,
+        "source_path": "dharma_swarm/conversation_distiller.py"
+      },
+      {
+        "count": 2,
+        "source_path": "dharma_swarm/overnight_director.py"
+      },
+      {
+        "count": 2,
+        "source_path": "dharma_swarm/pulse.py"
+      },
+      {
+        "count": 2,
+        "source_path": "scripts/allout_autopilot.py"
+      },
+      {
+        "count": 2,
+        "source_path": "scripts/lattice_test.py"
+      },
+      {
+        "count": 2,
+        "source_path": "scripts/seed_cybernetics_population_cycle.py"
+      },
+      {
+        "count": 2,
+        "source_path": "scripts/strange_loop.py"
+      },
+      {
+        "count": 1,
+        "source_path": "dharma_swarm/active_inference.py"
+      }
+    ],
+    "unregistered_discovery_count": 58,
+    "unreviewed_discovery_count": 1
+  },
+  "summary": {
+    "by_classification": {
+      "approved": 3,
+      "dormant": 6,
+      "legacy_tolerated": 10,
+      "review_required": 42
+    },
+    "by_status": {
+      "missing": 6,
+      "present": 54,
+      "unregistered_surface": 1
+    },
+    "error_count": 0,
+    "missing_count": 6,
+    "present_count": 55,
+    "unregistered_surface_count": 1,
+    "writer_count": 61
+  }
+}
+make: *** [Makefile:339: memory-kernel-readiness] Error 2
+--- exit_code: 2

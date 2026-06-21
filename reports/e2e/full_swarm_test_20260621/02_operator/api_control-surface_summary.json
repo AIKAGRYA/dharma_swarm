@@ -1,0 +1,37 @@
+{
+  "http_status": 200,
+  "raw": "{\"schema_version\":\"0.2.0\",\"request_id\":\"3ca25ec2-524b-4e8c-ac9d-eb8511e3b63e\",\"generated_at\":\"2026-06-21T13:51:58.716885+00:00\",\"source_errors\":[],\"freshness_window\":\"\",\"data\":{\"total\":133,\"bound\":38,\"partial\":64,\"drifted\":12,\"declared_only\":14,\"unknown\":5,\"human_decision_required_count\":17,\"p0_count\":55,\"p1_count\":56,\"generated_at\":\"2026-06-21T13:51:58+00:00\",\"sources_consulted\":[\"ACTIVE_SURFACE_MANIFEST.yaml\",\"operating_facts\",\"module_truth\",\"BROKEN_REGISTER.md\",\"runtime_state\",\"live_ops_census\",\"go_sdk\",\"recursive_discovery_shadow\",\"MemoryKernel\",\"operator_prod_smoke\",\"code/filesystem\"],\"memory_depth\":\"snapshot\"}}",
+  "json": {
+    "schema_version": "0.2.0",
+    "request_id": "3ca25ec2-524b-4e8c-ac9d-eb8511e3b63e",
+    "generated_at": "2026-06-21T13:51:58.716885+00:00",
+    "source_errors": [],
+    "freshness_window": "",
+    "data": {
+      "total": 133,
+      "bound": 38,
+      "partial": 64,
+      "drifted": 12,
+      "declared_only": 14,
+      "unknown": 5,
+      "human_decision_required_count": 17,
+      "p0_count": 55,
+      "p1_count": 56,
+      "generated_at": "2026-06-21T13:51:58+00:00",
+      "sources_consulted": [
+        "ACTIVE_SURFACE_MANIFEST.yaml",
+        "operating_facts",
+        "module_truth",
+        "BROKEN_REGISTER.md",
+        "runtime_state",
+        "live_ops_census",
+        "go_sdk",
+        "recursive_discovery_shadow",
+        "MemoryKernel",
+        "operator_prod_smoke",
+        "code/filesystem"
+      ],
+      "memory_depth": "snapshot"
+    }
+  }
+}

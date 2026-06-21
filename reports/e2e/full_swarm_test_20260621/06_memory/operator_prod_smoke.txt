@@ -1,0 +1,61 @@
+### operator_prod_smoke
+command: make operator-prod-smoke
+--- output ---
+PYTHONPATH=. python3 scripts/operator_prod_smoke.py --repo-root .
+{
+  "checks": [
+    {
+      "detail": "routes=27",
+      "name": "api_boot",
+      "ok": true
+    },
+    {
+      "detail": "rows=133",
+      "name": "control_surface_projection",
+      "ok": true
+    },
+    {
+      "detail": "memory_rows=13",
+      "name": "memory_row_projection",
+      "ok": true
+    },
+    {
+      "detail": "writers=61 missing=0 unregistered_surfaces=1 action_required=1",
+      "name": "memory_writer_sentinel_summary",
+      "ok": false
+    },
+    {
+      "detail": "hard_failures=1 warnings=3",
+      "name": "context_shadow_canary_report",
+      "ok": true
+    },
+    {
+      "detail": "status=<missing> strict=<missing> accounted=<missing>/<missing> required=<missing>/<missing> warnings=<missing> missing_fields=readiness_status,strict_readiness_state,strict_ready,accounted_surface_count,accounted_surface_total,required_surface_count,required_accounted_surface_count,warning_count",
+      "name": "memory_readiness_contract",
+      "ok": false
+    },
+    {
+      "detail": "ready=False linked=0 matched=0 proposal=<missing> decision=<missing> blockers=write_receipt_log_missing,canonical_receipt_log_missing,no_linked_knowledgeops_canonical_receipt",
+      "name": "memory_knowledgeops_bridge_contract",
+      "ok": false
+    },
+    {
+      "detail": "rollback=available rollout=off",
+      "name": "rollback_switch_presence",
+      "ok": true
+    },
+    {
+      "detail": "rollout=off safety=safe_default_off max_ready_tier=<missing> blockers=<none>",
+      "name": "memory_burn_in_safety",
+      "ok": true
+    },
+    {
+      "detail": "operator_home=/home/ubuntu/pr-work/full-swarm-e2e-20260621/.e2e_state/full_swarm_test_20260621/home env_home=<unset>",
+      "name": "memory_home_contract",
+      "ok": true
+    }
+  ],
+  "ok": false
+}
+make: *** [Makefile:370: operator-prod-smoke] Error 1
+--- exit_code: 2

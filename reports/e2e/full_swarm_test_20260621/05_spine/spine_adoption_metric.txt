@@ -1,0 +1,1838 @@
+### spine_adoption_metric
+command: python tools/spine_adoption_metric.py --print
+--- output ---
+{
+  "audit_sha": "726bc9d4d4add60c46f102d1ceee3a065c474892",
+  "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
+  "classification_vocabulary": [
+    "joined",
+    "adapter-ready",
+    "missing",
+    "quarantine",
+    "legacy"
+  ],
+  "doc_anchor_status": "ok",
+  "metric": "spine_adoption_metric",
+  "missing_doc_anchors": [],
+  "source_status": "dirty",
+  "source_status_entries": [
+    " M reports/governance/active_track_evidence.json",
+    " M reports/governance/active_track_evidence.md",
+    " M reports/governance/track_portfolio.json",
+    " M reports/orientation/repo_context.json",
+    " M reports/orientation/repo_context.md",
+    "?? .e2e_state/full_swarm_test_20260621/home/.dharma_manifest.json",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/PREFLIGHT_SUMMARY.md",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/git_head.txt",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/git_status.txt",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/git_toplevel.txt",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/make_onboard.txt",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/make_orient.txt",
+    "?? reports/e2e/full_swarm_test_20260621/00_preflight/make_status.txt",
+    "?? reports/e2e/full_swarm_test_20260621/01_map/ORGAN_SURFACE_MAP.md",
+    "?? reports/e2e/full_swarm_test_20260621/01_map/organ_surface_map_summary.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/OPERATOR_BOOT_REPORT.md",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_commands_tasks.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_commands_tasks_after_create.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_a2a_cards.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_agentops_cards.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_ds-goal_cards.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_rows.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_semantic-receipts_cards.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control-surface_summary.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control_surface_stream.stderr",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control_surface_stream.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_control_surface_summary_after_task.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_health.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_overview.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_task_create.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/api_task_dispatch.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/openapi.json.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_api_summary.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_boot_failure_log.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_log_after_restart_tail200.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_readiness_bug_evidence.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_restart.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/operator_start.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_control_surface_summary_after.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_evidence.txt",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_health_after.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_overview_after.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_tasks_after.json",
+    "?? reports/e2e/full_swarm_test_20260621/02_operator/restart_tasks_before.json",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/DASHBOARD_TEST_REPORT.md",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/agents.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/audit.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/control_surface.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/dashboard_gauntlet_recording.mp4",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/evolution.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/npm_build.txt",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/npm_gen_types_check.txt",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/npm_lint.txt",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/ontology.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/overview.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/recent_screenshots.txt",
+    "?? reports/e2e/full_swarm_test_20260621/03_dashboard/runtime.jpg",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/DARSHAN_FIRST_READER_ARTIFACT.md",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/DARSHAN_FIRST_READER_RECEIPT_DRAFT.json",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/MISSION_RUN_REPORT.md",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/api_commands_tasks_snapshot.json",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/control_surface_summary_pre_mission_artifact.json",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/darshan_task_records.json",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/dgc_help.txt",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/dharma_swarm_cli_help.txt",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/dharma_swarm_dgc_cli_help.txt",
+    "?? reports/e2e/full_swarm_test_20260621/04_mission/repo_darshan_evidence_grep.txt",
+    "?? reports/e2e/full_swarm_test_20260621/05_spine/pytest_authority_revenue_loop.txt",
+    "?? reports/e2e/full_swarm_test_20260621/05_spine/spine_adoption_metric.txt",
+    "?? reports/e2e/full_swarm_test_20260621/TEST_PLAN.md"
+  ],
+  "summary": {
+    "adapter_ready_count": 3,
+    "adoption_pct": 93.8,
+    "joined_count": 12,
+    "joined_or_adapter_ready_count": 15,
+    "joined_or_adapter_ready_percent": 93.8,
+    "joined_percent": 75.0,
+    "legacy_count": 1,
+    "missing_count": 0,
+    "non_joined_surface_ids": [
+      "tool_registry_dispatch",
+      "self_modification_loop",
+      "mcp_tool_access",
+      "legacy_no_identity_escape_hatch"
+    ],
+    "quarantine_count": 0,
+    "status_counts": {
+      "adapter-ready": 3,
+      "joined": 12,
+      "legacy": 1,
+      "missing": 0,
+      "quarantine": 0
+    },
+    "total_surfaces": 16
+  },
+  "surfaces": [
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "identity symbol is present",
+          "hits": [
+            {
+              "line": 16,
+              "path": "dharma_swarm/spine/identity.py",
+              "text": "class MissingExecutionIdentity(ValueError):"
+            }
+          ],
+          "key": "identity_name_seen",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        }
+      ],
+      "category": "identity",
+      "files": [
+        "dharma_swarm/spine/identity.py"
+      ],
+      "id": "identity_contract",
+      "joined_evidence": [
+        {
+          "description": "ExecutionIdentity type exists",
+          "hits": [
+            {
+              "line": 29,
+              "path": "dharma_swarm/spine/identity.py",
+              "text": "class ExecutionIdentity:"
+            }
+          ],
+          "key": "execution_identity_class",
+          "matched": true,
+          "regex": "\\bclass ExecutionIdentity\\b"
+        },
+        {
+          "description": "identity can be recovered from metadata",
+          "hits": [
+            {
+              "line": 103,
+              "path": "dharma_swarm/spine/identity.py",
+              "text": "def from_metadata("
+            }
+          ],
+          "key": "metadata_hydration",
+          "matched": true,
+          "regex": "\\bdef from_metadata\\b"
+        },
+        {
+          "description": "dispatch can require mandatory identity fields",
+          "hits": [
+            {
+              "line": 146,
+              "path": "dharma_swarm/spine/identity.py",
+              "text": "def require_for_dispatch(self) -> \"ExecutionIdentity\":"
+            }
+          ],
+          "key": "dispatch_requirement",
+          "matched": true,
+          "regex": "\\bdef require_for_dispatch\\b"
+        }
+      ],
+      "label": "Canonical ExecutionIdentity contract",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/spine/identity.py"
+      ],
+      "priority": 1,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "runtime store symbol is present",
+          "hits": [
+            {
+              "line": 1070,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "class RuntimeStateStore:"
+            }
+          ],
+          "key": "runtime_state_name_seen",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        }
+      ],
+      "category": "ledger",
+      "files": [
+        "dharma_swarm/runtime_state.py"
+      ],
+      "id": "runtime_state_ledger",
+      "joined_evidence": [
+        {
+          "description": "RuntimeStateStore type exists",
+          "hits": [
+            {
+              "line": 1070,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "class RuntimeStateStore:"
+            }
+          ],
+          "key": "store_class",
+          "matched": true,
+          "regex": "\\bclass RuntimeStateStore\\b"
+        },
+        {
+          "description": "execution identity table is declared",
+          "hits": [
+            {
+              "line": 211,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "CREATE TABLE IF NOT EXISTS execution_identities ("
+            }
+          ],
+          "key": "identity_table",
+          "matched": true,
+          "regex": "execution_identities"
+        },
+        {
+          "description": "runtime receipt table is declared",
+          "hits": [
+            {
+              "line": 234,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "CREATE TABLE IF NOT EXISTS runtime_receipts ("
+            }
+          ],
+          "key": "receipt_table",
+          "matched": true,
+          "regex": "runtime_receipts"
+        },
+        {
+          "description": "idempotency table is declared",
+          "hits": [
+            {
+              "line": 252,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "CREATE TABLE IF NOT EXISTS idempotency_records ("
+            }
+          ],
+          "key": "idempotency_table",
+          "matched": true,
+          "regex": "idempotency_records"
+        },
+        {
+          "description": "run ledger query exists",
+          "hits": [
+            {
+              "line": 3475,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
+            }
+          ],
+          "key": "run_ledger_query",
+          "matched": true,
+          "regex": "\\bdef get_run_ledger\\b"
+        }
+      ],
+      "label": "RuntimeStateStore durable ledger",
+      "legacy_evidence": [
+        {
+          "description": "legacy identity bypass flag is present",
+          "hits": [
+            {
+              "line": 915,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "\"legacy_no_identity_allowed\": True,"
+            }
+          ],
+          "key": "legacy_bypass_flag",
+          "matched": true,
+          "regex": "legacy_no_identity_allowed"
+        }
+      ],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/runtime_state.py"
+      ],
+      "priority": 1,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 18,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        }
+      ],
+      "category": "dispatch",
+      "files": [
+        "dharma_swarm/runtime_lifecycle.py"
+      ],
+      "id": "runtime_lifecycle_adapter",
+      "joined_evidence": [
+        {
+          "description": "lifecycle can create/require identity",
+          "hits": [
+            {
+              "line": 76,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "def ensure_execution_identity("
+            }
+          ],
+          "key": "ensure_identity",
+          "matched": true,
+          "regex": "\\bdef ensure_execution_identity\\b"
+        },
+        {
+          "description": "task claim lifecycle path exists",
+          "hits": [
+            {
+              "line": 206,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "async def record_task_claim("
+            }
+          ],
+          "key": "task_claim_receipt",
+          "matched": true,
+          "regex": "\\basync def record_task_claim\\b"
+        },
+        {
+          "description": "delegation run lifecycle path exists",
+          "hits": [
+            {
+              "line": 285,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "async def record_delegation_run("
+            }
+          ],
+          "key": "delegation_receipt",
+          "matched": true,
+          "regex": "\\basync def record_delegation_run\\b"
+        },
+        {
+          "description": "artifact lifecycle path exists",
+          "hits": [
+            {
+              "line": 394,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "async def record_artifact("
+            }
+          ],
+          "key": "artifact_receipt",
+          "matched": true,
+          "regex": "\\basync def record_artifact\\b"
+        },
+        {
+          "description": "runtime receipts are emitted",
+          "hits": [
+            {
+              "line": 14,
+              "path": "dharma_swarm/runtime_lifecycle.py",
+              "text": "RuntimeReceipt,"
+            }
+          ],
+          "key": "runtime_receipt",
+          "matched": true,
+          "regex": "RuntimeReceipt"
+        }
+      ],
+      "label": "Runtime lifecycle adapter",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/runtime_lifecycle.py"
+      ],
+      "priority": 2,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "task create path exists",
+          "hits": [
+            {
+              "line": 287,
+              "path": "dharma_swarm/task_board.py",
+              "text": "async def create("
+            }
+          ],
+          "key": "task_create",
+          "matched": true,
+          "regex": "\\basync def create\\b"
+        }
+      ],
+      "category": "ingress",
+      "files": [
+        "dharma_swarm/task_board.py"
+      ],
+      "id": "task_board_ingress",
+      "joined_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 22,
+              "path": "dharma_swarm/task_board.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "required identity option exists",
+          "hits": [
+            {
+              "line": 88,
+              "path": "dharma_swarm/task_board.py",
+              "text": "require_identity: bool = False,"
+            }
+          ],
+          "key": "require_identity",
+          "matched": true,
+          "regex": "require_identity"
+        },
+        {
+          "description": "runtime store accepted",
+          "hits": [
+            {
+              "line": 17,
+              "path": "dharma_swarm/task_board.py",
+              "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "task receipts are written to the ledger",
+          "hits": [
+            {
+              "line": 271,
+              "path": "dharma_swarm/task_board.py",
+              "text": "await self._runtime_state.record_receipt_for_identity("
+            }
+          ],
+          "key": "identity_receipt",
+          "matched": true,
+          "regex": "record_receipt_for_identity"
+        }
+      ],
+      "label": "TaskBoard local ingress",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/task_board.py"
+      ],
+      "priority": 2,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "orchestrator has lifecycle adapter seam",
+          "hits": [
+            {
+              "line": 116,
+              "path": "dharma_swarm/orchestrator.py",
+              "text": "self._runtime_lifecycle = RuntimeLifecycle(self._ledger)"
+            }
+          ],
+          "key": "runtime_lifecycle",
+          "matched": true,
+          "regex": "_runtime_lifecycle"
+        }
+      ],
+      "category": "dispatch",
+      "files": [
+        "dharma_swarm/orchestrator.py"
+      ],
+      "id": "orchestrator_dispatch",
+      "joined_evidence": [
+        {
+          "description": "dispatch attaches identity",
+          "hits": [
+            {
+              "line": 2018,
+              "path": "dharma_swarm/orchestrator.py",
+              "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
+            }
+          ],
+          "key": "ensure_identity",
+          "matched": true,
+          "regex": "ensure_execution_identity"
+        },
+        {
+          "description": "dispatch records task claims",
+          "hits": [
+            {
+              "line": 1768,
+              "path": "dharma_swarm/orchestrator.py",
+              "text": "await self._runtime_lifecycle.record_task_claim("
+            }
+          ],
+          "key": "claim_receipt",
+          "matched": true,
+          "regex": "record_task_claim"
+        },
+        {
+          "description": "dispatch records delegation runs",
+          "hits": [
+            {
+              "line": 1775,
+              "path": "dharma_swarm/orchestrator.py",
+              "text": "await self._runtime_lifecycle.record_delegation_run("
+            }
+          ],
+          "key": "delegation_receipt",
+          "matched": true,
+          "regex": "record_delegation_run"
+        }
+      ],
+      "label": "Orchestrator dispatch path",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/orchestrator.py"
+      ],
+      "priority": 3,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "event table exists",
+          "hits": [
+            {
+              "line": 68,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "CREATE TABLE IF NOT EXISTS events ("
+            }
+          ],
+          "key": "events_table",
+          "matched": true,
+          "regex": "\\bCREATE TABLE IF NOT EXISTS events\\b"
+        }
+      ],
+      "category": "event",
+      "files": [
+        "dharma_swarm/message_bus.py"
+      ],
+      "id": "message_bus_transport",
+      "joined_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 32,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "required identity option exists",
+          "hits": [
+            {
+              "line": 132,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "require_identity: bool = False,"
+            }
+          ],
+          "key": "require_identity",
+          "matched": true,
+          "regex": "require_identity"
+        },
+        {
+          "description": "idempotency is checked before send/emit side effects",
+          "hits": [
+            {
+              "line": 247,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "should_execute = await self._runtime_state.try_begin_idempotent_side_effect("
+            }
+          ],
+          "key": "begin_idempotent",
+          "matched": true,
+          "regex": "try_begin_idempotent_side_effect"
+        },
+        {
+          "description": "idempotency completion is recorded",
+          "hits": [
+            {
+              "line": 293,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "await self._runtime_state.complete_idempotent_side_effect("
+            }
+          ],
+          "key": "complete_idempotent",
+          "matched": true,
+          "regex": "complete_idempotent_side_effect"
+        },
+        {
+          "description": "message consumption receipt exists",
+          "hits": [
+            {
+              "line": 852,
+              "path": "dharma_swarm/message_bus.py",
+              "text": "receipt_type=\"message_consumed\","
+            }
+          ],
+          "key": "message_consumed_receipt",
+          "matched": true,
+          "regex": "message_consumed"
+        }
+      ],
+      "label": "MessageBus internal event transport",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/message_bus.py"
+      ],
+      "priority": 3,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "A2A task model exists",
+          "hits": [
+            {
+              "line": 186,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "class A2ATask:"
+            }
+          ],
+          "key": "a2a_task_model",
+          "matched": true,
+          "regex": "\\bclass A2ATask\\b"
+        }
+      ],
+      "category": "external-agent",
+      "files": [
+        "dharma_swarm/a2a/a2a_server.py"
+      ],
+      "id": "a2a_server_ingress",
+      "joined_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 38,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "runtime store accepted",
+          "hits": [
+            {
+              "line": 37,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "from dharma_swarm.runtime_state import RuntimeReceipt, RuntimeStateStore"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "external A2A task ID maps into identity",
+          "hits": [
+            {
+              "line": 384,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "\"external_a2a_task_id\": result.id,"
+            }
+          ],
+          "key": "a2a_external_id",
+          "matched": true,
+          "regex": "external_a2a_task_id"
+        },
+        {
+          "description": "A2A handler is idempotency-gated",
+          "hits": [
+            {
+              "line": 345,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "if not self._runtime_state.try_begin_idempotent_side_effect_sync("
+            }
+          ],
+          "key": "begin_idempotent",
+          "matched": true,
+          "regex": "try_begin_idempotent_side_effect_sync"
+        },
+        {
+          "description": "A2A task receipt is recorded",
+          "hits": [
+            {
+              "line": 372,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "receipt_type=\"a2a_task\","
+            }
+          ],
+          "key": "a2a_receipt",
+          "matched": true,
+          "regex": "receipt_type=\\\"a2a_task\\\""
+        }
+      ],
+      "label": "A2A task ingress",
+      "legacy_evidence": [
+        {
+          "description": "A2A still keeps a process-local task map",
+          "hits": [
+            {
+              "line": 280,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "self._tasks: dict[str, A2ATask] = {}"
+            }
+          ],
+          "key": "memory_task_store",
+          "matched": true,
+          "regex": "self\\._tasks: dict"
+        },
+        {
+          "description": "A2A still writes a JSONL projection",
+          "hits": [
+            {
+              "line": 43,
+              "path": "dharma_swarm/a2a/a2a_server.py",
+              "text": "_DEFAULT_TASK_LOG = _STATE_DIR / \"a2a\" / \"task_log.jsonl\""
+            }
+          ],
+          "key": "jsonl_task_log",
+          "matched": true,
+          "regex": "task_log\\.jsonl"
+        }
+      ],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/a2a/a2a_server.py"
+      ],
+      "priority": 4,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "artifact store exists",
+          "hits": [
+            {
+              "line": 28,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "class RuntimeArtifactStore:"
+            }
+          ],
+          "key": "artifact_store_class",
+          "matched": true,
+          "regex": "\\bclass RuntimeArtifactStore\\b"
+        }
+      ],
+      "category": "artifact",
+      "files": [
+        "dharma_swarm/artifact_store.py"
+      ],
+      "id": "artifact_store",
+      "joined_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 16,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "required identity option exists",
+          "hits": [
+            {
+              "line": 36,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "require_identity: bool = False,"
+            }
+          ],
+          "key": "require_identity",
+          "matched": true,
+          "regex": "require_identity"
+        },
+        {
+          "description": "artifact intent receipt is recorded",
+          "hits": [
+            {
+              "line": 119,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "def _record_artifact_intent_sync("
+            }
+          ],
+          "key": "artifact_intent",
+          "matched": true,
+          "regex": "_record_artifact_intent_sync"
+        },
+        {
+          "description": "artifact completion receipt is recorded",
+          "hits": [
+            {
+              "line": 139,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "def _record_artifact_complete_sync("
+            }
+          ],
+          "key": "artifact_complete",
+          "matched": true,
+          "regex": "_record_artifact_complete_sync"
+        },
+        {
+          "description": "artifact row is written to RuntimeStateStore",
+          "hits": [
+            {
+              "line": 119,
+              "path": "dharma_swarm/artifact_store.py",
+              "text": "def _record_artifact_intent_sync("
+            }
+          ],
+          "key": "store_artifact",
+          "matched": true,
+          "regex": "record_artifact"
+        }
+      ],
+      "label": "Runtime artifact store",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/artifact_store.py"
+      ],
+      "priority": 4,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 28,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "tool intent receipt is recorded",
+          "hits": [
+            {
+              "line": 199,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "runtime_state.record_side_effect_intent_sync("
+            }
+          ],
+          "key": "intent_receipt",
+          "matched": true,
+          "regex": "record_side_effect_intent_sync"
+        },
+        {
+          "description": "tool completion receipt is recorded",
+          "hits": [
+            {
+              "line": 220,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "runtime_state.record_side_effect_complete_sync("
+            }
+          ],
+          "key": "complete_receipt",
+          "matched": true,
+          "regex": "record_side_effect_complete_sync"
+        }
+      ],
+      "category": "tool",
+      "files": [
+        "dharma_swarm/tool_registry.py"
+      ],
+      "id": "tool_registry_dispatch",
+      "joined_evidence": [
+        {
+          "description": "identity imported",
+          "hits": [
+            {
+              "line": 28,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "required identity option exists",
+          "hits": [
+            {
+              "line": 73,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "require_identity: bool = False,"
+            }
+          ],
+          "key": "require_identity",
+          "matched": true,
+          "regex": "require_identity"
+        },
+        {
+          "description": "tool side effects are idempotency-gated",
+          "hits": [],
+          "key": "begin_idempotent",
+          "matched": false,
+          "regex": "try_begin_idempotent_side_effect"
+        },
+        {
+          "description": "tool completion receipt is recorded",
+          "hits": [
+            {
+              "line": 220,
+              "path": "dharma_swarm/tool_registry.py",
+              "text": "runtime_state.record_side_effect_complete_sync("
+            }
+          ],
+          "key": "complete_receipt",
+          "matched": true,
+          "regex": "record_side_effect_complete_sync"
+        }
+      ],
+      "label": "ToolRegistry side-effect dispatch",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [
+        {
+          "description": "tool side effects are idempotency-gated",
+          "key": "begin_idempotent",
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "path_patterns": [
+        "dharma_swarm/tool_registry.py"
+      ],
+      "priority": 5,
+      "quarantine_evidence": [],
+      "status": "adapter-ready"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "ActionDef declares typed actions",
+          "hits": [
+            {
+              "line": 172,
+              "path": "dharma_swarm/ontology.py",
+              "text": "class ActionDef(BaseModel):"
+            }
+          ],
+          "key": "action_def",
+          "matched": true,
+          "regex": "\\bclass ActionDef\\b"
+        },
+        {
+          "description": "typed action execution chokepoint exists",
+          "hits": [
+            {
+              "line": 774,
+              "path": "dharma_swarm/ontology.py",
+              "text": "def execute_action("
+            }
+          ],
+          "key": "execute_action",
+          "matched": true,
+          "regex": "\\bdef execute_action\\b"
+        },
+        {
+          "description": "modifies contract is declared",
+          "hits": [
+            {
+              "line": 183,
+              "path": "dharma_swarm/ontology.py",
+              "text": "modifies: list[str] = Field(default_factory=list)"
+            }
+          ],
+          "key": "modifies_declared",
+          "matched": true,
+          "regex": "modifies:"
+        },
+        {
+          "description": "approval contract is declared",
+          "hits": [
+            {
+              "line": 185,
+              "path": "dharma_swarm/ontology.py",
+              "text": "requires_approval: bool = False"
+            }
+          ],
+          "key": "approval_declared",
+          "matched": true,
+          "regex": "requires_approval"
+        }
+      ],
+      "category": "ontology",
+      "files": [
+        "dharma_swarm/ontology.py"
+      ],
+      "id": "ontology_action_tollbooth",
+      "joined_evidence": [
+        {
+          "description": "ontology actions receive execution identity",
+          "hits": [
+            {
+              "line": 42,
+              "path": "dharma_swarm/ontology.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "ontology actions write to runtime ledger",
+          "hits": [
+            {
+              "line": 47,
+              "path": "dharma_swarm/ontology.py",
+              "text": "# RuntimeStateStore.record_ontology_action_receipt_sync. Declaring the type here"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "ontology action receipts are recorded",
+          "hits": [
+            {
+              "line": 47,
+              "path": "dharma_swarm/ontology.py",
+              "text": "# RuntimeStateStore.record_ontology_action_receipt_sync. Declaring the type here"
+            }
+          ],
+          "key": "ontology_receipt",
+          "matched": true,
+          "regex": "record_ontology_action_receipt"
+        },
+        {
+          "description": "ActionDef.modifies is read at execution time",
+          "hits": [
+            {
+              "line": 834,
+              "path": "dharma_swarm/ontology.py",
+              "text": "\"modifies\": list(action_def.modifies),"
+            }
+          ],
+          "key": "modifies_enforced",
+          "matched": true,
+          "regex": "action_def\\.modifies"
+        },
+        {
+          "description": "requires_approval is read at execution time",
+          "hits": [
+            {
+              "line": 836,
+              "path": "dharma_swarm/ontology.py",
+              "text": "\"requires_approval\": action_def.requires_approval,"
+            }
+          ],
+          "key": "approval_enforced",
+          "matched": true,
+          "regex": "action_def\\.requires_approval"
+        }
+      ],
+      "label": "Ontology typed action tollbooth",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/ontology.py"
+      ],
+      "priority": 5,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "proposal model exists",
+          "hits": [
+            {
+              "line": 96,
+              "path": "dharma_swarm/evolution.py",
+              "text": "class Proposal(BaseModel):"
+            }
+          ],
+          "key": "proposal_model",
+          "matched": true,
+          "regex": "\\bclass Proposal\\b"
+        },
+        {
+          "description": "gate phase exists",
+          "hits": [
+            {
+              "line": 147,
+              "path": "dharma_swarm/evolution.py",
+              "text": "# as a hard REJECT (see DarwinEngine.gate_check) \u2014 a self-mod proposal must"
+            }
+          ],
+          "key": "gate_check",
+          "matched": true,
+          "regex": "\\bgate_check\\b"
+        },
+        {
+          "description": "apply/test phase exists",
+          "hits": [
+            {
+              "line": 345,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "async def apply_and_test("
+            },
+            {
+              "line": 1258,
+              "path": "dharma_swarm/evolution.py",
+              "text": "candidate, test_results = await self.apply_diff_and_test("
+            }
+          ],
+          "key": "apply_and_test",
+          "matched": true,
+          "regex": "apply_diff_and_test|apply_and_test"
+        },
+        {
+          "description": "rollback path exists",
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "\"\"\"Apply unified diffs to files with rollback and test integration."
+            },
+            {
+              "line": 1049,
+              "path": "dharma_swarm/evolution.py",
+              "text": "return (\"rollback\", \"rollback:apply_or_test\")"
+            },
+            {
+              "line": 435,
+              "path": "dharma_swarm/self_improve.py",
+              "text": "await applier.rollback(apply_result)"
+            }
+          ],
+          "key": "rollback",
+          "matched": true,
+          "regex": "\\brollback\\b"
+        }
+      ],
+      "category": "self-modification",
+      "files": [
+        "dharma_swarm/diff_applier.py",
+        "dharma_swarm/evolution.py",
+        "dharma_swarm/self_improve.py"
+      ],
+      "id": "self_modification_loop",
+      "joined_evidence": [
+        {
+          "description": "self-modification receives execution identity",
+          "hits": [
+            {
+              "line": 20,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "self-modification writes to runtime ledger",
+          "hits": [
+            {
+              "line": 19,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "self-modification receipts are recorded",
+          "hits": [
+            {
+              "line": 252,
+              "path": "dharma_swarm/diff_applier.py",
+              "text": "self._runtime_state.record_self_mod_receipt_sync("
+            }
+          ],
+          "key": "self_mod_receipt",
+          "matched": true,
+          "regex": "record_self_mod_receipt"
+        },
+        {
+          "description": "apply path is idempotency-gated",
+          "hits": [],
+          "key": "begin_idempotent",
+          "matched": false,
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "label": "Self-modification propose/gate/apply/verify loop",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [
+        {
+          "description": "apply path is idempotency-gated",
+          "key": "begin_idempotent",
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "path_patterns": [
+        "dharma_swarm/evolution.py",
+        "dharma_swarm/self_improve.py",
+        "dharma_swarm/diff_applier.py"
+      ],
+      "priority": 6,
+      "quarantine_evidence": [],
+      "status": "adapter-ready"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "workflow identity exists",
+          "hits": [
+            {
+              "line": 102,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "workflow_id: str,"
+            },
+            {
+              "line": 96,
+              "path": "dharma_swarm/workflow.py",
+              "text": "workflow_id: str"
+            }
+          ],
+          "key": "workflow_id",
+          "matched": true,
+          "regex": "workflow_id"
+        },
+        {
+          "description": "checkpointing exists",
+          "hits": [
+            {
+              "line": 12,
+              "path": "dharma_swarm/checkpoint.py",
+              "text": "3. **CheckpointStore** \u2014 filesystem-backed store for checkpoint data."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "\"\"\"Durable execution with crash-recovery checkpointing."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/workflow.py",
+              "text": "\"\"\"Workflow Compiler \u2014 Declarative DAGs with checkpointing."
+            }
+          ],
+          "key": "checkpoint",
+          "matched": true,
+          "regex": "checkpoint"
+        },
+        {
+          "description": "replay harness exists",
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/canonical_replay.py",
+              "text": "\"\"\"Canonical Replay Harness \u2014 proves all mutations are replayable."
+            },
+            {
+              "line": 9,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "- Temporal/Durable Functions: deterministic replay from event log"
+            }
+          ],
+          "key": "replay",
+          "matched": true,
+          "regex": "replay"
+        }
+      ],
+      "category": "checkpoint-replay",
+      "files": [
+        "dharma_swarm/canonical_replay.py",
+        "dharma_swarm/checkpoint.py",
+        "dharma_swarm/durable_execution.py",
+        "dharma_swarm/workflow.py"
+      ],
+      "id": "workflow_checkpoint_replay",
+      "joined_evidence": [
+        {
+          "description": "workflow/checkpoint path receives execution identity",
+          "hits": [
+            {
+              "line": 29,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "workflow/checkpoint path writes to runtime ledger",
+          "hits": [
+            {
+              "line": 28,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "from dharma_swarm.runtime_state import RuntimeStateStore"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "workflow/checkpoint path is ledger-reconstructable",
+          "hits": [
+            {
+              "line": 254,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "self._record_runtime_receipt("
+            }
+          ],
+          "key": "runtime_receipt",
+          "matched": true,
+          "regex": "record_runtime_receipt|get_run_ledger"
+        }
+      ],
+      "label": "Workflow/checkpoint/replay path",
+      "legacy_evidence": [
+        {
+          "description": "filesystem checkpoint state exists",
+          "hits": [
+            {
+              "line": 12,
+              "path": "dharma_swarm/checkpoint.py",
+              "text": "3. **CheckpointStore** \u2014 filesystem-backed store for checkpoint data."
+            },
+            {
+              "line": 233,
+              "path": "dharma_swarm/durable_execution.py",
+              "text": "target = self._persist_dir / \"state.json\""
+            },
+            {
+              "line": 270,
+              "path": "dharma_swarm/workflow.py",
+              "text": "checkpoint_dir: Path | None = None,"
+            }
+          ],
+          "key": "filesystem_checkpoint",
+          "matched": true,
+          "regex": "checkpoint_dir|state\\.json|CheckpointStore"
+        },
+        {
+          "description": "replay uses a separate event log",
+          "hits": [
+            {
+              "line": 71,
+              "path": "dharma_swarm/canonical_replay.py",
+              "text": "from dharma_swarm.event_log import EventLog"
+            }
+          ],
+          "key": "event_log_replay",
+          "matched": true,
+          "regex": "EventLog"
+        }
+      ],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/workflow.py",
+        "dharma_swarm/checkpoint.py",
+        "dharma_swarm/durable_execution.py",
+        "dharma_swarm/canonical_replay.py"
+      ],
+      "priority": 6,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "MCP/tool surface exists",
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/dharma_context_mcp.py",
+              "text": "\"\"\"dharma_swarm Context Engine MCP Server."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/mcp_server.py",
+              "text": "\"\"\"MCP Server \u2014 exposes DHARMA SWARM operations as MCP tools."
+            }
+          ],
+          "key": "mcp_surface",
+          "matched": true,
+          "regex": "MCP|mcp|tool"
+        }
+      ],
+      "category": "tool",
+      "files": [
+        "dharma_swarm/dharma_context_mcp.py",
+        "dharma_swarm/mcp_server.py"
+      ],
+      "id": "mcp_tool_access",
+      "joined_evidence": [
+        {
+          "description": "MCP tools receive execution identity",
+          "hits": [],
+          "key": "identity_import",
+          "matched": false,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "MCP tools write to runtime ledger",
+          "hits": [],
+          "key": "runtime_store",
+          "matched": false,
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "MCP side effects emit receipts",
+          "hits": [],
+          "key": "side_effect_receipt",
+          "matched": false,
+          "regex": "record_side_effect"
+        }
+      ],
+      "label": "MCP/tool access boundary",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [
+        {
+          "description": "MCP tools receive execution identity",
+          "key": "identity_import",
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "MCP tools write to runtime ledger",
+          "key": "runtime_store",
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "MCP side effects emit receipts",
+          "key": "side_effect_receipt",
+          "regex": "record_side_effect"
+        }
+      ],
+      "path_patterns": [
+        "dharma_swarm/mcp_server.py",
+        "dharma_swarm/dharma_context_mcp.py"
+      ],
+      "priority": 7,
+      "quarantine_evidence": [],
+      "status": "adapter-ready"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "NATS terms are present",
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "\"\"\"NATS/JetStream transport adapter for A2A runtime truth."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "\"\"\"Real JetStream live-contact verifier."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "\"\"\"NATS substrate status projection for operator-facing readiness claims."
+            }
+          ],
+          "key": "nats_name_seen",
+          "matched": true,
+          "regex": "NATS|JetStream|nats"
+        }
+      ],
+      "category": "event",
+      "files": [
+        "dharma_swarm/a2a/nats_transport.py",
+        "dharma_swarm/operator_core/nats_live_contact.py",
+        "dharma_swarm/operator_core/nats_substrate_status.py"
+      ],
+      "id": "nats_jetstream_transport",
+      "joined_evidence": [
+        {
+          "description": "NATS/JetStream client code exists",
+          "hits": [
+            {
+              "line": 1,
+              "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "\"\"\"NATS/JetStream transport adapter for A2A runtime truth."
+            },
+            {
+              "line": 1,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "\"\"\"Real JetStream live-contact verifier."
+            },
+            {
+              "line": 6,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "``nats_live_contact`` verifier for a real JetStream publish/consumer ack \u2014 that"
+            }
+          ],
+          "key": "nats_client",
+          "matched": true,
+          "regex": "\\bnats\\b|JetStream"
+        },
+        {
+          "description": "NATS events carry execution identity",
+          "hits": [
+            {
+              "line": 28,
+              "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "NATS receiver is idempotency-gated",
+          "hits": [
+            {
+              "line": 158,
+              "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "if not await self.runtime_state.try_begin_idempotent_side_effect("
+            }
+          ],
+          "key": "begin_idempotent",
+          "matched": true,
+          "regex": "try_begin_idempotent_side_effect"
+        },
+        {
+          "description": "ack/nack contract is visible",
+          "hits": [
+            {
+              "line": 47,
+              "path": "dharma_swarm/a2a/nats_transport.py",
+              "text": "async def ack(self) -> Any:"
+            },
+            {
+              "line": 4,
+              "path": "dharma_swarm/operator_core/nats_live_contact.py",
+              "text": "JetStream publish (and best-effort consumer ack) round-trip and only reports"
+            },
+            {
+              "line": 6,
+              "path": "dharma_swarm/operator_core/nats_substrate_status.py",
+              "text": "``nats_live_contact`` verifier for a real JetStream publish/consumer ack \u2014 that"
+            }
+          ],
+          "key": "ack_contract",
+          "matched": true,
+          "regex": "\\back\\b|\\bnack\\b"
+        }
+      ],
+      "label": "NATS/JetStream event transport",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/nats*.py",
+        "dharma_swarm/**/nats*.py"
+      ],
+      "priority": 8,
+      "quarantine_evidence": [],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [
+        {
+          "description": "stage-result surface exists",
+          "hits": [
+            {
+              "line": 58,
+              "path": "dharma_swarm/opportunity_refill.py",
+              "text": "class StageResult(BaseModel):"
+            }
+          ],
+          "key": "stage_results",
+          "matched": true,
+          "regex": "StageResult"
+        }
+      ],
+      "category": "quarantine",
+      "files": [
+        "dharma_swarm/opportunity_refill.py"
+      ],
+      "id": "opportunity_refill_research_backend",
+      "joined_evidence": [
+        {
+          "description": "opportunity refill carries execution identity",
+          "hits": [
+            {
+              "line": 36,
+              "path": "dharma_swarm/opportunity_refill.py",
+              "text": "from dharma_swarm.spine.identity import ExecutionIdentity"
+            }
+          ],
+          "key": "identity_import",
+          "matched": true,
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "opportunity refill writes to runtime ledger",
+          "hits": [
+            {
+              "line": 8,
+              "path": "dharma_swarm/opportunity_refill.py",
+              "text": "1. A durable RuntimeStateStore task claim + delegation run"
+            }
+          ],
+          "key": "runtime_store",
+          "matched": true,
+          "regex": "RuntimeStateStore"
+        }
+      ],
+      "label": "Opportunity refill research backend",
+      "legacy_evidence": [],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/opportunity_refill.py"
+      ],
+      "priority": 9,
+      "quarantine_evidence": [
+        {
+          "description": "surface has explicit quarantine mode",
+          "hits": [
+            {
+              "line": 14,
+              "path": "dharma_swarm/opportunity_refill.py",
+              "text": "If the backend is unavailable, the stage is quarantined with a clear marker."
+            }
+          ],
+          "key": "quarantine_marker",
+          "matched": true,
+          "regex": "QUARANTINE_MARKER|quarantined"
+        },
+        {
+          "description": "backend can be forced into quarantine",
+          "hits": [
+            {
+              "line": 189,
+              "path": "dharma_swarm/opportunity_refill.py",
+              "text": "sr.error = \"Research backend quarantined by operator (DHARMA_RESEARCH_BACKEND=quarantine)\""
+            }
+          ],
+          "key": "backend_quarantine",
+          "matched": true,
+          "regex": "DHARMA_RESEARCH_BACKEND=quarantine"
+        }
+      ],
+      "status": "joined"
+    },
+    {
+      "adapter_ready_evidence": [],
+      "category": "legacy",
+      "files": [
+        "dharma_swarm/runtime_state.py",
+        "tests/test_runtime_state_invariants.py"
+      ],
+      "id": "legacy_no_identity_escape_hatch",
+      "joined_evidence": [],
+      "label": "Legacy no-identity escape hatch",
+      "legacy_evidence": [
+        {
+          "description": "legacy bypass must stay explicit",
+          "hits": [
+            {
+              "line": 915,
+              "path": "dharma_swarm/runtime_state.py",
+              "text": "\"legacy_no_identity_allowed\": True,"
+            },
+            {
+              "line": 51,
+              "path": "tests/test_runtime_state_invariants.py",
+              "text": "legacy_no_identity_allowed=True,"
+            }
+          ],
+          "key": "legacy_flag",
+          "matched": true,
+          "regex": "legacy_no_identity_allowed"
+        },
+        {
+          "description": "legacy bypass has invariant coverage",
+          "hits": [
+            {
+              "line": 34,
+              "path": "tests/test_runtime_state_invariants.py",
+              "text": "async def test_sync_legacy_helpers_fail_closed_without_identity_unless_flagged("
+            }
+          ],
+          "key": "legacy_tests",
+          "matched": true,
+          "regex": "fail_closed_without_identity_unless_flagged"
+        }
+      ],
+      "missing_joined_patterns": [],
+      "path_patterns": [
+        "dharma_swarm/runtime_state.py",
+        "tests/test_runtime_state_invariants.py"
+      ],
+      "priority": 10,
+      "quarantine_evidence": [],
+      "status": "legacy"
+    }
+  ],
+  "top_saturation_targets": [
+    {
+      "category": "tool",
+      "files": [
+        "dharma_swarm/tool_registry.py"
+      ],
+      "id": "tool_registry_dispatch",
+      "label": "ToolRegistry side-effect dispatch",
+      "missing_joined_patterns": [
+        {
+          "description": "tool side effects are idempotency-gated",
+          "key": "begin_idempotent",
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "status": "adapter-ready"
+    },
+    {
+      "category": "self-modification",
+      "files": [
+        "dharma_swarm/diff_applier.py",
+        "dharma_swarm/evolution.py",
+        "dharma_swarm/self_improve.py"
+      ],
+      "id": "self_modification_loop",
+      "label": "Self-modification propose/gate/apply/verify loop",
+      "missing_joined_patterns": [
+        {
+          "description": "apply path is idempotency-gated",
+          "key": "begin_idempotent",
+          "regex": "try_begin_idempotent_side_effect"
+        }
+      ],
+      "status": "adapter-ready"
+    },
+    {
+      "category": "tool",
+      "files": [
+        "dharma_swarm/dharma_context_mcp.py",
+        "dharma_swarm/mcp_server.py"
+      ],
+      "id": "mcp_tool_access",
+      "label": "MCP/tool access boundary",
+      "missing_joined_patterns": [
+        {
+          "description": "MCP tools receive execution identity",
+          "key": "identity_import",
+          "regex": "ExecutionIdentity"
+        },
+        {
+          "description": "MCP tools write to runtime ledger",
+          "key": "runtime_store",
+          "regex": "RuntimeStateStore"
+        },
+        {
+          "description": "MCP side effects emit receipts",
+          "key": "side_effect_receipt",
+          "regex": "record_side_effect"
+        }
+      ],
+      "status": "adapter-ready"
+    },
+    {
+      "category": "legacy",
+      "files": [
+        "dharma_swarm/runtime_state.py",
+        "tests/test_runtime_state_invariants.py"
+      ],
+      "id": "legacy_no_identity_escape_hatch",
+      "label": "Legacy no-identity escape hatch",
+      "missing_joined_patterns": [],
+      "status": "legacy"
+    }
+  ],
+  "tracked_file_count": 3776
+}
+--- exit_code: 0

@@ -1,0 +1,132 @@
+### memory_kernel_promotion_smoke
+command: make memory-kernel-promotion-smoke
+--- output ---
+PYTHONPATH=. python3 scripts/memory_kernel_write_receipt_smoke.py --repo-root . --fail-on-blocked
+{
+  "allowed_receipt": {
+    "artifact_record_only": true,
+    "created_at": "2026-06-21T14:05:22Z",
+    "digest": "3d8c1a6bb8c80006af3e21656ab0ef3ca979353cc63467549e7bdb734fb1a07c",
+    "mutation_performed": false,
+    "policy_decision": {
+      "append_only": true,
+      "direct_mutation_blocked": false,
+      "outcome": "allow",
+      "reasons": [
+        "append_only_receipt_or_proposal_allowed"
+      ],
+      "target_surface": "memory_kernel.write_receipts"
+    },
+    "receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165",
+    "request": {
+      "proposed_operation": "append_proposal",
+      "reason": "record governed proposal receipt without mutating memory",
+      "reviewer_state": "human_approved",
+      "source_atom_ids": [
+        "memory_atom:write-receipt-smoke"
+      ],
+      "target_surface": "memory_kernel.write_receipts"
+    },
+    "rollback_reference": "memory_kernel_write_rollback:89e45ffb8dd06190e22ba594",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  },
+  "denied_receipt": {
+    "artifact_record_only": true,
+    "created_at": "2026-06-21T14:05:22Z",
+    "digest": "49eaf9d5ab1d9107045547b035fc7da9c2dc462c61c2d8e27061a0e2152fa964",
+    "mutation_performed": false,
+    "policy_decision": {
+      "append_only": false,
+      "direct_mutation_blocked": true,
+      "outcome": "deny",
+      "reasons": [
+        "operation_not_append_only",
+        "direct_memory_or_canon_mutation_blocked"
+      ],
+      "target_surface": "canon.primary"
+    },
+    "receipt_id": "memory_kernel_write_receipt:49eaf9d5ab1d9107045547b0",
+    "request": {
+      "proposed_operation": "update",
+      "reason": "direct canon mutation should be denied",
+      "reviewer_state": "human_approved",
+      "source_atom_ids": [
+        "memory_atom:direct-mutation-smoke"
+      ],
+      "target_surface": "canon.primary"
+    },
+    "rollback_reference": "memory_kernel_write_rollback:2512ebe4f3d8c85ed6c57c4f",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  },
+  "status": {
+    "allowed_receipt_count": 2,
+    "blockers": [],
+    "denied_direct_mutation_count": 2,
+    "denied_receipt_count": 2,
+    "immutable_log": true,
+    "latest_allowed_receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165",
+    "ready": true,
+    "receipt_count": 4,
+    "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+    "schema_version": "memory_kernel_write_receipt.v1"
+  }
+}
+PYTHONPATH=. python3 scripts/memory_kernel_promotion_smoke.py --repo-root . --fail-on-blocked
+{
+  "canonical_receipt": {
+    "artifact_record_only": true,
+    "blockers": [],
+    "canonical_receipt_id": "memory_kernel_canonical_receipt:ebf6a8fad91b951c934f2bc5",
+    "created_at": "2026-06-21T14:05:23Z",
+    "digest": "ebf6a8fad91b951c934f2bc5fd27125f06f4b5a22b2cb5aa2f1d7b806d248c80",
+    "human_approved": true,
+    "mutation_performed": false,
+    "rollback_reference": "memory_kernel_promotion_rollback:8eda12eab2bbe27ba53c1b56",
+    "schema_version": "memory_kernel_reviewed_canonical_receipt.v1",
+    "source_atom_ids": [
+      "memory_atom:write-receipt-smoke"
+    ],
+    "source_decision_id": "",
+    "source_proposal_id": "",
+    "source_write_receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165",
+    "status": "reviewed_canonical_receipt",
+    "target_authority_surface": "",
+    "warnings": [
+      "reviewed_canonical_receipt_only",
+      "no_silent_memory_or_canon_mutation"
+    ]
+  },
+  "decision": {
+    "approved_gates": [
+      "canon_policy_review",
+      "conflict_review",
+      "human_review",
+      "knowledgeops_linking",
+      "privacy_review",
+      "provenance_review"
+    ],
+    "created_at": "2026-06-21T14:05:23Z",
+    "decision": "approve",
+    "decision_id": "memory_kernel_promotion_decision:e4717ba07f3b6d0a372e3d3a",
+    "rationale": "reviewed provenance, conflicts, privacy, and canon policy",
+    "reviewer": "human",
+    "schema_version": "memory_kernel_promotion_decision.v1",
+    "source_decision_id": "",
+    "source_proposal_id": "",
+    "target_authority_surface": "",
+    "write_receipt_id": "memory_kernel_write_receipt:3d8c1a6bb8c80006af3e2165"
+  },
+  "status": {
+    "blocked_receipt_count": 0,
+    "blockers": [],
+    "human_approved_count": 1,
+    "immutable_log": true,
+    "latest_canonical_receipt_id": "memory_kernel_canonical_receipt:ebf6a8fad91b951c934f2bc5",
+    "promotion_ready": true,
+    "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl",
+    "reviewed_receipt_count": 1,
+    "rollback_engaged": false,
+    "schema_version": "memory_kernel_reviewed_canonical_receipt.v1"
+  }
+}
+--- exit_code: 0

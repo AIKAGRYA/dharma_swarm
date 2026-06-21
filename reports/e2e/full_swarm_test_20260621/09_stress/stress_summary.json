@@ -1,0 +1,76 @@
+{
+  "before_pids": [
+    {
+      "pid": 65249,
+      "cmd": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8420 --log-level info --no-access-log"
+    },
+    {
+      "pid": 82846,
+      "cmd": "bash -lc pgrep -af 'uvicorn api.main:app' || true"
+    }
+  ],
+  "after_kill_pids": [
+    {
+      "pid": 82885,
+      "cmd": "bash -lc pgrep -af 'uvicorn api.main:app' || true"
+    }
+  ],
+  "restart_pid": 82888,
+  "health_after_restart": {
+    "path": "/api/health",
+    "method": "GET",
+    "http_status": 200,
+    "elapsed_ms": 12.4,
+    "json": {
+      "status": "ok",
+      "data": {
+        "overall_status": "unknown",
+        "agent_health": [],
+        "anomalies": [],
+        "total_traces": 0,
+        "traces_last_hour": 0,
+        "failure_rate": 0.0,
+        "mean_fitness": null
+      },
+      "error": "",
+      "timestamp": "2026-06-21T14:12:42.389352"
+    },
+    "raw": "{\"status\":\"ok\",\"data\":{\"overall_status\":\"unknown\",\"agent_health\":[],\"anomalies\":[],\"total_traces\":0,\"traces_last_hour\":0,\"failure_rate\":0.0,\"mean_fitness\":null},\"error\":\"\",\"timestamp\":\"2026-06-21T14:12:42.389352\"}"
+  },
+  "before_task_count": 10,
+  "after_task_count": 10,
+  "bad_statuses": {
+    "commands_task_empty": 422,
+    "commands_task_bad_type": 422,
+    "opportunities_dispatch_missing_id": 200,
+    "opportunities_refill_missing_id": 422,
+    "control_surface_bad_lookup": 404
+  },
+  "concurrent_statuses": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+  ],
+  "final_pids": [
+    {
+      "pid": 82888,
+      "cmd": "python -m uvicorn api.main:app --host 127.0.0.1 --port 8420"
+    },
+    {
+      "pid": 83437,
+      "cmd": "bash -lc pgrep -af 'uvicorn api.main:app' || true"
+    }
+  ]
+}

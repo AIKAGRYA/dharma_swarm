@@ -286,3 +286,63 @@ Future appends should cite their source in the `evidence` field with file:line w
 ---
 
 *Append, do not rewrite. The register persists. Each item carries its own age. Closure requires evidence, not declaration.*
+
+
+---
+
+## Full Swarm E2E findings appended 2026-06-21
+
+### BR-023 — `run_operator.sh --background` readiness falsely depends on `lsof`
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** runtime
+- **root_cause:** Launcher readiness check shells to `lsof`; this environment lacks `lsof`, so the script reports failure even though uvicorn starts.
+- **blast_radius:** Operators can believe the backend failed when `/api/health` is already reachable, causing duplicate restarts and confusing process state.
+- **evidence:** `reports/e2e/full_swarm_test_20260621/02_operator/operator_start.txt`; `reports/e2e/full_swarm_test_20260621/02_operator/operator_readiness_bug_evidence.txt`; `reports/e2e/full_swarm_test_20260621/02_operator/api_health.json`; `reports/e2e/full_swarm_test_20260621/09_stress/STRESS_REPORT.md`.
+- **status:** OPEN
+
+### BR-024 — Dashboard OpenAPI generated types drift from committed client
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** dashboard
+- **root_cause:** `npm --prefix dashboard run gen:types:check` generated `/tmp/api-generated.check.ts` that differs from committed `dashboard/src/lib/api-generated.ts`.
+- **blast_radius:** Dashboard can build while its generated API client is stale relative to the live backend schema.
+- **evidence:** `reports/e2e/full_swarm_test_20260621/03_dashboard/npm_gen_types_check.txt`; `reports/e2e/full_swarm_test_20260621/03_dashboard/DASHBOARD_TEST_REPORT.md`.
+- **status:** OPEN
+
+### BR-025 — Opportunity dispatch accepts missing `id` as successful work
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** runtime/api
+- **root_cause:** `POST /api/opportunities/dispatch` does not reject a payload without `id`; it returns HTTP 200 and creates six successful stage tasks.
+- **blast_radius:** Bad producer payloads can create durable work under an implicit/empty id, making receipts and idempotency ambiguous.
+- **evidence:** `reports/e2e/full_swarm_test_20260621/05_spine/opportunity_malformed_missing_id.json`; `reports/e2e/full_swarm_test_20260621/09_stress/malformed_input_responses.json`; `reports/e2e/full_swarm_test_20260621/05_spine/SPINE_TRUTH_REPORT.md`.
+- **status:** OPEN
+
+### BR-026 — Memory readiness contract fails while projection partially works
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** memory
+- **root_cause:** `make memory-kernel-readiness`, strict readiness, `operator-prod-smoke`, and burn-in exit non-zero; operator-prod-smoke reports missing readiness contract fields and knowledgeops bridge blockers.
+- **blast_radius:** Control surface can show memory rows while the deeper readiness contract is false, risking overconfidence in memory participation.
+- **evidence:** `reports/e2e/full_swarm_test_20260621/06_memory/MEMORY_KERNEL_REPORT.md`; `reports/e2e/full_swarm_test_20260621/06_memory/operator_prod_smoke.txt`; `reports/e2e/full_swarm_test_20260621/06_memory/memory_control_surface_rows.json`.
+- **status:** OPEN
+
+### BR-027 — DocOps/generated inventory stale against current repo/report state
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** STALE
+- **domain:** docs
+- **root_cause:** `docs/docops/AUTO_INVENTORY.md` and assertion counts lag current tracked Python/test/Markdown file counts.
+- **blast_radius:** `make docops-report`, `make docops-integrity`, `make governance-all`, and `make agent-build-closeout` fail until generated inventory is refreshed by the owner script.
+- **evidence:** `reports/e2e/full_swarm_test_20260621/10_closeout/GOVERNANCE_CLOSEOUT_REPORT.md`; `reports/e2e/full_swarm_test_20260621/10_closeout/closeout_failure_lines.json`.
+- **status:** OPEN

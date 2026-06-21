@@ -1,0 +1,10 @@
+[
+  {
+    "pid": 65249,
+    "cmd": "/home/ubuntu/repos/dharma-swarm/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8420 --log-level info --no-access-log"
+  },
+  {
+    "pid": 82846,
+    "cmd": "bash -lc pgrep -af 'uvicorn api.main:app' || true"
+  }
+]

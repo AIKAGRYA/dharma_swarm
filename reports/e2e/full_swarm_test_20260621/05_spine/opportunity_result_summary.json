@@ -1,0 +1,56 @@
+{
+  "opportunity_dispatch.json": {
+    "http": 200,
+    "result_count": 6,
+    "all_success": true,
+    "task_ids": [
+      "task_6b2cc008c3554a31",
+      "task_5619cbb5a05e466e",
+      "task_8a0a1c61f3aa4b1b",
+      "task_d431ab8def1b434b",
+      "task_1feb9ef008b14d0e",
+      "task_68ae55d7f5214049"
+    ]
+  },
+  "opportunity_dispatch_repeat_same_id.json": {
+    "http": 200,
+    "result_count": 6,
+    "all_success": true,
+    "task_ids": [
+      "task_6b8461b5a81b45db",
+      "task_344e76dd72e44a45",
+      "task_e8b23d0a6a1e4bff",
+      "task_2f01fc60fb414650",
+      "task_fbe1970c775142c2",
+      "task_2fa61859bbde4c10"
+    ]
+  },
+  "opportunity_refill.json": {
+    "http": 200,
+    "stage_count": 6,
+    "statuses": [
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed",
+      "completed"
+    ],
+    "total_provider_cost_usd": 0.23,
+    "total_net_value_usd": 999.77,
+    "revenue_packet": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/.e2e_state/full_swarm_test_20260621/home/.dharma/revenue_packets/revenue_packet_deep-e2e-refill-20260621.md"
+  },
+  "opportunity_malformed_missing_id.json": {
+    "http": 200,
+    "result_count": 6,
+    "all_success": true,
+    "task_ids": [
+      "task_2371bbe2457a4627",
+      "task_b376891718c04bf9",
+      "task_a6d4927a1ece4df9",
+      "task_f5ddd9c20e024fb5",
+      "task_bf9b6e709dda4da1",
+      "task_6849a3a449ab4053"
+    ]
+  }
+}

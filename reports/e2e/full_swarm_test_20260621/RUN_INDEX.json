@@ -1,0 +1,104 @@
+{
+  "run_id": "full_swarm_test_20260621",
+  "date": "2026-06-21",
+  "branch": "devin/full-swarm-e2e-test-20260621",
+  "commit": "726bc9d4d4add60c46f102d1ceee3a065c474892",
+  "state_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/.e2e_state/full_swarm_test_20260621",
+  "recording": "reports/e2e/full_swarm_test_20260621/03_dashboard/dashboard_gauntlet_recording.mp4",
+  "reports_generated": [
+    "reports/e2e/full_swarm_test_20260621/00_preflight/PREFLIGHT_SUMMARY.md",
+    "reports/e2e/full_swarm_test_20260621/01_map/ORGAN_SURFACE_MAP.md",
+    "reports/e2e/full_swarm_test_20260621/02_operator/OPERATOR_BOOT_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/03_dashboard/DASHBOARD_TEST_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/04_mission/DARSHAN_FIRST_READER_ARTIFACT.md",
+    "reports/e2e/full_swarm_test_20260621/04_mission/MISSION_RUN_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/05_spine/SPINE_TRUTH_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/05_spine/revenue_packet_deep-e2e-refill-20260621.md",
+    "reports/e2e/full_swarm_test_20260621/06_memory/MEMORY_KERNEL_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/07_a2a/A2A_NATS_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/08_dgc/DGC_SELF_EVOLUTION_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/09_stress/STRESS_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/10_closeout/GOVERNANCE_CLOSEOUT_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/MASTER_REPORT.md",
+    "reports/e2e/full_swarm_test_20260621/TEST_PLAN.md"
+  ],
+  "file_count_under_run_root": 131,
+  "endpoints_hit": [
+    "/api/health",
+    "/api/overview",
+    "/openapi.json",
+    "/api/control-surface/summary",
+    "/api/control-surface/rows",
+    "/api/control-surface/stream",
+    "/api/control-surface/*/cards",
+    "/api/commands/task",
+    "/api/commands/dispatch",
+    "/api/commands/tasks",
+    "/api/opportunities/stages",
+    "/api/opportunities/dispatch",
+    "/api/opportunities/refill"
+  ],
+  "assertion_counts": {
+    "passed": 31,
+    "degraded": 14,
+    "failed": 8,
+    "untested": 1
+  },
+  "new_findings": [
+    {
+      "id": "BR-023",
+      "severity": "DEGRADED",
+      "domain": "runtime",
+      "summary": "`run_operator.sh --background` can falsely report failure when `lsof` is missing even though uvicorn starts and `/api/health` returns 200."
+    },
+    {
+      "id": "BR-024",
+      "severity": "DEGRADED",
+      "domain": "dashboard",
+      "summary": "Dashboard OpenAPI generated types drift from committed `dashboard/src/lib/api-generated.ts`."
+    },
+    {
+      "id": "BR-025",
+      "severity": "DEGRADED",
+      "domain": "runtime/api",
+      "summary": "`POST /api/opportunities/dispatch` with missing `id` returns HTTP 200 and creates six stage tasks instead of explicit validation failure."
+    },
+    {
+      "id": "BR-026",
+      "severity": "DEGRADED",
+      "domain": "memory",
+      "summary": "Memory readiness/operator-prod smoke fail while some memory write/promotion smokes pass; control surface projects 13 memory rows but readiness contracts are incomplete."
+    },
+    {
+      "id": "BR-027",
+      "severity": "STALE",
+      "domain": "docs",
+      "summary": "DocOps inventory/assertions are stale after current repo/report state; `make docops-integrity` and aggregate closeout fail with generated-count drift."
+    }
+  ],
+  "files_changed_expected": [
+    "reports/e2e/full_swarm_test_20260621/**",
+    "docs/state/LIVE_OPS_DASHBOARD.md",
+    "docs/state/BROKEN_REGISTER.md"
+  ],
+  "recommended_next_actions": [
+    "Fix opportunity dispatch request validation for missing id",
+    "Regenerate/update dashboard OpenAPI types or reconcile API schema drift",
+    "Make run_operator readiness check portable when lsof is unavailable",
+    "Repair memory readiness contract fields surfaced by operator-prod-smoke",
+    "Regenerate DocOps auto inventory through owner script before merging reports"
+  ],
+  "phase_reports": [
+    "00_preflight/PREFLIGHT_SUMMARY.md",
+    "01_map/ORGAN_SURFACE_MAP.md",
+    "02_operator/OPERATOR_BOOT_REPORT.md",
+    "03_dashboard/DASHBOARD_TEST_REPORT.md",
+    "04_mission/MISSION_RUN_REPORT.md",
+    "05_spine/SPINE_TRUTH_REPORT.md",
+    "06_memory/MEMORY_KERNEL_REPORT.md",
+    "07_a2a/A2A_NATS_REPORT.md",
+    "08_dgc/DGC_SELF_EVOLUTION_REPORT.md",
+    "09_stress/STRESS_REPORT.md",
+    "10_closeout/GOVERNANCE_CLOSEOUT_REPORT.md"
+  ]
+}

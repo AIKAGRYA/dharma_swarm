@@ -1,0 +1,1667 @@
+### memory_kernel_readiness_strict
+command: make memory-kernel-readiness-strict
+--- output ---
+PYTHONPATH=. python3 scripts/memory_kernel_readiness.py --repo-root . --dry-run --strict --fail-on-missing-adapter
+{
+  "schema_version": "memory_kernel_readiness.v1",
+  "status": "unavailable",
+  "summary": {
+    "accounted_optional_absent_count": 13,
+    "accounted_optional_count": 76,
+    "accounted_optional_lifecycle_count": 16,
+    "accounted_surface_count": 83,
+    "adapter_registered_count": 83,
+    "degraded_count": 0,
+    "disabled_count": 3,
+    "dormant_count": 0,
+    "expected_adapter_registered_count": 7,
+    "expected_adapter_surface_count": 7,
+    "expected_unavailable_count": 5,
+    "external_count": 0,
+    "missing_adapter_count": 0,
+    "missing_required_surface_count": 0,
+    "observed_surface_count": 83,
+    "optional_missing_adapter_count": 0,
+    "optional_surface_count": 76,
+    "optional_uncovered_count": 0,
+    "optional_warning_count": 50,
+    "ready_count": 3,
+    "required_adapter_registered_count": 7,
+    "required_failure_count": 4,
+    "required_ready_count": 3,
+    "required_surface_count": 7,
+    "retired_count": 1,
+    "snapshot_count": 6,
+    "surface_count": 83,
+    "total_degraded_count": 0,
+    "total_missing_adapter_count": 0,
+    "total_ready_count": 13,
+    "total_unavailable_count": 54,
+    "total_uncovered_count": 0,
+    "total_warning_count": 54,
+    "unavailable_count": 4,
+    "uncovered_count": 0,
+    "unsafe_disabled_count": 1,
+    "warning_count": 4
+  },
+  "surfaces": [
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.active_inference",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.agent_homes",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.agent_interop",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.agent_memory",
+      "warnings": []
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.agent_memory_db",
+      "warnings": []
+    },
+    {
+      "active_status": "expected_unavailable",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "expected_unavailable",
+      "surface_exists": false,
+      "surface_id": "home.alerts",
+      "warnings": []
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.algedonic_signals",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.artifacts",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.bridges",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.campaigns",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "disabled",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "disabled",
+      "surface_exists": false,
+      "surface_id": "home.citations",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.claude_agent_memory",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.claude_cabinet",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.claude_hooks",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.claude_projects",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.claude_root",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "codex_memory_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "external_memory"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": true,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.codex_memory",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.control",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "conversation_log_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": true,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.conversation_log",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.conversations",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.cost_log",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.costs",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.cron",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "expected_unavailable",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "expected_unavailable",
+      "surface_exists": false,
+      "surface_id": "home.custodians",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.dharma_graphs",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.dharma_root",
+      "warnings": []
+    },
+    {
+      "active_status": "disabled",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "disabled",
+      "surface_exists": false,
+      "surface_id": "home.distilled",
+      "warnings": []
+    },
+    {
+      "active_status": "disabled",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "disabled",
+      "surface_exists": false,
+      "surface_id": "home.ecosystem_index",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.evals",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.evolution",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": false,
+      "surface_id": "home.frontier_council",
+      "warnings": []
+    },
+    {
+      "active_status": "expected_unavailable",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "expected_unavailable",
+      "surface_exists": false,
+      "surface_id": "home.gaia_ledger",
+      "warnings": []
+    },
+    {
+      "active_status": "expected_unavailable",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "expected_unavailable",
+      "surface_exists": false,
+      "surface_id": "home.gaia_platform",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.ginko",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "expected_unavailable",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "expected_unavailable",
+      "surface_exists": false,
+      "surface_id": "home.hibernation",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.holon_agents",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.interop",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.jikoku",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.kaizen_ops",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_extracts",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_quarantine",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_root",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_staging",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_store",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "knowledge_wiki_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "knowledge_card",
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": true,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.knowledge_wiki",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.lancedb",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": false,
+      "surface_id": "home.m5_handoff",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.memory_db",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "memory_plane_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "episode",
+        "fact",
+        "retrieval_feedback",
+        "runtime_event",
+        "source_chunk"
+      ],
+      "path_type": "missing",
+      "read_mode": "immutable_snapshot",
+      "record_count": null,
+      "required": true,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.memory_plane",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.messages",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.meta",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.meta_concept_graph",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.ontology",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.organism_memory",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.population",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.psmv",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.quality_gates",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.revenue_intel",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.router_audit_log",
+      "warnings": []
+    },
+    {
+      "active_status": "retired",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "retired",
+      "surface_exists": false,
+      "surface_id": "home.routing_memory",
+      "warnings": []
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "read_only",
+      "adapter_name": "runtime_state_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "context_bundle",
+        "edge",
+        "fact",
+        "runtime_event"
+      ],
+      "path_type": "file",
+      "read_mode": "immutable_snapshot",
+      "record_count": null,
+      "required": true,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.runtime_state",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.semantic_concept_graph",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.sessions",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.shared",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "smriti_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "external_memory"
+      ],
+      "path_type": "missing",
+      "read_mode": "immutable_snapshot",
+      "record_count": null,
+      "required": true,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.smriti",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.state_knowledge",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.stigmergy",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.subconscious",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.telos",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.temporal_graph",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.terminal_supervisor",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.terminal_tui",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.terminal_tui_session_log",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": false,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.traces",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.training",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.vectors",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "active",
+      "adapter_mode": "streaming",
+      "adapter_name": "witness_jsonl_adapter",
+      "adapter_registered": true,
+      "adapter_version": "read_only.v2",
+      "atom_types": [
+        "witness_event"
+      ],
+      "path_type": "directory",
+      "read_mode": "streaming",
+      "record_count": null,
+      "required": true,
+      "status": "ready",
+      "surface_exists": true,
+      "surface_id": "home.witness",
+      "warnings": []
+    },
+    {
+      "active_status": "missing",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unavailable",
+      "surface_exists": false,
+      "surface_id": "home.workspace",
+      "warnings": [
+        "surface_missing"
+      ]
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "directory",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": true,
+      "surface_id": "repo.dharma_root",
+      "warnings": []
+    },
+    {
+      "active_status": "unsafe",
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unsafe_disabled",
+      "surface_exists": false,
+      "surface_id": "repo.literal_tilde_dharma",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": true,
+      "surface_id": "repo.memory_plane",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": true,
+      "surface_id": "repo.runtime_state",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": false,
+      "surface_id": "repo.swarm_memory",
+      "warnings": []
+    }
+  ],
+  "warnings": [
+    "home.codex_memory:surface_missing",
+    "home.knowledge_wiki:surface_missing",
+    "home.memory_plane:surface_missing",
+    "home.smriti:surface_missing"
+  ]
+}
+make: *** [Makefile:344: memory-kernel-readiness-strict] Error 5
+--- exit_code: 2

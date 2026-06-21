@@ -1,0 +1,151 @@
+{
+  "http_status": 200,
+  "raw": "{\"schema_version\":\"0.2.0\",\"request_id\":\"30ae0158-51fd-41fb-b3fd-167af6129265\",\"generated_at\":\"2026-06-21T13:51:59.110516+00:00\",\"source_errors\":[],\"freshness_window\":\"\",\"data\":{\"receipt_root\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts\",\"model\":null,\"verdict\":null,\"card_count\":2,\"cards\":[{\"id\":\"semr_receipt_ollama_glm5_8291_v1\",\"parent_objective\":\"semantic_receipts\",\"title\":\"SemanticReceipt ollama/glm-5:cloud: approve\",\"body\":\"receipt_id: receipt_ollama_glm5_8291_v1\\nverdict: approve\\nprovider: ollama\\nmodel: glm-5:cloud\\nconfidence: 0.98\\ncapability_match: 1.0\\nauthored_by_model: True\\nsemantic_reply_claim: True\\npeer_model_processed_claim: True\\nreview_target: semantic-receipt-runner-v7-goal\",\"status\":\"review\",\"claim_lease\":null,\"assignee_kind\":\"daemon\",\"capability_required\":[\"semantic_receipt\",\"model_critic\",\"agentops\"],\"acceptance_criteria\":[{\"id\":\"semantic_receipt_validates\",\"text\":\"SemanticReceipt artifact passes executable v1 validation or records validation failure explicitly\",\"kind\":\"test\",\"required\":true,\"verifier\":\"dharma_swarm.operator_core.semantic_receipt.validate_semantic_receipt\",\"evidence_ref\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json\"},{\"id\":\"semantic_claim_model_authored\",\"text\":\"semantic_reply_claim is true only for model-authored validated artifacts\",\"kind\":\"receipt\",\"required\":true,\"verifier\":\"scripts/runtime/model_critic_runner.py\",\"evidence_ref\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json\"}],\"receipt_refs\":[{\"receipt_id\":\"semantic_receipt:receipt_ollama_glm5_8291_v1\",\"kind\":\"semantic_receipt\",\"store\":\"external\",\"uri\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json\",\"checksum\":\"sha256:4143b945966f47f4bae1f63e3747fa1f0abdcd208cfa8e01e27950a14eea9077\",\"created_at\":\"2026-06-11T16:23:52Z\",\"summary\":\"The proposal to build SemanticReceipt v1 and the model critic runner is validated. The strongest risk involves incorrect integration with AgentOps or BoardStore, potentially creating 'dark' artifacts that bypass the control surface. The implementation must narrowly focus on the receipt schema and runner logic while rigorously enforcing 'not_claimed_agents' validation to prevent identity spoofing.\"}],\"cost_ceiling_usd\":\"0.00\",\"audit_log\":[],\"version\":1,\"idempotency_key\":\"semantic_receipt:sha256:23d5613e142b69f523eaff79f4fff4b9100489b743c6a7b96378268db5bae46b\",\"arjuna_weight\":0.51,\"created_by\":\"codex_composer\",\"created_at\":\"2026-06-11T16:23:52Z\",\"updated_at\":\"2026-06-11T16:23:52Z\",\"last_transitioned_at\":\"2026-06-11T16:23:52Z\",\"source_surface\":\"operator_bridge\",\"render_hints\":{\"view_priority\":0,\"color_key\":\"\",\"icon_key\":\"\",\"column_hint\":\"review\",\"lane_hint\":\"semantic_receipts\",\"thread_hint\":\"semantic-receipt-runner-v7-goal\",\"map_node_kind\":\"semantic_receipt\"}},{\"id\":\"semr_semr_f2db898f66a8421cb0b8705a539c340a\",\"parent_objective\":\"semantic_receipts\",\"title\":\"SemanticReceipt unavailable/missing-model: blocked\",\"body\":\"receipt_id: semr_f2db898f66a8421cb0b8705a539c340a\\nverdict: blocked\\nprovider: unavailable\\nmodel: missing-model\\nconfidence: 0.0\\ncapability_match: 0.0\\nauthored_by_model: False\\nsemantic_reply_claim: False\\npeer_model_processed_claim: False\\nfailure_type: provider_unavailable\\nfailure_reason: RuntimeError: provider is not supported by this runner: unavailable\\nexplicit_disagreement: RuntimeError: provider is not supported by this runner: unavailable\\nreview_target: semantic-receipt-runner-v7-provider-failure-smoke\",\"status\":\"blocked\",\"claim_lease\":null,\"assignee_kind\":\"daemon\",\"capability_required\":[\"semantic_receipt\",\"model_critic\",\"agentops\"],\"acceptance_criteria\":[{\"id\":\"semantic_receipt_validates\",\"text\":\"SemanticReceipt artifact passes executable v1 validation or records validation failure explicitly\",\"kind\":\"test\",\"required\":true,\"verifier\":\"dharma_swarm.operator_core.semantic_receipt.validate_semantic_receipt\",\"evidence_ref\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json\"},{\"id\":\"semantic_claim_model_authored\",\"text\":\"semantic_reply_claim is true only for model-authored validated artifacts\",\"kind\":\"receipt\",\"required\":true,\"verifier\":\"scripts/runtime/model_critic_runner.py\",\"evidence_ref\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json\"},{\"id\":\"provider_failure_typed\",\"text\":\"Provider or validation failure is recorded with failure_type and failure_reason\",\"kind\":\"receipt\",\"required\":true,\"verifier\":\"provider_unavailable\",\"evidence_ref\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json\"}],\"receipt_refs\":[{\"receipt_id\":\"semantic_receipt:semr_f2db898f66a8421cb0b8705a539c340a\",\"kind\":\"semantic_receipt\",\"store\":\"external\",\"uri\":\"/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json\",\"checksum\":\"sha256:39243fef2eb5f148e0af217fab6f94f2f5499318e27afcda51fbf0ac0c40ea05\",\"created_at\":\"2026-06-11T16:25:43Z\",\"summary\":\"Model critic runner could not produce a validated semantic receipt: provider_unavailable\"}],\"cost_ceiling_usd\":\"0.00\",\"audit_log\":[],\"version\":1,\"idempotency_key\":\"semantic_receipt:sha256:217203de473c2136bcb6bc56c5b38f604e2ac97b53e092037ef5966d0adac51b\",\"arjuna_weight\":0.95,\"created_by\":\"codex_composer\",\"created_at\":\"2026-06-11T16:25:43Z\",\"updated_at\":\"2026-06-11T16:25:43Z\",\"last_transitioned_at\":\"2026-06-11T16:25:43Z\",\"source_surface\":\"operator_bridge\",\"render_hints\":{\"view_priority\":0,\"color_key\":\"\",\"icon_key\":\"\",\"column_hint\":\"blocked\",\"lane_hint\":\"semantic_receipts\",\"thread_hint\":\"semantic-receipt-runner-v7-provider-failure-smoke\",\"map_node_kind\":\"semantic_receipt\"}}]}}",
+  "json": {
+    "schema_version": "0.2.0",
+    "request_id": "30ae0158-51fd-41fb-b3fd-167af6129265",
+    "generated_at": "2026-06-21T13:51:59.110516+00:00",
+    "source_errors": [],
+    "freshness_window": "",
+    "data": {
+      "receipt_root": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts",
+      "model": null,
+      "verdict": null,
+      "card_count": 2,
+      "cards": [
+        {
+          "id": "semr_receipt_ollama_glm5_8291_v1",
+          "parent_objective": "semantic_receipts",
+          "title": "SemanticReceipt ollama/glm-5:cloud: approve",
+          "body": "receipt_id: receipt_ollama_glm5_8291_v1\nverdict: approve\nprovider: ollama\nmodel: glm-5:cloud\nconfidence: 0.98\ncapability_match: 1.0\nauthored_by_model: True\nsemantic_reply_claim: True\npeer_model_processed_claim: True\nreview_target: semantic-receipt-runner-v7-goal",
+          "status": "review",
+          "claim_lease": null,
+          "assignee_kind": "daemon",
+          "capability_required": [
+            "semantic_receipt",
+            "model_critic",
+            "agentops"
+          ],
+          "acceptance_criteria": [
+            {
+              "id": "semantic_receipt_validates",
+              "text": "SemanticReceipt artifact passes executable v1 validation or records validation failure explicitly",
+              "kind": "test",
+              "required": true,
+              "verifier": "dharma_swarm.operator_core.semantic_receipt.validate_semantic_receipt",
+              "evidence_ref": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json"
+            },
+            {
+              "id": "semantic_claim_model_authored",
+              "text": "semantic_reply_claim is true only for model-authored validated artifacts",
+              "kind": "receipt",
+              "required": true,
+              "verifier": "scripts/runtime/model_critic_runner.py",
+              "evidence_ref": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json"
+            }
+          ],
+          "receipt_refs": [
+            {
+              "receipt_id": "semantic_receipt:receipt_ollama_glm5_8291_v1",
+              "kind": "semantic_receipt",
+              "store": "external",
+              "uri": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json",
+              "checksum": "sha256:4143b945966f47f4bae1f63e3747fa1f0abdcd208cfa8e01e27950a14eea9077",
+              "created_at": "2026-06-11T16:23:52Z",
+              "summary": "The proposal to build SemanticReceipt v1 and the model critic runner is validated. The strongest risk involves incorrect integration with AgentOps or BoardStore, potentially creating 'dark' artifacts that bypass the control surface. The implementation must narrowly focus on the receipt schema and runner logic while rigorously enforcing 'not_claimed_agents' validation to prevent identity spoofing."
+            }
+          ],
+          "cost_ceiling_usd": "0.00",
+          "audit_log": [],
+          "version": 1,
+          "idempotency_key": "semantic_receipt:sha256:23d5613e142b69f523eaff79f4fff4b9100489b743c6a7b96378268db5bae46b",
+          "arjuna_weight": 0.51,
+          "created_by": "codex_composer",
+          "created_at": "2026-06-11T16:23:52Z",
+          "updated_at": "2026-06-11T16:23:52Z",
+          "last_transitioned_at": "2026-06-11T16:23:52Z",
+          "source_surface": "operator_bridge",
+          "render_hints": {
+            "view_priority": 0,
+            "color_key": "",
+            "icon_key": "",
+            "column_hint": "review",
+            "lane_hint": "semantic_receipts",
+            "thread_hint": "semantic-receipt-runner-v7-goal",
+            "map_node_kind": "semantic_receipt"
+          }
+        },
+        {
+          "id": "semr_semr_f2db898f66a8421cb0b8705a539c340a",
+          "parent_objective": "semantic_receipts",
+          "title": "SemanticReceipt unavailable/missing-model: blocked",
+          "body": "receipt_id: semr_f2db898f66a8421cb0b8705a539c340a\nverdict: blocked\nprovider: unavailable\nmodel: missing-model\nconfidence: 0.0\ncapability_match: 0.0\nauthored_by_model: False\nsemantic_reply_claim: False\npeer_model_processed_claim: False\nfailure_type: provider_unavailable\nfailure_reason: RuntimeError: provider is not supported by this runner: unavailable\nexplicit_disagreement: RuntimeError: provider is not supported by this runner: unavailable\nreview_target: semantic-receipt-runner-v7-provider-failure-smoke",
+          "status": "blocked",
+          "claim_lease": null,
+          "assignee_kind": "daemon",
+          "capability_required": [
+            "semantic_receipt",
+            "model_critic",
+            "agentops"
+          ],
+          "acceptance_criteria": [
+            {
+              "id": "semantic_receipt_validates",
+              "text": "SemanticReceipt artifact passes executable v1 validation or records validation failure explicitly",
+              "kind": "test",
+              "required": true,
+              "verifier": "dharma_swarm.operator_core.semantic_receipt.validate_semantic_receipt",
+              "evidence_ref": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json"
+            },
+            {
+              "id": "semantic_claim_model_authored",
+              "text": "semantic_reply_claim is true only for model-authored validated artifacts",
+              "kind": "receipt",
+              "required": true,
+              "verifier": "scripts/runtime/model_critic_runner.py",
+              "evidence_ref": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json"
+            },
+            {
+              "id": "provider_failure_typed",
+              "text": "Provider or validation failure is recorded with failure_type and failure_reason",
+              "kind": "receipt",
+              "required": true,
+              "verifier": "provider_unavailable",
+              "evidence_ref": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json"
+            }
+          ],
+          "receipt_refs": [
+            {
+              "receipt_id": "semantic_receipt:semr_f2db898f66a8421cb0b8705a539c340a",
+              "kind": "semantic_receipt",
+              "store": "external",
+              "uri": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json",
+              "checksum": "sha256:39243fef2eb5f148e0af217fab6f94f2f5499318e27afcda51fbf0ac0c40ea05",
+              "created_at": "2026-06-11T16:25:43Z",
+              "summary": "Model critic runner could not produce a validated semantic receipt: provider_unavailable"
+            }
+          ],
+          "cost_ceiling_usd": "0.00",
+          "audit_log": [],
+          "version": 1,
+          "idempotency_key": "semantic_receipt:sha256:217203de473c2136bcb6bc56c5b38f604e2ac97b53e092037ef5966d0adac51b",
+          "arjuna_weight": 0.95,
+          "created_by": "codex_composer",
+          "created_at": "2026-06-11T16:25:43Z",
+          "updated_at": "2026-06-11T16:25:43Z",
+          "last_transitioned_at": "2026-06-11T16:25:43Z",
+          "source_surface": "operator_bridge",
+          "render_hints": {
+            "view_priority": 0,
+            "color_key": "",
+            "icon_key": "",
+            "column_hint": "blocked",
+            "lane_hint": "semantic_receipts",
+            "thread_hint": "semantic-receipt-runner-v7-provider-failure-smoke",
+            "map_node_kind": "semantic_receipt"
+          }
+        }
+      ]
+    }
+  }
+}

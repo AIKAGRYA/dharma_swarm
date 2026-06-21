@@ -1,0 +1,1022 @@
+[
+  {
+    "id": "memory.census",
+    "kind": "memory_census",
+    "label": "MemoryKernel Surface Census",
+    "authority_role": "projection",
+    "declared_state": "registered_surface_snapshot",
+    "desired_state": "deep_census_when_needed",
+    "observed_state": "registered=83 existing_path_templates=16",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/census.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "surface_specs=83 existing_path_templates=16",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971539+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "surface_specs",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "surface_specs=83 existing_path_templates=16"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/surfaces.py",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/census.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/surfaces.py",
+      "dharma_swarm/memory_kernel/census.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+      "surface_count": 83,
+      "existing_path_template_count": 16,
+      "home": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/.e2e_state/full_swarm_test_20260621/home",
+      "home_source": "path_home_default"
+    }
+  },
+  {
+    "id": "memory.adapter_coverage",
+    "kind": "memory_adapter",
+    "label": "MemoryKernel Adapter Coverage",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "existing_surfaces_have_read_adapters",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/facade.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971577+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.adapter_coverage",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/facade.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/facade.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.writer_sentinel",
+    "kind": "memory_writer",
+    "label": "Memory Writer Sentinel",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "no_action_required_bypasses",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/writer_sentinel.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971617+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.writer_sentinel",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/writer_sentinel.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/writer_sentinel.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.context_shadow",
+    "kind": "memory_context",
+    "label": "MemoryKernel Context Shadow",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "observe_without_prompt_injection",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/context.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971652+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.context_shadow",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/context.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/context.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.context_canary",
+    "kind": "memory_context",
+    "label": "MemoryKernel Context Canary Failure Projection",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "unsafe_context_failures_are_visible",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/context_parity.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971682+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.context_canary",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/context_parity.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/context_parity.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.write_receipts",
+    "kind": "memory_write_receipt",
+    "label": "MemoryKernel Governed Write Receipts",
+    "authority_role": "evidence",
+    "declared_state": "append_only_receipt_api",
+    "desired_state": "direct_mutations_blocked_receipts_append_only",
+    "observed_state": "ready",
+    "coherence_state": "bound",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/write_receipts.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "file",
+        "source": "allowed=3 denied_direct=2 immutable=True",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.969011+00:00",
+        "raw_content": null,
+        "status": "present",
+        "provenance_chain": [
+          "MemoryKernel",
+          "write_receipts",
+          "append_only_status"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "allowed=3 denied_direct=2 immutable=True"
+    ],
+    "freshness": "",
+    "gap_codes": [],
+    "next_action": "",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/write_receipts.py",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/write_receipts.py",
+      "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 11,
+      "tone": "ok",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": []
+    },
+    "raw": {
+      "schema_version": "memory_kernel_write_receipt.v1",
+      "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+      "receipt_count": 5,
+      "allowed_receipt_count": 3,
+      "denied_receipt_count": 2,
+      "denied_direct_mutation_count": 2,
+      "immutable_log": true,
+      "ready": true,
+      "blockers": [],
+      "latest_allowed_receipt_id": "memory_kernel_write_receipt:b06425d9cd8246d1db5fcff1"
+    }
+  },
+  {
+    "id": "memory.live_promotion",
+    "kind": "memory_promotion",
+    "label": "MemoryKernel Human-Gated Promotion Candidate",
+    "authority_role": "evidence",
+    "declared_state": "human_gated_reviewed_receipts",
+    "desired_state": "live_rollout_emits_reviewed_canonical_receipts_only",
+    "observed_state": "ready",
+    "coherence_state": "bound",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/promotion_gate.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "file",
+        "source": "reviewed=2 human_approved=2 rollback=False",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.969328+00:00",
+        "raw_content": null,
+        "status": "present",
+        "provenance_chain": [
+          "MemoryKernel",
+          "promotion_gate",
+          "reviewed_canonical_receipt"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "reviewed=2 human_approved=2 rollback=False"
+    ],
+    "freshness": "",
+    "gap_codes": [],
+    "next_action": "",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/promotion_gate.py",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/promotion_gate.py",
+      "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 11,
+      "tone": "ok",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": []
+    },
+    "raw": {
+      "schema_version": "memory_kernel_reviewed_canonical_receipt.v1",
+      "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl",
+      "reviewed_receipt_count": 2,
+      "blocked_receipt_count": 0,
+      "human_approved_count": 2,
+      "immutable_log": true,
+      "rollback_engaged": false,
+      "promotion_ready": true,
+      "blockers": [],
+      "latest_canonical_receipt_id": "memory_kernel_canonical_receipt:aa419a0efc46da4f37589368"
+    }
+  },
+  {
+    "id": "memory.knowledgeops_bridge",
+    "kind": "memory_promotion",
+    "label": "KnowledgeOps MemoryKernel Promotion Bridge",
+    "authority_role": "evidence",
+    "declared_state": "knowledgeops_decision_to_canonical_receipt_bridge",
+    "desired_state": "accepted_decisions_link_to_reviewed_canonical_receipts",
+    "observed_state": "ready",
+    "coherence_state": "bound",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/knowledge_ops/memory_kernel_promotion_bridge.py",
+    "truth_owner": "KnowledgeOps",
+    "evidence": [
+      {
+        "kind": "file",
+        "source": "linked=1 matched=1 immutable=True",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.969700+00:00",
+        "raw_content": null,
+        "status": "present",
+        "provenance_chain": [
+          "KnowledgeOps",
+          "memory_kernel_promotion_bridge",
+          "reviewed_canonical_receipt"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "linked=1 matched=1 immutable=True"
+    ],
+    "freshness": "",
+    "gap_codes": [],
+    "next_action": "",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/knowledge_ops/memory_kernel_promotion_bridge.py",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "scripts/memory_kernel_knowledgeops_bridge_smoke.py",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+        "exists": true,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/knowledge_ops/memory_kernel_promotion_bridge.py",
+      "scripts/memory_kernel_knowledgeops_bridge_smoke.py",
+      "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+      "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 11,
+      "tone": "ok",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": []
+    },
+    "raw": {
+      "schema_version": "memory_kernel_knowledgeops_bridge.v1",
+      "ready": true,
+      "blockers": [],
+      "write_receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/write_receipts.jsonl",
+      "canonical_receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/reviewed_canonical_receipts.jsonl",
+      "write_receipt_count": 5,
+      "canonical_receipt_count": 2,
+      "linked_canonical_receipt_count": 1,
+      "matched_write_receipt_link_count": 1,
+      "write_receipt_log_immutable": true,
+      "canonical_receipt_log_immutable": true,
+      "latest_canonical_receipt_id": "memory_kernel_canonical_receipt:aa419a0efc46da4f37589368",
+      "latest_source_write_receipt_id": "memory_kernel_write_receipt:b06425d9cd8246d1db5fcff1",
+      "latest_source_proposal_id": "memory_promotion_proposal:fb62ead7923352a46781e539",
+      "latest_source_decision_id": "knowledgeops_promotion_decision:e23e812b6afc391fc214a571",
+      "latest_target_authority_surface": "knowledge_authority.shadow_canon"
+    }
+  },
+  {
+    "id": "memory.knowledgeops_intake",
+    "kind": "memory_knowledgeops",
+    "label": "KnowledgeOps Memory Intake",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "accepted_decisions_enter_memory_kernel_intake",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/knowledge_ops/memory_intake.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971712+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.knowledgeops_intake",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/knowledge_ops/memory_intake.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/knowledge_ops/memory_intake.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.promotion_queue",
+    "kind": "memory_promotion",
+    "label": "Memory Promotion Queue",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "reviewable_candidates_before_canonical_memory",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/knowledge_ops/memory_promotion_queue.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971742+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.promotion_queue",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/knowledge_ops/memory_promotion_queue.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/knowledge_ops/memory_promotion_queue.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.readiness",
+    "kind": "memory_adapter",
+    "label": "MemoryKernel Strict Readiness",
+    "authority_role": "projection",
+    "declared_state": "deep_probe_required",
+    "desired_state": "strict_ready_all_accounted_warning_free",
+    "observed_state": "deep_probe_deferred",
+    "coherence_state": "partial",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/memory_kernel/readiness.py",
+    "truth_owner": "MemoryKernel",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "deep MemoryKernel probe deferred in default operator projection",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971771+00:00",
+        "raw_content": null,
+        "status": "stale",
+        "provenance_chain": [
+          "MemoryKernel",
+          "memory.readiness",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "deep MemoryKernel probe deferred in default operator projection"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/readiness.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "dharma_swarm/memory_kernel/readiness.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 6,
+      "tone": "warning",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": [
+        "investigate",
+        "handoff"
+      ]
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot_deep_probe_deferred",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py"
+    }
+  },
+  {
+    "id": "memory.rollout_gate",
+    "kind": "memory_rollout",
+    "label": "MemoryKernel Rollout Gate",
+    "authority_role": "adapter",
+    "declared_state": "operator_controlled_rollout",
+    "desired_state": "off_shadow_preview_canary_before_live",
+    "observed_state": "off",
+    "coherence_state": "bound",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/operator_core/control_surface_memory.py",
+    "truth_owner": "operator_control",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "DHARMA_MEMORY_KERNEL_ROLLOUT=<unset> resolved=off; deep readiness deferred",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971806+00:00",
+        "raw_content": null,
+        "status": "present",
+        "provenance_chain": [
+          "operator_control",
+          "rollout_gate",
+          "snapshot_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "DHARMA_MEMORY_KERNEL_ROLLOUT=<unset> resolved=off; deep readiness deferred"
+    ],
+    "freshness": "",
+    "gap_codes": [
+      "memory_deep_probe_deferred"
+    ],
+    "next_action": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "config",
+        "path": "env:DHARMA_MEMORY_KERNEL_ROLLOUT",
+        "exists": false,
+        "line_range": null
+      },
+      {
+        "kind": "file",
+        "path": "dharma_swarm/memory_kernel/readiness.py",
+        "exists": true,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "env:DHARMA_MEMORY_KERNEL_ROLLOUT",
+      "dharma_swarm/memory_kernel/readiness.py"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 11,
+      "tone": "ok",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": []
+    },
+    "raw": {
+      "schema_version": "memory_kernel_control_snapshot.v1",
+      "projection_mode": "snapshot",
+      "deep_probe_deferred": true,
+      "deep_probe_command": "GET /api/control-surface/rows?memory_depth=deep or python3 scripts/memory_kernel_readiness.py",
+      "state": "off",
+      "configured_value": "",
+      "invalid": false,
+      "allowed_states": [
+        "off",
+        "shadow",
+        "preview",
+        "canary",
+        "live"
+      ],
+      "default_state": "off",
+      "state_source": "safe_default",
+      "rollback_switch": "env:DHARMA_MEMORY_KERNEL_ROLLBACK",
+      "burn_in_safety_state": "safe_default_off",
+      "burn_in_safe": true
+    }
+  },
+  {
+    "id": "memory.rollback_switch",
+    "kind": "memory_rollout",
+    "label": "MemoryKernel Rollback Switch",
+    "authority_role": "adapter",
+    "declared_state": "operator_kill_switch",
+    "desired_state": "rollback_to_off_available",
+    "observed_state": "available",
+    "coherence_state": "bound",
+    "priority": "p1",
+    "owner_module": "dharma_swarm/operator_core/control_surface_memory.py",
+    "truth_owner": "operator_control",
+    "evidence": [
+      {
+        "kind": "process",
+        "source": "DHARMA_MEMORY_KERNEL_ROLLBACK=<unset>",
+        "line_range": null,
+        "observed_at": "2026-06-21T14:05:24.971827+00:00",
+        "raw_content": null,
+        "status": "present",
+        "provenance_chain": [
+          "operator_control",
+          "rollback_switch",
+          "env_projection"
+        ]
+      }
+    ],
+    "evidence_labels": [
+      "DHARMA_MEMORY_KERNEL_ROLLBACK=<unset>"
+    ],
+    "freshness": "",
+    "gap_codes": [],
+    "next_action": "",
+    "human_decision_required": false,
+    "human_decision": {
+      "required": false,
+      "why_now": "",
+      "recommended_action": "",
+      "evidence_count": 1,
+      "staleness_hours": null
+    },
+    "source_refs": [
+      {
+        "kind": "config",
+        "path": "env:DHARMA_MEMORY_KERNEL_ROLLBACK",
+        "exists": false,
+        "line_range": null
+      }
+    ],
+    "source_ref_labels": [
+      "env:DHARMA_MEMORY_KERNEL_ROLLBACK"
+    ],
+    "verification_timeline": [],
+    "display_hints": {
+      "severity_rank": 11,
+      "tone": "ok",
+      "icon_key": "circle",
+      "group": "other",
+      "freshness_state": "unknown",
+      "available_actions": []
+    },
+    "raw": {
+      "switch_present": true,
+      "switch_env_var": "DHARMA_MEMORY_KERNEL_ROLLBACK",
+      "engaged": false,
+      "raw_value": "",
+      "effect": "forces operator interpretation back to rollout state 'off'",
+      "current_rollout_state": "off"
+    }
+  }
+]

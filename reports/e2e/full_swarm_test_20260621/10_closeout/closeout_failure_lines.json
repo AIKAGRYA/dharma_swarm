@@ -1,0 +1,46 @@
+{
+  "make_docops_integrity.txt": [
+    "FAIL: assertion: manifest-total-python-modules: doc says 749, dharma_python_modules is 758; verify with `git ls-files dharma_swarm | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-top-level-python-modules: doc says 406, dharma_top_level_python_modules is 413; verify with `git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-files: doc says 729, test_files is 743; verify with `git ls-files tests | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-functions: doc says 11729, test_def_occurrences is 11820; verify with `git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l`",
+    "FAIL: assertion: manifest-markdown-files: doc says 1025, markdown_files is 1047; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l`",
+    "FAIL: assertion: manifest-markdown-lines: doc says 241706, markdown_total_lines is 245289; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l`",
+    "FAIL: auto-section: docs/docops/AUTO_INVENTORY.md has stale generated content; rerun with --write-auto-sections",
+    "make: *** [Makefile:274: docops-integrity] Error 1"
+  ],
+  "make_governance_all.txt": [
+    "# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.",
+    "FAIL: assertion: manifest-total-python-modules: doc says 749, dharma_python_modules is 758; verify with `git ls-files dharma_swarm | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-top-level-python-modules: doc says 406, dharma_top_level_python_modules is 413; verify with `git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-files: doc says 729, test_files is 743; verify with `git ls-files tests | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-functions: doc says 11729, test_def_occurrences is 11820; verify with `git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l`",
+    "FAIL: assertion: manifest-markdown-files: doc says 1025, markdown_files is 1047; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l`",
+    "FAIL: assertion: manifest-markdown-lines: doc says 241706, markdown_total_lines is 245289; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l`",
+    "FAIL: auto-section: docs/docops/AUTO_INVENTORY.md has stale generated content; rerun with --write-auto-sections",
+    "make: *** [Makefile:274: docops-integrity] Error 1"
+  ],
+  "make_docops_report.txt": [
+    "FAIL: assertion: manifest-total-python-modules: doc says 749, dharma_python_modules is 758; verify with `git ls-files dharma_swarm | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-top-level-python-modules: doc says 406, dharma_top_level_python_modules is 413; verify with `git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-files: doc says 729, test_files is 743; verify with `git ls-files tests | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-functions: doc says 11729, test_def_occurrences is 11820; verify with `git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l`",
+    "FAIL: assertion: manifest-markdown-files: doc says 1025, markdown_files is 1047; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l`",
+    "FAIL: assertion: manifest-markdown-lines: doc says 241706, markdown_total_lines is 245289; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l`",
+    "FAIL: auto-section: docs/docops/AUTO_INVENTORY.md has stale generated content; rerun with --write-auto-sections",
+    "make: *** [Makefile:289: docops-report] Error 1"
+  ],
+  "make_agent_build_closeout.txt": [
+    "# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.",
+    "FAIL: assertion: manifest-total-python-modules: doc says 749, dharma_python_modules is 758; verify with `git ls-files dharma_swarm | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-top-level-python-modules: doc says 406, dharma_top_level_python_modules is 413; verify with `git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-files: doc says 729, test_files is 743; verify with `git ls-files tests | rg '\\.py$' | wc -l`",
+    "FAIL: assertion: manifest-test-functions: doc says 11729, test_def_occurrences is 11820; verify with `git ls-files tests | rg '\\.py$' | xargs rg 'def test_' | wc -l`",
+    "FAIL: assertion: manifest-markdown-files: doc says 1025, markdown_files is 1047; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | wc -l`",
+    "FAIL: assertion: manifest-markdown-lines: doc says 241706, markdown_total_lines is 245289; verify with `git ls-files | rg '\\.md$' | rg -v '(^AGENTS\\.md$|^reports/docops/)' | xargs wc -l`",
+    "FAIL: auto-section: docs/docops/AUTO_INVENTORY.md has stale generated content; rerun with --write-auto-sections",
+    "make[1]: *** [Makefile:274: docops-integrity] Error 1",
+    "make: *** [Makefile:384: agent-build-closeout] Error 2"
+  ],
+  "make_hygiene_audit.txt": []
+}

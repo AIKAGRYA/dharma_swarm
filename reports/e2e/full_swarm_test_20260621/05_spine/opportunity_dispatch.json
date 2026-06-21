@@ -1,0 +1,62 @@
+{
+  "http_status": 200,
+  "json": {
+    "results": [
+      {
+        "stage": "scope",
+        "task_id": "task_6b2cc008c3554a31",
+        "claim_id": "claim_794116acb82f491c",
+        "run_id": "run_d4ab375669d3488a",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      },
+      {
+        "stage": "validate",
+        "task_id": "task_5619cbb5a05e466e",
+        "claim_id": "claim_8dfe599c02fe4c93",
+        "run_id": "run_6d40ddd6585143d0",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      },
+      {
+        "stage": "deep_research",
+        "task_id": "task_8a0a1c61f3aa4b1b",
+        "claim_id": "claim_3a29b984c2624d4a",
+        "run_id": "run_217768a9cf9041c5",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      },
+      {
+        "stage": "capability",
+        "task_id": "task_d431ab8def1b434b",
+        "claim_id": "claim_9314430b0bd047a2",
+        "run_id": "run_a6b691c9b482409d",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      },
+      {
+        "stage": "mvp",
+        "task_id": "task_1feb9ef008b14d0e",
+        "claim_id": "claim_c162f0260ed04051",
+        "run_id": "run_41ff2c72e4814a5f",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      },
+      {
+        "stage": "first_artifact",
+        "task_id": "task_68ae55d7f5214049",
+        "claim_id": "claim_92c8df5a572a45ec",
+        "run_id": "run_9f7a183ebadb4dcc",
+        "proposal_id": "",
+        "success": true,
+        "error": ""
+      }
+    ]
+  },
+  "raw": "{\"results\":[{\"stage\":\"scope\",\"task_id\":\"task_6b2cc008c3554a31\",\"claim_id\":\"claim_794116acb82f491c\",\"run_id\":\"run_d4ab375669d3488a\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"validate\",\"task_id\":\"task_5619cbb5a05e466e\",\"claim_id\":\"claim_8dfe599c02fe4c93\",\"run_id\":\"run_6d40ddd6585143d0\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"deep_research\",\"task_id\":\"task_8a0a1c61f3aa4b1b\",\"claim_id\":\"claim_3a29b984c2624d4a\",\"run_id\":\"run_217768a9cf9041c5\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"capability\",\"task_id\":\"task_d431ab8def1b434b\",\"claim_id\":\"claim_9314430b0bd047a2\",\"run_id\":\"run_a6b691c9b482409d\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"mvp\",\"task_id\":\"task_1feb9ef008b14d0e\",\"claim_id\":\"claim_c162f0260ed04051\",\"run_id\":\"run_41ff2c72e4814a5f\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"},{\"stage\":\"first_artifact\",\"task_id\":\"task_68ae55d7f5214049\",\"claim_id\":\"claim_92c8df5a572a45ec\",\"run_id\":\"run_9f7a183ebadb4dcc\",\"proposal_id\":\"\",\"success\":true,\"error\":\"\"}]}"
+}

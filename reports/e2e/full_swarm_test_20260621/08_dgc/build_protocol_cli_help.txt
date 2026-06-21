@@ -1,0 +1,17 @@
+### build_protocol_cli_help
+command: python -m tools.build_protocol.cli --help
+--- output ---
+usage: dharma-build [-h] {plan,seal,shadow-apply,opportunity-to-spec} ...
+
+positional arguments:
+  {plan,seal,shadow-apply,opportunity-to-spec}
+    plan                emit Pilot-00 dispatch artifacts
+    seal                write ReviewPacket and ProofPacket artifacts
+    shadow-apply        ingest a sealed packet through Darwin shadow
+                        evaluation
+    opportunity-to-spec
+                        emit a Pilot-00 spec from one opportunity board row
+
+options:
+  -h, --help            show this help message and exit
+--- exit_code: 0

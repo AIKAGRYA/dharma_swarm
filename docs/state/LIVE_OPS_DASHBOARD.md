@@ -169,3 +169,37 @@ In rough priority (matches Open Risks + Operator Decision above):
 ---
 
 *This dashboard refreshed 2026-06-15 by `perplexity-computer` under Stage 1 EVIDENCE_ONLY. See PR for the full audit and reconciliation map.*
+
+
+---
+
+## Full Swarm E2E Test — 2026-06-21
+
+**Run:** `reports/e2e/full_swarm_test_20260621/`  
+**Branch:** `devin/full-swarm-e2e-test-20260621`  
+**Commit:** `726bc9d4d4add60c46f102d1ceee3a065c474892`  
+**State root:** `/home/ubuntu/pr-work/full-swarm-e2e-20260621/.e2e_state/full_swarm_test_20260621`  
+**Master report:** `reports/e2e/full_swarm_test_20260621/MASTER_REPORT.md`
+
+### What is live enough to trust
+
+- FastAPI backend boots and recovers after restart; `/api/health`, `/api/overview`, `/api/control-surface/summary`, `/api/commands/tasks`, and opportunity endpoints returned live JSON evidence.
+- Dashboard routes `/dashboard`, `/dashboard/control-surface`, `/dashboard/cockpit`, `/dashboard/runtime`, `/dashboard/audit`, `/dashboard/agents`, `/dashboard/evolution`, and `/dashboard/ontology` rendered without a browser crash.
+- Opportunity loop dispatch/refill writes durable `task_claims`, `delegation_runs`, and `runtime_receipts`; refill economics for a $1000 test opportunity were `$0.23` provider cost / `$999.77` net value.
+- A2A substrate contract and DGC verify-corral checks passed locally.
+
+### What is not live / degraded
+
+- High-level Darshan mission became a real task record but provider execution failed through the default Ollama chain; artifact is local `not sent` only.
+- Memory readiness, strict readiness, operator-prod-smoke, and burn-in targets failed; some memory smokes passed in isolated state.
+- Dashboard typegen check failed: generated OpenAPI types differ from committed `dashboard/src/lib/api-generated.ts`.
+- `POST /api/opportunities/dispatch` accepts a missing `id` and creates six stage tasks with HTTP 200.
+- DocOps inventory/assertions are stale; closeout commands depending on DocOps fail until owner-generated inventory is refreshed.
+
+### Operator next moves
+
+1. Fix opportunity dispatch validation/idempotency.
+2. Regenerate or reconcile dashboard OpenAPI types.
+3. Repair memory readiness contract fields and writer sentinel row.
+4. Regenerate DocOps auto inventory with the owning script before merging report/doc changes.
+5. Keep BR-003 live apply closed unless an explicit approved live-apply lease exists.

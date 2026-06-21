@@ -1,0 +1,6 @@
+### make_spine_check
+command: make spine-check
+--- output ---
+python3 -m scripts.uplift_guards.check_spine_ownership
+spine-check: spine ownership clear (importable + all sqlite users declared)
+--- exit_code: 0

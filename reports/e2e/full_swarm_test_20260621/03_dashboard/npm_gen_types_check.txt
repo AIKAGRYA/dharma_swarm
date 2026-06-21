@@ -1,0 +1,11 @@
+### npm_gen_types_check
+command: env OPENAPI_URL=http://127.0.0.1:8420/openapi.json npm --prefix dashboard run gen:types:check
+--- output ---
+
+> dashboard@0.1.0 gen:types:check
+> openapi-typescript ${OPENAPI_URL:-http://127.0.0.1:8420/openapi.json} -o /tmp/api-generated.check.ts && diff -q src/lib/api-generated.ts /tmp/api-generated.check.ts
+
+✨ openapi-typescript 7.13.0
+🚀 http://127.0.0.1:8420/openapi.json → /tmp/api-generated.check.ts [319.7ms]
+Files src/lib/api-generated.ts and /tmp/api-generated.check.ts differ
+--- exit_code: 1

@@ -1,0 +1,4 @@
+.e2e_state/full_swarm_test_20260621/state/runtime.db
+.e2e_state/full_swarm_test_20260621/home/.dharma/state/runtime.db
+.e2e_state/full_swarm_test_20260621/home/.dharma/ontology.db
+.e2e_state/full_swarm_test_20260621/home/.dharma/agent_memory/memories.db

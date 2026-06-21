@@ -1,0 +1,12 @@
+{
+  "http_status": 200,
+  "raw": "{\"status\":\"ok\",\"data\":{\"dispatched\":5},\"error\":\"\",\"timestamp\":\"2026-06-21T13:52:02.469091\"}",
+  "json": {
+    "status": "ok",
+    "data": {
+      "dispatched": 5
+    },
+    "error": "",
+    "timestamp": "2026-06-21T13:52:02.469091"
+  }
+}

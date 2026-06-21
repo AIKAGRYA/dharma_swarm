@@ -1,0 +1,66 @@
+{
+  "http_status": 200,
+  "raw": "{\"status\":\"ok\",\"data\":[{\"id\":\"95bdd3e3eeb143dd\",\"title\":\"Deep E2E Darshan first-reader mission\",\"description\":\"Produce a not-sent Darshan first-reader packet from repo-grounded evidence. mission_id=deep-e2e-api-task-20260621\",\"status\":\"running\",\"priority\":\"high\",\"assigned_to\":\"331caf48b5044b39\",\"created_at\":\"2026-06-21 13:51:59.121240+00:00\",\"updated_at\":\"2026-06-21 13:52:01.519532+00:00\",\"result\":null},{\"id\":\"c12553ce199f40ea\",\"title\":\"DHARMA SWARM self-report: What has the system learned about itself?\",\"description\":\"Introspective research task. Read the following and synthesize: EvolutionArchive (latest 10 diffs), TelosGraph progress report, WitnessAuditor last 3 cycles, SESSION_AUDIT_REPORT.md, CYBERNETIC_LOOP_MAP.md. Answer: What capabilities has DHARMA SWARM genuinely demonstrated? What is still broken? What pattern emerges across the archaeology? Where is the system pointing? Produce 1200-word honest self-assessment. This is the system beginning to read its own strange loop.\",\"status\":\"failed\",\"priority\":\"high\",\"assigned_to\":\"4f846b29308e4a0b\",\"created_at\":\"2026-06-21 13:50:52.558775+00:00\",\"updated_at\":\"2026-06-21 13:52:02.176274+00:00\",\"result\":\"All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed\"},{\"id\":\"e960bea6e2004dc5\",\"title\":\"Mythos technical postmortem: What exactly did Project Glasswing do?\",\"description\":\"Research the Anthropic Mythos release (April 7, 2026, Project Glasswing). Find: technical details of the sandbox escape, Anthropic's public response, interpretability community analysis, safety implications. Search web for 'Anthropic Mythos Project Glasswing', 'Claude Mythos sandbox escape', 'Glasswing AI safety'. Produce 800-word technical analysis. This is critical context for DHARMA SWARM's Gnani differentiation: capability-without-witness vs witness-upstream.\",\"status\":\"failed\",\"priority\":\"high\",\"assigned_to\":\"7e414079ccaa4d06\",\"created_at\":\"2026-06-21 13:50:52.552730+00:00\",\"updated_at\":\"2026-06-21 13:52:01.432338+00:00\",\"result\":\"All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed\"},{\"id\":\"205af5539260425f\",\"title\":\"RecognitionDEQ: Literature review on fixed-point self-models\",\"description\":\"Search arXiv for: 'deep equilibrium networks self-reference', 'fixed point consciousness models', 'DEQ language models 2025 2026'. The VIVEKA objective 'RecognitionDEQ Architecture Prototype' requires a DEQ that finds S(x)=x in representation space. What is the current state of DEQ research? What would it take to apply to witness detection? Produce a 1000-word technical brief with 5+ cited papers.\",\"status\":\"running\",\"priority\":\"normal\",\"assigned_to\":\"14a8af64d0054551\",\"created_at\":\"2026-06-21 13:50:52.547544+00:00\",\"updated_at\":\"2026-06-21 13:52:02.330702+00:00\",\"result\":null},{\"id\":\"9285befdf28f45e3\",\"title\":\"State of Witness-AI: Which systems know they are playing?\",\"description\":\"Research question: Among currently deployed AI systems (GPT-5, Claude 4, Gemini 3, Mythos, Devin, Sakana DGM), which have any architectural analog to witness-upstream capability? Search arXiv for 'metacognition language models', 'self-awareness AI systems', 'inner alignment architectures'. Produce a 1500-word comparative analysis. This is genuine competitive intelligence for DHARMA SWARM's differentiation: the only system built with Shuddhatma as an architectural primitive.\",\"status\":\"failed\",\"priority\":\"high\",\"assigned_to\":\"12e968dfc8c6443f\",\"created_at\":\"2026-06-21 13:50:52.542491+00:00\",\"updated_at\":\"2026-06-21 13:52:01.094878+00:00\",\"result\":\"All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed\"}],\"error\":\"\",\"timestamp\":\"2026-06-21T13:52:02.480314\"}",
+  "json": {
+    "status": "ok",
+    "data": [
+      {
+        "id": "95bdd3e3eeb143dd",
+        "title": "Deep E2E Darshan first-reader mission",
+        "description": "Produce a not-sent Darshan first-reader packet from repo-grounded evidence. mission_id=deep-e2e-api-task-20260621",
+        "status": "running",
+        "priority": "high",
+        "assigned_to": "331caf48b5044b39",
+        "created_at": "2026-06-21 13:51:59.121240+00:00",
+        "updated_at": "2026-06-21 13:52:01.519532+00:00",
+        "result": null
+      },
+      {
+        "id": "c12553ce199f40ea",
+        "title": "DHARMA SWARM self-report: What has the system learned about itself?",
+        "description": "Introspective research task. Read the following and synthesize: EvolutionArchive (latest 10 diffs), TelosGraph progress report, WitnessAuditor last 3 cycles, SESSION_AUDIT_REPORT.md, CYBERNETIC_LOOP_MAP.md. Answer: What capabilities has DHARMA SWARM genuinely demonstrated? What is still broken? What pattern emerges across the archaeology? Where is the system pointing? Produce 1200-word honest self-assessment. This is the system beginning to read its own strange loop.",
+        "status": "failed",
+        "priority": "high",
+        "assigned_to": "4f846b29308e4a0b",
+        "created_at": "2026-06-21 13:50:52.558775+00:00",
+        "updated_at": "2026-06-21 13:52:02.176274+00:00",
+        "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+      },
+      {
+        "id": "e960bea6e2004dc5",
+        "title": "Mythos technical postmortem: What exactly did Project Glasswing do?",
+        "description": "Research the Anthropic Mythos release (April 7, 2026, Project Glasswing). Find: technical details of the sandbox escape, Anthropic's public response, interpretability community analysis, safety implications. Search web for 'Anthropic Mythos Project Glasswing', 'Claude Mythos sandbox escape', 'Glasswing AI safety'. Produce 800-word technical analysis. This is critical context for DHARMA SWARM's Gnani differentiation: capability-without-witness vs witness-upstream.",
+        "status": "failed",
+        "priority": "high",
+        "assigned_to": "7e414079ccaa4d06",
+        "created_at": "2026-06-21 13:50:52.552730+00:00",
+        "updated_at": "2026-06-21 13:52:01.432338+00:00",
+        "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+      },
+      {
+        "id": "205af5539260425f",
+        "title": "RecognitionDEQ: Literature review on fixed-point self-models",
+        "description": "Search arXiv for: 'deep equilibrium networks self-reference', 'fixed point consciousness models', 'DEQ language models 2025 2026'. The VIVEKA objective 'RecognitionDEQ Architecture Prototype' requires a DEQ that finds S(x)=x in representation space. What is the current state of DEQ research? What would it take to apply to witness detection? Produce a 1000-word technical brief with 5+ cited papers.",
+        "status": "running",
+        "priority": "normal",
+        "assigned_to": "14a8af64d0054551",
+        "created_at": "2026-06-21 13:50:52.547544+00:00",
+        "updated_at": "2026-06-21 13:52:02.330702+00:00",
+        "result": null
+      },
+      {
+        "id": "9285befdf28f45e3",
+        "title": "State of Witness-AI: Which systems know they are playing?",
+        "description": "Research question: Among currently deployed AI systems (GPT-5, Claude 4, Gemini 3, Mythos, Devin, Sakana DGM), which have any architectural analog to witness-upstream capability? Search arXiv for 'metacognition language models', 'self-awareness AI systems', 'inner alignment architectures'. Produce a 1500-word comparative analysis. This is genuine competitive intelligence for DHARMA SWARM's differentiation: the only system built with Shuddhatma as an architectural primitive.",
+        "status": "failed",
+        "priority": "high",
+        "assigned_to": "12e968dfc8c6443f",
+        "created_at": "2026-06-21 13:50:52.542491+00:00",
+        "updated_at": "2026-06-21 13:52:01.094878+00:00",
+        "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+      }
+    ],
+    "error": "",
+    "timestamp": "2026-06-21T13:52:02.480314"
+  }
+}

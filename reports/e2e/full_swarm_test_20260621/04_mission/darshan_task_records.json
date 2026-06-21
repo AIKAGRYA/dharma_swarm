@@ -1,0 +1,13 @@
+[
+  {
+    "id": "95bdd3e3eeb143dd",
+    "title": "Deep E2E Darshan first-reader mission",
+    "description": "Produce a not-sent Darshan first-reader packet from repo-grounded evidence. mission_id=deep-e2e-api-task-20260621",
+    "status": "failed",
+    "priority": "high",
+    "assigned_to": "331caf48b5044b39",
+    "created_at": "2026-06-21 13:51:59.121240+00:00",
+    "updated_at": "2026-06-21 13:52:03.708465+00:00",
+    "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+  }
+]

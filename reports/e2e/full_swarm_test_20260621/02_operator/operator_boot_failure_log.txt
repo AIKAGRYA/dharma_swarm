@@ -1,0 +1,10 @@
+INFO:     Started server process [60449]
+INFO:     Waiting for application startup.
+GnaniLodestone: stigmergy seeding failed: 1 validation error for StigmergicMark
+observation
+  String should have at most 200 characters [type=string_too_long, input_value='DHARMA SWARM identity: b...uality of every action.', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/string_too_long
+GnaniLodestone: concept seeding failed: cannot import name 'ConceptGraph' from 'dharma_swarm.graph_nexus' (/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/graph_nexus.py)
+Dashboard API bearer auth is disabled because no auth secret is configured. All API routes are open in dev mode.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8420 (Press CTRL+C to quit)

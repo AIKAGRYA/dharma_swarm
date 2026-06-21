@@ -1,0 +1,200 @@
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Task 9285befdf28f45e3 failed: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/orchestrator.py", line 2380, in _execute_task
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.pyenv/versions/3.12.8/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+ALGEDONIC: task 9285befdf28f45e3 exhausted 0 retries — dead-lettered
+Agent cyber-codex failed task e960bea6e2004dc5
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Task e960bea6e2004dc5 failed: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/orchestrator.py", line 2380, in _execute_task
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.pyenv/versions/3.12.8/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+ALGEDONIC: task e960bea6e2004dc5 exhausted 0 retries — dead-lettered
+Agent cyber-opus failed task c12553ce199f40ea
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Task c12553ce199f40ea failed: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/orchestrator.py", line 2380, in _execute_task
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.pyenv/versions/3.12.8/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+ALGEDONIC: task c12553ce199f40ea exhausted 0 retries — dead-lettered
+Agent archeologist failed task 205af5539260425f
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['openrouter'] :: openrouter:OPENROUTER_API_KEY not set; openrouter:OPENROUTER_API_KEY not set
+Task 205af5539260425f failed: All providers failed in chain ['openrouter'] :: openrouter:OPENROUTER_API_KEY not set; openrouter:OPENROUTER_API_KEY not set
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/orchestrator.py", line 2380, in _execute_task
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.pyenv/versions/3.12.8/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['openrouter'] :: openrouter:OPENROUTER_API_KEY not set; openrouter:OPENROUTER_API_KEY not set
+Agent cyber-kimi25 failed task 95bdd3e3eeb143dd
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Task 95bdd3e3eeb143dd failed: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+Traceback (most recent call last):
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/orchestrator.py", line 2380, in _execute_task
+    result = await asyncio.wait_for(
+             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.pyenv/versions/3.12.8/lib/python3.12/asyncio/tasks.py", line 520, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2271, in run_task
+    ) = await attempt_result
+        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 2022, in _execute_completion_attempt
+    await self._complete_with_tool_loop(task, request)
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1932, in _complete_with_tool_loop
+    route_request, route_decision, response = await self._invoke_provider(
+                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/agent_runner.py", line 1780, in _invoke_provider
+    route_decision, response = await self._provider.complete_for_task(
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/pr-work/full-swarm-e2e-20260621/dharma_swarm/providers.py", line 3258, in complete_for_task
+    raise RuntimeError(
+RuntimeError: All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed
+ALGEDONIC: task 95bdd3e3eeb143dd exhausted 0 retries — dead-lettered
+ALGEDONIC: task 205af5539260425f exhausted 0 retries — dead-lettered
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [60449]
+INFO:     Started server process [65249]
+INFO:     Waiting for application startup.
+Dashboard API bearer auth is disabled because no auth secret is configured. All API routes are open in dev mode.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8420 (Press CTRL+C to quit)

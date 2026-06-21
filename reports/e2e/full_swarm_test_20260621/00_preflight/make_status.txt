@@ -1,0 +1,39 @@
+### make_status
+command: make status
+--- output ---
+python3 scripts/governance/repo_status.py
+============================================================
+  DHARMA SWARM — REPO STATUS
+  2026-06-21 13:50 UTC
+============================================================
+
+📌 Branch: devin/full-swarm-e2e-test-20260621
+   Last commit: 726bc9d4 Merge pull request #658 from AmitabhainArunachala/claude/loop-closure-cascade-2je1gw
+
+🎯 Active Track: Runtime Truth Reconciliation — operator-visible truth packets
+   ID: runtime-truth-reconciliation-2026-06
+   Status: ACTIVE
+   Verified: 2026-06-20
+
+📋 Open PRs: 8 total, 0 stale (>14d)
+   #660 (app/devin-ai-integration) Add dashboard runtime inside-out testing skill
+   #659 (AmitabhainArunachala) chore(governance): ops report 2026-06-21T1200Z — spine 93.8%
+   #653 (AmitabhainArunachala) chore(governance): ops report 2026-06-21T0600Z — spine 93.8%
+   #649 (AmitabhainArunachala) chore(governance): ops report 2026-06-20T0600Z — spine 93.8%
+   #647 (AmitabhainArunachala) [codex] governance: refresh active track and fitness propert
+   ... and 3 more
+
+🔧 Broken Register: 21 total, 8 open-like
+
+📊 Hotlist: 39 items — 9 done, 3 WIP, 27 pending
+
+🧪 Test functions: 11820
+
+⚠️  Warnings:
+   - 8 open broken register items
+
+============================================================
+  Run `make onboard` for full operating reality
+  Run `make status` for this quick snapshot
+============================================================
+--- exit_code: 0

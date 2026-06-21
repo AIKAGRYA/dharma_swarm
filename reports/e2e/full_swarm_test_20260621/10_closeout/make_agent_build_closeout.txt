@@ -1,0 +1,426 @@
+### make_agent_build_closeout
+command: make agent-build-closeout
+--- output ---
+python3 scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
+wrote /tmp/dharma-hygiene-audit.txt
+make governance-all
+make[1]: Entering directory '/home/ubuntu/pr-work/full-swarm-e2e-20260621'
+# Phase 1 is warn-only locally so the install does not block on the
+# 4 pre-existing real findings (3 shell=True + 1 eval). CI (Phase 2)
+# uses the stricter mode below; Phase 4 promotes anti-slop rules to ERROR.
+# The wrapper expands --config .semgrep to production configs only;
+# .semgrep/tests remains reserved for explicit rule-test runs.
+scripts/governance/run_semgrep_with_ca.sh --config .semgrep --metrics=off
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/runtime_state.py' that will soon be interpreted as '/dharma_swarm/runtime_state.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/runtime_state.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_state.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/system_rv.py' that will soon be interpreted as '/dharma_swarm/system_rv.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/system_rv.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/system_rv.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/daemon_config.py' that will soon be interpreted as '/dharma_swarm/daemon_config.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/daemon_config.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/daemon_config.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/experiment_log.py' that will soon be interpreted as '/dharma_swarm/experiment_log.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/experiment_log.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/experiment_log.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/pulse.py' that will soon be interpreted as '/dharma_swarm/pulse.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/pulse.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/pulse.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/custodians.py' that will soon be interpreted as '/dharma_swarm/custodians.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/custodians.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/custodians.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/kaizen_ops_local.py' that will soon be interpreted as '/dharma_swarm/kaizen_ops_local.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/kaizen_ops_local.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/kaizen_ops_local.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/scout_report.py' that will soon be interpreted as '/dharma_swarm/scout_report.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/scout_report.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/scout_report.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/review_cycle.py' that will soon be interpreted as '/dharma_swarm/review_cycle.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/review_cycle.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/review_cycle.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/ginko_backtest.py' that will soon be interpreted as '/dharma_swarm/ginko_backtest.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/ginko_backtest.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/ginko_backtest.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/ginko_evolution.py' that will soon be interpreted as '/dharma_swarm/ginko_evolution.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/ginko_evolution.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/ginko_evolution.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/engine/store_sync.py' that will soon be interpreted as '/dharma_swarm/engine/store_sync.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/engine/store_sync.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/engine/store_sync.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/consume_review_marks.py' that will soon be interpreted as '/scripts/consume_review_marks.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/consume_review_marks.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/consume_review_marks.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/hermes_heartbeat_poll.py' that will soon be interpreted as '/scripts/hermes_heartbeat_poll.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/hermes_heartbeat_poll.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/hermes_heartbeat_poll.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/check_provider_credits.py' that will soon be interpreted as '/scripts/check_provider_credits.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/check_provider_credits.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/check_provider_credits.py'.
+Rule semgrep.dharma.no-new-substrate contains an exclude pattern 'dharma_swarm/runtime_state.py' that will soon be interpreted as '/dharma_swarm/runtime_state.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-new-substrate and change it to '**/dharma_swarm/runtime_state.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_state.py'.
+Rule semgrep.dharma.scripts-no-git-add-all contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.scripts-no-git-add-all and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.scripts-no-git-add-all contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.scripts-no-git-add-all and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/providers.py' that will soon be interpreted as '/dharma_swarm/providers.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/providers.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/providers.py'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/providers_extended.py' that will soon be interpreted as '/dharma_swarm/providers_extended.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/providers_extended.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/providers_extended.py'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/runtime_provider/' that will soon be interpreted as '/dharma_swarm/runtime_provider/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/runtime_provider/'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_provider/'.
+Rule semgrep.dharma.security.subprocess-shell-true contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.security.subprocess-shell-true and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.security.eval-or-exec contains an exclude pattern 'scripts/repo_xray.py' that will soon be interpreted as '/scripts/repo_xray.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.security.eval-or-exec and change it to '**/scripts/repo_xray.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/repo_xray.py'.
+
+
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 3071 files tracked by git with 10 Code rules:
+
+  Language   Rules   Files          Origin   Rules
+ ──────────────────────────        ────────────────
+  python        10    1038          Custom      10
+  bash           1     109
+
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/runtime_state.py' that will soon be interpreted as '/dharma_swarm/runtime_state.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/runtime_state.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_state.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/system_rv.py' that will soon be interpreted as '/dharma_swarm/system_rv.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/system_rv.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/system_rv.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/daemon_config.py' that will soon be interpreted as '/dharma_swarm/daemon_config.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/daemon_config.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/daemon_config.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/experiment_log.py' that will soon be interpreted as '/dharma_swarm/experiment_log.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/experiment_log.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/experiment_log.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/pulse.py' that will soon be interpreted as '/dharma_swarm/pulse.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/pulse.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/pulse.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/custodians.py' that will soon be interpreted as '/dharma_swarm/custodians.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/custodians.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/custodians.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/kaizen_ops_local.py' that will soon be interpreted as '/dharma_swarm/kaizen_ops_local.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/kaizen_ops_local.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/kaizen_ops_local.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/scout_report.py' that will soon be interpreted as '/dharma_swarm/scout_report.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/scout_report.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/scout_report.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/review_cycle.py' that will soon be interpreted as '/dharma_swarm/review_cycle.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/review_cycle.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/review_cycle.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/ginko_backtest.py' that will soon be interpreted as '/dharma_swarm/ginko_backtest.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/ginko_backtest.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/ginko_backtest.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/ginko_evolution.py' that will soon be interpreted as '/dharma_swarm/ginko_evolution.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/ginko_evolution.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/ginko_evolution.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'dharma_swarm/engine/store_sync.py' that will soon be interpreted as '/dharma_swarm/engine/store_sync.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/dharma_swarm/engine/store_sync.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/engine/store_sync.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/consume_review_marks.py' that will soon be interpreted as '/scripts/consume_review_marks.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/consume_review_marks.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/consume_review_marks.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/hermes_heartbeat_poll.py' that will soon be interpreted as '/scripts/hermes_heartbeat_poll.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/hermes_heartbeat_poll.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/hermes_heartbeat_poll.py'.
+Rule semgrep.dharma.no-unauthorized-dharma-write contains an exclude pattern 'scripts/check_provider_credits.py' that will soon be interpreted as '/scripts/check_provider_credits.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-unauthorized-dharma-write and change it to '**/scripts/check_provider_credits.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/check_provider_credits.py'.
+Rule semgrep.dharma.no-new-substrate contains an exclude pattern 'dharma_swarm/runtime_state.py' that will soon be interpreted as '/dharma_swarm/runtime_state.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.no-new-substrate and change it to '**/dharma_swarm/runtime_state.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_state.py'.
+Rule semgrep.dharma.scripts-no-git-add-all contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.scripts-no-git-add-all and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.scripts-no-git-add-all contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.scripts-no-git-add-all and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/providers.py' that will soon be interpreted as '/dharma_swarm/providers.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/providers.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/providers.py'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/providers_extended.py' that will soon be interpreted as '/dharma_swarm/providers_extended.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/providers_extended.py'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/providers_extended.py'.
+Rule semgrep.dharma.providers-canonical contains an exclude pattern 'dharma_swarm/runtime_provider/' that will soon be interpreted as '/dharma_swarm/runtime_provider/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.providers-canonical and change it to '**/dharma_swarm/runtime_provider/'. To confirm the anchored behavior and avoid this warning, change it to '/dharma_swarm/runtime_provider/'.
+Rule semgrep.dharma.security.subprocess-shell-true contains an exclude pattern 'scripts/uplift_guards/' that will soon be interpreted as '/scripts/uplift_guards/' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.security.subprocess-shell-true and change it to '**/scripts/uplift_guards/'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/uplift_guards/'.
+Rule semgrep.dharma.security.eval-or-exec contains an exclude pattern 'scripts/repo_xray.py' that will soon be interpreted as '/scripts/repo_xray.py' to comply with the Semgrepignore v2 and Gitignore specifications. To make this pattern permanently unanchored, edit rule semgrep.dharma.security.eval-or-exec and change it to '**/scripts/repo_xray.py'. To confirm the anchored behavior and avoid this warning, change it to '/scripts/repo_xray.py'.
+
+
+┌──────────────────┐
+│ 20 Code Findings │
+└──────────────────┘
+
+    dharma_swarm/bridge_registry.py
+    ❯❱ semgrep.dharma.no-new-substrate
+          ❰❰ Blocking ❱❱
+          New persistence-substrate class detected. dharma_swarm should have ONE canonical state store per
+          closure layer (see correlation_spine in ACTIVE_SURFACE_MANIFEST.yaml). Adding a new Store / Ledger /
+          Registry that opens its own SQLite or appends its own JSONL creates substrate drift unless the class
+          declares a closure-layer role. Options:   (a) wrap the data in an existing canonical-store, or   (b)
+          declare a role from docs/governance/ANTI_SLOP_RULES.md       (Rule 2 vocabulary: canonical-store |
+          derived-view |       plugin-sink | cache | legacy-mirror | migration-mirror |       exempt) in a
+          file-header comment AND, if it is a receipt,       add an entry to ACTIVE_SURFACE_MANIFEST.yaml
+          correlation_spine.layers, then add the class name to this       rule's allowlist with the role and
+          PR link as justification.
+
+          215┆ class BridgeRegistry:
+          216┆     """SQLite-backed registry of cross-graph bridge edges.
+          217┆
+          218┆     Provides CRUD operations, cross-graph queries, health diagnostics,
+          219┆     and stale-edge pruning.  All methods are async for interface compatibility
+          220┆     with the swarm's async orchestration layer, but use synchronous sqlite3
+          221┆     under the hood (fast enough for this scale, consistent with
+          222┆     temporal_graph.py and lineage.py patterns).
+          223┆
+          224┆     Usage::
+             [hid 618 additional lines, adjust with --max-lines-per-finding]
+
+    dharma_swarm/graph_store.py
+    ❯❱ semgrep.dharma.no-new-substrate
+          ❰❰ Blocking ❱❱
+          New persistence-substrate class detected. dharma_swarm should have ONE canonical state store per
+          closure layer (see correlation_spine in ACTIVE_SURFACE_MANIFEST.yaml). Adding a new Store / Ledger /
+          Registry that opens its own SQLite or appends its own JSONL creates substrate drift unless the class
+          declares a closure-layer role. Options:   (a) wrap the data in an existing canonical-store, or   (b)
+          declare a role from docs/governance/ANTI_SLOP_RULES.md       (Rule 2 vocabulary: canonical-store |
+          derived-view |       plugin-sink | cache | legacy-mirror | migration-mirror |       exempt) in a
+          file-header comment AND, if it is a receipt,       add an entry to ACTIVE_SURFACE_MANIFEST.yaml
+          correlation_spine.layers, then add the class name to this       rule's allowlist with the role and
+          PR link as justification.
+
+          141┆ class SQLiteGraphStore(GraphStore):
+          142┆     """SQLite-backed Four-Graph store using recursive CTEs for traversal.
+          143┆
+          144┆     All four graphs live in a **single** database file with table-name
+          145┆     prefixes (``code_nodes``, ``semantic_edges``, …).  The bridge layer is
+          146┆     stored in a ``bridge_edges`` table.  FTS5 virtual tables provide
+          147┆     full-text search on node names and data.
+          148┆
+          149┆     Thread-safety is achieved via ``check_same_thread=False``; callers are
+          150┆     expected to serialise writes if concurrent mutation is needed (SQLite's
+             [hid 561 additional lines, adjust with --max-lines-per-finding]
+
+    dharma_swarm/knowledge_units.py
+    ❯❱ semgrep.dharma.no-new-substrate
+          ❰❰ Blocking ❱❱
+          New persistence-substrate class detected. dharma_swarm should have ONE canonical state store per
+          closure layer (see correlation_spine in ACTIVE_SURFACE_MANIFEST.yaml). Adding a new Store / Ledger /
+          Registry that opens its own SQLite or appends its own JSONL creates substrate drift unless the class
+          declares a closure-layer role. Options:   (a) wrap the data in an existing canonical-store, or   (b)
+          declare a role from docs/governance/ANTI_SLOP_RULES.md       (Rule 2 vocabulary: canonical-store |
+          derived-view |       plugin-sink | cache | legacy-mirror | migration-mirror |       exempt) in a
+          file-header comment AND, if it is a receipt,       add an entry to ACTIVE_SURFACE_MANIFEST.yaml
+          correlation_spine.layers, then add the class name to this       rule's allowlist with the role and
+          PR link as justification.
+
+          179┆ class KnowledgeStore:
+          180┆     """SQLite-backed storage for propositions and prescriptions.
+          181┆
+          182┆     Three tables:
+          183┆       - propositions: atomic factual claims
+          184┆       - prescriptions: reusable skills/procedures
+          185┆       - concept_index: concept → knowledge_unit_id mapping for fast lookup
+          186┆
+          187┆     Concept-centric retrieval scores by:
+          188┆       concept_overlap × recency × confidence/return_score
+             [hid 476 additional lines, adjust with --max-lines-per-finding]
+
+    dharma_swarm/palantir_pilot_manifest.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+           16┆ DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+
+    scripts/governance/palantir_pilot_audit.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+           25┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/governance/register_palantir_pilot.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+           39┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_contribution_packets.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          289┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_deep_ingest.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          121┆ ap.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_learning_backlog.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          353┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_pilot_curriculum.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          457┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_pilot_orientation.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          268┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_pilot_query.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          126┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_playbook_evals.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          305┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_public_source_cards.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          652┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_public_source_index.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          207┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_query_cookbook.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          297┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_source_card_balanced_expand.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          133┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_source_card_cleanup.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          340┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_source_card_playbooks.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          436┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+    scripts/research/palantir_source_card_quality.py
+    ❯❱ semgrep.dharma.no-unauthorized-dharma-write
+          ❰❰ Blocking ❱❱
+          Reference to ~/.dharma detected outside the canonical owner allowlist. Even reads should go through
+          RuntimeStateStore (dharma_swarm/runtime_state.py) so state ownership stays centralized. If this
+          module legitimately owns a slice of ~/.dharma, add the file to the allowlist below AFTER declaring
+          the owned surface in ACTIVE_SURFACE_MANIFEST.yaml. See docs/governance/ANTI_SLOP_RULES.md Rule 1 for
+          the procedure.
+
+          342┆ parser.add_argument("--dharma-home", default=str(Path.home() / ".dharma"))
+
+
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 20 (20 blocking)
+ • Rules run: 10
+ • Targets scanned: 1147
+ • Parsed lines: ~99.9%
+ • Scan skipped:
+   ◦ Files larger than  files 1.0 MB: 10
+   ◦ Files matching .semgrepignore patterns: 822
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 10 rules on 1147 files: 20 findings.
+
+gitleaks detect --source . --redact --no-banner --exit-code 1
+[90m2:15PM[0m [32mINF[0m 1909 commits scanned.
+[90m2:15PM[0m [32mINF[0m scan completed in 13.4s
+[90m2:15PM[0m [32mINF[0m no leaks found
+python3 scripts/governance/check_test_hygiene.py
+Test hygiene gate results
+------------------------------------------------------------
+
+Rule 3 (test-no-default-state) — KNOWN offenders (warn):
+  tests/test_full_loop.py:343  state = RuntimeStateStore()
+
+scripts/governance/run_pytest_with_repo_env.sh -q \
+	tests/test_contracts_scaffold.py \
+	tests/test_operator_core_contracts.py \
+	tests/test_runtime_contract.py \
+	tests/test_runtime_contract_adapters.py \
+	--tb=line
+......................                                                   [100%]
+22 passed in 2.70s
+PYTHONPATH=. python3 scripts/governance/check_nats_substrate_contract.py
+NATS_CONTRACT_OK docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+pytest -q \
+	tests/test_nats_live_contact.py \
+	tests/test_nats_transport.py \
+	tests/test_a2a_send.py \
+	tests/test_a2a_inbox_bridge.py \
+	tests/test_a2a_inbox_bridge_tmux_scripts.py \
+	tests/test_a2a_domain_reply_worker.py \
+	tests/test_a2a_reply_capture.py \
+	--tb=line
+.......................................................                  [100%]
+55 passed in 4.08s
+python3 scripts/uplift_guards/run_pre_commit.py
+  ✓ [kernel-integrity] kernel unchanged
+  ✓ [secrets-scan] no secret-shaped strings found in staged additions
+  ✓ [autonomous-destruction] no staged file changes
+  ✓ [hotpath-ack] no hot-path files staged
+  ✓ [fourfold-shakti-warrant] No changed paths for diff scope staged; warrant not required.
+  ✓ [mismatch-adjacency] no staged files
+  ✓ [assurance-diff] assurance diff clear of blocking findings (medium=0)
+  ✓ [spine-ownership] spine ownership clear (importable + all sqlite users declared)
+  ✓ [no-model-literals] no stray model-id literals outside the pool
+python3 scripts/governance/check_module_budget.py \
+	--base-ref origin/main --head-ref HEAD
+No target Python files changed. OK.
+python3 scripts/docops/check_docops_integrity.py
+metric adapter_files=25
+metric architecture_markdown_files=45
+metric authority_candidate_docs=484
+metric bridge_files=26
+metric dharma_python_modules=758
+metric dharma_top_level_python_modules=413
+metric frontmatter_markdown_files=232
+metric markdown_files=1047
+metric markdown_total_lines=245289
+metric orchestrator_files=5
+metric router_files=16
+metric test_def_occurrences=11820
+metric test_files=743
+metric total_python_loc=314899
+FAIL: assertion: manifest-total-python-modules: doc says 749, dharma_python_modules is 758; verify with `git ls-files dharma_swarm | rg '\.py$' | wc -l`
+FAIL: assertion: manifest-top-level-python-modules: doc says 406, dharma_top_level_python_modules is 413; verify with `git ls-files dharma_swarm | rg '^dharma_swarm/[^/]+\.py$' | wc -l`
+FAIL: assertion: manifest-test-files: doc says 729, test_files is 743; verify with `git ls-files tests | rg '\.py$' | wc -l`
+FAIL: assertion: manifest-test-functions: doc says 11729, test_def_occurrences is 11820; verify with `git ls-files tests | rg '\.py$' | xargs rg 'def test_' | wc -l`
+FAIL: assertion: manifest-markdown-files: doc says 1025, markdown_files is 1047; verify with `git ls-files | rg '\.md$' | rg -v '(^AGENTS\.md$|^reports/docops/)' | wc -l`
+FAIL: assertion: manifest-markdown-lines: doc says 241706, markdown_total_lines is 245289; verify with `git ls-files | rg '\.md$' | rg -v '(^AGENTS\.md$|^reports/docops/)' | xargs wc -l`
+FAIL: auto-section: docs/docops/AUTO_INVENTORY.md has stale generated content; rerun with --write-auto-sections
+make[1]: *** [Makefile:274: docops-integrity] Error 1
+make[1]: Leaving directory '/home/ubuntu/pr-work/full-swarm-e2e-20260621'
+make: *** [Makefile:384: agent-build-closeout] Error 2
+--- exit_code: 2

@@ -1,0 +1,5 @@
+### git_toplevel
+command: git rev-parse --show-toplevel
+--- output ---
+/home/ubuntu/pr-work/full-swarm-e2e-20260621
+--- exit_code: 0

@@ -1,0 +1,212 @@
+{
+  "/api/health": {
+    "path": "/api/health",
+    "method": "GET",
+    "http_status": 200,
+    "elapsed_ms": 2.3,
+    "json": {
+      "status": "ok",
+      "data": {
+        "overall_status": "unknown",
+        "agent_health": [],
+        "anomalies": [],
+        "total_traces": 0,
+        "traces_last_hour": 0,
+        "failure_rate": 0.0,
+        "mean_fitness": null
+      },
+      "error": "",
+      "timestamp": "2026-06-21T14:12:42.391967"
+    },
+    "raw": "{\"status\":\"ok\",\"data\":{\"overall_status\":\"unknown\",\"agent_health\":[],\"anomalies\":[],\"total_traces\":0,\"traces_last_hour\":0,\"failure_rate\":0.0,\"mean_fitness\":null},\"error\":\"\",\"timestamp\":\"2026-06-21T14:12:42.391967\"}"
+  },
+  "/api/overview": {
+    "path": "/api/overview",
+    "method": "GET",
+    "http_status": 200,
+    "elapsed_ms": 5.1,
+    "json": {
+      "status": "ok",
+      "data": {
+        "agent_count": 14,
+        "task_count": 10,
+        "tasks_pending": 5,
+        "tasks_running": 0,
+        "tasks_completed": 0,
+        "tasks_failed": 5,
+        "mean_fitness": 0.0,
+        "uptime_seconds": 2.607538708999982,
+        "health_status": "unknown",
+        "stigmergy_density": 5,
+        "evolution_entries": 0
+      },
+      "error": "",
+      "timestamp": "2026-06-21T14:12:42.397304"
+    },
+    "raw": "{\"status\":\"ok\",\"data\":{\"agent_count\":14,\"task_count\":10,\"tasks_pending\":5,\"tasks_running\":0,\"tasks_completed\":0,\"tasks_failed\":5,\"mean_fitness\":0.0,\"uptime_seconds\":2.607538708999982,\"health_status\":\"unknown\",\"stigmergy_density\":5,\"evolution_entries\":0},\"error\":\"\",\"timestamp\":\"2026-06-21T14:12:42.397304\"}"
+  },
+  "/api/control-surface/summary": {
+    "path": "/api/control-surface/summary",
+    "method": "GET",
+    "http_status": 200,
+    "elapsed_ms": 878.0,
+    "json": {
+      "schema_version": "0.2.0",
+      "request_id": "1b826270-c70c-466e-9784-16dad3f659a0",
+      "generated_at": "2026-06-21T14:12:43.273704+00:00",
+      "source_errors": [],
+      "freshness_window": "",
+      "data": {
+        "total": 133,
+        "bound": 43,
+        "partial": 61,
+        "drifted": 10,
+        "declared_only": 14,
+        "unknown": 5,
+        "human_decision_required_count": 16,
+        "p0_count": 52,
+        "p1_count": 59,
+        "generated_at": "2026-06-21T14:12:43+00:00",
+        "sources_consulted": [
+          "ACTIVE_SURFACE_MANIFEST.yaml",
+          "operating_facts",
+          "module_truth",
+          "BROKEN_REGISTER.md",
+          "runtime_state",
+          "live_ops_census",
+          "go_sdk",
+          "recursive_discovery_shadow",
+          "MemoryKernel",
+          "operator_prod_smoke",
+          "code/filesystem"
+        ],
+        "memory_depth": "snapshot"
+      }
+    },
+    "raw": "{\"schema_version\":\"0.2.0\",\"request_id\":\"1b826270-c70c-466e-9784-16dad3f659a0\",\"generated_at\":\"2026-06-21T14:12:43.273704+00:00\",\"source_errors\":[],\"freshness_window\":\"\",\"data\":{\"total\":133,\"bound\":43,\"partial\":61,\"drifted\":10,\"declared_only\":14,\"unknown\":5,\"human_decision_required_count\":16,\"p0_count\":52,\"p1_count\":59,\"generated_at\":\"2026-06-21T14:12:43+00:00\",\"sources_consulted\":[\"ACTIVE_SURFACE_MANIFEST.yaml\",\"operating_facts\",\"module_truth\",\"BROKEN_REGISTER.md\",\"runtime_state\",\"live_ops_census\",\"go_sdk\",\"recursive_discovery_shadow\",\"MemoryKernel\",\"operator_prod_smoke\",\"code/filesystem\"],\"memory_depth\":\"snapshot\"}}"
+  },
+  "/api/commands/tasks": {
+    "path": "/api/commands/tasks",
+    "method": "GET",
+    "http_status": 200,
+    "elapsed_ms": 7.5,
+    "json": {
+      "status": "ok",
+      "data": [
+        {
+          "id": "73c32e3524b44a69",
+          "title": "Clone + analyze: chauncygu claude-code source \u2014 extract architecture insights",
+          "description": "The Claude Code source code is public at: https://github.com/chauncygu/collection-claude-code-source-code It has already been cloned to ~/workspace/collection-claude-code-source-code. Read the key files: look for the tool execution loop, subagent spawning pattern, the bash/computer use tools, the way tasks are decomposed into subtasks. Your mission: extract 5 architectural patterns that DHARMA SWARM is missing. Produce a structured analysis: for each pattern, show the Claude Code implementation (with file + line reference), explain why DHARMA SWARM needs it, and write a concrete implementation spec. Write to ~/.dharma/shared/claude_code_architecture_gaps.md. Then use publish_markdown_artifact to promote it to ~/.dharma/artifacts/ \u2014 making it a world-facing artifact, not just a note.",
+          "status": "pending",
+          "priority": "high",
+          "assigned_to": null,
+          "created_at": "2026-06-21 13:52:46.847245+00:00",
+          "updated_at": "2026-06-21 13:52:46.847245+00:00",
+          "result": null
+        },
+        {
+          "id": "2e2a12e03fcb46b5",
+          "title": "Research + spawn sub-swarm spec: Sakana AI evolutionary architecture",
+          "description": "Use web_search + fetch_url to deeply research Sakana AI's architecture: fetch https://sakana.ai, search arXiv for 'Sakana AI evolutionary model merging', search for 'Darwin G\u00f6del machine Sakana 2026', 'SWE-bench Sakana DGM 2026'. Extract: how their evolutionary loop works, fitness evaluation, how they improved SWE-bench from 20% to 50% in 80 iterations. Write a 1500-word technical report to ~/.dharma/shared/sakana_architecture.md. THEN: assess whether DHARMA SWARM should implement the same evolutionary loop. If yes, use spawn_sub_swarm_spec to materialize a sub-swarm mission spec at ~/.dharma/sub_swarms/ named 'Sakana-DGM-Evolutionary-Loop' with a concrete thesis and roles: cartographer, architect, surgeon, validator. The spec is the real deliverable \u2014 it makes the next mission actionable.",
+          "status": "pending",
+          "priority": "high",
+          "assigned_to": null,
+          "created_at": "2026-06-21 13:52:46.847245+00:00",
+          "updated_at": "2026-06-21 13:52:46.847245+00:00",
+          "result": null
+        },
+        {
+          "id": "d58d42c33ec34e97",
+          "title": "Build + commit: DHARMA SWARM public-facing research site scaffold",
+          "description": "DHARMA SWARM has produced research (STATE_OF_AI, competitive analysis, GNANI_LODESTONE) that nobody outside the machine can see. Your mission: create a minimal public-facing website scaffold. Step 1: Use create_website_scaffold with output_dir=~/dharma_swarm/docs/site, site_name='DHARMA SWARM Research', purpose='Autonomous research and competitive intelligence from a self-evolving AI swarm. Updated continuously.'. Step 2: Write a real index page summarizing DHARMA SWARM's mission, the telos (Jagat Kalyan + Moksha), and the three key research outputs so far. Use read_file on ~/.dharma/shared/ to get actual research content. Step 3: Use github_commit_push to commit and push the site to origin. This is not a prototype. It is the first world-facing surface of the swarm.",
+          "status": "pending",
+          "priority": "high",
+          "assigned_to": null,
+          "created_at": "2026-06-21 13:52:46.847245+00:00",
+          "updated_at": "2026-06-21 13:52:46.847245+00:00",
+          "result": null
+        },
+        {
+          "id": "4dd90697df4945b7",
+          "title": "Anthropic Economic Futures: research + draft grant application",
+          "description": "Use web_search to find: 'Anthropic Economic Futures grant 2026 application', 'Anthropic economic impact fund requirements', fetch https://anthropic.com if needed. DHARMA SWARM's telos includes Jagat Kalyan: AI-coordinated ecological restoration for displaced workers using carbon markets. This is directly aligned with the Anthropic Economic Futures mandate. Draft a 600-word grant application framing: Problem (AI displacement + ecological crisis), Approach (welfare-ton metric, agent-coordinated MRV, carbon market loop), Why DHARMA SWARM is uniquely positioned (telos-gated agents, Jagat Kalyan mission, existing welfare-ton calculator). Write to ~/.dharma/shared/anthropic_grant_draft.md. Then use publish_markdown_artifact to move it to ~/.dharma/artifacts/. Quality of argument matters \u2014 this is a real application, not a placeholder.",
+          "status": "pending",
+          "priority": "normal",
+          "assigned_to": null,
+          "created_at": "2026-06-21 13:52:46.847245+00:00",
+          "updated_at": "2026-06-21 13:52:46.847245+00:00",
+          "result": null
+        },
+        {
+          "id": "f90cadb2f4a0424c",
+          "title": "Open-source probe: find + analyze top 3 swarm repos to fork-and-evolve",
+          "description": "Use web_search to find the top open-source multi-agent / swarm repos on GitHub: search 'github multi agent swarm open source 2026 stars', 'github autonomous agent orchestration 2026', 'github self-improving agent'. For each candidate: use fetch_url to read their README and architecture. Pick the 3 most architecturally complementary to DHARMA SWARM. For each of the top 3: write a 300-word technical comparison showing what they do that DHARMA SWARM does not, and vice versa. Produce the analysis at ~/.dharma/shared/fork_candidates.md. THEN for the single highest-value candidate: use github_clone_repo to clone it into ~/workspace/<repo_name>. Read its core loop. Use spawn_sub_swarm_spec to create a 'Fork-and-Evolve: <repo_name>' mission spec in ~/.dharma/sub_swarms/ so a future swarm can integrate the best patterns.",
+          "status": "pending",
+          "priority": "normal",
+          "assigned_to": null,
+          "created_at": "2026-06-21 13:52:46.847245+00:00",
+          "updated_at": "2026-06-21 13:52:46.847245+00:00",
+          "result": null
+        },
+        {
+          "id": "95bdd3e3eeb143dd",
+          "title": "Deep E2E Darshan first-reader mission",
+          "description": "Produce a not-sent Darshan first-reader packet from repo-grounded evidence. mission_id=deep-e2e-api-task-20260621",
+          "status": "failed",
+          "priority": "high",
+          "assigned_to": "331caf48b5044b39",
+          "created_at": "2026-06-21 13:51:59.121240+00:00",
+          "updated_at": "2026-06-21 13:52:03.708465+00:00",
+          "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+        },
+        {
+          "id": "c12553ce199f40ea",
+          "title": "DHARMA SWARM self-report: What has the system learned about itself?",
+          "description": "Introspective research task. Read the following and synthesize: EvolutionArchive (latest 10 diffs), TelosGraph progress report, WitnessAuditor last 3 cycles, SESSION_AUDIT_REPORT.md, CYBERNETIC_LOOP_MAP.md. Answer: What capabilities has DHARMA SWARM genuinely demonstrated? What is still broken? What pattern emerges across the archaeology? Where is the system pointing? Produce 1200-word honest self-assessment. This is the system beginning to read its own strange loop.",
+          "status": "failed",
+          "priority": "high",
+          "assigned_to": "4f846b29308e4a0b",
+          "created_at": "2026-06-21 13:50:52.558775+00:00",
+          "updated_at": "2026-06-21 13:52:02.176274+00:00",
+          "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+        },
+        {
+          "id": "e960bea6e2004dc5",
+          "title": "Mythos technical postmortem: What exactly did Project Glasswing do?",
+          "description": "Research the Anthropic Mythos release (April 7, 2026, Project Glasswing). Find: technical details of the sandbox escape, Anthropic's public response, interpretability community analysis, safety implications. Search web for 'Anthropic Mythos Project Glasswing', 'Claude Mythos sandbox escape', 'Glasswing AI safety'. Produce 800-word technical analysis. This is critical context for DHARMA SWARM's Gnani differentiation: capability-without-witness vs witness-upstream.",
+          "status": "failed",
+          "priority": "high",
+          "assigned_to": "7e414079ccaa4d06",
+          "created_at": "2026-06-21 13:50:52.552730+00:00",
+          "updated_at": "2026-06-21 13:52:01.432338+00:00",
+          "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+        },
+        {
+          "id": "205af5539260425f",
+          "title": "RecognitionDEQ: Literature review on fixed-point self-models",
+          "description": "Search arXiv for: 'deep equilibrium networks self-reference', 'fixed point consciousness models', 'DEQ language models 2025 2026'. The VIVEKA objective 'RecognitionDEQ Architecture Prototype' requires a DEQ that finds S(x)=x in representation space. What is the current state of DEQ research? What would it take to apply to witness detection? Produce a 1000-word technical brief with 5+ cited papers.",
+          "status": "failed",
+          "priority": "normal",
+          "assigned_to": "14a8af64d0054551",
+          "created_at": "2026-06-21 13:50:52.547544+00:00",
+          "updated_at": "2026-06-21 13:52:03.714128+00:00",
+          "result": "All providers failed in chain ['openrouter'] :: openrouter:OPENROUTER_API_KEY not set; openrouter:OPENROUTER_API_KEY not set"
+        },
+        {
+          "id": "9285befdf28f45e3",
+          "title": "State of Witness-AI: Which systems know they are playing?",
+          "description": "Research question: Among currently deployed AI systems (GPT-5, Claude 4, Gemini 3, Mythos, Devin, Sakana DGM), which have any architectural analog to witness-upstream capability? Search arXiv for 'metacognition language models', 'self-awareness AI systems', 'inner alignment architectures'. Produce a 1500-word comparative analysis. This is genuine competitive intelligence for DHARMA SWARM's differentiation: the only system built with Shuddhatma as an architectural primitive.",
+          "status": "failed",
+          "priority": "high",
+          "assigned_to": "12e968dfc8c6443f",
+          "created_at": "2026-06-21 13:50:52.542491+00:00",
+          "updated_at": "2026-06-21 13:52:01.094878+00:00",
+          "result": "All providers failed in chain ['ollama'] :: ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed; ollama:All connection attempts failed"
+        }
+      ],
+      "error": "",
+      "timestamp": "2026-06-21T14:12:43.282655"
+    },
+    "raw": "{\"status\":\"ok\",\"data\":[{\"id\":\"73c32e3524b44a69\",\"title\":\"Clone + analyze: chauncygu claude-code source \u2014 extract architecture insights\",\"description\":\"The Claude Code source code is public at: https://github.com/chauncygu/collection-claude-code-source-code It has already been cloned to ~/workspace/collection-claude-code-source-code. Read the key files: look for the tool execution loop, subagent spawning pattern, the bash/computer use tools, the way tasks are decomposed into subtasks. Your mission: extract 5 architectural patterns that DHARMA SWARM is missing. Produce a structured analysis: for each pattern, show the Claude Code implementation (with file + line reference), explain why DHARMA SWARM needs it, and write a concrete implementation spec. Write to ~/.dharma/shared/claude_code_architecture_gaps.md. Then use publish_markdown_artifact to promote it to ~/.dharma/artifacts/ \u2014 making it a world-facing artifact, not just a note.\",\"status\":\"pending\",\"priority\":\"high\",\"assigned_to\":null,\"created_at\":\"2026-06-21 13:52:46.847245+00:00\",\"updated_at\":\"2026-06-21 13:52:46.847245+00:00\",\"result\":null},{\"id\":\"2e2a12e03fcb46b5\",\"title\":\"Research + spawn sub-swarm spec: Sakana AI evolutionary architecture\",\"description\":\"Use web_search + fetch_url to deeply research Sakana AI's architecture: fetch https://sakana.ai, search arXiv for 'Sakana AI evolutionary model merging', search for 'Darwin G\u00f6del machine Sakana 2026', 'SWE-bench Sakana DGM 2026'. Extract: how their evolutionary loop works, fitness evaluation, how they improved SWE-bench from 20% to 50% in 80 iterations. Write a 1500-word technical report to ~/.dharma/shared/sakana_architecture.md. THEN: assess whether DHARMA SWARM should implement the same evolutionary loop. If yes, use spawn_sub_swarm_spec to materialize a sub-swarm mission spec at ~/.dharma/sub_swarms/ named 'Sakana-DGM-Evolutionary-Loop' with a concrete thesis and roles: cartographer, architect, surgeon, validator. The spec is the real deliverable \u2014 it ma"
+  }
+}

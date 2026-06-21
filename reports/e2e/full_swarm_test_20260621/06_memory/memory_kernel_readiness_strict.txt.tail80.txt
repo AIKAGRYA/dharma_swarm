@@ -1,0 +1,80 @@
+      "adapter_mode": "metadata_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "metadata_only",
+      "record_count": null,
+      "required": false,
+      "status": "unsafe_disabled",
+      "surface_exists": false,
+      "surface_id": "repo.literal_tilde_dharma",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": true,
+      "surface_id": "repo.memory_plane",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "file",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": true,
+      "surface_id": "repo.runtime_state",
+      "warnings": []
+    },
+    {
+      "active_status": "snapshot",
+      "adapter_mode": "read_only",
+      "adapter_name": "generic_surface_metadata_adapter",
+      "adapter_registered": true,
+      "adapter_version": "generic_metadata.v1",
+      "atom_types": [
+        "metadata"
+      ],
+      "path_type": "missing",
+      "read_mode": "read_only",
+      "record_count": null,
+      "required": false,
+      "status": "snapshot",
+      "surface_exists": false,
+      "surface_id": "repo.swarm_memory",
+      "warnings": []
+    }
+  ],
+  "warnings": [
+    "home.codex_memory:surface_missing",
+    "home.knowledge_wiki:surface_missing",
+    "home.memory_plane:surface_missing",
+    "home.smriti:surface_missing"
+  ]
+}
+make: *** [Makefile:344: memory-kernel-readiness-strict] Error 5
+--- exit_code: 2

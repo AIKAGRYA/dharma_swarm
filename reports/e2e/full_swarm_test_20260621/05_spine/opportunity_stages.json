@@ -1,0 +1,14 @@
+{
+  "http_status": 200,
+  "json": {
+    "stages": [
+      "scope",
+      "validate",
+      "deep_research",
+      "capability",
+      "mvp",
+      "first_artifact"
+    ]
+  },
+  "raw": "{\"stages\":[\"scope\",\"validate\",\"deep_research\",\"capability\",\"mvp\",\"first_artifact\"]}"
+}

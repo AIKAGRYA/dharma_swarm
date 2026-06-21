@@ -1,0 +1,6 @@
+### make_hygiene_audit
+command: make hygiene-audit
+--- output ---
+scripts/governance/hygiene/scan.sh
+wrote docs/governance/hygiene/baselines/2026-06-21.txt
+--- exit_code: 0

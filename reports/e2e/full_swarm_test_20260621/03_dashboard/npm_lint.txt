@@ -1,0 +1,59 @@
+### npm_lint
+command: npm --prefix dashboard run lint
+--- output ---
+
+> dashboard@0.1.0 lint
+> eslint
+
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/agents/[id]/config/page.tsx
+  8:19  warning  'tierColor' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/agents/[id]/layout.tsx
+  22:15  warning  'AgentDetailData' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/agents/[id]/page.tsx
+  10:49  warning  'TaskStatusBadge' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/lineage/page.tsx
+  52:11  warning  'nodeMap' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/ontology/page.tsx
+  50:49  warning  'i' is defined but never used              @typescript-eslint/no-unused-vars
+  52:13  warning  'cols' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/app/dashboard/synthesizer/page.tsx
+    9:10  warning  'useEffect' is defined but never used                   @typescript-eslint/no-unused-vars
+   31:3   warning  'MessageSquare' is defined but never used               @typescript-eslint/no-unused-vars
+   33:3   warning  'Clock' is defined but never used                       @typescript-eslint/no-unused-vars
+   35:3   warning  'XCircle' is defined but never used                     @typescript-eslint/no-unused-vars
+  131:10  warning  'selectedMark' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  132:10  warning  'selectedReport' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  132:26  warning  'setSelectedReport' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  133:10  warning  'selectedAudit' is assigned a value but never used      @typescript-eslint/no-unused-vars
+  133:25  warning  'setSelectedAudit' is assigned a value but never used   @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/components/agent-workspace/shared.tsx
+  3:26  warning  'LucideIcon' is defined but never used  @typescript-eslint/no-unused-vars
+  4:10  warning  'HPBar' is defined but never used       @typescript-eslint/no-unused-vars
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/components/cockpit/SystemTruthMatrix.tsx
+  268:17  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/components/cockpit/SystemTruthMatrix.tsx:268:17
+  266 |   );
+  267 |
+> 268 |   const table = useReactTable({
+      |                 ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  269 |     data: filteredData,
+  270 |     columns,
+  271 |     state: { sorting, columnFilters, columnVisibility, globalFilter },  react-hooks/incompatible-library
+
+/home/ubuntu/pr-work/full-swarm-e2e-20260621/dashboard/src/hooks/useAgentChat.ts
+  125:6  warning  React Hook useEffect has a missing dependency: 'store'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 19 problems (0 errors, 19 warnings)
+
+--- exit_code: 0

@@ -1,0 +1,37 @@
+### a2a_send_help
+command: python scripts/runtime/a2a_send.py --help
+--- output ---
+usage: a2a_send.py [-h] --to TO --file FILE [--from SENDER] [--kind KIND]
+                   [--route {a2a,agent-inbox}] [--agent-uid AGENT_UID]
+                   [--wait WAIT] [--timeout TIMEOUT]
+                   [--receipt-dir RECEIPT_DIR] [--runtime-db RUNTIME_DB]
+                   [--packet-id PACKET_ID] [--json] [--insecure-tls]
+
+Operator surface for sending one A2A packet to an agent over NATS.
+
+options:
+  -h, --help            show this help message and exit
+  --to TO               agent lane, e.g. devin, codex, claude
+  --file FILE           packet file to send
+  --from SENDER         sender identity
+  --kind KIND           envelope kind
+  --route {a2a,agent-inbox}
+                        NATS subject route: dharma.a2a.<agent> compatibility
+                        or dharma.agent.<agent_uid>.inbox hot-contact path
+  --agent-uid AGENT_UID
+                        stable agent uid for --route agent-inbox; defaults to
+                        --to with known aliases
+  --wait WAIT           seconds to wait for consume/reply
+  --timeout TIMEOUT     connect/publish timeout seconds
+  --receipt-dir RECEIPT_DIR
+  --runtime-db RUNTIME_DB
+                        RuntimeStateStore database for direct-publish
+                        idempotency; defaults to DHARMA_STATE_DIR/runtime.db
+                        or ~/.dharma/state/runtime.db
+  --packet-id PACKET_ID
+                        explicit packet id for idempotent retries; defaults to
+                        a fresh random id
+  --json                print the receipt JSON to stdout
+  --insecure-tls        skip TLS verification (only until a NATS CA pem is
+                        distributed; ignored when a CA pem secret is present)
+--- exit_code: 0

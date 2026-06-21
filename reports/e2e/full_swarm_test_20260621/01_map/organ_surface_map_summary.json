@@ -1,0 +1,18 @@
+{
+  "phase": "00-01",
+  "commit": "726bc9d4d4add60c46f102d1ceee3a065c474892",
+  "organs_mapped": 12,
+  "preflight_outputs": [
+    "make_status.txt",
+    "git_toplevel.txt",
+    "make_onboard.txt",
+    "make_orient.txt",
+    "git_status.txt",
+    "git_head.txt"
+  ],
+  "notable_findings": [
+    "make onboard wrote /home/ubuntu/.dharma/ops/onboard_receipt.json outside repo-local state root",
+    "make orient reported Loop 1 NOT LIVE/no persisted EvidenceReceipt yet",
+    "make orient projected 15 open-like broken register items"
+  ]
+}

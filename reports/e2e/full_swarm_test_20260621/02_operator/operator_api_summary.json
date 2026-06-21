@@ -1,0 +1,78 @@
+{
+  "/api/health": {
+    "http_status": 200,
+    "status": "ok",
+    "error": ""
+  },
+  "/openapi.json": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/overview": {
+    "http_status": 200,
+    "status": "ok",
+    "error": ""
+  },
+  "/api/control-surface/summary": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/control-surface/rows": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/control-surface/ds-goal/cards": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/control-surface/agentops/cards": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/control-surface/a2a/cards": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/control-surface/semantic-receipts/cards": {
+    "http_status": 200,
+    "status": null,
+    "error": null
+  },
+  "/api/commands/tasks": {
+    "http_status": 200,
+    "status": "ok",
+    "error": ""
+  },
+  "api_task_create": {
+    "http_status": 200,
+    "json": {
+      "status": "ok",
+      "data": {
+        "id": "95bdd3e3eeb143dd",
+        "title": "Deep E2E Darshan first-reader mission",
+        "status": "pending",
+        "priority": "high"
+      },
+      "error": "",
+      "timestamp": "2026-06-21T13:51:59.126669"
+    }
+  },
+  "api_task_dispatch": {
+    "http_status": 200,
+    "json": {
+      "status": "ok",
+      "data": {
+        "dispatched": 5
+      },
+      "error": "",
+      "timestamp": "2026-06-21T13:52:02.469091"
+    }
+  },
+  "tasks_after_count": 5
+}

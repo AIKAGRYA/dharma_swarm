@@ -1,0 +1,42 @@
+### pytest_authority_revenue_loop
+command: python -m pytest tests/test_authority_revenue_loop.py -v
+--- output ---
+============================= test session starts ==============================
+platform linux -- Python 3.12.8, pytest-9.1.0, pluggy-1.6.0 -- /home/ubuntu/repos/dharma-swarm/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'dev' -> max_examples=20
+rootdir: /home/ubuntu/pr-work/full-swarm-e2e-20260621
+configfile: pyproject.toml
+plugins: anyio-4.14.0, timeout-2.4.0, cov-7.1.0, hypothesis-6.155.3, asyncio-1.4.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 23 items
+
+tests/test_authority_revenue_loop.py::TestGovernanceGuards::test_uplift_guard_runner_importable PASSED [  4%]
+tests/test_authority_revenue_loop.py::TestGovernanceGuards::test_uplift_guard_kernel_integrity_passes PASSED [  8%]
+tests/test_authority_revenue_loop.py::TestGovernanceGuards::test_test_hygiene_importable PASSED [ 13%]
+tests/test_authority_revenue_loop.py::TestGovernanceGuards::test_active_surface_manifest_exists PASSED [ 17%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_create_and_read_task_claim PASSED [ 21%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_heartbeat_claim PASSED [ 26%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_close_claim PASSED [ 30%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_create_and_read_delegation_run PASSED [ 34%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_close_delegation_run PASSED [ 39%]
+tests/test_authority_revenue_loop.py::TestRuntimeStateClaims::test_stale_after_semantics PASSED [ 43%]
+tests/test_authority_revenue_loop.py::TestOpportunityDispatcher::test_dispatch_creates_all_stages PASSED [ 47%]
+tests/test_authority_revenue_loop.py::TestOpportunityDispatcher::test_dispatch_claims_are_durable PASSED [ 52%]
+tests/test_authority_revenue_loop.py::TestOpportunityRefill::test_refill_produces_all_stages PASSED [ 56%]
+tests/test_authority_revenue_loop.py::TestOpportunityRefill::test_revenue_packet_written PASSED [ 60%]
+tests/test_authority_revenue_loop.py::TestOpportunityRefill::test_deep_research_quarantine PASSED [ 65%]
+tests/test_authority_revenue_loop.py::TestTelicLifecycleIntegrity::test_full_lifecycle_chain PASSED [ 69%]
+tests/test_authority_revenue_loop.py::TestTelicLifecycleIntegrity::test_empty_proposal_id_detected PASSED [ 73%]
+tests/test_authority_revenue_loop.py::TestTelicLifecycleIntegrity::test_unknown_proposal_id_detected PASSED [ 78%]
+tests/test_authority_revenue_loop.py::TestTelicLifecycleIntegrity::test_orphan_value_event_detected SKIPPED [ 82%]
+tests/test_authority_revenue_loop.py::TestEconomicTelemetry::test_record_economic_event_sync PASSED [ 86%]
+tests/test_authority_revenue_loop.py::TestEconomicTelemetry::test_economic_engine_records_expense PASSED [ 91%]
+tests/test_authority_revenue_loop.py::TestWebSocketStateContract::test_manager_initial_state PASSED [ 95%]
+tests/test_authority_revenue_loop.py::TestWebSocketStateContract::test_manager_explicit_state PASSED [100%]
+
+======================== 22 passed, 1 skipped in 1.90s =========================
+--- exit_code: 0

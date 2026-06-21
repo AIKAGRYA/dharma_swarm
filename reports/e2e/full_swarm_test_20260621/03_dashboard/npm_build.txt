@@ -1,0 +1,63 @@
+### npm_build
+command: npm --prefix dashboard run build
+--- output ---
+
+> dashboard@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.7s
+  Running TypeScript ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/32) ...
+  Generating static pages using 7 workers (8/32)
+  Generating static pages using 7 workers (16/32)
+  Generating static pages using 7 workers (24/32)
+✓ Generating static pages using 7 workers (32/32) in 630.8ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /dashboard
+├ ○ /dashboard/agents
+├ ƒ /dashboard/agents/[id]
+├ ƒ /dashboard/agents/[id]/chat
+├ ƒ /dashboard/agents/[id]/config
+├ ƒ /dashboard/agents/[id]/connections
+├ ƒ /dashboard/agents/[id]/memory
+├ ƒ /dashboard/agents/[id]/tasks
+├ ○ /dashboard/audit
+├ ○ /dashboard/blocks
+├ ○ /dashboard/claude
+├ ○ /dashboard/cockpit
+├ ○ /dashboard/command-post
+├ ○ /dashboard/control-surface
+├ ○ /dashboard/ecosystem
+├ ○ /dashboard/eval
+├ ○ /dashboard/evolution
+├ ○ /dashboard/gates
+├ ○ /dashboard/glm5
+├ ○ /dashboard/lineage
+├ ○ /dashboard/log
+├ ○ /dashboard/models
+├ ○ /dashboard/modules
+├ ○ /dashboard/observatory
+├ ○ /dashboard/ontology
+├ ○ /dashboard/qwen35
+├ ○ /dashboard/qwen35/telemetry
+├ ○ /dashboard/runtime
+├ ○ /dashboard/stigmergy
+├ ○ /dashboard/synthesizer
+├ ○ /dashboard/tasks
+├ ○ /dashboard/telemetry
+├ ○ /dashboard/timeline
+└ ○ /dashboard/workflows
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+--- exit_code: 0

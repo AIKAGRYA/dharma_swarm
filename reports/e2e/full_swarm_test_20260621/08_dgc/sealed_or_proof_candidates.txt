@@ -1,0 +1,5 @@
+./reports/e2e/full_swarm_test_20260621/08_dgc/sealed_or_proof_candidates.txt
+./reports/dgc_self_proving_packet_20260313/proof_packet.md
+./dharma_swarm/sealed_packet_apply.py
+reports/e2e/full_swarm_test_20260621/08_dgc/sealed_or_proof_candidates.txt
+reports/dgc_self_proving_packet_20260313/proof_packet.md

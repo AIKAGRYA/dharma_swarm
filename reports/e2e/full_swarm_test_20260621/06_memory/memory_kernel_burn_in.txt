@@ -1,0 +1,47 @@
+### memory_kernel_burn_in
+command: make memory-kernel-burn-in
+--- output ---
+PYTHONPATH=. python3 scripts/memory_kernel_burn_in.py --repo-root . --fail-on-blocked
+{
+  "receipt": {
+    "context_case_count": 11,
+    "context_case_failure_count": 0,
+    "context_case_hard_failure_count": 0,
+    "created_at": "2026-06-21T14:05:21Z",
+    "digest": "423602b5fe559831d79a11c8fc3c9d61a601fa4ca054dcf9800e70611bab3706",
+    "parity_hard_failure_count": 0,
+    "receipt_id": "memory_kernel_burn_in:423602b5fe559831d79a11c8",
+    "rollback_available": true,
+    "schema_version": "memory_kernel_burn_in_receipt.v1",
+    "shadow_scenario_count": 7,
+    "status": "blocked",
+    "strict_readiness_ready": false,
+    "synthetic_canary_detected": true,
+    "warning_count": 66,
+    "warnings": [
+      "burn_in_receipt_is_append_only_artifact",
+      "strict_readiness_not_ready"
+    ]
+  },
+  "status": {
+    "blockers": [
+      "burn_in_min_run_count_not_met",
+      "burn_in_latest_receipt_missing"
+    ],
+    "burn_in_ready": false,
+    "immutable_log": true,
+    "latest_age_seconds": null,
+    "latest_created_at": "",
+    "latest_receipt_id": "",
+    "max_age_seconds": 86400,
+    "parity_hard_failure_count": 0,
+    "ready_receipt_count": 0,
+    "receipt_path": "/home/ubuntu/pr-work/full-swarm-e2e-20260621/reports/memory_kernel/burn_in_receipts.jsonl",
+    "receipts": [],
+    "required_run_count": 1,
+    "schema_version": "memory_kernel_burn_in_receipt.v1",
+    "synthetic_canary_detected": false
+  }
+}
+make: *** [Makefile:350: memory-kernel-burn-in] Error 6
+--- exit_code: 2

@@ -1,0 +1,5 @@
+### truth_graph_nats_e2e_demo_help
+command: python scripts/governance/truth_graph_nats_e2e_demo.py --help
+--- output ---
+NATS_E2E_FAIL: [Errno 111] Connection refused
+--- exit_code: 1

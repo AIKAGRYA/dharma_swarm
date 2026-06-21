@@ -1,0 +1,5 @@
+### git_head
+command: git rev-parse HEAD
+--- output ---
+726bc9d4d4add60c46f102d1ceee3a065c474892
+--- exit_code: 0

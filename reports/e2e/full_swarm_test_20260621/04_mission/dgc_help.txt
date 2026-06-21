@@ -1,0 +1,120 @@
+### dgc_help
+command: dgc --help
+--- output ---
+usage: dgc [-h]
+           {map,status,runtime-status,mission-status,mission-brief,campaign-brief,canonical-status,value-events,trace-attractor,chat,dashboard,ui,up,down,daemon-status,pulse,organism-pulse,invariants,transcendence,orchestrate-live,swarm,stress,full-power-probe,probe,provider-smoke,provider-matrix,context,memory,witness,develop,gates,health,health-check,verify-baseline,doctor,setup,migrate,model,agni,spawn,agent,task,evolve,dharma,stigmergy,hum,cascade,forge,loops,run,rag,flywheel,reciprocity,ouroboros,eval,self-improve,log,audit,review,instincts,loop-status,skills,route,orchestrate,autonomy,context-search,intent-plan,compose,execute-compose,overnight,handoff,agent-memory,sprint,ledger,semantic,bootstrap,field,ginko,foundations,telos,meta,prune,xray,foreman,review-cycle,initiatives,cron,gateway,free-fleet,model-catalog,custodians,cross}
+           ...
+
+DGC -- Dharmic Godel Claw unified CLI
+
+positional arguments:
+  {map,status,runtime-status,mission-status,mission-brief,campaign-brief,canonical-status,value-events,trace-attractor,chat,dashboard,ui,up,down,daemon-status,pulse,organism-pulse,invariants,transcendence,orchestrate-live,swarm,stress,full-power-probe,probe,provider-smoke,provider-matrix,context,memory,witness,develop,gates,health,health-check,verify-baseline,doctor,setup,migrate,model,agni,spawn,agent,task,evolve,dharma,stigmergy,hum,cascade,forge,loops,run,rag,flywheel,reciprocity,ouroboros,eval,self-improve,log,audit,review,instincts,loop-status,skills,route,orchestrate,autonomy,context-search,intent-plan,compose,execute-compose,overnight,handoff,agent-memory,sprint,ledger,semantic,bootstrap,field,ginko,foundations,telos,meta,prune,xray,foreman,review-cycle,initiatives,cron,gateway,free-fleet,model-catalog,custodians,cross}
+    map                 Living map — all 8 layers, regenerated fresh from live
+                        sources
+    status              System status overview
+    runtime-status      Canonical runtime control-plane summary
+    mission-status      Mission readiness lanes + gap report
+    mission-brief       Show active mission continuity state
+    campaign-brief      Show active campaign continuity state
+    canonical-status    Show canonical DGC/SAB repo topology
+    value-events        List operator_brief ValueEvents grouped by agent
+    trace-attractor     Project a trace_id into an operator-visible
+                        AttractorPacket
+    chat                Launch native Claude Code interactive UI
+    dashboard           Launch DGC dashboard (TUI)
+    ui                  Show canonical operator-surface launch paths
+    up                  Start the daemon
+    down                Stop the daemon
+    daemon-status       Show daemon state
+    pulse               Run one heartbeat pulse
+    organism-pulse      Run one canonical organism pulse
+                        (sense→constrain→execute→evaluate→adapt)
+    invariants          Show the 4 computable system invariants
+    transcendence       Show transcendence metrics (ensemble vs individual)
+    orchestrate-live    Run all DGC systems concurrently (live orchestrator)
+    swarm               Swarm orchestrator + overnight/live
+    stress              Run max-capacity DGC stress harness
+    full-power-probe (probe)
+                        Run the reusable operator-facing full-power probe
+    provider-smoke      Probe local and external provider lanes
+    provider-matrix     Run the live provider/model matrix harness
+    context             Load context for a domain
+    memory              Show memory status
+    witness             Record a witness observation
+    develop             Record a development marker
+    gates               Run telos gates on an action
+    health              Ecosystem file health
+    health-check        Monitor-based system health check
+    verify-baseline     Full baseline verification (gates + health)
+    doctor              Deep runtime diagnostics and fix guidance
+    setup               Install dependencies
+    migrate             Migrate old DGC memory
+    model               Model management and switching
+    agni                Run command on AGNI VPS
+    spawn               Spawn a new agent
+    agent               Autonomous agents with multi-step reasoning and tool
+                        use
+    task                Task management
+    evolve              Evolution engine commands
+    dharma              Dharma subsystem commands
+    stigmergy           Stigmergy marks and hot paths
+    hum                 Subconscious associations
+    cascade             Run strange loop cascade domain
+    forge               Score artifact through quality forge
+    loops               Show strange loop status and cascade history
+    run                 Run orchestration loop
+    rag                 NVIDIA RAG integration commands
+    flywheel            NVIDIA Data Flywheel commands
+    reciprocity         Planetary Reciprocity Commons commands
+    ouroboros           Behavioral self-observation tools
+    eval                ECC eval harness — measure system health
+    self-improve        Self-improvement cycle — strange loop
+    log                 Conversation log — what was said + promises
+    audit               Harness audit — 7-dimension scorecard
+    review              Review bridge — ruff findings as evolution proposals
+    instincts           Instinct bridge — ECC ↔ fitness signals
+    loop-status         Loop supervisor — health of all loops
+    skills              List discovered skills (v0.4.0)
+    route               Route a task to best skill (v0.4.0)
+    orchestrate         Decompose and orchestrate a task (v0.4.0)
+    autonomy            Check autonomy for an action (v0.4.0)
+    context-search      Search for task-relevant context (v0.4.0)
+    intent-plan         Inspect the intent-to-work-packet pipeline for a
+                        prompt (non-executing)
+    compose             Compose a task into DAG execution plan (v0.4.1)
+    execute-compose     Compose and execute a task DAG end-to-end
+    overnight           Run overnight autonomous loop
+    handoff             Create a structured agent handoff (v0.4.1)
+    agent-memory        Agent self-editing memory (v0.4.1)
+    sprint              Generate today's adaptive 8-hour sprint prompt
+    ledger              Inspect orchestrator session ledgers
+    semantic            Semantic Evolution Engine commands
+    bootstrap           Generate bootstrap manifest (NOW.json) — orients any
+                        new LLM instance
+    field               D3 External AI Field Intelligence Engine
+    ginko               Shakti Ginko autonomous economic engine
+    foundations         Intellectual pillars and syntheses
+    telos               Telos Engine research documents
+    meta                Overseeing I — wholistic system assessment
+    prune               Sweep the zen garden — cut noise, keep signal
+    xray                Run Repo X-Ray — codebase analysis for any repo
+    foreman             The Foreman — focused quality forge
+    review-cycle        Generate 6-hour review cycle report
+    initiatives         Initiative depth ledger
+    cron                Cron job scheduler (v0.6.0)
+    gateway             Start messaging gateway (v0.6.0)
+    free-fleet          Show free-tier OpenRouter model fleet
+    model-catalog       Show canonical model packs and routing selectors
+    custodians          Autonomous code maintenance fleet
+    cross               YATAGARASU cross-pollination — weave lattice
+                        connections
+
+options:
+  -h, --help            show this help message and exit
+
+DGC CLI — unified command interface for the dharmic swarm.
+
+Thin dispatcher: argparse definitions + match-case routing.
+Command implementations live in dharma_swarm.terminal_commands.
+See docs/plans/OPERATOR_COMMAND_VISION.md for the architecture vision.
+--- exit_code: 0

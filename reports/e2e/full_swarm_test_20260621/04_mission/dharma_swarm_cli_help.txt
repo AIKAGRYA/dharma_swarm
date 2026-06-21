@@ -1,0 +1,34 @@
+### dharma_swarm_cli_help
+command: python -m dharma_swarm.cli --help
+--- output ---
+
+ Usage: python -m dharma_swarm.cli [OPTIONS] COMMAND [ARGS]...
+
+ DHARMA SWARM orchestrator CLI
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --install-completion          Install completion for the current shell.      │
+│ --show-completion             Show completion for the current shell, to copy │
+│                               it or customize the installation.              │
+│ --help                        Show this message and exit.                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ init             Initialize a new DHARMA SWARM workspace.                    │
+│ spawn            Spawn a new agent.                                          │
+│ status           Show swarm status.                                          │
+│ context          Show what context an agent would receive.                   │
+│ context-full     Dump full context for an agent (for inspection).            │
+│ run              Run the orchestration loop.                                 │
+│ evolve-verify    Verify cryptographic integrity of evolution archive (Merkle │
+│                  chain).                                                     │
+│ evolve-economic  Show economic impact report for an evolution entry.         │
+│ health           Run system health check.                                    │
+│ sprint           Generate today's adaptive 8-hour sprint prompt from live    │
+│                  system state.                                               │
+│ task             Task management                                             │
+│ memory           Memory operations                                           │
+│ ledger           Orchestrator ledger commands                                │
+│ evolve           Evolution engine commands                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+--- exit_code: 0

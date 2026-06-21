@@ -1,0 +1,86 @@
+{
+  ".e2e_state/full_swarm_test_20260621/state/runtime.db": {
+    "tables": [
+      "sessions",
+      "task_claims",
+      "delegation_runs",
+      "workspace_leases",
+      "artifact_records",
+      "artifact_links",
+      "memory_facts",
+      "memory_edges",
+      "context_bundles",
+      "operator_actions",
+      "session_events",
+      "session_events_fts",
+      "session_events_fts_data",
+      "session_events_fts_idx",
+      "session_events_fts_content",
+      "session_events_fts_docsize",
+      "session_events_fts_config",
+      "execution_identities",
+      "runtime_receipts",
+      "idempotency_records",
+      "event_log",
+      "source_documents",
+      "source_chunks",
+      "index_runs",
+      "retrieval_log",
+      "conversation_turns",
+      "idea_shards",
+      "idea_links",
+      "idea_uptake"
+    ],
+    "task_claims": {
+      "total": 24,
+      "matching": 0
+    },
+    "delegation_runs": {
+      "total": 24,
+      "matching": 0
+    },
+    "runtime_receipts": {
+      "total": 54,
+      "matching": 54
+    },
+    "idempotency_records": {
+      "total": 0,
+      "matching": 0
+    }
+  },
+  ".e2e_state/full_swarm_test_20260621/home/.dharma/ontology.db": {
+    "tables": [
+      "_meta",
+      "objects",
+      "links",
+      "action_log",
+      "objects_fts",
+      "objects_fts_data",
+      "objects_fts_idx",
+      "objects_fts_docsize",
+      "objects_fts_config"
+    ]
+  },
+  ".e2e_state/full_swarm_test_20260621/home/.dharma/state/runtime.db": {
+    "tables": [
+      "agent_identity",
+      "agent_reward_ledger",
+      "agent_reputation",
+      "team_roster",
+      "workflow_scores",
+      "routing_decisions",
+      "policy_decisions",
+      "intervention_outcomes",
+      "economic_events",
+      "external_outcomes",
+      "overnight_metrics"
+    ]
+  },
+  ".e2e_state/full_swarm_test_20260621/home/.dharma/agent_memory/memories.db": {
+    "tables": [
+      "memories",
+      "sqlite_sequence",
+      "shared_memories"
+    ]
+  }
+}
