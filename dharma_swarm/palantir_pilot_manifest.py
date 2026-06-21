@@ -14,6 +14,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DHARMA_HOME = Path.home() / ".dharma"
+DHARMA_HOME_SURFACE = str(Path("~") / ".dharma")
 
 AGENT_ID = "palantir_pilot"
 CALLSIGN = "palantir-pilot"
@@ -56,9 +57,9 @@ OWNED_SURFACES = [
     "scripts/research/palantir_query_cookbook.py",
     "scripts/research/palantir_learning_backlog.py",
     "tests/test_palantir_pilot.py",
-    "~/.dharma/knowledge/wiki/research/palantir-pilot.md",
-    "~/.dharma/knowledge/wiki/research/palantir-pilot/**",
-    "~/.dharma/knowledge/wiki/raw/palantir-pilot/**",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/research/palantir-pilot.md",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/research/palantir-pilot/**",
+    f"{DHARMA_HOME_SURFACE}/knowledge/wiki/raw/palantir-pilot/**",
 ]
 
 FORBIDDEN_ACTIONS = [
@@ -475,4 +476,3 @@ def write_manifest_json(path: Path, manifest: dict[str, Any]) -> None:
 def write_wiki_home(path: Path, manifest: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(format_markdown(manifest), encoding="utf-8")
-
