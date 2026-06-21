@@ -1292,6 +1292,8 @@ def render_model_key_routing() -> None:
     print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
     print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
     print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
+    print("  Egress: a key needs its host on the env network allowlist (more hosts = more models = more freedom)")
+    print("          list/verify: python3 scripts/ops/provider_egress_hosts.py  ·  'Host not in allowlist' = env policy, not code")
     print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
     print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
 

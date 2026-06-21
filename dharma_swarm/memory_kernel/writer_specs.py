@@ -557,6 +557,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "Packet provenance checker script is not present on current main.",
         ),
         MemoryWriterSpec(
+            "holon_talk.talk_receipts",
+            "scripts/holon_talk.py",
+            "talk",
+            ("home.holon_agents",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.HIGH,
+            "Sovereign holon talk receipts are coordination evidence, not semantic canon.",
+        ),
+        MemoryWriterSpec(
             "orchestrate_live.revenue_intel_signal",
             "dharma_swarm.orchestrate_live",
             "_on_revenue_intel",

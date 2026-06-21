@@ -13,7 +13,10 @@ build/
 
 # Local runtime state (machine-specific)
 .claude-flow/
-.claude/
+.claude/*
+# Keep the Claude Code on the web SessionStart hook + its registration tracked.
+!.claude/hooks/
+!.claude/settings.json
 .swarm/
 .dharma_baseline/
 .dharma_test/

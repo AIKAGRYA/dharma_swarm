@@ -5,6 +5,13 @@
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
+> **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
+>
+> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate documented here (working LLM provider with valid API key) is unchanged — a runtime configuration concern, not a code-path concern.
+> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) re-verified present. Status PARTIAL unchanged.
+>
+> No new BLOCKERs surfaced. The full re-running of "Evidence From ~/.dharma/" section requires live-seat access and is deferred.
+
 ---
 
 ## Canonical Truth Source

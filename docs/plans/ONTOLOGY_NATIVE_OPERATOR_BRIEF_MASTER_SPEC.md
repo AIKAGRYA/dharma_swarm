@@ -1,6 +1,14 @@
 # Master Build Spec — Ontology-Native Operator Brief (Daily Insight Brief)
 
-**Status:** spec, not implemented
+> **DEPRECATED — retained as historical reference** (re-verified 2026-06-15 by perplexity-computer).
+> Per `docs/governance/ACTIVE_TRACK.yaml`, this master spec is superseded by the `cockpit-control-surface-2026-05` lane. First ontology-native seam shipped at commit `695f149`; runtime artifact seam wiring shipped at `e0cdb79`. Retained for citation by `scripts/governance/agent_onboard.py` and the active-track notes. Do not pick this up as a fresh build target.
+>
+> Deprecated: 2026-06-15
+> Reason: Superseded by `cockpit-control-surface-2026-05` lane (SHIPPED); first seam shipped at `695f149`, runtime artifact seam wiring at `e0cdb79`.
+> Replacement: `docs/governance/ACTIVE_TRACK.yaml` (current build portfolio)
+> Review / removal date: 2026-09-15
+
+**Status:** **DEPRECATED — historical reference** (was: spec, not implemented; portions shipped via cockpit lane)
 **Owner of:** the contract for the first ontology-native seam in dharma_swarm.
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md), [`docs/governance/SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md), [`reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`](../../reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md).
 **Companion:** [`HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md`](HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md) (copy-paste handoff for the next code agent).

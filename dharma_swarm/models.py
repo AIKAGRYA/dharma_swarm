@@ -130,6 +130,7 @@ class ProviderType(str, Enum):
     SAMBANOVA = "sambanova"
     MISTRAL = "mistral"
     CHUTES = "chutes"
+    ZHIPU = "zhipu"
 
 
 class AutonomyLevel(str, Enum):
