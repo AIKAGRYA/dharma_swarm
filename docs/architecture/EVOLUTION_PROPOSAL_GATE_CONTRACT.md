@@ -44,12 +44,12 @@ python3 scripts/diagnostics/proposal_gate_probe.py -d "..." --diff "+x"
 ```
 
 It runs the candidate through the real `gate_check` path and prints a ✅/❌ per
-gate plus the final decision. This is the authoritative way to re-derive the
-contract if the gates change.
+gate plus the final decision. This is the reliable way to re-derive the
+contract directly from the gate code if the gates change.
 
 ## The one correct way to build a passing proposal (tests)
 
-`tests/evolution_gate_helpers.py` is the **single source of truth**. Use it
+`tests/evolution_gate_helpers.py` is the **one helper to reach for**. Use it
 instead of hand-crafting descriptions:
 
 ```python
@@ -68,7 +68,7 @@ await engine.propose(component="x.py", change_type="mutation",
 ```
 
 The helper is **self-validated** by `tests/test_evolution_gate_helpers.py`: if a
-gate changes its requirements, that test fails loudly at the source of truth
+gate changes its requirements, that test fails loudly in the helper itself
 instead of silently rotting across every dependent evolution test. It also
 asserts that a *terse* proposal is still rejected, so the helper can't be masking
 a gate that has gone permissive.
