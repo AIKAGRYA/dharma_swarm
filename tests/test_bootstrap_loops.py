@@ -71,6 +71,23 @@ def _runtime_delegation_statuses(db_path: Path) -> list[str]:
     return [str(row[0]) for row in rows]
 
 
+async def _await_delegation_status(
+    db_path: Path, expected: str, *, timeout: float = 5.0
+) -> None:
+    """Poll the delegation_runs row until it reaches ``expected``.
+
+    The orchestrator runs ``_execute_task`` as a detached background task, so a
+    fixed sleep races the failure-recording path (claim + run + receipts + retry
+    requeue). Poll for the terminal status instead so the test is deterministic
+    on slow runners rather than wedged to one machine's timing.
+    """
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        if expected in _runtime_delegation_statuses(db_path):
+            return
+        await asyncio.sleep(0.05)
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Signal Bus round-trip (Loop 1 backbone — every loop uses signal bus)
 # ---------------------------------------------------------------------------
@@ -500,7 +517,7 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
 
     result = await orch.tick()
     assert result["dispatched"] >= 1
-    await asyncio.sleep(0.1)
+    await _await_delegation_status(runtime_db_path, "failed")
 
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
