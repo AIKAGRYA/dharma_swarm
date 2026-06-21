@@ -89,6 +89,7 @@ TIER_FREE: tuple[ProviderType, ...] = (
 )
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
+    ProviderType.ZHIPU,          # GLM-4.6 direct (z.ai/Zhipu first-party lane)
     ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
     ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
@@ -309,6 +310,7 @@ MODEL_INTELLIGENCE: dict[ProviderType, int] = {
     ProviderType.CODEX: 70,            # GPT-5-class via subscription
     # Free / cheap frontier
     ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
+    ProviderType.ZHIPU: 67,            # GLM-4.6 direct (z.ai/Zhipu)
     ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
     ProviderType.GROQ: 64,             # Kimi K2 1T MoE
     ProviderType.CEREBRAS: 63,         # Qwen3 235B

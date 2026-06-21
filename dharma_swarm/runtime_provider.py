@@ -38,6 +38,8 @@ from dharma_swarm.api_keys import (
     SILICONFLOW_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
     TOGETHER_BASE_URL_ENV,
+    ZHIPU_API_KEY_ENV,
+    ZHIPU_BASE_URL_ENV,
     env_value,
     normalize_env_aliases,
 )
@@ -61,6 +63,8 @@ GOOGLE_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1"
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 CHUTES_BASE_URL = "https://api.chutes.ai/v1"
+# z.ai / Zhipu OpenAI-compatible endpoint (GLM models, first-party lane)
+ZHIPU_BASE_URL = "https://api.z.ai/api/paas/v4"
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     default_model,
@@ -80,6 +84,7 @@ DEFAULT_SAMBANOVA_MODEL = default_model(ProviderType.SAMBANOVA)
 DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
 DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
 DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
+DEFAULT_ZHIPU_MODEL = default_model(ProviderType.ZHIPU)
 DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
 
@@ -428,6 +433,21 @@ def resolve_runtime_provider_config(
             available=bool(token),
         )
 
+    if provider == ProviderType.ZHIPU:
+        token = api_key or _env_value(env_map, ZHIPU_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, ZHIPU_BASE_URL_ENV)
+            or ZHIPU_BASE_URL
+        ).rstrip("/")
+        return RuntimeProviderConfig(
+            provider=provider,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_ZHIPU_MODEL,
+            available=bool(token),
+        )
+
     raise ValueError(f"Unsupported runtime provider: {provider.value}")
 
 
@@ -452,6 +472,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         SambaNovaProvider,
         SiliconFlowProvider,
         TogetherProvider,
+        ZhipuProvider,
     )
 
     if config.provider == ProviderType.ANTHROPIC:
@@ -547,6 +568,13 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         return ChutesProvider(**kwargs)
+    if config.provider == ProviderType.ZHIPU:
+        kwargs = {}
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return ZhipuProvider(**kwargs)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
