@@ -36,37 +36,42 @@ objects:
       bridge: scripts/runtime/a2a_inbox_bridge.py
       card_resolver: dharma_swarm/a2a/agent_card.py
   ModelKeyRouting:
-    kind: routing_contract
-    description: Canonical boundary for mapping model names, provider keys, and routing policy.
-    owns:
-      - model_literals
-      - provider_key_reads
-      - provider_selection
-  DKeysKeyStore:
-    kind: secret_store
-    description: Approved key store boundary for provider credentials.
-    replaces:
+    kind: governance_contract
+    owner: docs/ops/MODEL_KEY_ROUTING.md
+    description: Canonical contract for provider keys, runtime providers, model order, and routing memory.
+    canonical_components:
+      key_store: DKeysKeyStore
+      runtime_provider: RuntimeProvider
+      model_order: ModelHierarchy
+      provider_policy: ProviderPolicyRouter
+      router: ModelRouter
+      learning_state: RoutingMemory
+    deprecated_patterns:
+      - parallel model routing layer
       - project .env keys
-  RuntimeProvider:
-    kind: runtime_boundary
-    owner: dharma_swarm.runtime_provider
-    description: Runtime provider adapter boundary for model execution.
-    forbids:
       - direct provider factory
-  ModelHierarchy:
-    kind: model_registry
-    owner: dharma_swarm.model_hierarchy
-    description: Canonical model ordering and fallback registry.
-    replaces:
       - scattered model order
+  DKeysKeyStore:
+    kind: key_store
+    owner: dharma_swarm/api_keys.py
+    description: The single approved path for provider key lookup, backed by dkeys and ~/.dharma/agent_keys.env.
+  RuntimeProvider:
+    kind: provider_factory
+    owner: dharma_swarm/runtime_provider.py
+    description: The single runtime provider resolution and creation door for model calls.
+  ModelHierarchy:
+    kind: routing_order
+    owner: dharma_swarm/model_hierarchy.py
+    description: Canonical most-powerful-first model and route ordering.
   ProviderPolicyRouter:
     kind: routing_policy
-    owner: dharma_swarm.provider_policy.ProviderPolicyRouter
-    description: Provider selection policy for routing requests.
+    owner: dharma_swarm/provider_policy.py
+    description: Policy layer that selects and escalates provider families without bypassing ModelKeyRouting.
   ModelRouter:
-    kind: routing_runtime
-    owner: dharma_swarm.model_routing
-    description: Runtime model routing facade.
+    kind: runtime_router
+    owner: dharma_swarm/providers.py
+    description: Provider router that executes model calls under RuntimeProvider and ModelHierarchy constraints.
   RoutingMemory:
-    kind: routing_state
-    description: Durable memory for routing decisions, outcomes, and policy feedback.
+    kind: routing_telemetry
+    owner: dharma_swarm/routing_memory.py
+    description: Provider-learning evidence store for route outcomes; telemetry, not semantic canon.

@@ -1285,6 +1285,41 @@ def render_hygiene_system() -> None:
                 print(f"    - {pattern.get('id')}: {pattern.get('title')} ({pattern.get('stage')})")
 
 
+def render_spine_bypass() -> None:
+    """Surface live spine bypass count — projects from spine_bypass_report.py.
+
+    Reads only; never modifies any owner file. Always exits 0. Skips
+    gracefully if the bypass report script is unavailable or fails.
+    """
+    section("SPINE BYPASS SITES (adoption track signal)")
+    bypass_script = REPO_ROOT / "scripts/governance/spine_bypass_report.py"
+    if not bypass_script.exists():
+        print("  (spine_bypass_report.py not found — skipping)")
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, str(bypass_script), "--json"],
+            capture_output=True, text=True, timeout=15, cwd=REPO_ROOT,
+        )
+        data = json.loads(result.stdout)
+    except Exception as exc:
+        print(f"  (could not run spine_bypass_report: {exc})")
+        return
+
+    summary = data.get("summary", {})
+    intentional = summary.get("intentional", 0)
+    unknown = summary.get("unknown", 0)
+    adopted = summary.get("spine-adopted", 0)
+    total_bypass = intentional + unknown
+
+    status = "✅" if unknown == 0 else "⚠️"
+    print(f"  {status} Spine bypass sites: {total_bypass} total "
+          f"({adopted} adopted, {intentional} intentional, {unknown} unknown)")
+    if unknown > 0:
+        print(f"  → {unknown} unclassified bypass(es) — drain before shipping adoption track")
+    print("  Full map: python3 scripts/governance/spine_bypass_report.py")
+
+
 def render_model_key_routing() -> None:
     section("MODEL & KEY ROUTING — THE ONE WAY")
     print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
@@ -1292,6 +1327,8 @@ def render_model_key_routing() -> None:
     print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
     print("         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain")
     print("  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)")
+    print("  Egress: a key needs its host on the env network allowlist (more hosts = more models = more freedom)")
+    print("          list/verify: python3 scripts/ops/provider_egress_hosts.py  ·  'Host not in allowlist' = env policy, not code")
     print("  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`")
     print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
 
@@ -1518,6 +1555,7 @@ def main(argv: list[str] | None = None) -> int:
     render_axioms()
     render_recent_activity(track)
     render_spine_status()
+    render_spine_bypass()
     rows = render_runtime_truth(evidence, track)
     prs = render_pr_hygiene(net=net)
     render_hygiene_system()

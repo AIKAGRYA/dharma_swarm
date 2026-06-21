@@ -16,7 +16,9 @@ logger = logging.getLogger("e2e_boot")
 
 
 @pytest.fixture
-def state_dir(tmp_path):
+def state_dir(tmp_path, monkeypatch):
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
+    monkeypatch.delenv("DHARMA_READ_ONLY_BOOT", raising=False)
     d = tmp_path / ".dharma_e2e"
     d.mkdir()
     return str(d)
@@ -31,6 +33,9 @@ async def test_full_lifecycle_boot(state_dir):
     logger.info("=== PHASE 1: Init SwarmManager ===")
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
+    startup_task = getattr(swarm, "_startup_background_task", None)
+    if startup_task is not None:
+        await asyncio.wait_for(startup_task, timeout=5.0)
 
     # Verify agents spawned (correct attr: _agent_pool)
     pool = swarm._agent_pool

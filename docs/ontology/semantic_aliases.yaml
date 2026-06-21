@@ -12,22 +12,36 @@ aliases:
   agent_uid:
     canonical: AgentUID
     kind: identifier_alias
+  dkeys:
+    canonical: DKeysKeyStore
+    kind: key_store_alias
+  runtime_provider:
+    canonical: RuntimeProvider
+    kind: provider_factory_alias
+  model_hierarchy:
+    canonical: ModelHierarchy
+    kind: routing_order_alias
+  provider_policy_router:
+    canonical: ProviderPolicyRouter
+    kind: routing_policy_alias
+  model_router:
+    canonical: ModelRouter
+    kind: runtime_router_alias
+  routing_memory:
+    canonical: RoutingMemory
+    kind: routing_telemetry_alias
   "parallel model routing layer":
     canonical: ModelKeyRouting
-    kind: deprecated_alias
-    status: forbidden
+    kind: deprecated_pattern
   "project .env keys":
     canonical: DKeysKeyStore
-    kind: deprecated_alias
-    status: forbidden
+    kind: deprecated_pattern
   "direct provider factory":
     canonical: RuntimeProvider
-    kind: deprecated_alias
-    status: forbidden
+    kind: deprecated_pattern
   "scattered model order":
     canonical: ModelHierarchy
-    kind: deprecated_alias
-    status: forbidden
+    kind: deprecated_pattern
 agent_uid_aliases:
   codex: codex_composer
   opus: opus_composer

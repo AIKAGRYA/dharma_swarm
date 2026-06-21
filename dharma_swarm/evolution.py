@@ -1481,9 +1481,17 @@ class DarwinEngine:
             proposal_id=proposal.id,
             component=proposal.component,
         ):
+            gate_content_parts = [proposal.description]
+            if proposal.think_notes and proposal.think_notes != proposal.description:
+                gate_content_parts.append(proposal.think_notes)
+            if proposal.diff:
+                gate_content_parts.append(proposal.diff)
+            gate_content = "\n\n".join(
+                part.strip() for part in gate_content_parts if part.strip()
+            )
             outcome = check_with_reflective_reroute(
                 action=proposal.description,
-                content=proposal.diff,
+                content=gate_content,
                 tool_name="darwin_executor",
                 think_phase="before_write",
                 reflection=proposal.think_notes or proposal.description,

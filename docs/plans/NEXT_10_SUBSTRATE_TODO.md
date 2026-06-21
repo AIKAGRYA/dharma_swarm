@@ -1,6 +1,14 @@
 # Next 10 Substrate Todos
 
-**Status:** active build sequence
+> **DEPRECATED — retained as historical reference** (re-verified 2026-06-15 by perplexity-computer).
+> Per `docs/governance/ACTIVE_TRACK.yaml`, this file is superseded by the `cockpit-control-surface-2026-05` lane and is retained for citation only. The canonical "what is being built right now" surface is `docs/governance/ACTIVE_TRACK.yaml`. Do not treat this file as the current queue.
+>
+> Deprecated: 2026-06-15
+> Reason: Superseded by `cockpit-control-surface-2026-05` lane (SHIPPED); canonical queue is now `docs/governance/ACTIVE_TRACK.yaml`.
+> Replacement: `docs/governance/ACTIVE_TRACK.yaml` (current build portfolio)
+> Review / removal date: 2026-09-15
+
+**Status:** **DEPRECATED — historical reference** (was: active build sequence)
 **Owner of:** the prioritised order in which to take this repo from ~10–15% ontology-native to one fully native seam, then to a measurable value loop.
 **Read first:** [`docs/governance/BUILD_SESSION_ENTRYPOINT.md`](../governance/BUILD_SESSION_ENTRYPOINT.md). That file gives you the read order and the rules. This file is the queue.
 

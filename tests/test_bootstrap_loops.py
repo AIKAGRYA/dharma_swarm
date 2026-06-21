@@ -71,6 +71,39 @@ def _runtime_delegation_statuses(db_path: Path) -> list[str]:
     return [str(row[0]) for row in rows]
 
 
+async def _await_delegation_status(
+    db_path: Path, expected: str, *, timeout: float = 5.0
+) -> None:
+    """Poll the delegation_runs row until it reaches ``expected``.
+
+    The orchestrator runs ``_execute_task`` as a detached background task, so a
+    fixed sleep races the failure-recording path (claim + run + receipts + retry
+    requeue). Poll for the terminal status instead so the test is deterministic
+    on slow runners rather than wedged to one machine's timing.
+    """
+    await _await_condition(
+        lambda: expected in _runtime_delegation_statuses(db_path),
+        timeout=timeout,
+        what=f"delegation status {expected!r} (last seen: see orchestrator)",
+    )
+
+
+async def _await_condition(predicate, *, timeout: float = 5.0, what: str = "condition") -> None:
+    """Poll *predicate* until true or *timeout*, then fail loudly.
+
+    The orchestrator runs ``_execute_task`` as a detached background task, so a
+    fixed sleep races whatever the test then reads. Poll for the actual terminal
+    condition instead so the test is deterministic on slow runners. Raising on
+    timeout keeps a "never happened" distinct from a "happened wrong".
+    """
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.05)
+    pytest.fail(f"timed out after {timeout}s waiting for {what}")
+
+
 # ---------------------------------------------------------------------------
 # Test 1: Signal Bus round-trip (Loop 1 backbone — every loop uses signal bus)
 # ---------------------------------------------------------------------------
@@ -386,9 +419,14 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "context_bundles") == 1
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
 
-    # The background _execute_task coroutine runs async — yield to let it complete.
-    # run_task() is an async no-op so it finishes after a couple of event loop turns.
-    await asyncio.sleep(0.1)
+    # The background _execute_task coroutine runs async. Wait for the LAST write
+    # in the success path (artifact record + delegation 'completed') rather than a
+    # fixed sleep, which races the background task on slow runners.
+    await _await_condition(
+        lambda: _runtime_table_count(runtime_db_path, "artifact_records") >= 1
+        and _runtime_delegation_statuses(runtime_db_path) == ["completed"],
+        what="task lifecycle to complete (artifact + delegation 'completed')",
+    )
 
     # After the background task finishes the board should show COMPLETED
     completed = await board.get(task.id)
@@ -403,13 +441,19 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert _runtime_table_count(runtime_db_path, "session_events") >= 3
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    assert _runtime_delegation_statuses(runtime_db_path) == ["completed"]
+    delegation_statuses: list[str] = []
+    for _ in range(20):
+        delegation_statuses = _runtime_delegation_statuses(runtime_db_path)
+        if delegation_statuses == ["completed"]:
+            break
+        await asyncio.sleep(0.05)
+    assert delegation_statuses == ["completed"]
     artifact_count = 0
     for _ in range(20):
         artifact_count = _runtime_table_count(runtime_db_path, "artifact_records")
         if artifact_count >= 1:
             break
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.05)
     assert artifact_count >= 1
     with sqlite3.connect(runtime_db_path) as db:
         artifact_kind, artifact_task_id, payload_path, checksum = db.execute(
@@ -504,6 +548,8 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
 
     result = await orch.tick()
     assert result["dispatched"] >= 1
+    await _await_delegation_status(runtime_db_path, "failed")
+
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
 

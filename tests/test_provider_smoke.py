@@ -117,6 +117,8 @@ def test_run_provider_smoke_local_prefers_installed_chat_model_before_missing_de
 def test_run_provider_smoke_reports_success_with_monkeypatched_probes(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "test-ollama-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
     monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
     monkeypatch.setattr(
         "dharma_swarm.provider_smoke.list_ollama_manifest_models",
@@ -351,22 +353,22 @@ def test_probe_qwen_dashboard_collects_tool_calls_and_content(
     )
 
     monkeypatch.setenv("TOGETHER_API_KEY", "together-key")
-    monkeypatch.setattr(chat_router, "_get_chat_settings", lambda profile_id=None: settings)
+    monkeypatch.setattr(
+        "api.routers.chat._get_chat_settings",
+        lambda profile_id=None: settings,
+    )
 
-    async def _fake_qwen_stream(router, messages, runtime_settings, *, profile_id=""):
-        del router
+    async def _fake_agentic_stream(messages, runtime_settings, *, session_id="", profile_id=""):
         del messages
         del runtime_settings
+        del session_id
         del profile_id
         yield 'data: {"tool_call":{"name":"read_file","args":{"path":"dharma_swarm/runtime_provider.py"}}}\n\n'
         yield 'data: {"tool_result":{"name":"read_file","summary":"runtime provider loaded"}}\n\n'
         yield 'data: {"content":"Resolved provider and tool path confirmed."}\n\n'
         yield "data: [DONE]\n\n"
 
-    monkeypatch.setattr(
-        "dharma_swarm.provider_smoke._iter_qwen_dashboard_stream",
-        _fake_qwen_stream,
-    )
+    monkeypatch.setattr("api.routers.chat._agentic_stream", _fake_agentic_stream)
 
     result = asyncio.run(_probe_qwen_dashboard("together", "inspect wiring"))
 

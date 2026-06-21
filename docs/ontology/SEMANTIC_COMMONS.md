@@ -29,6 +29,22 @@ resolver must map:
 codex_composer -> A2ACard -> AgentUID -> A2AInboxRoute -> dharma.agent.codex_composer.inbox
 ```
 
+## Canonical Model/Key Routing Vocabulary
+
+| Object | Meaning | Runtime projection |
+| --- | --- | --- |
+| `ModelKeyRouting` | The one routing contract for provider keys, runtime provider creation, model order, and routing memory. | `docs/ops/MODEL_KEY_ROUTING.md` |
+| `DKeysKeyStore` | Provider key lookup source. | `dharma_swarm/api_keys.py` via `dkeys` and `~/.dharma/agent_keys.env` |
+| `RuntimeProvider` | Single provider resolution and creation door. | `dharma_swarm/runtime_provider.py` |
+| `ModelHierarchy` | Canonical most-powerful-first model and route order. | `dharma_swarm/model_hierarchy.py` |
+| `ProviderPolicyRouter` | Provider-family policy and escalation layer. | `dharma_swarm/provider_policy.py` |
+| `ModelRouter` | Runtime router for executing provider calls under the canonical contract. | `dharma_swarm/providers.py` |
+| `RoutingMemory` | Provider-learning evidence store for route outcomes. | `dharma_swarm/routing_memory.py` |
+
+Deprecated names resolve back into `ModelKeyRouting`; do not create a
+`parallel model routing layer`, read `project .env keys`, instantiate a
+`direct provider factory`, or maintain `scattered model order`.
+
 ## Boundary
 
 NATS is the internal fleet transport. A2A HTTP and public Agent Cards remain

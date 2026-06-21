@@ -21,7 +21,11 @@
 
 ---
 
-## OPEN ITEMS (5 open/partial after 2026-05-20 closure pass; BR-009/010/011/012 fixed below)
+## OPEN ITEMS (5 open/partial — re-verified 2026-06-15)
+
+> **Re-verification pass executed 2026-06-15 (perplexity-computer, Stage 1 EVIDENCE_ONLY):** the register had drifted 22 days since the 2026-05-24 git touch. All 5 OPEN items below have refreshed `last_verified` dates with a `re-verification 2026-06-15` note. No new BRs opened in this pass. No status flips: behavior on disk is unchanged for BR-003 / BR-004 / BR-005 / BR-013 / BR-014. Anti-Slop note: PROD-issue #521 cites this BR-003 as 'Owner doc' but its own owner doc `docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch — BR-003 is real and tracked here; the PROD-issue is the orphan.
+
+> **Historical: 2026-05-20 closure pass** — BR-009/010/011/012 fixed below.
 
 > **Convergence pass executed 2026-05-07 18:00–18:10:** Plan at `~/.claude/plans/yes-write-a-plan-wobbly-cerf.md`. Closed items moved to CLOSED section: BR-001 (cron daemon plist fixed), BR-016 (SOVEREIGN_MANIFEST counts refreshed and now DocOps-verified), BR-017 (BUILD_SESSION_ENTRYPOINT.md present), BR-018 (MEGAFILE_INDEX referenced from CLAUDE.md + README), BR-019 (Coherence Delta CI validator installed). BR-015 was already CLOSED. Total CLOSED = 6; OPEN = 13.
 
@@ -29,36 +33,61 @@
 
 ### BR-003 — Apply gate present but closed (self-evolution loop)
 - **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
+- **last_verified:** 2026-06-15 (re-verified by perplexity-computer)
+- **age_days:** 39
 - **severity:** BLOCKER
 - **domain:** runtime
 - **root_cause:** Two parallel apply paths share zero import edge. Build Protocol (`tools/build_protocol/`) self-declared shape-only; DarwinEngine `apply_diff_and_test` at `evolution.py:2156` env-locked closed by `DHARMA_EVOLUTION_SHADOW=1` default. `grep "from dharma_swarm.tools.build_protocol"` returns 0 hits inside `dharma_swarm/dharma_swarm/`.
 - **blast_radius:** Self-evolution trace reported 96 dryruns; direct disk check on 2026-05-07 found 9 current dryrun dirs, 4 `proof_packet.json` files, and 0 `applied` markers. Sediment-to-crystallization mechanism remains absent. Kernel + telos_gates static for 6+ weeks.
 - **evidence:** `~/.dharma/audit/self_evolution_trace_2026-05-07.md`; `find ~/.dharma/build_protocol/dryruns -mindepth 1 -maxdepth 1 -type d | wc -l` = 9; `find ~/.dharma/build_protocol -name proof_packet.json | wc -l` = 4; vision_maps `05_autopoiesis_evolution.md`.
 - **status:** PARTIAL — 2026-05-07 partial closure: `tools/build_protocol/cli.py` now exposes `dharma-build shadow-apply <dryrun_root>`, which calls `DarwinEngine.apply_sealed_packet(..., shadow=True)` and archives the proof result without live mutation. Live apply remains intentionally gated. **End-to-end exercise on 2026-05-07 (this commit):** ran `python -m tools.build_protocol.cli shadow-apply ~/.dharma/build_protocol/dryruns/wp005-seal-cli-20260506`. Result: `accepted: true`, `archive_entry_id: 64280c7685784e63`, `shadow: true`, `proof_exit_code: 0` (5 tests pass), packet archived as line in `~/.dharma/evolution/archive.jsonl` with id `64280c7685784e63` and `shadow:true`. First confirmed end-to-end shadow-apply on this branch. `applied:false` is correct — `diff_missing:true` for this dryrun (test-only seal, no diff to apply); the seam itself is now exercised. Full closure (live, non-shadow apply) remains a multi-day plan gated by `DHARMA_EVOLUTION_SHADOW=0` and a real telos-gate→kernel→apply traversal.
+- **re-verification 2026-06-15 (perplexity-computer):** `DHARMA_EVOLUTION_SHADOW` defaults to `"1"` at 5 callsites confirmed by repo grep: `dharma_swarm/swarm_health_api.py:97` and `:142`, `dharma_swarm/orchestrate_live.py:618`, `dharma_swarm/dgm_loop.py:289`, `benchmarks/gauntlet.py:387` and `:409`. `dharma_swarm/guardian_crew.py:503,506` explicitly instructs operators to set both `DHARMA_EVOLUTION_SHADOW=0` and `DGC_AUTONOMY_LEVEL=2` for real mutation. `dharma_swarm/evolution.py:190` still defaults `applied=False, shadow=True` on the `AppliedResult` dataclass. Cannot inspect `~/.dharma/evolution/archive.jsonl` from cloud seat; no `applied:true` line confirmable. Status PARTIAL unchanged. Cross-references: PROD-issue #521 cites this BR as 'Owner doc' — the BR is real; the PROD-issue's own owner doc `docs/governance/PROD_READINESS_TOP10.md` does not exist on any branch.
+
+### BR-021 — WS4 Tier-C battery hard-rejects terse evolution-test proposals
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** runtime / state (tests)
+- **root_cause:** WS4 (`dharma_swarm/evolution.py` ~L1543) hard-rejects a self-mod proposal on any Tier-C advisory `REVIEW`; the anekanta / steelman / dogma-drift gates were tightened *after* the evolution test suite was written, so proposals with terse descriptions are rejected for "low epistemological diversity" / "no counterarguments" — unrelated to what the tests assert. Masked for weeks under `pytest -x` (stopped at an earlier failure).
+- **blast_radius:** ~8 tests in `tests/test_integration.py` + `tests/test_godel_claw_e2e.py` (routed through the new helper); OTHER evolution test files may still carry terse self-mod proposals and will surface as `pytest -x` advances. Real internal callers that build terse self-mod proposals would also be rejected.
+- **evidence:** `scripts/diagnostics/proposal_gate_probe.py` (per-gate map); `tests/evolution_gate_helpers.py` + `tests/test_evolution_gate_helpers.py` (self-validating helper); `docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` (contract).
+- **status:** WORKAROUND — contract mapped, self-validating helper built, `test_integration` + `godel_claw` routed through it. Remaining evolution test files to be routed as CI surfaces them. WS4 itself is correct and intentionally unchanged; do not weaken it.
+
+### BR-022 — Center of gravity is inward: outward edge unowned + governance rent uninstrumented
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** STALE
+- **domain:** outward
+- **root_cause:** Strategic read-only finding (not a runtime breakage). Two coupled structural gaps. (1) **Outward edge unowned:** the `revenue-external-humans-served` spine objective ("value leaves the house and someone acts on it") has zero active track — confirmed at `docs/governance/ACTIVE_TRACK.yaml:61` and rendered as "**no active track**" by `make onboard`. All 7 active tracks serve `substrate-nativeness`; `research-depth` is also unowned. (2) **Governance rent uninstrumented:** `CLAUDE.md` (Transcendence Principle) states as doctrine that "Every governance mechanism must be evaluated against its diversity cost" and the metabolic test is "does each gate prevent more drift than the coordination tax it imposes" — but no instrument computes a per-gate rent/diversity-cost measure; the Krogh-Vedelsby diversity term (`diversity_archive.py`) exists but is not wired to gate-addition decisions. Governance accretes (watcher surfaces grow faster than watched runtime) with no metabolic ledger to flag autoimmune tip-over.
+- **blast_radius:** Organism cannot yet "feed itself" (no outward acted-receipt revenue loop) while the immune/governance layer keeps expanding uncosted. Risk is twofold: (a) vision tracks (campaigns, economic/legal/ecological build loops, recursive AI-building-AI) all sit downstream of an outward edge that has no owner; (b) ungoverned governance growth silently raises the coordination tax on every agent. Both are second-order, not blocking any single dispatch.
+- **evidence:** `docs/governance/ACTIVE_TRACK.yaml:61-63` (revenue objective, no serving track); `make onboard` render (spine objectives section: revenue + research-depth = no active track); `CLAUDE.md` Transcendence Principle ("Every governance mechanism must be evaluated against its diversity cost"); `dharma_swarm/diversity_archive.py` (Krogh-Vedelsby term exists, unwired to gate decisions). NOTE: claims (1) are ledger-confirmed; claim (2) is an asserted negative ("no instrument found") and must be verified by the working agent before action — search for any gate-cost/rent instrument before treating it as absent.
+- **status:** OPEN — shelved for a future agent per operator (2026-06-21). Two candidate work packets: (A) open a `revenue-external-humans-served` track with an owned outward surface + acted-receipt quorum (One Wire, N>=5/M>=3 per `loop-closure-2026-06`); (B) instrument per-gate metabolic rent (prevented-drift vs coordination-tax) so governance additions are decided against a measure, not a vibe. Do NOT auto-add governance to close this — that would deepen it.
 
 ### BR-004 — Cron split-brain (repo vs live)
 - **first_observed:** ≤ 2026-05-06
-- **last_verified:** 2026-05-07
-- **age_days:** 1+
+- **last_verified:** 2026-06-15 (re-verified by perplexity-computer)
+- **age_days:** 40+
 - **severity:** DEGRADED
 - **domain:** cron / docs
 - **root_cause:** Repo `dharma_swarm/cron_jobs.json` and live `~/.dharma/cron/jobs.json` still use different schemas and job populations. The original sub-claim "No doc declares which is canonical" is now stale.
 - **blast_radius:** Job-level health can still diverge between repo intent and launchd reality, but the scheduler state authority is no longer ambiguous.
 - **evidence:** `docs/governance/METABOLIC_CLOCK.md` declares `~/.dharma/cron/jobs.json` as scheduler state authority and says to fix failed jobs as separate scoped work packets. `scripts/cron_unify.py` remains the non-mutating unification helper.
 - **status:** PARTIAL — canonical authority declared; actual repo/live job reconciliation remains a scoped follow-up.
+- **re-verification 2026-06-15 (perplexity-computer):** `dharma_swarm/cron_jobs.json` present in repo (intent); `~/.dharma/cron/jobs.json` cannot be inspected from cloud seat. `docs/governance/METABOLIC_CLOCK.md` still declares the live-side authority. `scripts/cron_unify.py` present. No reconciliation PR landed in the 232 commits since last verification. Status PARTIAL unchanged.
 
 ### BR-005 — Algedonic stream in degenerate steady-state
-- **first_observed:** ~2026-05-02 (5 days prior to audit)
-- **last_verified:** 2026-05-07 20:30 (post-BR-001-fix verification)
-- **age_days:** ~5
+- **first_observed:** ~2026-05-02 (5 days prior to original audit)
+- **last_verified:** 2026-06-15 (re-verified by perplexity-computer)
+- **age_days:** ~44
 - **severity:** DEGRADED
 - **domain:** runtime
 - **root_cause:** The original "last-200 rows are only omega_divergence" finding is now stale. The live stream contains chronic `omega_divergence` plus many `task_retries_exhausted` dead-letter warning signals. The remaining gap is consumer/action coherence: some actions emitted by `algedonic_activation.py` are unsupported or only partially consumed by `Organism`/VSM paths.
 - **blast_radius:** Sensing is richer than actuation. Signals exist, but not every signal class has an explicit consumer policy: log-only, prompt-context, scheduling bias, review, hold, or dispatch stop.
 - **evidence:** 2026-05-11 live tail of `~/.dharma/algedonic_signals.jsonl`; `dharma_swarm/algedonic_activation.py` defines `rebalance_priorities`, `enforce_glossary`, and `recalibrate_from_metrics`; `dharma_swarm/organism.py` concretely handles only a subset of algedonic actions.
 - **status:** PARTIAL — degenerate steady-state claim corrected; causal consumption/action coverage remains open.
+- **re-verification 2026-06-15 (perplexity-computer):** `dharma_swarm/algedonic_activation.py` still defines `rebalance_priorities`, `enforce_glossary`, `recalibrate_from_metrics`. `dharma_swarm/organism.py` still concretely handles only a subset. Live `~/.dharma/algedonic_signals.jsonl` cannot be inspected from cloud seat. Status PARTIAL unchanged.
 
 ### BR-009 — Roadmap is contested (3 docs claim primacy)
 - **first_observed:** 2026-05-07
@@ -106,25 +135,27 @@
 
 ### BR-013 — Agent contract fragmented across 8+ surfaces
 - **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
+- **last_verified:** 2026-06-15 (re-verified by perplexity-computer)
+- **age_days:** 39
 - **severity:** DEGRADED
 - **domain:** agent / docs
 - **root_cause:** 25 `~/.claude/projects/-Users-dhyana/memory/feedback_*.md` files (~792 lines) un-consolidated; some carry 36-day-stale system-reminders. `~/.claude/CLAUDE.md` is a 4-line ruflo stub; canonical is `/Users/dhyana/CLAUDE.md` (308 lines) — naming suggests reverse. `foundations/GLOSSARY.md` exists but is **not referenced** from `CLAUDE.md`, `MEMORY.md`, or `cabinet/INDEX.md`.
 - **blast_radius:** Non-Claude-Code agents (Codex sub-agents, headless invocations, MCP workers) may have NO path to the substrate. Onboarding requires prior knowledge of where the canonical contract lives.
 - **evidence:** `~/.dharma/audit/ten_megafiles_q6_2026-05-07.md`.
 - **status:** PARTIAL — 2026-05-07 19:29 (Phase 3D micro-fix): `~/.claude/CLAUDE.md` replaced with a pointer-stub directing agents to `/Users/dhyana/CLAUDE.md`. Backup at `~/.dharma/audit/_backup_~.claude.CLAUDE.md.2026-05-07`. Remaining work: consolidate the 25 `feedback_*.md` files into Slot 9 of MEGAFILE_INDEX (`docs/agent/AGENT_CONTRACT_AND_TEAM.md`); add a discoverability path from `CLAUDE.md` / `MEMORY.md` / `cabinet/INDEX.md` to `foundations/GLOSSARY.md`. Non-CC agents that cannot follow the pointer-stub still hit the gap; that residual issue is the active part of BR-013.
+- **re-verification 2026-06-15 (perplexity-computer):** `docs/agent/AGENT_CONTRACT_AND_TEAM.md` still not present — the consolidation has not landed. `foundations/GLOSSARY.md` still present. `docs/agents/` has grown to include per-agent nests (`devin-roaming-2987d222/`, `perplexity-computer/`) — this is a parallel substrate that partially relieves the fragmentation by giving each agent a stable identity path, but does not consolidate the original `feedback_*.md` fragmentation. Status PARTIAL unchanged.
 
 ### BR-014 — `BHED_GNAN` always passes
 - **first_observed:** 2026-05-07
-- **last_verified:** 2026-05-07
-- **age_days:** 0
+- **last_verified:** 2026-06-15 (re-verified by perplexity-computer)
+- **age_days:** 39
 - **severity:** DEGRADED
 - **domain:** runtime
 - **root_cause:** `dharma_swarm/telos_gates.py:512-513` literal hard-pass. The Gnani check defined to be most central is structurally inert.
 - **blast_radius:** Recognition layer's hardest gate is a no-op. Witness emits but doesn't gate.
 - **evidence:** vision_maps `01_gnani_prakruti.md`; `telos_gates.py:512-513`.
 - **status:** OPEN — direct edits to `telos_gates.py` are governance-forbidden by `CLAUDE.md`; closure must go through `GateRegistry.propose()` / gate pressure policy rather than a hard-coded gate mutation.
+- **re-verification 2026-06-15 (perplexity-computer):** literal hard-pass at `dharma_swarm/telos_gates.py:512-513` still in place per direct read. Closure path unchanged (must route through GateRegistry per governance). Status OPEN unchanged.
 
 ### BR-015 — `.FOCUS` writer with stale claim "no reader"
 - **first_observed:** 2026-05-07

@@ -326,6 +326,7 @@ def test_provider_policy_swarm_plan_keeps_simple_task_single_agent() -> None:
             novelty=0.12,
             urgency=0.2,
             expected_impact=0.2,
+            preferred_low_cost=True,  # simple/cheap task: opt into cost-first
             context={"complexity_score": 0.10},
         ),
         available_providers=[
@@ -513,6 +514,7 @@ async def test_model_router_complete_for_task_uses_policy_selection() -> None:
             novelty=0.10,
             urgency=0.3,
             expected_impact=0.2,
+            preferred_low_cost=True,  # cost-path test: power-first is now the opt-out default
         ),
         LLMRequest(
             model="ignored",
@@ -551,6 +553,7 @@ async def test_model_router_complete_for_task_falls_back_cross_provider() -> Non
             novelty=0.10,
             urgency=0.3,
             expected_impact=0.2,
+            preferred_low_cost=True,  # cost-path test: power-first is now the opt-out default
         ),
         LLMRequest(
             model="ignored",
@@ -724,6 +727,7 @@ async def test_model_router_learning_reorders_after_failures() -> None:
             novelty=0.1,
             urgency=0.2,
             expected_impact=0.1,
+            preferred_low_cost=True,  # learning test: cost-first base so free tier is tried first
         ),
         LLMRequest(model="ignored", messages=[{"role": "user", "content": "summarize"}]),
         available_provider_types=[ProviderType.OPENROUTER_FREE, ProviderType.ANTHROPIC],
@@ -740,6 +744,7 @@ async def test_model_router_learning_reorders_after_failures() -> None:
             novelty=0.1,
             urgency=0.2,
             expected_impact=0.1,
+            preferred_low_cost=True,  # learning test: cost-first base so free tier is tried first
         ),
         LLMRequest(model="ignored", messages=[{"role": "user", "content": "summarize again"}]),
         available_provider_types=[ProviderType.OPENROUTER_FREE, ProviderType.ANTHROPIC],
