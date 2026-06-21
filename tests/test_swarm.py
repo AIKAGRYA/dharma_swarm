@@ -27,8 +27,20 @@ def _expected_agent_count() -> int:
     return len(crew)
 
 
+def _expected_seed_task_count() -> int:
+    from dharma_swarm.gnani_lodestone import _GNANI_TASK_SEEDS
+
+    return len(_GNANI_TASK_SEEDS)
+
+
 _AUTO_AGENTS = _expected_agent_count()
-_AUTO_TASKS = 5
+_AUTO_TASKS = _expected_seed_task_count()
+
+
+@pytest.fixture(autouse=True)
+def _clear_boot_mode_flags(monkeypatch):
+    monkeypatch.delenv("DHARMA_FAST_BOOT", raising=False)
+    monkeypatch.delenv("DHARMA_READ_ONLY_BOOT", raising=False)
 
 
 def _make_dynamic_spec(name: str, **overrides: object) -> AgentSpec:

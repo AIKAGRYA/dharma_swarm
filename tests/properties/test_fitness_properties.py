@@ -21,8 +21,10 @@ def fitness_score_strategy():
         FitnessScore,
         correctness=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         dharmic_alignment=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+        swabhaav_alignment=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         performance=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         utilization=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
+        economic_value=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         elegance=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         efficiency=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
         safety=st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False),
@@ -35,8 +37,10 @@ if ARCHIVE_AVAILABLE:
         """Property: All fitness dimensions must be in [0, 1]."""
         assert 0.0 <= fitness.correctness <= 1.0
         assert 0.0 <= fitness.dharmic_alignment <= 1.0
+        assert 0.0 <= fitness.swabhaav_alignment <= 1.0
         assert 0.0 <= fitness.performance <= 1.0
         assert 0.0 <= fitness.utilization <= 1.0
+        assert 0.0 <= fitness.economic_value <= 1.0
         assert 0.0 <= fitness.elegance <= 1.0
         assert 0.0 <= fitness.efficiency <= 1.0
         assert 0.0 <= fitness.safety <= 1.0
@@ -59,7 +63,17 @@ if ARCHIVE_AVAILABLE:
 
 
     @given(fitness_score_strategy(), st.dictionaries(
-        st.sampled_from(['correctness', 'dharmic_alignment', 'performance', 'utilization', 'elegance', 'efficiency', 'safety']),
+        st.sampled_from([
+            'correctness',
+            'dharmic_alignment',
+            'swabhaav_alignment',
+            'performance',
+            'utilization',
+            'economic_value',
+            'elegance',
+            'efficiency',
+            'safety',
+        ]),
         st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
         min_size=1
     ))
@@ -84,8 +98,10 @@ if ARCHIVE_AVAILABLE:
 
         assert restored.correctness == fitness.correctness
         assert restored.dharmic_alignment == fitness.dharmic_alignment
+        assert restored.swabhaav_alignment == fitness.swabhaav_alignment
         assert restored.performance == fitness.performance
         assert restored.utilization == fitness.utilization
+        assert restored.economic_value == fitness.economic_value
         assert restored.elegance == fitness.elegance
         assert restored.efficiency == fitness.efficiency
         assert restored.safety == fitness.safety
@@ -117,6 +133,7 @@ if ARCHIVE_AVAILABLE:
         zero = FitnessScore(
             correctness=0.0,
             dharmic_alignment=0.0,
+            swabhaav_alignment=0.0,
             performance=0.0,
             utilization=0.0,
             economic_value=0.0,  # Added in Phase 1

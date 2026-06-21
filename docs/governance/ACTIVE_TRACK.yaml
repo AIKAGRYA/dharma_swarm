@@ -460,6 +460,25 @@ active_tracks:
       - id: campaign_retrospective_exists
         kind: file_exists
         file: reports/loop_closure/RETROSPECTIVE.md
+      - id: cybernetics_codex_manifest_registered
+        kind: file_contains
+        file: ACTIVE_SURFACE_MANIFEST.yaml
+        pattern: "id: cybernetics_codex"
+      - id: cybernetics_codex_seed_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/agent.seed.yaml
+      - id: cybernetics_codex_soul_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/SOUL.md
+      - id: cybernetics_codex_context_desk_exists
+        kind: file_exists
+        file: docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md
+      - id: cybernetics_codex_audit_script_exists
+        kind: file_exists
+        file: scripts/governance/cybernetics_codex_audit.py
+      - id: cybernetics_codex_registration_script_exists
+        kind: file_exists
+        file: scripts/governance/register_cybernetics_codex.py
 
     non_goals:
       - Do not weaken, bypass, or hard-code any telos gate to close a loop.

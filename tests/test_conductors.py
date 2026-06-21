@@ -8,6 +8,7 @@ from dharma_swarm.conductors import (
     CONDUCTOR_CONFIGS,
     _resolve_conductor_provider,
 )
+from dharma_swarm.model_hierarchy import default_model as canonical_default_model
 from dharma_swarm.models import AgentRole, ProviderType
 
 

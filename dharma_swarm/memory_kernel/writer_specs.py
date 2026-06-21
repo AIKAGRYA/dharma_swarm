@@ -417,6 +417,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "High-volume raw episodic log; must stay streaming/metadata-first.",
         ),
         MemoryWriterSpec(
+            "holon_talk.write_receipt",
+            "scripts.holon_talk",
+            "talk",
+            ("home.agent_homes",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.HIGH,
+            "Holon talk receipts are raw agent-contact evidence, not canon.",
+        ),
+        MemoryWriterSpec(
             "semantic_memory_bridge.index_concepts",
             "dharma_swarm.semantic_memory_bridge",
             "index_concepts_into_memory",
