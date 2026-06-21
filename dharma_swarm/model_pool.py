@@ -145,9 +145,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
 }
 _DEFAULT_RANK = 5
 
-_NESTED_ROUTE_LOGICAL_IDS = {
-    "deepseek-ai/deepseek-v4-pro/flash": "deepseek-v4-pro",
-}
+_NESTED_ROUTE_LOGICAL_IDS: dict[str, str] = {}
 
 
 def _logical_id(slot: ModelSlot) -> str:
