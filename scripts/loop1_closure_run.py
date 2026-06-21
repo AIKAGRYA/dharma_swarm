@@ -39,6 +39,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 os.environ.setdefault("DHARMA_SPINE_DISPATCH", "1")
 
+# Load the keystore the same way the live runtime entrypoints do. As a
+# standalone process this script does not inherit the daemon's bootstrap, so
+# without this the provider chain sees "<PROVIDER>_API_KEY not set" even when
+# the key is wired in ~/.dharma/agent_keys.env — the dispatch then dead-letters
+# and Loop 1 cannot close. Keys are read only through the api_keys front door.
+from dharma_swarm import api_keys as _api_keys
+
+_api_keys.bootstrap_runtime_env()
+
 from dharma_swarm.models import AgentRole, ProviderType, TaskPriority, TaskStatus
 
 TERMINAL = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
