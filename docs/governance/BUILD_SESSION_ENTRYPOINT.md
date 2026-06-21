@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 7 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 8 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -328,6 +328,54 @@ Precedence the router must follow, documented in one place:
 - Do not wire Moonshot/DeepSeek/Perplexity first-party in this track (only z.ai/Zhipu).
 - Do not commit provider API keys or any credentials.
 - Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
+
+### The Seeing Organ — living world-ingestion / sensemaking / world-model, built before action
+
+**Track id:** `seeing-organ-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-21 (TTL 21 days)
+**Relations:** complements: loop-closure-2026-06, runtime-truth-reconciliation-2026-06
+**Owns surfaces:** dharma_swarm/world_radar/safety.py, dharma_swarm/world_radar/frontier_council.py, dharma_swarm/world_radar/sensemaking.py, dharma_swarm/world_radar/proposal.py, scripts/governance/check_world_quarantine.py, scripts/governance/check_world_sensemaking_closure.py, tests/test_world_radar_safety.py, tests/test_frontier_council.py, docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md
+**Moves vital signs:** eval_coverage, tool_coverage, memory_persistence
+
+Operator directive 2026-06-21: before Dharma Swarm pushes outward, build
+the Seer eye to full power — a living world-ingestion / sensemaking /
+evolutionary world-model organ that ingests reality deeply, places each
+signal in the organism's own map, and CAUSALLY rewires the repo (memory,
+ontology, tracks, roster, tools). The eventual outward slice is a
+Karpathy-style auto-research loop with hardcoded verifiability.
+
+Cross-validated by two decorrelated same-prompt syntheses (this repo +
+Devin's SENSEMAKING_ORGAN_SYNTHESIS.md). Both found: the machinery already
+exists and is dormant (Bronze intake, Zeitgeist scanner, Shakti S4
+executive with DISPATCH_AUTHORITY=False, Memory Kernel ingest->gate->
+promote, Chetana, ontology, VSM S3<->S4) — the current is broken at five
+seams. The moat is the VERIFIER (an uncheatable reward loop), not the
+model or the ingestion.
+
+Ordering principle (LOCKED): the eye may CONDUCT READ-ONLY immediately
+(Shakti reads world-signals; warrant-pressure becomes world-driven), but
+NO causal write-authority (dispatch flip, ontology/track/roster mutation
+from a world-signal) until BOTH the safety substrate AND the verifier are
+green. Seeing is cheap and safe; acting on what you saw is the gated step.
+
+Full design: docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md.
+
+**Next items:**
+
+- [code] (blocker) Stage 0: safety substrate (world_radar/safety.py) + adversarial test + check_world_quarantine.py — instruction/data separation by construction. SHIPPED (PR-1).
+- [code] (blocker) Stage 1: Frontier Council verifier — cross-falsify across >=2 decorrelated model families + a steelman/refuter -> WorldSensemakingReceipt (corroboration metric), env-gated off by default, bounded-replay closure check.
+- [code] (blocker) Stage 2: Shakti reads the world READ-ONLY (warrant-pressure world-driven, DISPATCH_AUTHORITY unchanged).
+- [code] Stage 3: WorldProposal (source/specialist/track/tool) -> existing Memory-Kernel/telos gates with 24h incubation + blast-radius-graded evidence. The first guarded motor neuron.
+- [code] Stage 4-5: World Pulse + Sensemaking Health read-only dashboards; then the self-improvement gym (corroborated signals -> scorable tasks -> DarwinEngine eval/RL).
+
+**Non-goals:**
+
+- Do not create a new truth store/daemon/DB; extend Bronze, the Memory Kernel, the ontology, and spine.EvidenceReceipt.
+- Do not treat ingested external content as trusted; it is untrusted data, fenced by construction (safety not detection).
+- Do not flip DISPATCH_AUTHORITY or grant any world-signal write-authority until the safety substrate AND the verifier are green.
+- Do not let internal artifacts touch archive fitness; only countersigned external acted receipts above One Wire quorum do.
+- Do not weaken or bypass a telos gate to admit a world-signal.
+- Do not build a bare RSS reader / RAG store / trend monitor; the goal is an evolutionary intelligence organ.
 
 **Recently closed tracks:**
 
