@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T02:21:53+00:00",
+  "generated_at": "2026-06-21T03:25:48+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 7,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 4
+    "shippable": 5
   },
   "spine_objectives": [
     {
@@ -740,10 +740,10 @@
       "verified_at": "2026-06-21",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": false,
+      "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 0,
+        "passed": 7,
         "total": 7
       },
       "criteria": [
@@ -768,44 +768,44 @@
         {
           "id": "routing_architecture_doc_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md MISSING"
+          "passed": true,
+          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
         },
         {
           "id": "routing_precedence_documented",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md missing"
+          "passed": true,
+          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
         },
         {
           "id": "explicit_provider_honored",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'preferred_provider' NOT FOUND in dharma_swarm/provider_policy.py"
+          "passed": true,
+          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
         },
         {
           "id": "explicit_wins_test_exists",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "tests/test_provider_routing_explicit.py missing"
+          "passed": true,
+          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
         },
         {
           "id": "power_first_default",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'power_first' NOT FOUND in dharma_swarm/provider_policy.py"
+          "passed": true,
+          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
         },
         {
           "id": "zhipu_provider_enum",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'ZHIPU' NOT FOUND in dharma_swarm/models.py"
+          "passed": true,
+          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
         },
         {
           "id": "zhipu_provider_class",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'class ZhipuProvider' NOT FOUND in dharma_swarm/providers.py"
+          "passed": true,
+          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
         }
       ]
     }
@@ -873,8 +873,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:provider-routing-consolidation-2026-06",
-      "message": "[provider-routing-consolidation-2026-06] 0/7 completion criteria pass.",
+      "check": "track-shippable:provider-routing-consolidation-2026-06",
+      "message": "[provider-routing-consolidation-2026-06] all 7 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     }
   ]
