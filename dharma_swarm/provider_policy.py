@@ -188,6 +188,22 @@ class ProviderPolicyRouter:
         *,
         available_providers: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
+        """Select a provider + fallback chain under the single routing precedence.
+
+        Order (see docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md):
+            explicit > capability/power > malleable overlays > availability
+
+        1. EXPLICIT: a named provider/model short-circuits here and is pinned at
+           position 0 (it can never be demoted by an overlay).
+        2. CAPABILITY/POWER: with no cost request, candidates are ranked
+           most-capable-first (power_first base ordering in _candidate_providers).
+        3. OVERLAYS: cost (SmartRouter), language, reasoning, tooling, then the
+           telemetry overlay refine the ranking when their signals apply.
+        The post-decision learned overlays (session affinity, routing-memory
+        EWMA, reward, canary) and availability pruning run in ModelRouter, never
+        overriding an explicit pin. Each pass appends to ``reasons`` (the audit
+        trail).
+        """
         decision = self.decision_router.route(
             DecisionInput(
                 action_name=request.action_name,

@@ -104,6 +104,8 @@ def test_garbage_pin_is_ignored() -> None:
 
 
 def _plain_request(**over: object) -> ProviderRouteRequest:
+    # Context-only keys (not request fields) get routed into context.
+    context = {k: over.pop(k) for k in ("preferred_provider", "preferred_model") if k in over}
     base = dict(
         action_name="general_task",
         risk_score=0.10,
@@ -111,6 +113,7 @@ def _plain_request(**over: object) -> ProviderRouteRequest:
         novelty=0.10,
         urgency=0.3,
         expected_impact=0.2,
+        context=context,
     )
     base.update(over)
     return ProviderRouteRequest(**base)  # type: ignore[arg-type]
@@ -144,3 +147,34 @@ def test_cost_opt_in_reverts_to_cheap() -> None:
         ],
     )
     assert decision.selected_provider != ProviderType.ANTHROPIC
+
+
+def test_precedence_explicit_beats_power_beats_cost() -> None:
+    """Stage 4 invariant: the one precedence holds end to end.
+
+    explicit  >  capability/power  >  cost
+    An explicit pin wins even with a cost preference set (cost would otherwise
+    pick the cheap provider, power would pick Anthropic) — proving explicit is
+    the top of the order and is never demoted by a lower pass.
+    """
+    router = ProviderPolicyRouter()
+    avail = [
+        ProviderType.OPENROUTER_FREE,  # cheapest
+        ProviderType.OLLAMA,
+        ProviderType.ANTHROPIC,        # most capable
+        ProviderType.ZHIPU,
+    ]
+    # explicit pin for the mid provider + a cost preference: explicit still wins
+    explicit = router.route(
+        _plain_request(preferred_low_cost=True, preferred_provider="zhipu"),
+        available_providers=avail,
+    )
+    assert explicit.selected_provider == ProviderType.ZHIPU
+
+    # no explicit, no cost -> power wins (Anthropic)
+    power = router.route(_plain_request(), available_providers=avail)
+    assert power.selected_provider == ProviderType.ANTHROPIC
+
+    # no explicit, cost opt-in -> cheap wins (not Anthropic)
+    cost = router.route(_plain_request(preferred_low_cost=True), available_providers=avail)
+    assert cost.selected_provider != ProviderType.ANTHROPIC
