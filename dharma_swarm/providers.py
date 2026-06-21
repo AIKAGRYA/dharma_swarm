@@ -1964,11 +1964,16 @@ class ZhipuProvider(LLMProvider):
 
     async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
         client = self._client_or_raise()
-        resp = await client.chat.completions.create(
+        kwargs: dict[str, Any] = dict(
             model=request.model, stream=True,
             messages=self._build_messages(request.messages, request.system),
             max_tokens=request.max_tokens, temperature=request.temperature,
         )
+        # capabilities declares supports_tools=True; honor tools when streaming
+        # too (complete() already does) so function-calling isn't silently lost.
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
         async for chunk in resp:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta and delta.content:

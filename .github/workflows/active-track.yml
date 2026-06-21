@@ -58,7 +58,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports/governance
-          python3 scripts/governance/check_track_status.py
+          # TTL staleness blocks only on the weekly freshness sweep (schedule),
+          # never on per-PR runs — a stale unrelated track must not block every
+          # open PR. Structural/graph/regression findings still block on PRs.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python3 scripts/governance/check_track_status.py --enforce-ttl
+          else
+            python3 scripts/governance/check_track_status.py
+          fi
 
       - name: Verify managed blocks are in sync (no drift)
         run: |

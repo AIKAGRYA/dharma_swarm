@@ -66,14 +66,17 @@ class LaneRole(str, Enum):
 # Within each tier, ordering is the Day 1 seed.  EWMA scores override this
 # after sufficient routing events (~100 calls).
 
-# MODEL PREFERENCE DOCTRINE — FREE/CHEAP POWERFUL FRONTIER FIRST.
-# Within every lane, the default model is the MOST POWERFUL model that lane
-# offers at $0 (or near-$0) — never the small convenience model. Small models
-# (llama3.2, mistral-small, 8B-class) are permitted ONLY as explicit keyless
-# local fallbacks (see ollama_config.OLLAMA_DEFAULT_LOCAL_MODEL) or fast-path
-# T0 classifiers — never as a lane's default. Every other file seeds its
-# models from DEFAULT_MODELS / default_model() below; do not hardcode model
-# ids elsewhere.
+# MODEL PREFERENCE DOCTRINE — POWER-FIRST (operator decision 2026-06-21).
+# Selection is power-first: ProviderPolicyRouter ranks providers most-capable-
+# first by default (cost is an opt-in nudge). This file is the data/registry
+# layer; see docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md for the precedence.
+# Within every lane the default *model* is still the MOST POWERFUL model that
+# lane offers — never the small convenience model. Small models (llama3.2,
+# mistral-small, 8B-class) are permitted ONLY as explicit keyless local
+# fallbacks (see ollama_config.OLLAMA_DEFAULT_LOCAL_MODEL) or fast-path T0
+# classifiers — never as a lane's default. Every other file seeds its models
+# from DEFAULT_MODELS / default_model() below; do not hardcode model ids
+# elsewhere.
 
 # Tier members are listed MOST INTELLIGENT FIRST (see MODEL_INTELLIGENCE
 # below) — the cost ladder picks the tier, intelligence picks within it.
@@ -118,12 +121,15 @@ ALL_TIERS: dict[str, tuple[ProviderType, ...]] = {
     "paid": TIER_PAID,
 }
 
-# The canonical seed ordering: SUSTAINABLE FIRST.
+# The canonical provider REGISTRY — all tiers, used as the base list for
+# power-first reranking (operator decision 2026-06-21). The tier enumeration
+# below is the historical fallback only: ProviderPolicyRouter applies
+# power_first_priority at selection time, so this seed order no longer drives
+# the default selection. EWMA scores still refine within that reranking.
 # 1. Free frontier (Ollama Cloud, Groq, Cerebras, etc.) — $0, high quality
-# 2. Cheap (Mistral, Google AI, etc.) — ~$0
+# 2. Cheap (Mistral, Google AI, Zhipu, etc.) — ~$0
 # 3. Subscription (Claude Max, Codex) — unlimited via active plans
-# 4. Paid API (Anthropic, OpenAI credits) — LAST RESORT, runs dry
-# After ~100 routing events, EWMA scores override this seed order.
+# 4. Paid API (Anthropic, OpenAI credits) — credit-limited
 CANONICAL_SEED_ORDER: tuple[ProviderType, ...] = (
     TIER_FREE + TIER_CHEAP + TIER_SUBSCRIPTION + TIER_PAID_API
 )
