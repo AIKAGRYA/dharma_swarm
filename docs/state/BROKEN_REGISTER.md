@@ -49,6 +49,17 @@
 - **evidence:** `scripts/diagnostics/proposal_gate_probe.py` (per-gate map); `tests/evolution_gate_helpers.py` + `tests/test_evolution_gate_helpers.py` (self-validating helper); `docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` (contract).
 - **status:** WORKAROUND — contract mapped, self-validating helper built, `test_integration` + `godel_claw` routed through it. Remaining evolution test files to be routed as CI surfaces them. WS4 itself is correct and intentionally unchanged; do not weaken it.
 
+### BR-022 — Center of gravity is inward: outward edge unowned + governance rent uninstrumented
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** STALE
+- **domain:** outward
+- **root_cause:** Strategic read-only finding (not a runtime breakage). Two coupled structural gaps. (1) **Outward edge unowned:** the `revenue-external-humans-served` spine objective ("value leaves the house and someone acts on it") has zero active track — confirmed at `docs/governance/ACTIVE_TRACK.yaml:61` and rendered as "**no active track**" by `make onboard`. All 7 active tracks serve `substrate-nativeness`; `research-depth` is also unowned. (2) **Governance rent uninstrumented:** `CLAUDE.md` (Transcendence Principle) states as doctrine that "Every governance mechanism must be evaluated against its diversity cost" and the metabolic test is "does each gate prevent more drift than the coordination tax it imposes" — but no instrument computes a per-gate rent/diversity-cost measure; the Krogh-Vedelsby diversity term (`diversity_archive.py`) exists but is not wired to gate-addition decisions. Governance accretes (watcher surfaces grow faster than watched runtime) with no metabolic ledger to flag autoimmune tip-over.
+- **blast_radius:** Organism cannot yet "feed itself" (no outward acted-receipt revenue loop) while the immune/governance layer keeps expanding uncosted. Risk is twofold: (a) vision tracks (campaigns, economic/legal/ecological build loops, recursive AI-building-AI) all sit downstream of an outward edge that has no owner; (b) ungoverned governance growth silently raises the coordination tax on every agent. Both are second-order, not blocking any single dispatch.
+- **evidence:** `docs/governance/ACTIVE_TRACK.yaml:61-63` (revenue objective, no serving track); `make onboard` render (spine objectives section: revenue + research-depth = no active track); `CLAUDE.md` Transcendence Principle ("Every governance mechanism must be evaluated against its diversity cost"); `dharma_swarm/diversity_archive.py` (Krogh-Vedelsby term exists, unwired to gate decisions). NOTE: claims (1) are ledger-confirmed; claim (2) is an asserted negative ("no instrument found") and must be verified by the working agent before action — search for any gate-cost/rent instrument before treating it as absent.
+- **status:** OPEN — shelved for a future agent per operator (2026-06-21). Two candidate work packets: (A) open a `revenue-external-humans-served` track with an owned outward surface + acted-receipt quorum (One Wire, N>=5/M>=3 per `loop-closure-2026-06`); (B) instrument per-gate metabolic rent (prevented-drift vs coordination-tax) so governance additions are decided against a measure, not a vibe. Do NOT auto-add governance to close this — that would deepen it.
+
 ### BR-004 — Cron split-brain (repo vs live)
 - **first_observed:** ≤ 2026-05-06
 - **last_verified:** 2026-05-07
