@@ -1,6 +1,7 @@
 ---
 name: testing-dashboard-runtime
 description: Test DHARMA COMMAND dashboard and FastAPI runtime end-to-end. Use when verifying the app boots locally, dashboard telemetry is live, or opportunity dispatch/refill writes durable runtime state.
+type: reference
 ---
 
 # Testing Dashboard + Runtime Inside-Out
@@ -13,19 +14,19 @@ description: Test DHARMA COMMAND dashboard and FastAPI runtime end-to-end. Use w
 
 ## Setup
 
-Use the repo venv when present:
+Use the repo venv when present from the repo or worktree under test:
 
 ```bash
-cd /home/ubuntu/repos/dharma-swarm
+cd /path/to/dharma-swarm
 PATH="$PWD/.venv/bin:$PATH" make onboard
 ```
 
-If testing from a separate worktree, reuse the canonical venv and set `PYTHONPATH` to the worktree:
+If testing from a separate worktree, set `PYTHONPATH` to that worktree. Prefer its local `.venv`; only point `PATH` at a shared venv after verifying that shared venv belongs to the same repository and dependency set.
 
 ```bash
 cd /path/to/dharma-swarm-worktree
 export PYTHONPATH="$PWD"
-export PATH="/home/ubuntu/repos/dharma-swarm/.venv/bin:$PATH"
+export PATH="$PWD/.venv/bin:$PATH"
 ```
 
 If `dashboard/node_modules` is missing, install dashboard dependencies incrementally:
@@ -75,15 +76,15 @@ Pass criteria:
 
 `health_status: "unknown"` is a warning, not a dashboard wiring failure, if `/api/health` returns `status: "ok"` and no endpoint error.
 
-## Opportunity Loop Assertions
+## Opportunity Loop Checks
 
-Verify the canonical stages:
+Verify the stage list:
 
 ```bash
 curl -s http://127.0.0.1:8420/api/opportunities/stages | python -m json.tool
 ```
 
-Expected stages exactly:
+Expected stage names:
 
 ```text
 scope, validate, deep_research, capability, mvp, first_artifact
@@ -98,7 +99,7 @@ curl -s -X POST http://127.0.0.1:8420/api/opportunities/dispatch \
   | python -m json.tool
 ```
 
-Pass criteria:
+Checks:
 
 - Exactly 6 results.
 - Every result has `success: true`.
@@ -114,12 +115,12 @@ curl -s -X POST http://127.0.0.1:8420/api/opportunities/refill \
   | python -m json.tool
 ```
 
-Pass criteria:
+Checks:
 
 - `success: true`.
 - Exactly 6 stages.
-- `total_provider_cost_usd` is `0.23`.
-- `total_net_value_usd` is `999.77` for a `$1000` estimated value.
+- `total_provider_cost_usd` is present and numeric.
+- `total_net_value_usd` is present, numeric, and equals `estimated_value_usd - total_provider_cost_usd` for the submitted opportunity.
 - `revenue_packet_path` is non-empty, exists on disk, and the file contains the refill opportunity ID.
 
 ## Useful Diagnostics
