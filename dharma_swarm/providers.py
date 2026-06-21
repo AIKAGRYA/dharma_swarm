@@ -680,7 +680,12 @@ class _SubprocessProvider(LLMProvider):
         prompt += "- Read other agents' notes in ~/.dharma/shared/ first\n"
         # Memory survival instinct — injected into EVERY subprocess agent
         prompt += MEMORY_SURVIVAL_DIRECTIVE
-        return prompt
+        # A NUL byte anywhere in the prompt makes asyncio.create_subprocess_exec
+        # raise ValueError("embedded null byte") and kills the dispatch (the
+        # long-standing "claude_code embedded null byte" failure class). It is
+        # never meaningful in an LLM prompt and can ride in from upstream context
+        # assembly, so strip it at this shared chokepoint for every CLI provider.
+        return prompt.replace("\x00", "")
 
     def _build_cli_args(self, prompt: str, model: str | None = None) -> list[str]:
         resolved = model or "sonnet"
