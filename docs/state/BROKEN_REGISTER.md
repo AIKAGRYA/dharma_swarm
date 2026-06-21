@@ -38,6 +38,17 @@
 - **evidence:** `~/.dharma/audit/self_evolution_trace_2026-05-07.md`; `find ~/.dharma/build_protocol/dryruns -mindepth 1 -maxdepth 1 -type d | wc -l` = 9; `find ~/.dharma/build_protocol -name proof_packet.json | wc -l` = 4; vision_maps `05_autopoiesis_evolution.md`.
 - **status:** PARTIAL — 2026-05-07 partial closure: `tools/build_protocol/cli.py` now exposes `dharma-build shadow-apply <dryrun_root>`, which calls `DarwinEngine.apply_sealed_packet(..., shadow=True)` and archives the proof result without live mutation. Live apply remains intentionally gated. **End-to-end exercise on 2026-05-07 (this commit):** ran `python -m tools.build_protocol.cli shadow-apply ~/.dharma/build_protocol/dryruns/wp005-seal-cli-20260506`. Result: `accepted: true`, `archive_entry_id: 64280c7685784e63`, `shadow: true`, `proof_exit_code: 0` (5 tests pass), packet archived as line in `~/.dharma/evolution/archive.jsonl` with id `64280c7685784e63` and `shadow:true`. First confirmed end-to-end shadow-apply on this branch. `applied:false` is correct — `diff_missing:true` for this dryrun (test-only seal, no diff to apply); the seam itself is now exercised. Full closure (live, non-shadow apply) remains a multi-day plan gated by `DHARMA_EVOLUTION_SHADOW=0` and a real telos-gate→kernel→apply traversal.
 
+### BR-021 — WS4 Tier-C battery hard-rejects terse evolution-test proposals
+- **first_observed:** 2026-06-21
+- **last_verified:** 2026-06-21
+- **age_days:** 0
+- **severity:** DEGRADED
+- **domain:** runtime / state (tests)
+- **root_cause:** WS4 (`dharma_swarm/evolution.py` ~L1543) hard-rejects a self-mod proposal on any Tier-C advisory `REVIEW`; the anekanta / steelman / dogma-drift gates were tightened *after* the evolution test suite was written, so proposals with terse descriptions are rejected for "low epistemological diversity" / "no counterarguments" — unrelated to what the tests assert. Masked for weeks under `pytest -x` (stopped at an earlier failure).
+- **blast_radius:** ~8 tests in `tests/test_integration.py` + `tests/test_godel_claw_e2e.py` (routed through the new helper); OTHER evolution test files may still carry terse self-mod proposals and will surface as `pytest -x` advances. Real internal callers that build terse self-mod proposals would also be rejected.
+- **evidence:** `scripts/diagnostics/proposal_gate_probe.py` (per-gate map); `tests/evolution_gate_helpers.py` + `tests/test_evolution_gate_helpers.py` (self-validating helper); `docs/architecture/EVOLUTION_PROPOSAL_GATE_CONTRACT.md` (contract).
+- **status:** WORKAROUND — contract mapped, self-validating helper built, `test_integration` + `godel_claw` routed through it. Remaining evolution test files to be routed as CI surfaces them. WS4 itself is correct and intentionally unchanged; do not weaken it.
+
 ### BR-004 — Cron split-brain (repo vs live)
 - **first_observed:** ≤ 2026-05-06
 - **last_verified:** 2026-05-07
