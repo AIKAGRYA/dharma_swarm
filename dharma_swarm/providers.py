@@ -1898,7 +1898,7 @@ class ChutesProvider(LLMProvider):
 
 
 class ZhipuProvider(LLMProvider):
-    """z.ai / Zhipu -- first-party GLM lane (GLM-4.6, GLM-4.5). OpenAI-compatible.
+    """z.ai / Zhipu -- first-party GLM lane (glm-5.2, GLM-4.6). OpenAI-compatible.
 
     Direct vendor endpoint, NOT routed through OpenRouter. Base URL defaults to
     the z.ai OpenAI-compatible paas endpoint and is overridable via ZHIPU_BASE_URL.
