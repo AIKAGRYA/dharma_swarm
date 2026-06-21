@@ -97,6 +97,9 @@ if ARCHIVE_AVAILABLE:
         perfect = FitnessScore(
             correctness=1.0,
             dharmic_alignment=1.0,
+            swabhaav_alignment=1.0,  # P9: omitted here predated the dimension,
+                                     # which carries 0.08 weight -> perfect was
+                                     # scoring 0.92 and failing CI on every PR.
             performance=1.0,
             utilization=1.0,
             economic_value=1.0,  # Added in Phase 1

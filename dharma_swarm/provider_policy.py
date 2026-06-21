@@ -25,6 +25,7 @@ from dharma_swarm.model_hierarchy import (
     TIER_FREE,
     TIER_PAID,
     heuristic_score,
+    intelligence_order,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.smart_router import SmartRouter, SmartRouterConfig
@@ -48,6 +49,23 @@ def _dedupe_keep_order(items: Iterable[ProviderType]) -> list[ProviderType]:
     return out
 
 
+def _coerce_provider(value: Any) -> ProviderType | None:
+    """Best-effort coerce a context value (str or ProviderType) to a member.
+
+    The route context carries ``preferred_provider`` as a ProviderType.value
+    string (set by agent_runner). Returns None on anything unrecognized so an
+    explicit pin degrades to the ranked chain (pin + safe fallback).
+    """
+    if isinstance(value, ProviderType):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return ProviderType(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 @dataclass(frozen=True)
 class ProviderRouteRequest:
     action_name: str
@@ -58,7 +76,9 @@ class ProviderRouteRequest:
     expected_impact: float
     estimated_latency_ms: int = 800
     estimated_tokens: int = 1200
-    preferred_low_cost: bool = True
+    # Power-first default (operator decision 2026-06-21): cost is an OPT-IN
+    # nudge, so this defaults False. Set True to prefer cheaper providers.
+    preferred_low_cost: bool = False
     requires_frontier_precision: bool = False
     privileged_action: bool = False
     requires_human_consent: bool = False
@@ -97,6 +117,15 @@ class ProviderRoutingConfig:
         ProviderType.SAMBANOVA,
     )
     reasoning_priority: tuple[ProviderType, ...] = DELIBERATIVE_REASONING_PRIORITY
+    # Power-first default (operator decision 2026-06-21): with no explicit cost
+    # request, rank by raw model intelligence (most capable first), NOT the
+    # free-tier-first seed order. Cost is an opt-in nudge via preferred_low_cost.
+    power_first: bool = True
+    power_first_priority: tuple[ProviderType, ...] = field(
+        default_factory=lambda: tuple(
+            intelligence_order(CANONICAL_SEED_ORDER, respect_cost_tiers=False)
+        )
+    )
     default_model_hints: dict[ProviderType, str] = field(
         default_factory=lambda: dict(DEFAULT_MODELS)
     )
@@ -159,6 +188,22 @@ class ProviderPolicyRouter:
         *,
         available_providers: list[ProviderType] | None = None,
     ) -> ProviderRouteDecision:
+        """Select a provider + fallback chain under the single routing precedence.
+
+        Order (see docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md):
+            explicit > capability/power > malleable overlays > availability
+
+        1. EXPLICIT: a named provider/model short-circuits here and is pinned at
+           position 0 (it can never be demoted by an overlay).
+        2. CAPABILITY/POWER: with no cost request, candidates are ranked
+           most-capable-first (power_first base ordering in _candidate_providers).
+        3. OVERLAYS: cost (SmartRouter), language, reasoning, tooling, then the
+           telemetry overlay refine the ranking when their signals apply.
+        The post-decision learned overlays (session affinity, routing-memory
+        EWMA, reward, canary) and availability pruning run in ModelRouter, never
+        overriding an explicit pin. Each pass appends to ``reasons`` (the audit
+        trail).
+        """
         decision = self.decision_router.route(
             DecisionInput(
                 action_name=request.action_name,
@@ -198,6 +243,26 @@ class ProviderPolicyRouter:
         else:
             filtered = candidates
 
+        # Explicit-wins (pin + safe fallback): if the caller named a provider,
+        # it becomes the selection and short-circuits the cost/telemetry
+        # re-ranking so it can never be demoted out of position 0. An
+        # unavailable pin (named provider not registered) degrades to the
+        # ranked chain below — that is the "safe fallback" half.
+        explicit = _coerce_provider(request.context.get("preferred_provider"))
+        if explicit is not None:
+            honorable = (not available) or (explicit in available) or (explicit in filtered)
+            if honorable:
+                pinned = _dedupe_keep_order([explicit, *filtered])
+                reasons.append(f"explicit_provider_pinned={explicit.value}")
+                raw_hint = request.context.get("preferred_model")
+                return self._finalize_decision(
+                    path=path,
+                    chain=pinned,
+                    decision=decision,
+                    reasons=reasons,
+                    model_hint_override=raw_hint if isinstance(raw_hint, str) and raw_hint else None,
+                )
+
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
         requires_tooling = bool(request.context.get("requires_tooling"))
@@ -223,12 +288,37 @@ class ProviderPolicyRouter:
         )
         reasons.extend(telemetry_reasons)
 
-        selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
-        fallbacks = [item for item in filtered[1:] if item != selected]
+        return self._finalize_decision(
+            path=path,
+            chain=filtered,
+            decision=decision,
+            reasons=reasons,
+        )
+
+    def _finalize_decision(
+        self,
+        *,
+        path: RoutePath,
+        chain: list[ProviderType],
+        decision: Any,
+        reasons: list[str],
+        model_hint_override: str | None = None,
+    ) -> ProviderRouteDecision:
+        """Build the ProviderRouteDecision from a final, ordered provider chain.
+
+        Shared by the normal ranked path and the explicit-wins short-circuit so
+        both construct an identical decision shape. ``model_hint_override`` lets
+        an explicit model request set the selected hint directly.
+        """
+        selected = chain[0] if chain else ProviderType.CLAUDE_CODE
+        fallbacks = [item for item in chain[1:] if item != selected]
+        selected_model_hint = (
+            model_hint_override or self.config.default_model_hints.get(selected)
+        )
         return ProviderRouteDecision(
             path=path,
             selected_provider=selected,
-            selected_model_hint=self.config.default_model_hints.get(selected),
+            selected_model_hint=selected_model_hint,
             fallback_providers=fallbacks,
             fallback_model_hints=[
                 self.config.default_model_hints[item]
@@ -408,6 +498,22 @@ class ProviderPolicyRouter:
 
         if requires_tooling:
             candidates = list(self.config.tooling_candidates) + candidates
+
+        # Power-first base ordering (operator decision 2026-06-21): with no
+        # explicit cost request, rank by raw model intelligence — most capable
+        # first — instead of the free-tier-first seed order. The language /
+        # reasoning / cost overlays below refine this when they apply; when none
+        # apply (the common default), power-first stands.
+        if (
+            self.config.power_first
+            and not prefer_low_cost
+            and path != RoutePath.ESCALATE
+        ):
+            priority = {
+                provider: idx
+                for idx, provider in enumerate(self.config.power_first_priority)
+            }
+            candidates.sort(key=lambda provider: priority.get(provider, len(priority)))
 
         if prefer_japanese_quality:
             priority = {
