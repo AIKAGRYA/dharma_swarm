@@ -138,3 +138,29 @@ Expanded, in strict order:
 - First-party direct paths rank above OpenRouter.
 - No new model/key/route registry is created; everything converges on the data
   layer in §3.
+
+---
+
+## 7. Consolidation status (2026-06-21)
+
+Stages 1–4 shipped; Stage 5 done with scoped exceptions recorded below.
+
+- **Stage 1 — explicit-wins:** DONE. `provider_policy` honors
+  `context["preferred_provider"]`/`["preferred_model"]` as selection.
+- **Stage 2 — power-first default:** DONE. `power_first` base ordering;
+  `preferred_low_cost` defaults False (request + production derivation).
+- **Stage 3 — z.ai/Zhipu first-party:** DONE. `ProviderType.ZHIPU`, default
+  `glm-5.2`, endpoint `https://api.z.ai/api/paas/v4`. (Live calls require the
+  environment's network egress allowlist to include `api.z.ai`.)
+- **Stage 4 — one precedence, documented + tested:** DONE. See §2 and
+  `tests/test_provider_routing_explicit.py`.
+- **Stage 5 — drift cleanup:** env templates updated for Zhipu. The following
+  were **deliberately NOT changed** (out of scope / unsafe in this track):
+  - `AgentConfig.model = "claude-sonnet-4-20250514"` — agent-identity surface,
+    a codebase-wide convention across 10+ files; belongs to the identity owners,
+    not routing. The router resolves model hints from the data layer regardless.
+  - `providers_extended.py` — NOT dead code: `test_providers_quality_track.py`
+    imports its `MoonshotProvider`. Left intact.
+  - Model-specific literals in `cost_tracker.py` (pricing table), TUI
+    `ModelProfile`s, and CLI `--model` defaults — legitimately per-model config,
+    not routing drift.
