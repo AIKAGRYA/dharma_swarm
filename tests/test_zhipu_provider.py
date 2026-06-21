@@ -5,6 +5,8 @@ enum -> key env -> default model -> resolution -> factory -> intelligence rank.
 """
 from __future__ import annotations
 
+import pytest
+
 from dharma_swarm.api_keys import ZHIPU_API_KEY_ENV, PROVIDER_API_KEY_ENV_KEYS
 from dharma_swarm.model_defaults import default_for_provider
 from dharma_swarm.model_hierarchy import (
@@ -49,7 +51,7 @@ def test_zhipu_resolves_to_first_party_endpoint() -> None:
     assert "openrouter" not in (cfg.base_url or "")
 
 
-def test_zhipu_unavailable_without_key(monkeypatch) -> None:
+def test_zhipu_unavailable_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # Deterministic: clear every alias the resolver would fall back to, so the
     # assertion can't be flaked by a GLM/z.ai key present in the CI environment.
     for var in ("ZHIPU_API_KEY", "GLM_API_KEY", "ZAI_API_KEY", "ZHIPUAI_API_KEY"):
