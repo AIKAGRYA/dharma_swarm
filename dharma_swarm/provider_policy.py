@@ -48,6 +48,23 @@ def _dedupe_keep_order(items: Iterable[ProviderType]) -> list[ProviderType]:
     return out
 
 
+def _coerce_provider(value: Any) -> ProviderType | None:
+    """Best-effort coerce a context value (str or ProviderType) to a member.
+
+    The route context carries ``preferred_provider`` as a ProviderType.value
+    string (set by agent_runner). Returns None on anything unrecognized so an
+    explicit pin degrades to the ranked chain (pin + safe fallback).
+    """
+    if isinstance(value, ProviderType):
+        return value
+    if isinstance(value, str) and value.strip():
+        try:
+            return ProviderType(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 @dataclass(frozen=True)
 class ProviderRouteRequest:
     action_name: str
@@ -198,6 +215,26 @@ class ProviderPolicyRouter:
         else:
             filtered = candidates
 
+        # Explicit-wins (pin + safe fallback): if the caller named a provider,
+        # it becomes the selection and short-circuits the cost/telemetry
+        # re-ranking so it can never be demoted out of position 0. An
+        # unavailable pin (named provider not registered) degrades to the
+        # ranked chain below — that is the "safe fallback" half.
+        explicit = _coerce_provider(request.context.get("preferred_provider"))
+        if explicit is not None:
+            honorable = (not available) or (explicit in available) or (explicit in filtered)
+            if honorable:
+                pinned = _dedupe_keep_order([explicit, *filtered])
+                reasons.append(f"explicit_provider_pinned={explicit.value}")
+                raw_hint = request.context.get("preferred_model")
+                return self._finalize_decision(
+                    path=path,
+                    chain=pinned,
+                    decision=decision,
+                    reasons=reasons,
+                    model_hint_override=raw_hint if isinstance(raw_hint, str) and raw_hint else None,
+                )
+
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
         requires_tooling = bool(request.context.get("requires_tooling"))
@@ -223,12 +260,37 @@ class ProviderPolicyRouter:
         )
         reasons.extend(telemetry_reasons)
 
-        selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
-        fallbacks = [item for item in filtered[1:] if item != selected]
+        return self._finalize_decision(
+            path=path,
+            chain=filtered,
+            decision=decision,
+            reasons=reasons,
+        )
+
+    def _finalize_decision(
+        self,
+        *,
+        path: RoutePath,
+        chain: list[ProviderType],
+        decision: Any,
+        reasons: list[str],
+        model_hint_override: str | None = None,
+    ) -> ProviderRouteDecision:
+        """Build the ProviderRouteDecision from a final, ordered provider chain.
+
+        Shared by the normal ranked path and the explicit-wins short-circuit so
+        both construct an identical decision shape. ``model_hint_override`` lets
+        an explicit model request set the selected hint directly.
+        """
+        selected = chain[0] if chain else ProviderType.CLAUDE_CODE
+        fallbacks = [item for item in chain[1:] if item != selected]
+        selected_model_hint = (
+            model_hint_override or self.config.default_model_hints.get(selected)
+        )
         return ProviderRouteDecision(
             path=path,
             selected_provider=selected,
-            selected_model_hint=self.config.default_model_hints.get(selected),
+            selected_model_hint=selected_model_hint,
             fallback_providers=fallbacks,
             fallback_model_hints=[
                 self.config.default_model_hints[item]
