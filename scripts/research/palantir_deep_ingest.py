@@ -100,11 +100,17 @@ def render_deep_card(
     return "\n".join(lines)
 
 
+# Exact Palantir-controlled hosts (mirrors palantir_public_source_cards.ALLOWED_HOSTS).
+# A bare endswith("palantir.com") would also match unrelated hosts like
+# evilpalantir.com — pin to the explicit set instead.
+ALLOWED_HOSTS = frozenset({"palantir.com", "www.palantir.com"})
+
+
 def allowed(url: str) -> bool:
     host = urlparse(url).netloc.lower()
     if any(skip in host for skip in SKIP_HOST_SUBSTRINGS):
         return False
-    return host.endswith("palantir.com")
+    return host in ALLOWED_HOSTS
 
 
 def main(argv: list[str] | None = None) -> int:
