@@ -56,8 +56,9 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     ProviderType.MISTRAL: "mistral-small-latest",
     ProviderType.GOOGLE_AI: "gemini-2.5-flash",
     ProviderType.CHUTES: "deepseek-ai/DeepSeek-R1",
-    # z.ai / Zhipu direct — first-party GLM lane (not routed via OpenRouter)
-    ProviderType.ZHIPU: "glm-4.6",
+    # z.ai / Zhipu direct — first-party GLM lane (not routed via OpenRouter).
+    # glm-5.2 is the current frontier GLM (mid-2026).
+    ProviderType.ZHIPU: "glm-5.2",
     ProviderType.OPENROUTER_FREE: "meta-llama/llama-3.3-70b-instruct:free",
     # Paid / subscription tier
     # FLOOR-compliant: the K2.6 floor route (not the superseded sub-floor K2.5).

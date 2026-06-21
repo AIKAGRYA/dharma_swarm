@@ -30,7 +30,7 @@ def test_zhipu_key_env_registered() -> None:
 
 
 def test_zhipu_default_model_is_glm() -> None:
-    assert default_for_provider(ProviderType.ZHIPU) == "glm-4.6"
+    assert default_for_provider(ProviderType.ZHIPU) == "glm-5.2"
 
 
 def test_zhipu_has_intelligence_score() -> None:
@@ -43,7 +43,7 @@ def test_zhipu_resolves_to_first_party_endpoint() -> None:
         ProviderType.ZHIPU, api_key="sk-zhipu-test"
     )
     assert cfg.available is True
-    assert cfg.default_model == "glm-4.6"
+    assert cfg.default_model == "glm-5.2"
     # First-party z.ai endpoint — NOT openrouter.ai
     assert "z.ai" in (cfg.base_url or "")
     assert "openrouter" not in (cfg.base_url or "")
