@@ -143,7 +143,7 @@ async def apply_sealed_packet(
     component = files_changed[0] if files_changed else _first_allowed_path(allowed_paths)
     proposal = Proposal(
         component=component or "sealed_packet",
-        change_type="sealed_packet",
+        change_type="sealed_packet_shadow" if shadow else "sealed_packet",
         description=description,
         diff=diff_text,
         spec_ref=str(build_meta.get("spec_path") or root),
@@ -160,6 +160,7 @@ async def apply_sealed_packet(
             "build_protocol_version": build_meta.get("protocol_version", "v0"),
             "diff_ref": diff_ref,
             "diff_missing": diff_missing,
+            "shadow": shadow,
         },
     )
     result.proposal_id = proposal.id

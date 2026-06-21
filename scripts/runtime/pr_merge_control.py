@@ -1600,6 +1600,17 @@ def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 
 def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSConfig:
+    if not require_devin_secrets and env.get("NATS_URL"):
+        return NATSConfig(
+            endpoint=env.get("NATS_URL", ""),
+            user=env.get("NATS_USER", ""),
+            credential=env.get("NATS_PASSWORD", ""),
+            missing=(),
+            ca_pem=_normalize_ca_pem(env.get("NATS_CA_PEM", "")),
+            tls_hostname=env.get("NATS_TLS_HOSTNAME", "").strip(),
+            credential_family="direct",
+        )
+
     mike_present = any(env.get(name) for name in MERGE_MASTER_MIKE_NATS_SECRET_NAMES)
     credential_family = "merge_master_mike" if mike_present else "devin"
     endpoint = (
