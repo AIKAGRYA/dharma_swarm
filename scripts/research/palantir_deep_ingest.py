@@ -107,7 +107,10 @@ ALLOWED_HOSTS = frozenset({"palantir.com", "www.palantir.com"})
 
 
 def allowed(url: str) -> bool:
-    host = urlparse(url).netloc.lower()
+    parsed = urlparse(url)
+    if parsed.scheme != "https":  # sanctioned public docs surface is https-only
+        return False
+    host = parsed.netloc.lower()
     if any(skip in host for skip in SKIP_HOST_SUBSTRINGS):
         return False
     return host in ALLOWED_HOSTS
@@ -148,7 +151,13 @@ def main(argv: list[str] | None = None) -> int:
     failures: list[dict[str, str]] = []
     for url in urls:
         slug = slugify(urlparse(url).path.strip("/") or url)
-        card_path = deep_dir / f"{slug}.md"
+        # slugify already strips path separators; resolve + contain anyway so a
+        # URL-derived slug can never write outside the deep-cards directory.
+        card_path = (deep_dir / f"{slug}.md").resolve()
+        if deep_dir.resolve() not in card_path.parents:
+            failed += 1
+            failures.append({"url": url, "error": "path_escape"})
+            continue
         if card_path.exists() and not args.refresh:
             skipped += 1
             continue

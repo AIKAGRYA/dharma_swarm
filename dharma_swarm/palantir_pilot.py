@@ -68,7 +68,7 @@ OWNED_SURFACES = [
 
 FORBIDDEN_ACTIONS = [
     "bypass login, paywall, robots.txt, rate limits, or course enrollment controls",
-    "store full copyrighted Palantir pages, course text, videos, transcripts, or labs wholesale",
+    "store Learn/course bodies, videos, transcripts, labs, or quizzes wholesale, or commit deep-card prose to git (full prose of robots-allowed public docs pages, kept local-only as deep-cards, is permitted)",
     "claim official Palantir affiliation, certification, access, or insider knowledge",
     "read or write provider secrets outside the declared Dharma key owner",
     "spend money, enroll accounts, submit forms, or touch live external accounts",
@@ -110,7 +110,7 @@ PUBLIC_SOURCES = [
         "url": "https://www.palantir.com/docs/sitemap.xml",
         "surface": "public_docs_sitemap",
         "access_status": "autonomous_fetch_allowed_observed_2026-06-14",
-        "ingestion_policy": "Index URLs, lastmod values, product family, and distilled summaries. Do not mirror full pages.",
+        "ingestion_policy": "Index URLs, lastmod values, product family, and distilled summaries; for robots-allowed public docs pages, also store full parsed prose as local-only deep-cards. Do not mirror Learn/course bodies or private-tenant material.",
     },
     {
         "id": "palantir_www_sitemap",
@@ -228,6 +228,7 @@ def build_source_manifest(
                 "short excerpts within copyright limits",
                 "original summaries and concept maps",
                 "bounded public docs source cards",
+                "full-text deep-cards for robots-allowed public docs pages (local-only under ~/.dharma, never committed)",
                 "balanced public docs source-card expansion receipts",
                 "archive-only source-card cleanup receipts",
                 "task playbooks synthesized from bounded source cards",
@@ -238,7 +239,7 @@ def build_source_manifest(
                 "query-answer receipts with citations",
             ],
             "disallowed_storage": [
-                "full docs pages copied into the repo or wiki",
+                "full docs-page prose committed into the git repo (public deep-cards stay local-only under ~/.dharma, never committed)",
                 "course videos, transcripts, labs, or quizzes copied wholesale",
                 "private tenant material",
                 "credentialed Palantir content unless the operator supplies explicit rights and boundaries",
@@ -436,7 +437,7 @@ def format_markdown(manifest: dict[str, Any]) -> str:
             "",
             "## Storage Rule",
             "",
-            "Store links, metadata, timestamps, original summaries, concept maps, and short compliant excerpts. Do not mirror full pages, courses, videos, labs, quizzes, or private tenant material.",
+            "Store links, metadata, timestamps, original summaries, concept maps, short excerpts, and — for robots-allowed public docs pages — full parsed prose as local-only deep-cards (under ~/.dharma, never committed to git). Do not mirror Learn/course bodies, videos, labs, quizzes, or private-tenant material.",
             "",
             "## Current Workspace",
             "",

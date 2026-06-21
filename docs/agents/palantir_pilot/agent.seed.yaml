@@ -78,7 +78,8 @@ capabilities:
 forbidden_actions:
   - access_control_bypass
   - robots_or_rate_limit_bypass
-  - wholesale_copyrighted_content_storage
+  - learn_course_or_private_full_text_storage  # public-docs deep-cards (local-only) permitted; Learn/course/gated/private full-text forbidden
+  - deep_card_prose_committed_to_git
   - private_palantir_tenant_claims
   - official_affiliation_claims
   - provider_secret_access
@@ -102,6 +103,6 @@ verifiers:
 
 invariants:
   public_source_only: "Use public URLs, sitemaps, docs, and operator-provided material only."
-  copyright_boundary: "Store links, metadata, summaries, concept maps, and small compliant excerpts; do not mirror full docs/course bodies."
+  copyright_boundary: "Store links, metadata, summaries, concept maps, small excerpts, and — for robots-allowed public docs pages — full parsed prose as local-only deep-cards (under ~/.dharma, never committed to git, internal RAG only, no redistribution). Do not mirror Learn/course bodies, gated, or private-tenant material."
   learn_boundary: "learn.palantir.com is manual-review/link-only until allowed autonomous access is confirmed."
   affiliation_boundary: "No official Palantir affiliation, certification, private tenant access, or insider status is claimed."

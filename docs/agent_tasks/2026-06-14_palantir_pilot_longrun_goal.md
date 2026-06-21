@@ -17,9 +17,11 @@ offer Palantir-side contributions back into Dharma Swarm.
 
 This is public-source only. Do not bypass access controls, login, paywalls,
 robots.txt, enrollment flows, rate limits, or private tenant boundaries. Do not
-copy full copyrighted docs, course pages, videos, transcripts, labs, quizzes, or
-private material into the repo/wiki. Store URLs, metadata, timestamps, original
-summaries, concept maps, and short compliant excerpts.
+copy Learn/course bodies, course pages, videos, transcripts, labs, quizzes, gated,
+or private material, and do not commit deep-card prose to git. Store URLs, metadata,
+timestamps, original summaries, concept maps, short excerpts, and — for robots-allowed
+public docs pages — full parsed prose as local-only deep-cards (under ~/.dharma,
+internal RAG only, no redistribution).
 
 `learn.palantir.com/page/course-catalog` is important but currently treated as
 link/manual-review only because autonomous fetch observed a 403 robots response
