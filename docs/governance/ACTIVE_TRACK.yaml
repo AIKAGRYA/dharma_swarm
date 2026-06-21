@@ -880,12 +880,17 @@ active_tracks:
     owned_surfaces:
       - dharma_swarm/world_radar/safety.py
       - dharma_swarm/world_radar/frontier_council.py
+      - dharma_swarm/world_radar/warrant_handoff.py
       - dharma_swarm/world_radar/sensemaking.py
       - dharma_swarm/world_radar/proposal.py
       - scripts/governance/check_world_quarantine.py
+      - scripts/governance/check_frontier_council_replay.py
+      - scripts/governance/check_world_warrant_handoff.py
       - scripts/governance/check_world_sensemaking_closure.py
       - tests/test_world_radar_safety.py
       - tests/test_frontier_council.py
+      - tests/test_world_warrant_handoff.py
+      - docs/architecture/SENSEMAKING_ORGAN.md
       - docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md
     moves_vital_signs:
       - eval_coverage
@@ -942,6 +947,16 @@ active_tracks:
       - id: frontier_council_verifier_exists
         kind: file_exists
         file: dharma_swarm/world_radar/frontier_council.py
+      - id: stage2_read_only_handoff_exists
+        kind: file_exists
+        file: dharma_swarm/world_radar/warrant_handoff.py
+      - id: stage2_dispatch_authority_stays_false
+        kind: file_contains
+        file: dharma_swarm/world_radar/warrant_handoff.py
+        pattern: "dispatch_authority: bool = False"
+      - id: stage2_replay_check_exists
+        kind: file_exists
+        file: scripts/governance/check_world_warrant_handoff.py
 
     non_goals:
       - Do not create a new truth store/daemon/DB; extend Bronze, the Memory Kernel, the ontology, and spine.EvidenceReceipt.
@@ -957,11 +972,11 @@ active_tracks:
         kind: code
         blocker: true
       - id: 2
-        what: "Stage 1: Frontier Council verifier — cross-falsify across >=2 decorrelated model families + a steelman/refuter -> WorldSensemakingReceipt (corroboration metric), env-gated off by default, bounded-replay closure check."
+        what: "Stage 1: Frontier Council verifier — cross-falsify across >=2 decorrelated model families + a steelman/refuter -> WorldSensemakingReceipt (corroboration metric), env-gated off by default, bounded-replay closure check. SHIPPED (PR-2)."
         kind: code
         blocker: true
       - id: 3
-        what: "Stage 2: Shakti reads the world READ-ONLY (warrant-pressure world-driven, DISPATCH_AUTHORITY unchanged)."
+        what: "Stage 2: Shakti reads the world READ-ONLY — corroborated receipts -> advisory WorldWarrantPressure (warrant_handoff.py), DISPATCH_AUTHORITY unchanged, bounded-replay closure check (WORLD_WARRANT_HANDOFF=pass). SHIPPED."
         kind: code
         blocker: true
       - id: 4

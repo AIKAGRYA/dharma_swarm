@@ -1,0 +1,53 @@
+{
+  "check": "world_warrant_handoff",
+  "stage": "seeing-organ Stage 2 \u2014 Shakti reads the world (read-only)",
+  "checked_count": 6,
+  "passed": true,
+  "failures": [],
+  "dispatch_authority_held_false": true,
+  "cases": [
+    {
+      "case": "corroborated_yields_one_advisory_pressure",
+      "expected_pressures": 1,
+      "got_pressures": 1,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    },
+    {
+      "case": "refuted_yields_none",
+      "expected_pressures": 0,
+      "got_pressures": 0,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    },
+    {
+      "case": "insufficient_yields_none",
+      "expected_pressures": 0,
+      "got_pressures": 0,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    },
+    {
+      "case": "quarantined_high_risk_yields_none",
+      "expected_pressures": 0,
+      "got_pressures": 0,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    },
+    {
+      "case": "quarantined_unsafe_yields_none",
+      "expected_pressures": 0,
+      "got_pressures": 0,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    },
+    {
+      "case": "authority_claiming_receipt_dropped",
+      "expected_pressures": 0,
+      "got_pressures": 0,
+      "all_advisory_no_dispatch": true,
+      "passed": true
+    }
+  ],
+  "observed_at": "2026-06-21T15:20:29.912479Z"
+}

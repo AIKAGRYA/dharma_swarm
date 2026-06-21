@@ -13,28 +13,37 @@ world (untrusted)
   └─ INTAKE ............ dharma_swarm/world_radar/bronze.py  (raw receipt, content-hash, dedup, boundary signal)
   └─ STAGE 0 SAFETY .... dharma_swarm/world_radar/safety.py  ✅  (untrusted envelope verify + instruction/data fence)
   └─ STAGE 1 VERIFIER .. dharma_swarm/world_radar/frontier_council.py  ✅  (decorrelated cross-falsification → WorldSensemakingReceipt; NO action authority)
-  └─ STAGE 2 READ ...... dharma_swarm/shakti_zeitgeist_executive.py  (reads corroborated receipts → advisory warrant-pressure; DISPATCH_AUTHORITY stays False)  ← design below
+  └─ STAGE 2 READ ...... dharma_swarm/world_radar/warrant_handoff.py  ✅  (corroborated receipts → advisory warrant-pressure; DISPATCH_AUTHORITY stays False)
   └─ STAGE 3 PROPOSE ... WorldProposal → memory_kernel promotion gate / telos_gates (24h incubation, blast-radius-graded evidence)  ← future
   └─ OBSERVE ........... orientation_graph.py / make orient  (World Pulse + Sensemaking Health, read-only projection)  ← future
 ```
 
-✅ = shipped (Stage 0 + Stage 1). The verifier is the moat: corroboration is *earned* by ≥2 decorrelated evaluator
-families AND ≥2 decorrelated source families, never *granted* by confident prose. Poisoned signals are quarantined.
+✅ = shipped (Stage 0 + Stage 1 + Stage 2). The verifier is the moat: corroboration is *earned* by ≥2 decorrelated
+evaluator families AND ≥2 decorrelated source families, never *granted* by confident prose. Poisoned signals are
+quarantined.
 
-## Stage 2 — Shakti reads the world (read-only handoff design — NOT yet implemented)
+## Stage 2 — Shakti reads the world (read-only handoff) ✅
 
-The seam, defined so the next PR is obvious and safe:
+The eye conducts read-only: corroborated receipts become advisory pressure S4 *can* read, but the hands stay down.
 
+- **Owner:** `dharma_swarm/world_radar/warrant_handoff.py` — a pure function
+  `world_warrant_pressure(receipts) -> list[WorldWarrantPressure]`. No I/O, no owner mutation. Accepts receipt objects
+  or the JSON dicts they serialise to.
 - **Input:** corroborated `WorldSensemakingReceipt`s (verdict == `corroborated`, `no_action_authority == True`).
-- **Adapter (future):** a pure function `world_warrant_pressure(receipts) -> list[WarrantPressureProjection]` added near
-  `shakti_zeitgeist_executive`. It reads receipts, emits a **read-only advisory pressure** data object. It must:
-  - NOT set `DISPATCH_AUTHORITY` (stays `False`).
-  - NOT mutate `ACTIVE_TRACK.yaml`, ontology, memory, or any owner doc.
-  - Produce a *proposal/pressure data object*, never a dispatch or a mutation.
-- **Tests (future, `tests/test_shakti_reads_world.py`):** corroborated → advisory pressure only; refuted/quarantined →
-  no pressure; `DISPATCH_AUTHORITY` remains False; output is a data object, not a mutation.
+- **Output:** `WorldWarrantPressure` **data objects** — advisory magnitude in `[0, 1]` that rises with decorrelated
+  agreement (never 1.0 from a single family). Each projection stamps `is_advisory=True`, `no_action_authority=True`,
+  `dispatch_authority=False`.
+- **Invariants (proved):**
+  - `DISPATCH_AUTHORITY` is never set (stays `False`); stamped on every projection.
+  - Refuted / insufficient / quarantined receipts produce **no** pressure.
+  - A receipt that claims action authority (`dispatch_authority=True` or `no_action_authority` not True) is
+    **defensively dropped** — the projector never trusts an upstream authority flag.
+  - The function mutates no owner: not `ACTIVE_TRACK.yaml`, ontology, memory, or any doc.
+- **Tests:** `tests/test_world_warrant_handoff.py` (5 proofs).
+- **Bounded-replay check:** `scripts/governance/check_world_warrant_handoff.py` → `WORLD_WARRANT_HANDOFF=pass`
+  (report under `reports/sensemaking_organ/stage2/<date>/`).
 - **Gate to Stage 3:** only after Stage 2 is solid does a `WorldProposal` gain *gated* write-authority — through the
-  **existing** Memory-Kernel promotion gate / telos gates, never a new apply path.
+  **existing** Memory-Kernel promotion gate / telos gates, never a new apply path. The hands do not move yet.
 
 ## Receipt integration seam (Stage 1.5)
 
