@@ -29,6 +29,13 @@ AGENT_ID = "cybernetics_codex"
 CALLSIGN = "cybernetics-codex"
 SCHEMA_VERSION = "cybernetics_codex.audit.v2"
 LOOP1_BOUNDED_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop1*_spine_dispatch.json"
+# General per-loop closure receipts for the cascade (loops 2..11). Each proves
+# its OWN sense->interpret->constrain->act->adapt cycle on real data, mirroring
+# the Loop 1 bounded-replay pattern but loop-agnostic. The audit VERIFIES the
+# structural evidence (see _evaluate_loop_closure_replay); it never trusts a
+# bare "closed" boolean carried by the receipt itself.
+LOOP_CLOSURE_REPLAY_GLOB = "reports/loop_closure/cybernetics_codex/*loop{number}_*closure.json"
+LOOP_CLOSURE_TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 REPO_AGENT_HOME = Path("docs/agents/cybernetics_codex")
 SEED_FILE = REPO_AGENT_HOME / "agent.seed.yaml"
 SOUL_FILE = REPO_AGENT_HOME / "SOUL.md"
@@ -111,6 +118,7 @@ def build_audit(
     seed = read_seed_summary(repo)
     live_registration = read_live_registration_summary(state)
     bounded_replays = read_bounded_replays_summary(repo)
+    bounded_replays.update(read_loop_closure_replays(repo))
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -340,6 +348,96 @@ def read_bounded_replays_summary(repo_root: Path) -> dict[str, Any]:
             "blocker": "" if closed else "bounded replay did not satisfy strict Loop 1 closure predicate",
         }
     )
+    return out
+
+
+def _evaluate_loop_closure_replay(data: dict[str, Any]) -> dict[str, Any]:
+    """Honest, loop-agnostic closure criterion for a cascade loop's replay.
+
+    Closed only when the receipt proves, structurally, that the loop ran the full
+    cybernetic cycle on real data:
+      - cycles ran on real data (cycles > 0 and real_data true),
+      - every sense/interpret/constrain/act/adapt transition emitted a receipt,
+      - the adapt transition produced a real before != after change that fed the
+        next cycle (adapt_proof.fed_forward true), and
+      - no tick errors.
+    The boolean is COMPUTED here from the evidence; a receipt's own "closed" field
+    is never trusted (FORBIDDEN_ACTIONS: claim closure from smoke tests/prose).
+    """
+    transitions = data.get("transitions_receipted") or {}
+    adapt = data.get("adapt_proof") or {}
+    cycles = int(data.get("cycles") or 0)
+    tick_errors = data.get("tick_errors") or []
+    transitions_ok = all(bool(transitions.get(t)) for t in LOOP_CLOSURE_TRANSITIONS)
+    adapt_real = (
+        bool(adapt)
+        and bool(adapt.get("fed_forward"))
+        and adapt.get("before") != adapt.get("after")
+    )
+    closed = (
+        cycles > 0
+        and bool(data.get("real_data"))
+        and transitions_ok
+        and adapt_real
+        and not tick_errors
+    )
+    return {
+        "exists": True,
+        "closed": closed,
+        "cycles": cycles,
+        "transitions_ok": transitions_ok,
+        "adapt_real": adapt_real,
+        "tick_errors": len(tick_errors),
+        "adapt_proof": adapt or None,
+        "blocker": (
+            "" if closed
+            else "general loop closure replay did not satisfy the strict cascade criterion"
+        ),
+    }
+
+
+def read_loop_closure_replays(repo_root: Path) -> dict[str, Any]:
+    """Project per-loop (2..11) closure replays from the loop-closure surface.
+
+    Mirrors read_bounded_replays_summary but loop-agnostic. Loops with no receipt
+    return exists=False/closed=False, so the audit's existing PARTIAL logic still
+    governs them — this only ever ADDS a CLOSED verdict for a loop that ships a
+    strict, structurally-verified replay.
+    """
+    out: dict[str, Any] = {}
+    for number, loop_id, _label in LOOPS:
+        if number in (1, 12, 13):
+            continue
+        key = f"loop{number}"
+        glob = LOOP_CLOSURE_REPLAY_GLOB.format(number=number)
+        reports = sorted(
+            repo_root.glob(glob),
+            key=lambda p: p.stat().st_mtime if p.exists() else 0.0,
+            reverse=True,
+        )
+        if not reports:
+            out[key] = {
+                "exists": False,
+                "closed": False,
+                "path": None,
+                "blocker": f"no bounded closure replay report found for loop {number}",
+            }
+            continue
+        path = reports[0]
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            out[key] = {
+                "exists": True,
+                "closed": False,
+                "path": str(path),
+                "blocker": f"closure replay unreadable: {type(exc).__name__}: {exc}",
+            }
+            continue
+        evaluated = _evaluate_loop_closure_replay(data)
+        evaluated["path"] = str(path)
+        evaluated["loop_id"] = data.get("loop_id") or loop_id
+        out[key] = evaluated
     return out
 
 
@@ -744,6 +842,25 @@ def build_loop_statuses(
         status = "UNKNOWN"
         blocker = "no fresh closure packet inspected by cybernetics_codex"
         evidence: list[str] = []
+
+        # Cascade loops (2..11): a strict, structurally-verified closure replay
+        # closes the loop, mirroring Loop 1's bounded-replay verdict. Absent a
+        # receipt this is a no-op and the PARTIAL logic below still governs.
+        general_replay = (bounded_replays or {}).get(f"loop{number}") or {}
+        if number not in (1, 12, 13) and general_replay.get("closed"):
+            rows.append({
+                "number": number,
+                "id": loop_id,
+                "label": label,
+                "verdict": "CLOSED_BOUNDED_REPLAY",
+                "evidence": [f"bounded_replays.loop{number}"],
+                "blocker": (
+                    f"bounded closure replay closes loop {number} "
+                    f"(cycles={general_replay.get('cycles')}, all transitions "
+                    "receipted, adapt change fed the next cycle)"
+                ),
+            })
+            continue
 
         if number == 1:
             evidence = [
