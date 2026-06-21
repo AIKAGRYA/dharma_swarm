@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T10:55:41+00:00",
+  "generated_at": "2026-06-21T14:44:47+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,7 +95,7 @@
     }
   ],
   "portfolio_summary": {
-    "active": 7,
+    "active": 8,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 5
@@ -844,13 +844,94 @@
           "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
         }
       ]
+    },
+    {
+      "id": "seeing-organ-2026-06",
+      "name": "The Seeing Organ \u2014 living world-ingestion / sensemaking / world-model, built before action",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "loop-closure-2026-06",
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/world_radar/safety.py",
+        "dharma_swarm/world_radar/frontier_council.py",
+        "dharma_swarm/world_radar/sensemaking.py",
+        "dharma_swarm/world_radar/proposal.py",
+        "scripts/governance/check_world_quarantine.py",
+        "scripts/governance/check_world_sensemaking_closure.py",
+        "tests/test_world_radar_safety.py",
+        "tests/test_frontier_council.py",
+        "docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md"
+      ],
+      "moves_vital_signs": [
+        "eval_coverage",
+        "tool_coverage",
+        "memory_persistence"
+      ],
+      "verified_at": "2026-06-21",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 5,
+        "total": 6
+      },
+      "criteria": [
+        {
+          "id": "bronze_intake_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/world_radar/bronze.py present"
+        },
+        {
+          "id": "synthesis_doc_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md present"
+        },
+        {
+          "id": "safety_substrate_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/world_radar/safety.py present"
+        },
+        {
+          "id": "instruction_data_separation_by_construction",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def render_untrusted_for_context' found in dharma_swarm/world_radar/safety.py"
+        },
+        {
+          "id": "quarantine_closure_check_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/check_world_quarantine.py present"
+        },
+        {
+          "id": "safety_adversarial_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'cannot_forge_the_fence' found in tests/test_world_radar_safety.py"
+        },
+        {
+          "id": "frontier_council_verifier_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "dharma_swarm/world_radar/frontier_council.py MISSING"
+        }
+      ]
     }
   ],
   "findings": [
     {
       "severity": "WARN",
       "check": "wip-high",
-      "message": "7 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
+      "message": "8 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
       "criterion_id": null
     },
     {
@@ -905,6 +986,12 @@
       "severity": "INFO",
       "check": "track-shippable:provider-routing-consolidation-2026-06",
       "message": "[provider-routing-consolidation-2026-06] all 7 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:seeing-organ-2026-06",
+      "message": "[seeing-organ-2026-06] 5/6 completion criteria pass.",
       "criterion_id": null
     }
   ]

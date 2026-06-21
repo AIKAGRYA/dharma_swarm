@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-21T10:55:41+00:00 (schema v2)
-Active tracks: **7** (warn 5, max 10) — shippable 5
+Generated: 2026-06-21T14:44:47+00:00 (schema v2)
+Active tracks: **8** (warn 5, max 10) — shippable 5
 
 ## Spine coverage
 
@@ -135,9 +135,23 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
 
+## `seeing-organ-2026-06` — 5/6
+
+- serves: `substrate-nativeness` · complements: ['loop-closure-2026-06', 'runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['dharma_swarm/world_radar/safety.py', 'dharma_swarm/world_radar/frontier_council.py', 'dharma_swarm/world_radar/sensemaking.py', 'dharma_swarm/world_radar/proposal.py', 'scripts/governance/check_world_quarantine.py', 'scripts/governance/check_world_sensemaking_closure.py', 'tests/test_world_radar_safety.py', 'tests/test_frontier_council.py', 'docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md']
+- moves_vital_signs: ['eval_coverage', 'tool_coverage', 'memory_persistence']
+
+  - ✓ `bronze_intake_owner_exists` (file_exists) — dharma_swarm/world_radar/bronze.py present
+  - ✓ `synthesis_doc_exists` (file_exists) — docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md present
+  - ✓ `safety_substrate_exists` (file_exists) — dharma_swarm/world_radar/safety.py present
+  - ✓ `instruction_data_separation_by_construction` (file_contains) — pattern 'def render_untrusted_for_context' found in dharma_swarm/world_radar/safety.py
+  - ✓ `quarantine_closure_check_exists` (file_exists) — scripts/governance/check_world_quarantine.py present
+  - ✓ `safety_adversarial_test_exists` (file_contains) — pattern 'cannot_forge_the_fence' found in tests/test_world_radar_safety.py
+  - ✗ `frontier_council_verifier_exists` (file_exists) — dharma_swarm/world_radar/frontier_council.py MISSING
+
 ## Findings
 
-- **WARN** `wip-high`: 7 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+- **WARN** `wip-high`: 8 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
@@ -147,3 +161,4 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 7 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-in-progress:seeing-organ-2026-06`: [seeing-organ-2026-06] 5/6 completion criteria pass.
