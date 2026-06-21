@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-18T11:03:04+09:00",
+  "generated_at": "2026-06-21T03:25:48+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,10 +95,10 @@
     }
   ],
   "portfolio_summary": {
-    "active": 6,
+    "active": 7,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 4
+    "shippable": 5
   },
   "spine_objectives": [
     {
@@ -420,7 +420,7 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 3,
+        "passed": 4,
         "total": 5
       },
       "criteria": [
@@ -457,8 +457,8 @@
         {
           "id": "loop1_closure_receipt_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md MISSING"
+          "passed": true,
+          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
         },
         {
           "id": "campaign_retrospective_exists",
@@ -708,13 +708,113 @@
           "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
         }
       ]
+    },
+    {
+      "id": "provider-routing-consolidation-2026-06",
+      "name": "Provider Routing Consolidation \u2014 one power-first router, explicit-wins, first-party paths",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-spine-adoption-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/providers.py",
+        "dharma_swarm/provider_policy.py",
+        "dharma_swarm/model_hierarchy.py",
+        "dharma_swarm/model_pool.py",
+        "dharma_swarm/model_defaults.py",
+        "dharma_swarm/runtime_provider.py",
+        "dharma_swarm/router_v1.py",
+        "dharma_swarm/smart_router.py",
+        "dharma_swarm/decision_router.py",
+        "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "tool_coverage",
+        "cost_efficiency"
+      ],
+      "verified_at": "2026-06-21",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": true,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 7,
+        "total": 7
+      },
+      "criteria": [
+        {
+          "id": "model_pool_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/model_pool.py present"
+        },
+        {
+          "id": "provider_policy_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/provider_policy.py present"
+        },
+        {
+          "id": "model_hierarchy_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/model_hierarchy.py present"
+        },
+        {
+          "id": "routing_architecture_doc_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present"
+        },
+        {
+          "id": "routing_precedence_documented",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
+        },
+        {
+          "id": "explicit_provider_honored",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py"
+        },
+        {
+          "id": "explicit_wins_test_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py"
+        },
+        {
+          "id": "power_first_default",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py"
+        },
+        {
+          "id": "zhipu_provider_enum",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py"
+        },
+        {
+          "id": "zhipu_provider_class",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
+        }
+      ]
     }
   ],
   "findings": [
     {
       "severity": "WARN",
       "check": "wip-high",
-      "message": "6 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
+      "message": "7 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
       "criterion_id": null
     },
     {
@@ -727,6 +827,12 @@
       "severity": "WARN",
       "check": "spine-uncovered:revenue-external-humans-served",
       "message": "Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).",
+      "criterion_id": null
+    },
+    {
+      "severity": "ERROR",
+      "check": "track-stale:runtime-truth-reconciliation-2026-06",
+      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
       "criterion_id": null
     },
     {
@@ -750,7 +856,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 3/5 completion criteria pass.",
+      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -763,6 +869,12 @@
       "severity": "INFO",
       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
       "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-shippable:provider-routing-consolidation-2026-06",
+      "message": "[provider-routing-consolidation-2026-06] all 7 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
       "criterion_id": null
     }
   ]

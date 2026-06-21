@@ -417,6 +417,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "High-volume raw episodic log; must stay streaming/metadata-first.",
         ),
         MemoryWriterSpec(
+            "holon_talk.write_receipt",
+            "scripts.holon_talk",
+            "talk",
+            ("home.agent_homes",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.HIGH,
+            "Holon talk receipts are raw agent-contact evidence, not canon.",
+        ),
+        MemoryWriterSpec(
             "semantic_memory_bridge.index_concepts",
             "dharma_swarm.semantic_memory_bridge",
             "index_concepts_into_memory",
@@ -545,6 +555,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             WriterClassification.DORMANT,
             RiskLevel.MEDIUM,
             "Packet provenance checker script is not present on current main.",
+        ),
+        MemoryWriterSpec(
+            "holon_talk.talk_receipts",
+            "scripts/holon_talk.py",
+            "talk",
+            ("home.holon_agents",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.HIGH,
+            "Sovereign holon talk receipts are coordination evidence, not semantic canon.",
         ),
         MemoryWriterSpec(
             "orchestrate_live.revenue_intel_signal",

@@ -33,8 +33,8 @@ if ARCHIVE_AVAILABLE:
     @given(fitness_score_strategy())
     def test_fitness_all_dimensions_bounded(fitness):
         """Property: All fitness dimensions must be in [0, 1]."""
-        for dim in FITNESS_DIMENSIONS:
-            value = getattr(fitness, dim)
+        values = fitness.model_dump(include=set(FITNESS_DIMENSIONS))
+        for dim, value in values.items():
             assert 0.0 <= value <= 1.0, f"{dim}={value} out of bounds [0, 1]"
 
 
@@ -78,8 +78,9 @@ if ARCHIVE_AVAILABLE:
         json_str = fitness.model_dump_json()
         restored = FitnessScore.model_validate_json(json_str)
 
-        for dim in FITNESS_DIMENSIONS:
-            assert getattr(restored, dim) == getattr(fitness, dim)
+        assert restored.model_dump(include=set(FITNESS_DIMENSIONS)) == fitness.model_dump(
+            include=set(FITNESS_DIMENSIONS)
+        )
 
 
     @given(fitness_score_strategy())

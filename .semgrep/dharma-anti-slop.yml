@@ -67,6 +67,7 @@ rules:
         - "dharma_swarm/runtime_state.py"
     patterns:
       - pattern-either:
+          # Class-body bare-name assignment: `conn = sqlite3.connect(...)`.
           - pattern: |
               class $NAME:
                   ...
@@ -77,6 +78,22 @@ rules:
                   ...
                   $X = aiosqlite.connect(...)
                   ...
+          # Method-body attribute assignment: `self.conn = sqlite3.connect(...)`
+          # (the idiomatic __init__ form the bare-name patterns above miss).
+          - pattern: |
+              class $NAME:
+                  ...
+                  def $M(...):
+                      ...
+                      self.$X = sqlite3.connect(...)
+                      ...
+          - pattern: |
+              class $NAME:
+                  ...
+                  def $M(...):
+                      ...
+                      self.$X = aiosqlite.connect(...)
+                      ...
       - metavariable-regex:
           metavariable: $NAME
           regex: '.*(Store|Ledger|Registry|Substrate)$'

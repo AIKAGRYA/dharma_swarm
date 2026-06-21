@@ -408,6 +408,21 @@ agents:
     priority: p0
     next_action: null
 
+  - id: cybernetics_codex
+    label: "Cybernetics Codex Steward"
+    module: dharma_swarm/cybernetics_codex.py
+    seed: docs/agents/cybernetics_codex/agent.seed.yaml
+    status: shadow
+    health_check_ids: [module_file_exists, test_file_exists]
+    wired_to: [audit, lineage, telemetry]
+    priority: p0
+    registration:
+      a2a_card: ~/.dharma/a2a/cards/cybernetics-codex.json
+      route: agent-inbox
+      nats_subject: dharma.agent.cybernetics_codex.inbox
+      nats_runtime_status: declared_not_started
+    next_action: "Run cybernetics_codex_audit.py after each bounded closure batch"
+
   - id: telos_gatekeeper
     label: "Telos Gatekeeper"
     module: dharma_swarm/telos_gates.py

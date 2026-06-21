@@ -314,13 +314,13 @@ def test_deepseek_v4_pro_is_one_entry_live_provider_first():
     }
     # Live provider (Ollama Cloud) ranked first, dead/secondary after.
     assert dv4.routes[0].provider is ProviderType.OLLAMA
-    assert entry_for_model_id("deepseek-ai/deepseek-v4-pro/flash") is dv4
+    assert entry_for_model_id("deepseek-ai/deepseek-v4-pro") is dv4
 
 
 def test_floor_nim_routes_cover_kimi_deepseek_and_minimax():
     expected = {
         "kimi-k2.6": "moonshotai/kimi-k2.6",
-        "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro/flash",
+        "deepseek-v4-pro": "deepseek-ai/deepseek-v4-pro",
         "minimax-m3": "minimaxai/minimax-m3",
     }
     for logical_id, model_id in expected.items():

@@ -60,6 +60,21 @@ DEFAULT_A2A_NATS_SUBJECTS = (
     "dharma.a2a.perplexity",
 )
 DEFAULT_REQUIRED_REVIEWERS = ("codex", "claude")
+# PRs carrying this label are produced by trusted automation (automerge.yml
+# enrolls bot/automated PRs). For these, Merge Master Mike waives the human/
+# agent reviewer-receipt requirement and ignores advisory-bot comment threads
+# so a genuinely green automation PR can merge without a human in the loop.
+# Every other gate (mergeable, failing/pending checks, CHANGES_REQUESTED,
+# Coherence Delta, CI truth, HIGH/CRITICAL risk) still applies unchanged.
+BOT_PR_LABEL = "bot-pr"
+# Review bots whose comment threads are advisory/non-blocking: they post
+# informational summaries (and re-post on every push) but never represent a
+# human request for changes. Their perpetually-unresolved threads must not
+# wedge a trusted bot-pr merge gate. Greptile (`greptile-apps`) is the
+# canonical example. This neither silences the bot nor relaxes substance for
+# human/agent reviewers — it only scopes the bot-pr thread waiver. See
+# build_gate() and thread_is_advisory_only().
+ADVISORY_REVIEW_BOTS = frozenset({"greptile-apps"})
 MERGE_MASTER_MIKE_NATS_SECRET_NAMES = (
     "MERGE_MASTER_MIKE_NATS_URL",
     "MERGE_MASTER_MIKE_NATS_USER",
@@ -389,7 +404,7 @@ def fetch_pr_view(pr_number: int) -> dict[str, Any]:
         "view",
         str(pr_number),
         "--json",
-        "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+        "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,labels,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
     ])
 
 
@@ -454,6 +469,26 @@ def fetch_review_threads(pr_number: int, repo: str) -> dict[str, Any]:
         if not node.get("isResolved") and not node.get("isOutdated")
     ]
     return {"ok": True, "threads": nodes, "unresolved": unresolved, "unresolved_count": len(unresolved)}
+
+
+def thread_is_advisory_only(thread: dict[str, Any]) -> bool:
+    """True when every comment in a review thread was authored by an advisory
+    review bot (see ADVISORY_REVIEW_BOTS).
+
+    Such a thread carries no human/agent change request, so it must not wedge a
+    trusted bot-pr merge gate. A thread with any non-advisory participant (a
+    human, Copilot, Codex, Devin, …) is never advisory-only and still blocks.
+    """
+    comments = ((thread or {}).get("comments") or {}).get("nodes") or []
+    logins = {
+        str(((comment or {}).get("author") or {}).get("login") or "").lower()
+        for comment in comments
+    }
+    logins.discard("")
+    if not logins:
+        return False
+    advisory = {bot.lower() for bot in ADVISORY_REVIEW_BOTS}
+    return logins <= advisory
 
 
 def fetch_pr_diff(pr_number: int) -> str:
@@ -979,11 +1014,40 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append("Coherence Delta fields missing or placeholder")
     blockers.extend(current_ci_truth.get("merge_blockers", []))
     warnings.extend(current_ci_truth.get("warnings", []))
+    pr_labels = [
+        str((label or {}).get("name") or "").lower()
+        for label in (current_pr.get("labels") or [])
+        if isinstance(label, dict)
+    ]
+    is_bot_pr = BOT_PR_LABEL in pr_labels
+    bot_pr_waivers: list[str] = []
+
+    unresolved_threads = current_threads.get("unresolved") or []
     unresolved_count = current_threads.get("unresolved_count")
-    if unresolved_count:
-        blockers.append(f"{unresolved_count} unresolved review threads")
+    if is_bot_pr:
+        blocking_threads = [
+            thread for thread in unresolved_threads
+            if not thread_is_advisory_only(thread)
+        ]
+        ignored_advisory = len(unresolved_threads) - len(blocking_threads)
+        blocking_unresolved_count = len(blocking_threads)
+        if ignored_advisory:
+            bot_pr_waivers.append(
+                f"bot-pr: ignored {ignored_advisory} advisory review thread(s) "
+                f"from {', '.join(sorted(ADVISORY_REVIEW_BOTS))} (non-blocking)"
+            )
+    else:
+        blocking_unresolved_count = unresolved_count or 0
+    if blocking_unresolved_count:
+        blockers.append(f"{blocking_unresolved_count} unresolved review threads")
 
     required_reviewers = required_reviewer_agents(args)
+    if is_bot_pr and required_reviewers:
+        bot_pr_waivers.append(
+            "bot-pr: waived required reviewer receipts "
+            f"({', '.join(required_reviewers)}) — trusted automation merges when green"
+        )
+        required_reviewers = []
     review_statuses = {
         agent: load_agent_review_status(out_dir, agent)
         for agent in required_reviewers
@@ -1040,6 +1104,8 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         blockers.append(f"{original_risk} risk requires --human-approved")
     if current_classification["checks"]["unknown"]:
         warnings.append(f"unknown checks: {', '.join(current_classification['checks']['unknown'])}")
+    if bot_pr_waivers:
+        warnings.extend(bot_pr_waivers)
 
     return {
         "schema": "dharma.pr_review.merge_gate.v1",
@@ -1058,6 +1124,13 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "review_threads": {
             "ok": current_threads.get("ok"),
             "unresolved_count": unresolved_count,
+            "blocking_unresolved_count": blocking_unresolved_count,
+        },
+        "bot_pr": {
+            "is_bot_pr": is_bot_pr,
+            "label": BOT_PR_LABEL,
+            "waivers": bot_pr_waivers,
+            "advisory_review_bots": sorted(ADVISORY_REVIEW_BOTS),
         },
         "review_receipts": review_statuses,
         "backup_review_receipts": backup_statuses,
@@ -1527,6 +1600,17 @@ def required_reviewer_agents(args: argparse.Namespace) -> list[str]:
 
 
 def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSConfig:
+    if not require_devin_secrets and env.get("NATS_URL"):
+        return NATSConfig(
+            endpoint=env.get("NATS_URL", ""),
+            user=env.get("NATS_USER", ""),
+            credential=env.get("NATS_PASSWORD", ""),
+            missing=(),
+            ca_pem=_normalize_ca_pem(env.get("NATS_CA_PEM", "")),
+            tls_hostname=env.get("NATS_TLS_HOSTNAME", "").strip(),
+            credential_family="direct",
+        )
+
     mike_present = any(env.get(name) for name in MERGE_MASTER_MIKE_NATS_SECRET_NAMES)
     credential_family = "merge_master_mike" if mike_present else "devin"
     endpoint = (

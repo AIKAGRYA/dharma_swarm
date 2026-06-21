@@ -404,12 +404,12 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
     ),
     ModelSlot(
         ProviderType.NVIDIA_NIM,
-        "deepseek-ai/deepseek-v4-pro/flash",
-        "DeepSeek V4 Pro Flash (NIM)",
+        "deepseek-ai/deepseek-v4-pro",
+        "DeepSeek V4 Pro (NIM)",
         ModelTier.STRONG,
         ("code", "reasoning", "chinese"),
         256_000,
-        "Floor — DeepSeek V4 Pro flash route via NVIDIA NIM hosted catalog",
+        "Floor — DeepSeek V4 Pro route via NVIDIA NIM hosted catalog",
     ),
     ModelSlot(
         ProviderType.SAMBANOVA,

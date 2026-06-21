@@ -164,6 +164,8 @@ def test_model_hint_for_provider_prefers_self_hosted_nim_frontier(monkeypatch) -
 def test_model_hint_for_provider_prefers_ollama_cloud_frontier(monkeypatch) -> None:
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-cloud-key")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
 
     jp_request = LLMRequest(
         model="x",

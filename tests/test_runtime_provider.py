@@ -41,7 +41,9 @@ def test_resolve_runtime_provider_config_for_nim_uses_env_base_and_model(monkeyp
 
 def test_resolve_runtime_provider_config_for_ollama_prefers_cloud_with_api_key(monkeypatch) -> None:
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("OLLAMA_FORCE_LOCAL", raising=False)
     monkeypatch.setenv("OLLAMA_API_KEY", "ollama-key")
+    monkeypatch.setenv("OLLAMA_USE_CLOUD", "1")
 
     cfg = resolve_runtime_provider_config(ProviderType.OLLAMA)
 

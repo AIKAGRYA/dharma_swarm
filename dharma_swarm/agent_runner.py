@@ -749,10 +749,12 @@ def _build_route_request(
         "prefer_low_cost",
     )
     if preferred_low_cost is None:
-        preferred_low_cost = not requires_frontier and not privileged_action and task.priority in {
-            TaskPriority.LOW,
-            TaskPriority.NORMAL,
-        }
+        # Power-first default (routing consolidation 2026-06-21, operator-locked):
+        # cost is an OPT-IN nudge, so a task that does not ask for cheap routing
+        # no longer auto-prefers the free tier — the router reaches for the most
+        # capable provider. Tasks opt into cost via metadata preferred_low_cost /
+        # prefer_low_cost. See docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md.
+        preferred_low_cost = False
 
     requires_human_consent = _metadata_bool(
         metadata,

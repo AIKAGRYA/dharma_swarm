@@ -235,6 +235,11 @@ class TestLoopSupervisor:
         sup.record_progress("overnight", 0.3, improved=True)
         assert sup._loops["overnight"].stagnant_cycles == 0
 
+    def test_orchestrate_live_persists_supervisor_state_hook(self):
+        source = Path("dharma_swarm/orchestrate_live.py").read_text(encoding="utf-8")
+        assert "supervisor.save_state()" in source
+        assert "loop supervisor state save failed" in source
+
 
 class TestCLI:
     def test_no_state(self, monkeypatch):
