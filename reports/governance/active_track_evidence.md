@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-21T00:53:51+00:00 (schema v2)
-Active tracks: **6** (warn 5, max 10) — shippable 4
+Generated: 2026-06-21T02:21:53+00:00 (schema v2)
+Active tracks: **7** (warn 5, max 10) — shippable 4
 
 ## Spine coverage
 
@@ -112,9 +112,26 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
 
+## `provider-routing-consolidation-2026-06` — 0/7
+
+- serves: `substrate-nativeness` · complements: ['runtime-truth-spine-adoption-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['dharma_swarm/providers.py', 'dharma_swarm/provider_policy.py', 'dharma_swarm/model_hierarchy.py', 'dharma_swarm/model_pool.py', 'dharma_swarm/model_defaults.py', 'dharma_swarm/runtime_provider.py', 'dharma_swarm/router_v1.py', 'dharma_swarm/smart_router.py', 'dharma_swarm/decision_router.py', 'docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md']
+- moves_vital_signs: ['quality_gates', 'tool_coverage', 'cost_efficiency']
+
+  - ✓ `model_pool_owner_exists` (file_exists) — dharma_swarm/model_pool.py present
+  - ✓ `provider_policy_owner_exists` (file_exists) — dharma_swarm/provider_policy.py present
+  - ✓ `model_hierarchy_owner_exists` (file_exists) — dharma_swarm/model_hierarchy.py present
+  - ✗ `routing_architecture_doc_exists` (file_exists) — docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md MISSING
+  - ✗ `routing_precedence_documented` (file_contains) — docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md missing
+  - ✗ `explicit_provider_honored` (file_contains) — pattern 'preferred_provider' NOT FOUND in dharma_swarm/provider_policy.py
+  - ✗ `explicit_wins_test_exists` (file_contains) — tests/test_provider_routing_explicit.py missing
+  - ✗ `power_first_default` (file_contains) — pattern 'power_first' NOT FOUND in dharma_swarm/provider_policy.py
+  - ✗ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' NOT FOUND in dharma_swarm/models.py
+  - ✗ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' NOT FOUND in dharma_swarm/providers.py
+
 ## Findings
 
-- **WARN** `wip-high`: 6 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+- **WARN** `wip-high`: 7 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
@@ -124,3 +141,4 @@ Active tracks: **6** (warn 5, max 10) — shippable 4
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 4/5 completion criteria pass.
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-in-progress:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] 0/7 completion criteria pass.

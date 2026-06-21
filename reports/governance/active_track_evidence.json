@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T00:53:51+00:00",
+  "generated_at": "2026-06-21T02:21:53+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -95,7 +95,7 @@
     }
   ],
   "portfolio_summary": {
-    "active": 6,
+    "active": 7,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 4
@@ -708,13 +708,113 @@
           "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
         }
       ]
+    },
+    {
+      "id": "provider-routing-consolidation-2026-06",
+      "name": "Provider Routing Consolidation \u2014 one power-first router, explicit-wins, first-party paths",
+      "status": "ACTIVE",
+      "serves": "substrate-nativeness",
+      "complements": [
+        "runtime-truth-spine-adoption-2026-06",
+        "loop-closure-2026-06"
+      ],
+      "depends_on": [],
+      "conflicts_with": [],
+      "owned_surfaces": [
+        "dharma_swarm/providers.py",
+        "dharma_swarm/provider_policy.py",
+        "dharma_swarm/model_hierarchy.py",
+        "dharma_swarm/model_pool.py",
+        "dharma_swarm/model_defaults.py",
+        "dharma_swarm/runtime_provider.py",
+        "dharma_swarm/router_v1.py",
+        "dharma_swarm/smart_router.py",
+        "dharma_swarm/decision_router.py",
+        "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
+      ],
+      "moves_vital_signs": [
+        "quality_gates",
+        "tool_coverage",
+        "cost_efficiency"
+      ],
+      "verified_at": "2026-06-21",
+      "ttl_days": 21,
+      "owner": "@AmitabhainArunachala",
+      "shippable": false,
+      "prerequisites_ok": true,
+      "completion_progress": {
+        "passed": 0,
+        "total": 7
+      },
+      "criteria": [
+        {
+          "id": "model_pool_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/model_pool.py present"
+        },
+        {
+          "id": "provider_policy_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/provider_policy.py present"
+        },
+        {
+          "id": "model_hierarchy_owner_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "dharma_swarm/model_hierarchy.py present"
+        },
+        {
+          "id": "routing_architecture_doc_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md MISSING"
+        },
+        {
+          "id": "routing_precedence_documented",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md missing"
+        },
+        {
+          "id": "explicit_provider_honored",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern 'preferred_provider' NOT FOUND in dharma_swarm/provider_policy.py"
+        },
+        {
+          "id": "explicit_wins_test_exists",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "tests/test_provider_routing_explicit.py missing"
+        },
+        {
+          "id": "power_first_default",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern 'power_first' NOT FOUND in dharma_swarm/provider_policy.py"
+        },
+        {
+          "id": "zhipu_provider_enum",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern 'ZHIPU' NOT FOUND in dharma_swarm/models.py"
+        },
+        {
+          "id": "zhipu_provider_class",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern 'class ZhipuProvider' NOT FOUND in dharma_swarm/providers.py"
+        }
+      ]
     }
   ],
   "findings": [
     {
       "severity": "WARN",
       "check": "wip-high",
-      "message": "6 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
+      "message": "7 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
       "criterion_id": null
     },
     {
@@ -769,6 +869,12 @@
       "severity": "INFO",
       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
       "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "criterion_id": null
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:provider-routing-consolidation-2026-06",
+      "message": "[provider-routing-consolidation-2026-06] 0/7 completion criteria pass.",
       "criterion_id": null
     }
   ]
