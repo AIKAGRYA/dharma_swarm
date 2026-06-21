@@ -172,6 +172,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "Unified index writes documents/chunks into memory_plane as retrieval projection state.",
         ),
         MemoryWriterSpec(
+            "palantir_pilot.prune_stale_wiki_documents",
+            "dharma_swarm.palantir_pilot_index",
+            "_prune_stale_palantir_wiki_documents",
+            ("home.memory_plane",),
+            WriteMode.READ_WRITE,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.MEDIUM,
+            "Palantir Pilot prunes stale wiki projection rows from memory_plane.",
+        ),
+        MemoryWriterSpec(
             "vector_store.store",
             "dharma_swarm.vector_store",
             "VectorStore",
