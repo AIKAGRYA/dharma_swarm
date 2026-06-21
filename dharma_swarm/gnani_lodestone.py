@@ -548,13 +548,10 @@ class GnaniLodestone:
     async def _seed_tasks(self) -> int:
         """Inject Gnani self-knowledge tasks into TaskBoard if not present."""
         try:
-            from dharma_swarm.task_board import TaskBoard, Task, TaskStatus, TaskPriority
+            from dharma_swarm.task_board import TaskBoard, TaskPriority
 
-            board = TaskBoard(state_dir=self._state_dir)
-            try:
-                await board.load()
-            except Exception:
-                pass
+            board = TaskBoard(self._state_dir / "db" / "tasks.db")
+            await board.init_db()
 
             added = 0
             for task_data in _GNANI_TASK_SEEDS:
@@ -564,24 +561,27 @@ class GnaniLodestone:
                     continue
 
                 # Map priority
-                priority_map = {10: TaskPriority.CRITICAL, 9: TaskPriority.HIGH,
-                                8: TaskPriority.HIGH, 7: TaskPriority.MEDIUM,
-                                6: TaskPriority.LOW}
-                priority = priority_map.get(task_data["priority"], TaskPriority.MEDIUM)
+                priority_map = {
+                    10: TaskPriority.URGENT,
+                    9: TaskPriority.HIGH,
+                    8: TaskPriority.HIGH,
+                    7: TaskPriority.NORMAL,
+                    6: TaskPriority.LOW,
+                }
+                priority = priority_map.get(task_data["priority"], TaskPriority.NORMAL)
 
-                task = Task(
+                await board.create(
                     title=task_data["title"],
                     description=task_data["description"],
-                    status=TaskStatus.PENDING,
                     priority=priority,
-                    tags=task_data.get("tags", []),
-                    metadata={"source": "gnani_lodestone", "layer": "gnani"},
+                    created_by="gnani_lodestone",
+                    metadata={
+                        "source": "gnani_lodestone",
+                        "layer": "gnani",
+                        "tags": task_data.get("tags", []),
+                    },
                 )
-                await board.add_task(task)
                 added += 1
-
-            if added > 0:
-                await board.save()
 
             return added
         except Exception as exc:

@@ -5,11 +5,15 @@ tier in comments. Scope excludes ``scripts/`` (operator utilities).
 
 Routing truth (2026 maintenance):
 - ``api/routers/chat.py`` remains the in-repo **dashboard** bypass (per-request provider).
-- ``AutonomousAgent`` injected path: ``anthropic`` / ``openrouter`` →
+- ``AutonomousAgent`` injected path: ``anthropic`` and ``openrouter`` →
   ``ModelRouter.complete_for_task`` when the router registers overlapping runtime
   providers; ``codex`` always uses
   ``create_runtime_provider(..., working_dir=identity.working_directory)``;
   fallbacks use direct runtime chain. ``cli_wake`` documents no router (legacy CLI).
+- ``holon_bridge.py`` is the read-only agent-as-itself bridge and resolves through the
+  canonical runtime-provider door.
+- ``living_agent_kernel_provider_worker.py`` is the promoted kernel provider execution
+  boundary after promotion admission.
 Also asserts shared ``create_default_router()`` is invoked once per long-running
 ``orchestrate_live`` loop (source-inspect guard).
 """

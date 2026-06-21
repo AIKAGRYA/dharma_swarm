@@ -597,7 +597,15 @@ def run(args: argparse.Namespace) -> int:
                 findings.append(Finding("ERROR", f"verified-at-malformed:{tid}",
                     f"[{tid}] verified_at malformed: {t.get('verified_at')!r}"))
             elif age > ttl:
-                findings.append(Finding("ERROR", f"track-stale:{tid}",
+                # TTL staleness is a portfolio-FRESHNESS signal, not a property
+                # of any single PR — a PR author neither caused nor can fix an
+                # unrelated track going stale. So on the per-PR path it is a
+                # WARN (informational); only the scheduled freshness sweep
+                # (--enforce-ttl) treats it as a blocking ERROR. This decouples
+                # merge gating from the freshness clock so one stale track stops
+                # blocking every open PR. See docs/governance/REPO_GOVERNANCE_AUDIT.md.
+                ttl_sev = "ERROR" if getattr(args, "enforce_ttl", False) else "WARN"
+                findings.append(Finding(ttl_sev, f"track-stale:{tid}",
                     f"[{tid}] verified_at is {age} days old (ttl_days={ttl}). "
                     "Re-verify and bump verified_at, or retire the track."))
 
@@ -742,6 +750,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate ACTIVE_TRACK.yaml against repo reality.")
     parser.add_argument("--warn-only", action="store_true",
                         help="Emit findings but never exit non-zero (for pre-commit)")
+    parser.add_argument("--enforce-ttl", action="store_true",
+                        help="Treat TTL staleness as a blocking ERROR (scheduled "
+                             "freshness sweep). Off by default so an unrelated stale "
+                             "track does not block per-PR merges.")
     args = parser.parse_args()
     code = run(args)
     if args.warn_only:

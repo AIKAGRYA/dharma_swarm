@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 6 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 7 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -245,6 +245,60 @@ to main through the normal review path before it is called shipped.
 - Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
 - Do not merge holon substrate to main without the frozen verifier runbook passing.
 
+### Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
+
+**Track id:** `provider-routing-consolidation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-21 (TTL 21 days)
+**Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06
+**Owns surfaces:** dharma_swarm/providers.py, dharma_swarm/provider_policy.py, dharma_swarm/model_hierarchy.py, dharma_swarm/model_pool.py, dharma_swarm/model_defaults.py, dharma_swarm/runtime_provider.py, dharma_swarm/router_v1.py, dharma_swarm/smart_router.py, dharma_swarm/decision_router.py, docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md
+**Moves vital signs:** quality_gates, tool_coverage, cost_efficiency
+
+Operator directive 2026-06-21: consolidate the LLM provider/model routing
+subsystem into one coherent, malleable, intelligent router. After weeks of
+accretion the DECISION layer drifted: an explicit provider/model request is
+treated only as a constraint and never as a selection (agent_runner stores
+context["preferred_provider"] but provider_policy never reads it), two rank
+systems disagree (model_hierarchy.CANONICAL_SEED_ORDER is free-first while
+model_pool._PROVIDER_RANK is first-party-first), and ~8 router files stack
+~6 reorder passes with no single documented precedence.
+
+The data/registry half is already consolidated (model_hierarchy ->
+model_pool -> model_defaults, keys in api_keys) and is preserved. This
+track fixes the decision half and the wiring gaps, converging on the
+existing registries (no new truth store).
+
+Four operator decisions are LOCKED (2026-06-21):
+  1. Default selection = POWER-FIRST (most capable model by default; cost
+     is an opt-in nudge). Reverses today's free-tier-first default.
+  2. Explicit request = PIN + SAFE FALLBACK (exact provider/model wins;
+     fall back to the ranked chain only if down / no live key).
+  3. Architecture = UNIFY, KEEP SMARTS (keep session-affinity, EWMA memory,
+     reward learning, canary; collapse them under ONE documented precedence).
+  4. New first-party path = z.ai / Zhipu / GLM direct (Moonshot/Kimi stays
+     via OpenRouter for now).
+
+Precedence the router must follow, documented in one place:
+  explicit > capability/power > malleable overlays (cost/path/lang/tooling)
+  > learned (affinity/EWMA/reward/canary) > availability prune (first-party
+  preferred, OpenRouter last) > fallback chain walk.
+
+**Next items:**
+
+- [docs] (blocker) Author docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration (locked decisions).
+- [code] (blocker) Stage 1 keystone: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback).
+- [code] (blocker) Stage 2: unify the two rank systems into one power-first, first-party-preferred order.
+- [code] (blocker) Stage 3: wire z.ai/Zhipu as a first-party provider (enum + resolution + factory + ZhipuProvider).
+- [code] Stage 5: drift cleanup — AgentConfig default model, hardcoded literals, providers_extended.py dead code, env templates.
+
+**Non-goals:**
+
+- Do not create a new truth store, registry, or model catalog; converge on model_hierarchy / model_pool / model_defaults / api_keys.
+- Do not change the EvidenceReceipt schema or the spine dispatch path (owned by spine-adoption).
+- Do not edit agent_runner.py / orchestrator.py routing wiring beyond what is unavoidable; honor context["preferred_provider"] inside provider_policy instead (avoids spine-adoption surface overlap).
+- Do not wire Moonshot/DeepSeek/Perplexity first-party in this track (only z.ai/Zhipu).
+- Do not commit provider API keys or any credentials.
+- Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
+
 **Recently closed tracks:**
 
 - `orientation-graph-2026-06` — Orientation Graph — whole-system view served on token one (SHIPPED, closed 2026-06-12)
@@ -301,7 +355,7 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-11 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-19 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
@@ -325,6 +379,33 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1025** | find . -name "*.md" -type f |
 | Markdown total lines | **241,706** | wc -l across all .md |
+| Total Python modules | **753** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **409 (54.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **312,264** | wc -l across dharma_swarm Python modules |
+| Test files | **731** | find tests -name "*.py" -type f |
+| Test functions | **11,743 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1032** | find . -name "*.md" -type f |
+| Markdown total lines | **242,129** | wc -l across all .md |
+| Total Python modules | **748** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **406 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
+| Test files | **734** | find tests -name "*.py" -type f |
+| Test functions | **11,747 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1027** | find . -name "*.md" -type f |
+| Markdown total lines | **242,149** | wc -l across all .md |
+| Total Python modules | **748** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **406 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
+| Test files | **734** | find tests -name "*.py" -type f |
+| Test functions | **11,747 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1027** | find . -name "*.md" -type f |
+| Markdown total lines | **242,149** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |

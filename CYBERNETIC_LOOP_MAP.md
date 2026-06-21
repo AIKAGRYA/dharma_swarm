@@ -1,23 +1,58 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-05-20 (against HEAD on main — recognition loop status corrected)
-**Previous version:** 2026-04-04 (initial map: 0 closed, 2 partial, 11 blocked)
+**Last audit:** 2026-06-18T16:49:32Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
+> **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
+>
+> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate documented here (working LLM provider with valid API key) is unchanged — a runtime configuration concern, not a code-path concern.
+> - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) re-verified present. Status PARTIAL unchanged.
+>
+> No new BLOCKERs surfaced. The full re-running of "Evidence From ~/.dharma/" section requires live-seat access and is deferred.
+
 ---
 
-## What Changed Since April 4
+## Canonical Truth Source
 
-| Blocker | Old Status | New Status | Resolution |
-|---------|-----------|-----------|-----------|
-| MM-01: huggingface_hub ImportError | BLOCKER (Loop 1) | RESOLVED | `try/except ImportError` + heuristic fallback in `tiny_router_shadow.py` |
-| MM-02/03: PersistentAgent enum coercion | BLOCKER (Loops 1, 11) | RESOLVED | Commit `7f6a1c0` — both call sites wrap with `AgentRole()` and `PT()` |
-| MM-05: Private Orchestrator coupling | DEGRADED | RESOLVED | Commit `003b247` — `retry_policy_for_failure()` public API added |
-| MM-10: AutoProposer stigmergy None | DEGRADED (Loop 3) | RESOLVED | `auto_proposer.py:297` has `if self._stigmergy is None: return` |
-| MM-11: WitnessAuditor provider type | DEGRADED (Loop 6) | RESOLVED | `swarm.py:456` uses `OpenRouterFreeProvider()` |
+The authoritative projection is now:
 
-**Net change:** All 3 original BLOCKERs resolved. 0 open BLOCKERs remain. See `INTERFACE_MISMATCH_MAP.md` for 4 remaining DEGRADED structural issues.
+```bash
+python3 scripts/governance/cybernetics_codex_audit.py --json
+```
+
+`delegation_runs.receipt_json` is the orchestrator/spine-dispatch witness column.
+It is not the universal closure witness. A2A-surface rows can be successful with
+empty `receipt_json` because their canonical witness is `runtime_receipts` plus
+idempotency records. For Loop 1, the current production acceptance bar is actual
+served provider/model truth in the audited scope, zero `dispatch_dropoff`, and a
+bounded replay proving tick N affects tick N+1.
+
+Live runtime truth from the latest audit:
+
+| Surface | Current value |
+|---------|---------------|
+| `delegation_runs` | 5,222 total, 2,027 completed, 3,144 failed, 50 running, 1 claimed |
+| `runtime_receipts` | 17,410 rows, latest 2026-06-18T16:45:05Z |
+| `receipt_json` | 669 rows, orchestrator surface only |
+| served provider/model truth | 599 completed delegation runs, 1,716 runtime receipts |
+| `dispatch_dropoff` | 1,428 failures, latest 2026-06-18T15:02:59Z |
+| One Wire quorum | N=3/5, M=1/3, not eligible |
+| evolution archive | 11,591 entries, 11,145 internal-positive-fitness risk rows, 0 external authority markers |
+
+Bounded Loop 1 replay proof (current code/provider lane):
+
+| Surface | Current value |
+|---------|---------------|
+| report | `reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
+| command | `python3 scripts/loop1_closure_run.py --tasks 3 --agents 1 --provider ollama --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
+| result | `LOOP1_CLOSED=yes` |
+| completed tasks | 3/3 |
+| dispatch dropoff | 0 |
+| evidence receipts | 3 ok |
+| served provider/model truth | 3/3 completed delegation receipts, source `receipt_json` |
+| tick errors | 0 |
 
 ---
 
@@ -25,21 +60,21 @@ Each loop is "closed" only when its output feeds back as input to a future cycle
 
 | # | Loop | Interval | Closed? | Remaining Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **NO** | Routing works (39 successful decisions logged). Dispatch fails: `dispatch_dropoff` — worker unavailable at `orchestrator.py:2074`. Needs at least one configured LLM provider with valid API key. |
-| 2 | Organism Heartbeat | 300s | **PARTIAL** | Sense works — 5 heartbeat cycles recorded in organism_memory (health=1.00, coherence=0.28). Algedonic events emitted (48 events). Gnani verdicts issued (18 verdicts). Act/adapt still blocked on running agents. |
-| 3 | Evolution Loop | every 3rd tick | **PARTIAL** | MetaEvolutionEngine records meta_fitness (3 entries in `evolution/meta_archive.jsonl`, fitness=0.58494). AutoProposer stigmergy guard fixed. Still needs real fitness data from completed tasks. |
-| 4 | Consolidation Loop | configurable | **PARTIAL** | 89 organism_memory entities exist (algedonic_event: 48, gnani_verdict: 18, decision: 18, insight: 5). Consolidation dedup working (invalidation_reason logged). No agent-produced outputs to consolidate yet. |
-| 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Local scanning works. Gate pressure feedback path structurally present. No real gate check data flowing yet. |
-| 6 | Witness Auditor | 3600s | **YES (in test)** | 1,013 witness entries across 2 days. BLOCKED destructive filesystem commands (AHIMSA gate). PASSED 444, BLOCKED 230, WARN 4. Provider mismatch (MM-11) RESOLVED. Code path fully functional — operates on test data from pytest; will audit real agent actions when Loop 1 closes. |
-| 7 | Training Flywheel | 300s | **PARTIAL** | Quality gate evaluations running (structural scorer, 5+ evaluations logged in `quality_gates/log/evaluations.jsonl`). 182 trace entries. Trajectory scoring from real tasks still blocked on Loop 1. |
-| 8 | Recognition Loop | 7200s | **PARTIAL** | Recognition seed computation wired in `cascade.py:386-491` and `shakti_executive/inputs.py:100`. Seed is read by `meta_daemon.py` and feeds into context health. Actual periodic trigger depends on LoopEngine schedule. |
-| 9 | Conductors | 120s | **PARTIAL** | Conductor configs use proper enum values. Cron health shows 7 jobs tracked (pulse: 3 runs, 0 failures). Blocked on LLM provider availability for actual conductor work. |
-| 10 | Context Agent | 60s | **NO** | Depends on Loop 1 (working agent_runner). MM-01 resolved, but no provider available for real execution. |
-| 11 | Replication Monitor | 3600s | **PARTIAL** | MM-02/03 RESOLVED (enum coercion fixed). Replication path structurally correct. No replication events triggered yet because no tasks complete to trigger child spawning. |
-| 12 | Self-Improvement | 3600s | **NO** | DarwinEngine can be instantiated. `auto_evolve()` signature fixed (NEW-02). Requires `DHARMA_SELF_IMPROVE` env + functioning provider chain. |
-| 13 | Free Evolution Grind | 600s | **NO** | Requires DarwinEngine with functioning provider chain. Routing works but all providers fail (OPENROUTER_API_KEY not set, ollama unreachable, claude_code circuit_open). |
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1428`, so do not call the whole daemon history clean. |
+| 2 | Organism Heartbeat | 300s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 6 | Witness Auditor | 3600s | **PARTIAL** | Audit/receipt activity exists, but current Loop 1 production tie-in is not proven. |
+| 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
+| 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 10 | Context Agent | 60s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 11 | Replication Monitor | 3600s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
+| 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 
-**Summary: 0 fully closed in production. 1 closed in test context (Witness). 7 PARTIAL (up from 2). 5 still NO (down from 11). The single remaining gate to closing Loop 1 is a working LLM provider with a valid API key.**
+**Summary: standing all-history audit is still 0 fully clean, 11 PARTIAL, 2 BLOCKED. Current bounded production replay closes Loop 1 only. The old "1 of 13 closed" reading came from mixing a historical harness receipt, this stale prose map, and live runtime truth; the current map separates standing history from bounded replay proof.**
 
 ---
 

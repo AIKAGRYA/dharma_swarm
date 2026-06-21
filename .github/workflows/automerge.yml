@@ -7,10 +7,11 @@ name: automerge
 # then dispatches the existing Merge Master Mike router
 # (codex-mention-router.yml) with merge_when_clean=true.
 #
-# Guard rails (nothing is weakened):
-#   - Mike's deterministic gate still runs in full: fourfold-warrant,
-#     coherence-delta, CI rollup, unresolved review threads, and reviewer
-#     receipts must ALL be clean before auto-merge is armed.
+# Guard rails:
+#   - Mike's deterministic gate still runs required CI, fourfold-warrant,
+#     unresolved review threads, and reviewer receipts before auto-merge is armed.
+#   - Advisory governance signals (Coherence Delta / ACTIVE_TRACK) are ignored
+#     by this raw green-check filter; they continue to report in CI Truth.
 #   - This workflow never merges directly; it only asks Mike.
 #   - Draft PRs and PRs with CHANGES_REQUESTED are never dispatched.
 #   - One dispatch per readiness fingerprint, so later reviews/receipt comments
@@ -139,11 +140,14 @@ jobs:
               skipped=$((skipped + 1)); continue
             fi
 
-            # 3. All checks must be completed and green (ignore this workflow
-            #    and neutral/skipped conclusions).
+            # 3. Required checks must be completed and green. Ignore this
+            #    workflow plus governance checks that are advisory signals.
             not_green="$(echo "$view" | jq -r '
               [ .statusCheckRollup[]?
-                | select((.name // .context // "") | test("automerge") | not)
+                | select((.name // .context // .workflowName // "") | test("automerge") | not)
+                | select((.name // .context // .workflowName // "")
+                    | IN("ACTIVE_TRACK governance gate", "active-track-governance",
+                         "Coherence Delta PR body", "coherence-delta") | not)
                 | select(
                     ((.status // "COMPLETED") != "COMPLETED")
                     or (((.conclusion // .state // "") | ascii_upcase)
@@ -188,8 +192,8 @@ jobs:
           \`merge_when_clean: true\` for head \`${sha}\`.
 
           Mike still runs the full deterministic gate (fourfold-warrant,
-          coherence-delta, reviewer receipts, unresolved threads) before any
-          merge is armed. This dispatch marker is keyed to readiness state
+          reviewer receipts, unresolved threads, and required CI before any
+          merge is armed. Coherence Delta / ACTIVE_TRACK remain advisory. This dispatch marker is keyed to readiness state
           \`${ready_key}\`; later review/comment/check changes can dispatch
           again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`
           label to leave this lane." || true

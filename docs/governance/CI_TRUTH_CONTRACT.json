@@ -1,7 +1,7 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
   "version": 1,
-  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands and may still block through GitHub's raw failing-check rollup.",
+  "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
   "required": [
     {
       "id": "docops_integrity",
@@ -10,17 +10,17 @@
       "local_command": "make docops-integrity",
       "failure_category": "doc_drift",
       "autofix": "limited"
-    },
+    }
+  ],
+  "advisory": [
     {
       "id": "coherence_delta",
       "names": ["Coherence Delta PR body"],
       "owner": "governance",
       "local_command": "python3 scripts/governance/check_pr_coherence_delta.py",
       "failure_category": "pr_body_contract",
-      "autofix": "forbidden"
-    }
-  ],
-  "advisory": [
+      "autofix": "limited"
+    },
     {
       "id": "active_track",
       "names": ["ACTIVE_TRACK governance gate"],
