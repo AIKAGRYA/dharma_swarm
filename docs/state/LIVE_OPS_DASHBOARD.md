@@ -36,7 +36,7 @@ PR #574 (qwen/spine-adoption integration lane) and PR #585 (holon/spine-v1) land
   - ✓ `invoke_agent_defined` · ✓ `a2a_bridge_calls_spine` · ✓ `orchestrator_calls_spine` · ✓ `agent_runner_calls_spine` · ✓ `dispatch_emits_evidence_receipt` · ✓ `zero_dropoff_sources` · ✓ `gate1_witnessed`
 - The single remaining ✗ is a cosmetic regex check in `scripts/governance/spine_bypass_report.py` (`bypass_allowlist_empty` — looks for the literal empty-dict declaration). One-line fix flips the track to SHIPPABLE.
 
-Five of six co-equal active tracks are SHIPPABLE (`runtime-truth-reconciliation-2026-06`, `runtime-truth-nats-2026-06`, `orientation-graph-2026-06`, `composer-holon-spine-longrun-2026-06`, and one criterion away `runtime-truth-spine-adoption-2026-06`). `loop-closure-2026-06` is 3/5 (Phase 1 closure receipt + retrospective still missing).
+Five of six co-equal active tracks are SHIPPABLE (`runtime-truth-reconciliation-2026-06`, `runtime-truth-nats-2026-06`, `truth-graph-platform-2026-06`, `composer-holon-spine-longrun-2026-06`, and one criterion away `runtime-truth-spine-adoption-2026-06`). `loop-closure-2026-06` is 3/5 (Phase 1 closure receipt + retrospective still missing).
 
 **Operator decision needed:** Whether to (a) close the SHIPPABLE tracks and declare the next portfolio cohort, or (b) hold them ACTIVE while the apply gate (BR-003 / DGC live-apply) closes — since several SHIPPABLE tracks were closure-bound by reconciliation rather than apply proof.
 
@@ -105,7 +105,7 @@ Five of six co-equal active tracks are SHIPPABLE (`runtime-truth-reconciliation-
 | `runtime-truth-nats-2026-06` | **SHIPPABLE** | 3/3 ✓ |
 | `runtime-truth-spine-adoption-2026-06` | ACTIVE | 7/8 ✓ (one regex fix in `spine_bypass_report.py`) |
 | `loop-closure-2026-06` | ACTIVE | 3/5 ✓ (LOOP1_CLOSURE_RECEIPT.md + RETROSPECTIVE.md missing) |
-| `orientation-graph-2026-06` | **SHIPPABLE** | 8/8 ✓ |
+| `truth-graph-platform-2026-06` | **SHIPPABLE** | 15/15 ✓ |
 | `composer-holon-spine-longrun-2026-06` | **SHIPPABLE** | 9/9 ✓ |
 
 Evidence is machine-graded by `scripts/governance/check_track_status.py`. Re-render evidence: `make active-track-check` or `python3 scripts/governance/check_track_status.py`.
