@@ -106,6 +106,16 @@ def greet(name: str) -> str:
 BAD_CODE = "x=1\ny=2\nz=3\nfor i in range(10):\n for j in range(10):\n  for k in range(10):\n   pass"
 
 
+def _diverse_description(summary: str) -> str:
+    return (
+        f"{summary} with mechanism validation, witness awareness, and feedback resilience"
+    )
+
+
+def _steelman_diff(diff: str) -> str:
+    return f"{diff}\n+# Risk: preserve the simpler baseline if tests show no measured benefit."
+
+
 # =========================================================================
 # 1. Evolution Pipeline Integration
 # =========================================================================

@@ -136,27 +136,27 @@ class TestCorrelationScope:
 # ---------------------------------------------------------------------------
 
 
-def _make_seam(signal_bus=None):
-    """Create a TelicSeam with in-memory registry (no disk DB)."""
+def _make_seam(tmp_path: Path, signal_bus=None):
+    """Create a TelicSeam with isolated registry + lineage state."""
     from dharma_swarm.lineage import LineageGraph
     from dharma_swarm.ontology import OntologyRegistry
     from dharma_swarm.telic_seam import TelicSeam
 
     registry = OntologyRegistry.create_dharma_registry()
-    lineage = LineageGraph()
+    lineage = LineageGraph(tmp_path / "lineage.db")
     return TelicSeam(registry=registry, lineage=lineage, signal_bus=signal_bus)
 
 
 class TestTelicSeamSignalFanout:
     @pytest.mark.asyncio
-    async def test_record_outcome_emits_signal(self):
+    async def test_record_outcome_emits_signal(self, tmp_path: Path):
         from dharma_swarm.signal_bus import (
             SIGNAL_OUTCOME_RECORDED,
             SignalBus,
         )
 
         bus = SignalBus()
-        seam = _make_seam(signal_bus=bus)
+        seam = _make_seam(tmp_path, signal_bus=bus)
 
         from dharma_swarm.models import Task, TaskPriority, TaskStatus
         task = Task(
@@ -196,14 +196,14 @@ class TestTelicSeamSignalFanout:
         assert sig["agent_id"] == "agent_a"
 
     @pytest.mark.asyncio
-    async def test_record_value_event_emits_signal(self):
+    async def test_record_value_event_emits_signal(self, tmp_path: Path):
         from dharma_swarm.signal_bus import (
             SIGNAL_VALUE_EVENT_RECORDED,
             SignalBus,
         )
 
         bus = SignalBus()
-        seam = _make_seam(signal_bus=bus)
+        seam = _make_seam(tmp_path, signal_bus=bus)
 
         from dharma_swarm.models import Task, TaskPriority, TaskStatus
         task = Task(
@@ -246,11 +246,11 @@ class TestTelicSeamSignalFanout:
         assert sig["agent_id"] == "agent_v"
 
     @pytest.mark.asyncio
-    async def test_no_signal_without_bus(self):
+    async def test_no_signal_without_bus(self, tmp_path: Path):
         """TelicSeam without signal_bus should not raise."""
         from dharma_swarm.models import Task, TaskPriority, TaskStatus
 
-        seam = _make_seam()  # no signal_bus
+        seam = _make_seam(tmp_path)  # no signal_bus
         task = Task(
             id="task_003",
             title="no bus test",
