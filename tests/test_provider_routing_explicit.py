@@ -101,3 +101,46 @@ def test_garbage_pin_is_ignored() -> None:
         ProviderType.OPENROUTER_FREE,
         ProviderType.CODEX,
     }
+
+
+def _plain_request(**over: object) -> ProviderRouteRequest:
+    base = dict(
+        action_name="general_task",
+        risk_score=0.10,
+        uncertainty=0.10,
+        novelty=0.10,
+        urgency=0.3,
+        expected_impact=0.2,
+    )
+    base.update(over)
+    return ProviderRouteRequest(**base)  # type: ignore[arg-type]
+
+
+def test_power_first_default_selects_most_capable() -> None:
+    """Stage 2: with NO explicit cost preference, the default reaches for the
+    most capable provider (Anthropic, intelligence 72) — not the cheapest."""
+    router = ProviderPolicyRouter()
+    decision = router.route(
+        _plain_request(),  # preferred_low_cost defaults False -> power-first
+        available_providers=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.OLLAMA,
+            ProviderType.ANTHROPIC,
+        ],
+    )
+    assert decision.selected_provider == ProviderType.ANTHROPIC
+
+
+def test_cost_opt_in_reverts_to_cheap() -> None:
+    """Cost is the opt-in nudge: preferred_low_cost=True flips back to
+    free-tier-first, away from the most capable provider."""
+    router = ProviderPolicyRouter()
+    decision = router.route(
+        _plain_request(preferred_low_cost=True),
+        available_providers=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.OLLAMA,
+            ProviderType.ANTHROPIC,
+        ],
+    )
+    assert decision.selected_provider != ProviderType.ANTHROPIC

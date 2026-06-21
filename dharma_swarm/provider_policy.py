@@ -25,6 +25,7 @@ from dharma_swarm.model_hierarchy import (
     TIER_FREE,
     TIER_PAID,
     heuristic_score,
+    intelligence_order,
 )
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
 from dharma_swarm.smart_router import SmartRouter, SmartRouterConfig
@@ -75,7 +76,9 @@ class ProviderRouteRequest:
     expected_impact: float
     estimated_latency_ms: int = 800
     estimated_tokens: int = 1200
-    preferred_low_cost: bool = True
+    # Power-first default (operator decision 2026-06-21): cost is an OPT-IN
+    # nudge, so this defaults False. Set True to prefer cheaper providers.
+    preferred_low_cost: bool = False
     requires_frontier_precision: bool = False
     privileged_action: bool = False
     requires_human_consent: bool = False
@@ -114,6 +117,15 @@ class ProviderRoutingConfig:
         ProviderType.SAMBANOVA,
     )
     reasoning_priority: tuple[ProviderType, ...] = DELIBERATIVE_REASONING_PRIORITY
+    # Power-first default (operator decision 2026-06-21): with no explicit cost
+    # request, rank by raw model intelligence (most capable first), NOT the
+    # free-tier-first seed order. Cost is an opt-in nudge via preferred_low_cost.
+    power_first: bool = True
+    power_first_priority: tuple[ProviderType, ...] = field(
+        default_factory=lambda: tuple(
+            intelligence_order(CANONICAL_SEED_ORDER, respect_cost_tiers=False)
+        )
+    )
     default_model_hints: dict[ProviderType, str] = field(
         default_factory=lambda: dict(DEFAULT_MODELS)
     )
@@ -470,6 +482,22 @@ class ProviderPolicyRouter:
 
         if requires_tooling:
             candidates = list(self.config.tooling_candidates) + candidates
+
+        # Power-first base ordering (operator decision 2026-06-21): with no
+        # explicit cost request, rank by raw model intelligence — most capable
+        # first — instead of the free-tier-first seed order. The language /
+        # reasoning / cost overlays below refine this when they apply; when none
+        # apply (the common default), power-first stands.
+        if (
+            self.config.power_first
+            and not prefer_low_cost
+            and path != RoutePath.ESCALATE
+        ):
+            priority = {
+                provider: idx
+                for idx, provider in enumerate(self.config.power_first_priority)
+            }
+            candidates.sort(key=lambda provider: priority.get(provider, len(priority)))
 
         if prefer_japanese_quality:
             priority = {
