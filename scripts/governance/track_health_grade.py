@@ -35,7 +35,9 @@ quality grade is only HONORED when it carries decorrelated, independent
 attestations, mirroring the Transcendence Principle (diverse competent
 graders + quality aggregation) and the loop-closure One-Wire quorum:
 
-  MIN_SIGNOFFS distinct graders AND MIN_FAMILIES distinct model families.
+  MIN_SIGNOFFS distinct graders that meet the reviewer capability floor
+  (Opus 4.8+, operator policy 2026-06-22). Decorrelation comes from
+  independent runs/stances of floor-meeting auditors, not weaker families.
 
 Axes are aggregated by MEDIAN across sign-offs (robust to one outlier
 grader), never by a single voice. A track is attested-SHIPPABLE only when
@@ -51,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import statistics
 import sys
 from dataclasses import dataclass, field
@@ -77,10 +80,48 @@ AXIS_WEIGHTS = {
 VERDICTS = ("SHIPPABLE", "IN_PROGRESS", "OVERSTATED", "BLOCKED")
 
 # Quorum thresholds — the decorrelation discipline.
-MIN_SIGNOFFS = 3          # at least 3 independent graders
-MIN_FAMILIES = 2          # spanning at least 2 distinct model families
+MIN_SIGNOFFS = 3          # at least 3 independent graders that meet the floor
 SHIPPABLE_WIRED_FLOOR = 3
 SHIPPABLE_PROVEN_FLOOR = 3
+
+# REVIEWER CAPABILITY FLOOR (operator directive, 2026-06-22):
+# Track reviews must be conducted by high-capability auditors only — Opus 4.8
+# or higher. Lower-tier models (sonnet / haiku and pre-4.8 opus) may be
+# RECORDED for transparency but do NOT count toward the attesting quorum.
+# This deliberately trades model-family decorrelation for reviewer capability
+# per operator policy; decorrelation now comes from INDEPENDENT RUNS / stances
+# of floor-meeting auditors rather than from weaker model families.
+#
+# A sign-off meets the floor when its family is accepted AND (if it declares a
+# parseable model id) that id is at or above the version floor. Operators raise
+# the bar by editing these two constants in one place, or allowlist a specific
+# frontier model id via GRADER_ALLOWLIST.
+ACCEPTED_GRADER_FAMILIES = {"claude-opus"}
+MIN_OPUS_VERSION = (4, 8)
+GRADER_ALLOWLIST: set[str] = set()   # explicit model ids approved at/above the floor
+
+
+def meets_capability_floor(model_family: str, model: str = "") -> bool:
+    """True iff this auditor is Opus 4.8+ caliber (or operator-allowlisted)."""
+    mf = (model_family or "").strip().lower()
+    mid = (model or "").strip().lower()
+    if mid and mid in {m.lower() for m in GRADER_ALLOWLIST}:
+        return True
+    if mf not in ACCEPTED_GRADER_FAMILIES:
+        return False
+    # Family is accepted (claude-opus). If a model id pins a version, enforce
+    # the >= 4.8 floor so an older opus (4.6/4.7) does not slip through. A
+    # receipt that names only the family is trusted to be the current opus.
+    ver = _parse_opus_version(mid)
+    return ver is None or ver >= MIN_OPUS_VERSION
+
+
+def _parse_opus_version(model_id: str) -> tuple[int, int] | None:
+    """Extract (major, minor) from ids like 'claude-opus-4-8' / 'opus-4.8'."""
+    m = re.search(r"opus[-_]?(\d+)[._-](\d+)", model_id)
+    if not m:
+        return None
+    return (int(m.group(1)), int(m.group(2)))
 
 
 @dataclass
@@ -90,8 +131,9 @@ class TrackHealth:
     file_total: int = 0
     file_shippable: bool = False
     serves: str | None = None
-    signoff_count: int = 0
+    signoff_count: int = 0              # graders that MEET the capability floor
     families: list[str] = field(default_factory=list)
+    below_floor: list[str] = field(default_factory=list)  # recorded, not counted
     quorum_met: bool = False
     median_axes: dict[str, float] = field(default_factory=dict)
     score: float | None = None          # 0..100, None when ungraded
@@ -173,7 +215,9 @@ def grade_track(tid: str, file_grade: dict[str, Any],
         serves=file_grade.get("serves"),
     )
 
-    # Collect this track's attestations across all graders.
+    # Collect this track's attestations. Only auditors that MEET the capability
+    # floor (Opus 4.8+, operator policy) count toward the quorum; below-floor
+    # sign-offs are recorded for transparency but never weighted.
     per_grader: list[tuple[str, str, dict[str, int], str]] = []
     for r in receipts:
         tr = (r.get("tracks") or {}).get(tid)
@@ -186,18 +230,29 @@ def grade_track(tid: str, file_grade: dict[str, Any],
             continue
         grader = str(r.get("grader") or r.get("_source"))
         family = str(r.get("model_family") or "unknown")
+        model = str(r.get("model") or "")
         verdict = str(tr.get("verdict") or "").upper()
         if verdict not in VERDICTS:
             verdict = "IN_PROGRESS"
+        if not meets_capability_floor(family, model):
+            th.below_floor.append(f"{grader} ({family})")
+            continue
         per_grader.append((grader, family, axes, verdict))  # type: ignore[arg-type]
 
     th.signoff_count = len(per_grader)
     th.families = sorted({fam for _, fam, _, _ in per_grader})
-    th.quorum_met = (th.signoff_count >= MIN_SIGNOFFS
-                     and len(th.families) >= MIN_FAMILIES)
+    if th.below_floor:
+        th.notes.append(
+            f"below-capability-floor sign-offs recorded but NOT counted "
+            f"(policy: Opus {MIN_OPUS_VERSION[0]}.{MIN_OPUS_VERSION[1]}+): "
+            f"{', '.join(th.below_floor)}")
+    # Quorum = enough FLOOR-MEETING graders. Capability gates; independent runs
+    # provide decorrelation (operator policy replaced family-diversity).
+    th.quorum_met = th.signoff_count >= MIN_SIGNOFFS
 
     if not per_grader:
-        th.notes.append("no sign-offs — quality grade withheld (file-grade only)")
+        th.notes.append(
+            "no floor-meeting sign-offs — quality grade withheld (file-grade only)")
         return th
 
     # Quality aggregation: MEDIAN per axis (robust to a single outlier grader).
@@ -234,8 +289,8 @@ def grade_track(tid: str, file_grade: dict[str, Any],
     else:
         th.grade = f"PROVISIONAL-{_letter(th.score)}"
         th.notes.append(
-            f"below sign-off quorum ({th.signoff_count}/{MIN_SIGNOFFS} graders, "
-            f"{len(th.families)}/{MIN_FAMILIES} families) — grade is provisional")
+            f"below sign-off quorum ({th.signoff_count}/{MIN_SIGNOFFS} "
+            f"floor-meeting graders) — grade is provisional")
     return th
 
 
@@ -272,7 +327,9 @@ def emit(tracks: list[TrackHealth], portfolio: dict[str, Any],
     payload = {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "rubric": {"axes": list(AXES), "weights": AXIS_WEIGHTS,
-                   "min_signoffs": MIN_SIGNOFFS, "min_families": MIN_FAMILIES},
+                   "min_signoffs": MIN_SIGNOFFS,
+                   "accepted_grader_families": sorted(ACCEPTED_GRADER_FAMILIES),
+                   "min_opus_version": list(MIN_OPUS_VERSION)},
         "graders": sorted({r.get("grader", r.get("_source", "?")) for r in receipts}),
         "portfolio": portfolio,
         "tracks": [
@@ -283,6 +340,7 @@ def emit(tracks: list[TrackHealth], portfolio: dict[str, Any],
                 "serves": t.serves,
                 "signoff_count": t.signoff_count,
                 "families": t.families,
+                "below_floor": t.below_floor,
                 "quorum_met": t.quorum_met,
                 "median_axes": t.median_axes,
                 "score": t.score,
@@ -306,10 +364,13 @@ def emit(tracks: list[TrackHealth], portfolio: dict[str, Any],
         "and `track_signoffs/*.signoff.json` (independent grader attestations). "
         "Read-only — it grades, it does not own track truth.",
         "",
-        f"**Sign-off quorum:** {MIN_SIGNOFFS} independent graders across "
-        f"{MIN_FAMILIES}+ model families. Axes aggregated by median; "
-        "attested-SHIPPABLE requires median wired>=3 AND proven>=3 AND a "
-        "grader majority verdict of SHIPPABLE.",
+        f"**Reviewer policy (operator, 2026-06-22):** auditors must be "
+        f"Opus {MIN_OPUS_VERSION[0]}.{MIN_OPUS_VERSION[1]}+ caliber "
+        f"({sorted(ACCEPTED_GRADER_FAMILIES)}); lower-tier sign-offs are "
+        "recorded but do not count. "
+        f"**Quorum:** {MIN_SIGNOFFS} independent floor-meeting graders. "
+        "Axes aggregated by median; attested-SHIPPABLE requires median "
+        "wired>=3 AND proven>=3 AND a grader majority verdict of SHIPPABLE.",
         "",
         f"**Graders this run:** {', '.join(payload['graders']) or '(none)'}",
         "",

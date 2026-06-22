@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-22T15:48:18+00:00",
+  "generated_at": "2026-06-22T19:40:12+00:00",
   "rubric": {
     "axes": [
       "wired",
@@ -16,7 +16,13 @@
       "balanced": 0.1
     },
     "min_signoffs": 3,
-    "min_families": 2
+    "accepted_grader_families": [
+      "claude-opus"
+    ],
+    "min_opus_version": [
+      4,
+      8
+    ]
   },
   "graders": [
     "track-grader-haiku",
@@ -24,20 +30,13 @@
     "track-grader-sonnet"
   ],
   "portfolio": {
-    "track_mean": 57.7,
+    "track_mean": 58.8,
     "objective_coverage": 0.33,
     "coverage_cap": 84.9,
-    "portfolio_score": 57.7,
+    "portfolio_score": 58.8,
     "portfolio_grade": "F",
-    "attested_shippable": [
-      "provider-routing-consolidation-2026-06",
-      "runtime-truth-reconciliation-2026-06",
-      "truth-graph-platform-2026-06"
-    ],
-    "overstated": [
-      "composer-holon-spine-longrun-2026-06",
-      "runtime-truth-nats-2026-06"
-    ]
+    "attested_shippable": [],
+    "overstated": []
   },
   "tracks": [
     {
@@ -45,13 +44,15 @@
       "file_grade": "11/11",
       "file_shippable": true,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
       "median_axes": {
         "wired": 3.0,
         "proven": 3.0,
@@ -60,56 +61,29 @@
         "balanced": 1.0
       },
       "score": 70.0,
-      "grade": "C",
+      "grade": "PROVISIONAL-C",
       "consensus_verdict": "SHIPPABLE",
-      "dissent": [
-        "track-grader-sonnet:IN_PROGRESS"
-      ],
-      "attested_shippable": true,
-      "notes": []
+      "dissent": [],
+      "attested_shippable": false,
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
     },
     {
       "id": "runtime-truth-nats-2026-06",
       "file_grade": "2/2",
       "file_shippable": true,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
-      "median_axes": {
-        "wired": 2.0,
-        "proven": 3.0,
-        "live": 1.0,
-        "world_class": 2.0,
-        "balanced": 1.0
-      },
-      "score": 51.2,
-      "grade": "F",
-      "consensus_verdict": "OVERSTATED",
-      "dissent": [
-        "track-grader-haiku:SHIPPABLE"
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
       ],
-      "attested_shippable": false,
-      "notes": [
-        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
-      ]
-    },
-    {
-      "id": "runtime-truth-spine-adoption-2026-06",
-      "file_grade": "7/8",
-      "file_shippable": false,
-      "serves": "substrate-nativeness",
-      "signoff_count": 3,
-      "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
-      ],
-      "quorum_met": true,
+      "quorum_met": false,
       "median_axes": {
         "wired": 2.0,
         "proven": 3.0,
@@ -118,52 +92,91 @@
         "balanced": 1.0
       },
       "score": 58.8,
-      "grade": "F",
+      "grade": "PROVISIONAL-F",
+      "consensus_verdict": "OVERSTATED",
+      "dissent": [],
+      "attested_shippable": false,
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
+    },
+    {
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "file_grade": "7/8",
+      "file_shippable": false,
+      "serves": "substrate-nativeness",
+      "signoff_count": 1,
+      "families": [
+        "claude-opus"
+      ],
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
+      "median_axes": {
+        "wired": 2.0,
+        "proven": 3.0,
+        "live": 1.0,
+        "world_class": 3.0,
+        "balanced": 1.0
+      },
+      "score": 55.0,
+      "grade": "PROVISIONAL-F",
       "consensus_verdict": "IN_PROGRESS",
       "dissent": [],
       "attested_shippable": false,
-      "notes": []
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
     },
     {
       "id": "loop-closure-2026-06",
       "file_grade": "10/11",
       "file_shippable": false,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
       "median_axes": {
         "wired": 2.0,
         "proven": 2.0,
-        "live": 1.0,
+        "live": 2.0,
         "world_class": 2.0,
         "balanced": 1.0
       },
-      "score": 43.8,
-      "grade": "F",
+      "score": 47.5,
+      "grade": "PROVISIONAL-F",
       "consensus_verdict": "IN_PROGRESS",
-      "dissent": [
-        "track-grader-sonnet:OVERSTATED"
-      ],
+      "dissent": [],
       "attested_shippable": false,
-      "notes": []
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
     },
     {
       "id": "truth-graph-platform-2026-06",
       "file_grade": "15/15",
       "file_shippable": true,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
       "median_axes": {
         "wired": 3.0,
         "proven": 3.0,
@@ -172,26 +185,29 @@
         "balanced": 1.0
       },
       "score": 70.0,
-      "grade": "C",
+      "grade": "PROVISIONAL-C",
       "consensus_verdict": "SHIPPABLE",
-      "dissent": [
-        "track-grader-sonnet:IN_PROGRESS"
-      ],
-      "attested_shippable": true,
-      "notes": []
+      "dissent": [],
+      "attested_shippable": false,
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
     },
     {
       "id": "composer-holon-spine-longrun-2026-06",
       "file_grade": "6/6",
       "file_shippable": true,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
       "median_axes": {
         "wired": 2.0,
         "proven": 2.0,
@@ -200,14 +216,13 @@
         "balanced": 1.0
       },
       "score": 43.8,
-      "grade": "F",
+      "grade": "PROVISIONAL-F",
       "consensus_verdict": "OVERSTATED",
-      "dissent": [
-        "track-grader-haiku:SHIPPABLE"
-      ],
+      "dissent": [],
       "attested_shippable": false,
       "notes": [
-        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
       ]
     },
     {
@@ -215,13 +230,15 @@
       "file_grade": "7/7",
       "file_shippable": true,
       "serves": "substrate-nativeness",
-      "signoff_count": 3,
+      "signoff_count": 1,
       "families": [
-        "claude-haiku",
-        "claude-opus",
-        "claude-sonnet"
+        "claude-opus"
       ],
-      "quorum_met": true,
+      "below_floor": [
+        "track-grader-haiku (claude-haiku)",
+        "track-grader-sonnet (claude-sonnet)"
+      ],
+      "quorum_met": false,
       "median_axes": {
         "wired": 3.0,
         "proven": 3.0,
@@ -230,13 +247,14 @@
         "balanced": 1.0
       },
       "score": 66.2,
-      "grade": "D",
+      "grade": "PROVISIONAL-D",
       "consensus_verdict": "SHIPPABLE",
-      "dissent": [
-        "track-grader-sonnet:IN_PROGRESS"
-      ],
-      "attested_shippable": true,
-      "notes": []
+      "dissent": [],
+      "attested_shippable": false,
+      "notes": [
+        "below-capability-floor sign-offs recorded but NOT counted (policy: Opus 4.8+): track-grader-haiku (claude-haiku), track-grader-sonnet (claude-sonnet)",
+        "below sign-off quorum (1/3 floor-meeting graders) \u2014 grade is provisional"
+      ]
     }
   ]
 }
