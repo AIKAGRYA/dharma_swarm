@@ -422,6 +422,13 @@ track-health:
 criterion-lint:
 	$(PYTHON) scripts/governance/criterion_lint.py $(if $(STRICT),--strict,)
 
+# Unified coherence projection: one read-model joining presence grade, Opus-4.8
+# quorum quality+attestation, 3-run audit consensus, criterion smells, and spine
+# coverage, rolled up to the 3 consolidation umbrellas. The single feed a
+# coherence cockpit consumes. Refresh inputs first (track-health, criterion-lint).
+track-coherence: track-health criterion-lint
+	$(PYTHON) scripts/governance/track_coherence.py
+
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
 # ============================================================================

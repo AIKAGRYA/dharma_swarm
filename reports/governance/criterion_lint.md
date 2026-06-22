@@ -1,6 +1,6 @@
 # Criterion smell report
 
-Generated: 2026-06-22T20:48:50+00:00
+Generated: 2026-06-22T20:51:32+00:00
 
 Static lint of `ACTIVE_TRACK.yaml` completion criteria: would each criterion, *if it passed*, actually prove the capability? Read-only projection — it does not evaluate pass/fail (that is `check_track_status.py`).
 

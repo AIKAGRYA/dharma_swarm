@@ -1,6 +1,6 @@
 # Track Health — quality-aggregated, sign-off-gated grade
 
-Generated: 2026-06-22T20:02:31+00:00
+Generated: 2026-06-22T20:51:32+00:00
 
 Projects two owners: `active_track_evidence.json` (file/presence grade) and `track_signoffs/*.signoff.json` (independent grader attestations). Read-only — it grades, it does not own track truth.
 

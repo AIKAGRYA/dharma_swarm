@@ -1,0 +1,250 @@
+{
+  "generated_at": "2026-06-22T20:51:32+00:00",
+  "doctrine": "read model: projects from owners; owns no truth",
+  "portfolio": {
+    "active": 7,
+    "close_ready": [
+      "provider-routing-consolidation-2026-06",
+      "runtime-truth-reconciliation-2026-06"
+    ],
+    "overstated": [
+      "truth-graph-platform-2026-06"
+    ],
+    "objective_coverage": {
+      "substrate-nativeness": true,
+      "revenue-external-humans-served": false,
+      "research-depth": false
+    },
+    "uncovered_objectives": [
+      "revenue-external-humans-served",
+      "research-depth"
+    ]
+  },
+  "umbrellas": [
+    {
+      "id": "runtime-truth-spine",
+      "name": "Runtime Truth Spine",
+      "keystone": "runtime-truth-spine-adoption-2026-06",
+      "members": [
+        "runtime-truth-spine-adoption-2026-06",
+        "runtime-truth-reconciliation-2026-06",
+        "runtime-truth-nats-2026-06",
+        "truth-graph-platform-2026-06"
+      ],
+      "rollup_state": "IN_PROGRESS",
+      "close_ready": [
+        "runtime-truth-reconciliation-2026-06"
+      ],
+      "blocked_on": [
+        "runtime-truth-nats-2026-06",
+        "runtime-truth-spine-adoption-2026-06",
+        "truth-graph-platform-2026-06"
+      ]
+    },
+    {
+      "id": "cybernetic-closure-routing",
+      "name": "Cybernetic Closure & Routing",
+      "keystone": "loop-closure-2026-06",
+      "members": [
+        "loop-closure-2026-06",
+        "provider-routing-consolidation-2026-06"
+      ],
+      "rollup_state": "IN_PROGRESS",
+      "close_ready": [
+        "provider-routing-consolidation-2026-06"
+      ],
+      "blocked_on": [
+        "loop-closure-2026-06"
+      ]
+    },
+    {
+      "id": "sovereign-holons",
+      "name": "Sovereign Holons",
+      "keystone": "composer-holon-spine-longrun-2026-06",
+      "members": [
+        "composer-holon-spine-longrun-2026-06"
+      ],
+      "rollup_state": "IN_PROGRESS",
+      "close_ready": [],
+      "blocked_on": [
+        "composer-holon-spine-longrun-2026-06"
+      ]
+    }
+  ],
+  "tracks": [
+    {
+      "id": "runtime-truth-reconciliation-2026-06",
+      "umbrella": "runtime-truth-spine",
+      "serves": "substrate-nativeness",
+      "owner": "@AmitabhainArunachala",
+      "coherence_state": "CLOSE_READY",
+      "presence": "11/11",
+      "file_shippable": true,
+      "quality_grade": "D",
+      "quality_score": 66.2,
+      "attested_shippable": true,
+      "audit_opinion": "QUALIFIED",
+      "claim_holds": true,
+      "holds_votes": "3/3",
+      "opinion_spread": [
+        "CLEAN",
+        "QUALIFIED"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 2,
+      "ttl_days": 14,
+      "stale": false,
+      "open_blockers": 2,
+      "depends_on": []
+    },
+    {
+      "id": "runtime-truth-nats-2026-06",
+      "umbrella": "runtime-truth-spine",
+      "serves": "substrate-nativeness",
+      "owner": "@codex",
+      "coherence_state": "IN_PROGRESS",
+      "presence": "1/3",
+      "file_shippable": false,
+      "quality_grade": "F",
+      "quality_score": 13.7,
+      "attested_shippable": false,
+      "audit_opinion": "ADVERSE",
+      "claim_holds": false,
+      "holds_votes": "0/3",
+      "opinion_spread": [
+        "ADVERSE"
+      ],
+      "high_smells": 2,
+      "verified_age_days": 15,
+      "ttl_days": 21,
+      "stale": false,
+      "open_blockers": 0,
+      "depends_on": []
+    },
+    {
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "umbrella": "runtime-truth-spine",
+      "serves": "substrate-nativeness",
+      "owner": "@AmitabhainArunachala",
+      "coherence_state": "IN_PROGRESS",
+      "presence": "6/9",
+      "file_shippable": false,
+      "quality_grade": "F",
+      "quality_score": 51.2,
+      "attested_shippable": false,
+      "audit_opinion": "QUALIFIED",
+      "claim_holds": false,
+      "holds_votes": "0/3",
+      "opinion_spread": [
+        "QUALIFIED"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 12,
+      "ttl_days": 21,
+      "stale": false,
+      "open_blockers": 4,
+      "depends_on": []
+    },
+    {
+      "id": "loop-closure-2026-06",
+      "umbrella": "cybernetic-closure-routing",
+      "serves": "substrate-nativeness",
+      "owner": "@AmitabhainArunachala",
+      "coherence_state": "IN_PROGRESS",
+      "presence": "9/11",
+      "file_shippable": false,
+      "quality_grade": "F",
+      "quality_score": 36.2,
+      "attested_shippable": false,
+      "audit_opinion": "ADVERSE",
+      "claim_holds": false,
+      "holds_votes": "0/3",
+      "opinion_spread": [
+        "ADVERSE"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 11,
+      "ttl_days": 21,
+      "stale": false,
+      "open_blockers": 2,
+      "depends_on": []
+    },
+    {
+      "id": "truth-graph-platform-2026-06",
+      "umbrella": "runtime-truth-spine",
+      "serves": "substrate-nativeness",
+      "owner": "@codex",
+      "coherence_state": "OVERSTATED",
+      "presence": "15/15",
+      "file_shippable": true,
+      "quality_grade": "F",
+      "quality_score": 55.0,
+      "attested_shippable": false,
+      "audit_opinion": "QUALIFIED",
+      "claim_holds": false,
+      "holds_votes": "0/3",
+      "opinion_spread": [
+        "QUALIFIED"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 10,
+      "ttl_days": 21,
+      "stale": false,
+      "open_blockers": 2,
+      "depends_on": [
+        "orientation-graph-2026-06"
+      ]
+    },
+    {
+      "id": "composer-holon-spine-longrun-2026-06",
+      "umbrella": "sovereign-holons",
+      "serves": "substrate-nativeness",
+      "owner": "@AmitabhainArunachala",
+      "coherence_state": "IN_PROGRESS",
+      "presence": "6/7",
+      "file_shippable": false,
+      "quality_grade": "F",
+      "quality_score": 36.2,
+      "attested_shippable": false,
+      "audit_opinion": "DISCLAIMER",
+      "claim_holds": false,
+      "holds_votes": "0/3",
+      "opinion_spread": [
+        "DISCLAIMER",
+        "QUALIFIED"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 11,
+      "ttl_days": 14,
+      "stale": false,
+      "open_blockers": 4,
+      "depends_on": [
+        "runtime-truth-spine-adoption-2026-06"
+      ]
+    },
+    {
+      "id": "provider-routing-consolidation-2026-06",
+      "umbrella": "cybernetic-closure-routing",
+      "serves": "substrate-nativeness",
+      "owner": "@AmitabhainArunachala",
+      "coherence_state": "CLOSE_READY",
+      "presence": "7/7",
+      "file_shippable": true,
+      "quality_grade": "D",
+      "quality_score": 66.2,
+      "attested_shippable": true,
+      "audit_opinion": "CLEAN",
+      "claim_holds": true,
+      "holds_votes": "3/3",
+      "opinion_spread": [
+        "CLEAN"
+      ],
+      "high_smells": 0,
+      "verified_age_days": 1,
+      "ttl_days": 21,
+      "stale": false,
+      "open_blockers": 4,
+      "depends_on": []
+    }
+  ]
+}
