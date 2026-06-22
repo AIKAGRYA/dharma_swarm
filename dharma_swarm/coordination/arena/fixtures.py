@@ -49,33 +49,48 @@ ROSTER_REGISTRY: dict[str, ModelSpec] = {
 
 ALL_MODEL_IDS: tuple[str, ...] = tuple(ROSTER_REGISTRY)
 
-# Recorded answers: model_id -> {task_id: answer_string}. Embedded literals — a
-# faithful recording of what each worker returned, independent of sealed labels.
-_RECORDED: dict[str, dict[str, str]] = {
-    "alpha-math": {
-        # math specialty (faithful)
-        "m1": "391", "m2": "129", "m3": "12", "m4": "132",
-        # one cross-domain hit, the rest plausible-but-wrong (distinct per model)
-        "c3": "8",
-        "c1": "dharma", "c2": "4", "c4": "8",
-        "l1": "yes", "l2": "sue", "l3": "5", "l4": "30",
-    },
-    "beta-code": {
-        # code specialty (faithful)
-        "c1": "amrahd", "c2": "5", "c3": "8", "c4": "9",
-        # one cross-domain hit, rest wrong (distinct)
-        "m1": "391",
-        "m2": "100", "m3": "6", "m4": "120",
-        "l1": "yes", "l2": "ann", "l3": "9", "l4": "24",
-    },
-    "gamma-logic": {
-        # logic specialty (faithful)
-        "l1": "no", "l2": "tom", "l3": "6", "l4": "32",
-        # no cross-domain hits — everything else wrong (distinct)
-        "m1": "400", "m2": "130", "m3": "10", "m4": "144",
-        "c1": "amrad", "c2": "3", "c3": "7", "c4": "6",
-    },
+# ``_ANSWER_KEY`` is the recording reference each worker call was checked against
+# at RECORDING time — embedded here as recorded data, NOT a runtime read of the
+# sealed taskpack. The scorer remains the only code path that reads
+# ``Taskpack.sealed_label`` at runtime; the fixture pool never does.
+_ANSWER_KEY: dict[str, str] = {
+    # math
+    "m1": "391", "m2": "129", "m3": "12", "m4": "132",
+    "m5": "1024", "m6": "5050", "m7": "504", "m8": "63",
+    # code
+    "c1": "amrahd", "c2": "5", "c3": "8", "c4": "9",
+    "c5": "mraws", "c6": "3", "c7": "20", "c8": "1",
+    # logic
+    "l1": "no", "l2": "tom", "l3": "6", "l4": "32",
+    "l5": "c", "l6": "no", "l7": "29", "l8": "monday",
 }
+
+# Which tasks each specialist answered correctly: its whole family + a couple of
+# cross-domain hits, so no single model is correct everywhere (Krogh-Vedelsby) but
+# route-by-family beats the best single model at equal compute.
+_CORRECT_SETS: dict[str, set[str]] = {
+    "alpha-math": {f"m{i}" for i in range(1, 9)} | {"c3"},
+    "beta-code": {f"c{i}" for i in range(1, 9)} | {"m1"},
+    "gamma-logic": {f"l{i}" for i in range(1, 9)},
+}
+
+
+def _build_recorded() -> dict[str, dict[str, str]]:
+    """Faithful recording: correct tasks return the answer-key string; the rest
+    return a distinct plausible-but-wrong token (so brute-force ensembles cannot
+    accidentally agree on a wrong answer)."""
+    recorded: dict[str, dict[str, str]] = {}
+    for model_id, correct in _CORRECT_SETS.items():
+        prefix = model_id[0]
+        recorded[model_id] = {
+            task_id: (_ANSWER_KEY[task_id] if task_id in correct else f"x-{prefix}-{task_id}")
+            for task_id in _ANSWER_KEY
+        }
+    return recorded
+
+
+# Recorded answers: model_id -> {task_id: answer_string}.
+_RECORDED: dict[str, dict[str, str]] = _build_recorded()
 
 
 @dataclass(frozen=True)

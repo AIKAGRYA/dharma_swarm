@@ -171,7 +171,7 @@ def test_frozen_slice_boundary_holds():
     # curator pool grows, frozen slice stays byte-stable
     assert len(curator.candidate_pool) == 1
     curator.assert_frozen_slice_intact()
-    assert len(tp.tasks) == 12
+    assert len(tp.tasks) == 24
 
 
 def test_curator_next_epoch_is_a_documented_seam():
