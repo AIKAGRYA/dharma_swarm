@@ -45,10 +45,19 @@ def _as_dict(receipt: WorldSensemakingReceipt | dict[str, Any]) -> dict[str, Any
     return asdict(receipt) if isinstance(receipt, WorldSensemakingReceipt) else dict(receipt)
 
 
-def _pressure_weight(corroboration_count: int, source_family_count: int) -> float:
-    """Bounded advisory magnitude. Monotonic in decorrelated agreement; never 1.0
-    from a single family (the moat: structure, not confidence)."""
-    return round(min(1.0, 0.2 * int(corroboration_count) + 0.2 * int(source_family_count)), 4)
+def _pressure_weight(source_family_count: int, avg_support_quality: float) -> float:
+    """Bounded advisory magnitude. Decorrelation drives it (a gentle, NON-saturating
+    curve so more independent families always add some signal); evidence quality
+    scales it. Two independent families at perfect quality ~= 0.64; each further
+    decorrelated family adds less. It never reaches 1.0 from a single family (the
+    moat: structure, not confidence) — and corroboration already requires >=2."""
+    source_term = 1.0 - 0.6 ** max(0, int(source_family_count))
+    return round(max(0.0, min(1.0, source_term * float(avg_support_quality))), 4)
+
+
+def _avg_support_quality(evidence_refs: list[dict[str, Any]]) -> float:
+    qualities = [float(e.get("quality", 0.0)) for e in evidence_refs if e.get("supports")]
+    return sum(qualities) / len(qualities) if qualities else 0.0
 
 
 def world_warrant_pressure(
@@ -67,6 +76,7 @@ def world_warrant_pressure(
             continue
         corroboration = int(r.get("corroboration_count") or 0)
         source_families = int(r.get("source_family_count") or 0)
+        avg_quality = _avg_support_quality(list(r.get("evidence_refs") or []))
         out.append(
             WorldWarrantPressure(
                 pressure_id=f"world_pressure_{str(r.get('receipt_id', ''))[-24:]}",
@@ -75,7 +85,7 @@ def world_warrant_pressure(
                 claim=str(r.get("claim", "")),
                 corroboration_count=corroboration,
                 source_family_count=source_families,
-                pressure_weight=_pressure_weight(corroboration, source_families),
+                pressure_weight=_pressure_weight(source_families, avg_quality),
                 risks=list(r.get("risks") or []),
                 generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 is_advisory=True,

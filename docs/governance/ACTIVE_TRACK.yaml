@@ -886,6 +886,7 @@ active_tracks:
       - scripts/governance/check_world_quarantine.py
       - scripts/governance/check_frontier_council_replay.py
       - scripts/governance/check_world_warrant_handoff.py
+      - scripts/governance/run_world_signal_seed_batch.py
       - scripts/governance/check_world_sensemaking_closure.py
       - tests/test_world_radar_safety.py
       - tests/test_frontier_council.py

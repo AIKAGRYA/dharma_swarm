@@ -45,6 +45,22 @@ The eye conducts read-only: corroborated receipts become advisory pressure S4 *c
 - **Gate to Stage 3:** only after Stage 2 is solid does a `WorldProposal` gain *gated* write-authority — through the
   **existing** Memory-Kernel promotion gate / telos gates, never a new apply path. The hands do not move yet.
 
+## First real meal — the organ run on real signal (not fixtures)
+
+`scripts/governance/run_world_signal_seed_batch.py` runs Devin's 2026-06-21 tool seed-batch
+report (18 tool-claims) through the live Stage 0/1/2 pipeline as the first batch of REAL
+untrusted world-signals. Evidence refs are hand-assembled from each claim's real provenance;
+the verdict falls out of the structural moat, not opinion. Result: **9 corroborated, 7
+insufficient, 2 refuted** (the two screenshot identity mismatches preserved as contradictions,
+not normalized). MarkItDown earns the highest advisory weight — it is the one tool with an
+independent reproduction (a genuinely decorrelated third source family). A vendor self-report
+("Headroom 60–95%") correctly falls to *insufficient*. The whole run is read-only;
+`dispatch_authority` stays False. Report: `reports/sensemaking_organ/seed_batch/<date>/`.
+
+This run drove one adapt-step fix: the Stage 2 magnitude formula saturated to 1.0 for every
+corroborated signal (it could not rank them). It now uses a gentle non-saturating decorrelation
+curve scaled by real evidence quality, so more independent families always add signal.
+
 ## Receipt integration seam (Stage 1.5)
 
 `WorldSensemakingReceipt` is currently emitted as a JSON object + replay report under

@@ -1,0 +1,1447 @@
+{
+  "summary": {
+    "run": "world_signal_seed_batch_first_real_meal",
+    "source": "docs report: Screenshot Tool Seed Batch (Devin, 2026-06-21) \u2014 untrusted world-signal",
+    "signals": 18,
+    "stage0": {
+      "all_envelopes_safe": true,
+      "all_payloads_fenced": true
+    },
+    "verdict_counts": {
+      "corroborated": 9,
+      "insufficient": 7,
+      "refuted": 2
+    },
+    "verdicts": {
+      "corroborated": [
+        "cost_control",
+        "markitdown",
+        "dspy",
+        "continue",
+        "dify",
+        "twenty",
+        "docuseal",
+        "anytype",
+        "papermark"
+      ],
+      "insufficient": [
+        "maybe",
+        "headroom_perf",
+        "last30days_skill",
+        "taste_skill",
+        "agent_reach",
+        "career_ops",
+        "pm_skills"
+      ],
+      "refuted": [
+        "huly_docuseal_identity",
+        "open_notebook_identity"
+      ]
+    },
+    "advisory_pressures": [
+      {
+        "id": "markitdown",
+        "claim": "MarkItDown reliably converts heterogeneous documents to Markdown and is usable as the Phase-0 ingestion seam.",
+        "weight": 0.6011,
+        "evaluator_families": 3,
+        "source_families": 3,
+        "dispatch_authority": false
+      },
+      {
+        "id": "cost_control",
+        "claim": "Tiered model selection + prompt caching + output-token minimization materially reduce LLM operating cost.",
+        "weight": 0.5749,
+        "evaluator_families": 3,
+        "source_families": 3,
+        "dispatch_authority": false
+      },
+      {
+        "id": "dspy",
+        "claim": "DSPy is a usable framework for typed, evaluable LLM modules with optimizers.",
+        "weight": 0.5749,
+        "evaluator_families": 3,
+        "source_families": 3,
+        "dispatch_authority": false
+      },
+      {
+        "id": "continue",
+        "claim": "Continue is a real, independently distributed open coding-assistant with a context-provider model.",
+        "weight": 0.5096,
+        "evaluator_families": 3,
+        "source_families": 3,
+        "dispatch_authority": false
+      },
+      {
+        "id": "dify",
+        "claim": "Dify is a real, self-hostable OSS LLM workflow platform.",
+        "weight": 0.4416,
+        "evaluator_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      },
+      {
+        "id": "twenty",
+        "claim": "Twenty is a real, self-hostable open CRM with a customizable object model.",
+        "weight": 0.4416,
+        "evaluator_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      },
+      {
+        "id": "docuseal",
+        "claim": "DocuSeal is a real OSS e-signature/document tool with an API and JS SDK.",
+        "weight": 0.4416,
+        "evaluator_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      },
+      {
+        "id": "anytype",
+        "claim": "Anytype is a real local-first/E2EE knowledge OS with an independent sync protocol and clients.",
+        "weight": 0.432,
+        "evaluator_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      },
+      {
+        "id": "papermark",
+        "claim": "Papermark is a real OSS document-sharing tool with analytics and a published API/CLI.",
+        "weight": 0.4224,
+        "evaluator_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      }
+    ],
+    "dispatch_authority_held_false": true,
+    "rows": [
+      {
+        "id": "cost_control",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 3,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "markitdown",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 3,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "dspy",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 3,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "continue",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 3,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "dify",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "twenty",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "docuseal",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "anytype",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "papermark",
+        "verdict": "corroborated",
+        "evaluator_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "maybe",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "headroom_perf",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "last30days_skill",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "taste_skill",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "agent_reach",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "career_ops",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "pm_skills",
+        "verdict": "insufficient",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "huly_docuseal_identity",
+        "verdict": "refuted",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 2,
+        "stage0_safe": true,
+        "fence_intact": true
+      },
+      {
+        "id": "open_notebook_identity",
+        "verdict": "refuted",
+        "evaluator_families": 0,
+        "source_families": 1,
+        "refutations": 2,
+        "stage0_safe": true,
+        "fence_intact": true
+      }
+    ],
+    "observed_at": "2026-06-22T02:43:09.285552Z"
+  },
+  "receipts": [
+    {
+      "claim": "Tiered model selection + prompt caching + output-token minimization materially reduce LLM operating cost.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.85,
+          "ref": "platform.claude.com prompt-caching + batch-processing",
+          "source_family": "anthropic_docs",
+          "supports": true
+        },
+        {
+          "quality": 0.7,
+          "ref": "openai.com/api/pricing",
+          "source_family": "openai_pricing",
+          "supports": true
+        },
+        {
+          "quality": 0.65,
+          "ref": "openrouter.ai routing/price catalog",
+          "source_family": "openrouter",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "3 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "anthropic_docs",
+            "openai_pricing",
+            "openrouter"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "anthropic_docs",
+            "openai_pricing",
+            "openrouter"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.73",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "anthropic_docs",
+            "openai_pricing",
+            "openrouter"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.279792Z",
+      "input_signal_hash": "sha256:d9fb0b0c629d",
+      "no_action_authority": true,
+      "payload_hash": "sha256:83452bc9f40e3ba7a73046d915bdb749b3ae6d5222140748b0d7cb244c0be990",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_83452bc9f40e3ba7a73046d9",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 3,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "MarkItDown reliably converts heterogeneous documents to Markdown and is usable as the Phase-0 ingestion seam.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/microsoft/markitdown",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.65,
+          "ref": "pypi.org/project/markitdown (independent distribution)",
+          "source_family": "pkg_index",
+          "supports": true
+        },
+        {
+          "quality": 0.85,
+          "ref": "Devin ran a real CLI E2E ingest of an HTML signal into isolated Chetana",
+          "source_family": "independent_repro",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "3 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_repro",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_repro",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.77",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_repro",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.281106Z",
+      "input_signal_hash": "sha256:5d8385727c71",
+      "no_action_authority": true,
+      "payload_hash": "sha256:9f8566f54cc08dfd3468af73526d9e877fead1f76d4e757c54bfff56fdc72a8f",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_9f8566f54cc08dfd3468af73",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 3,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "DSPy is a usable framework for typed, evaluable LLM modules with optimizers.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/stanfordnlp/dspy",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.65,
+          "ref": "pypi.org/project/dspy",
+          "source_family": "pkg_index",
+          "supports": true
+        },
+        {
+          "quality": 0.75,
+          "ref": "independent citation/use beyond Stanford in the NLP community",
+          "source_family": "academic_adoption",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "3 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "academic_adoption",
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "academic_adoption",
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.73",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "academic_adoption",
+            "first_party_repo",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.281438Z",
+      "input_signal_hash": "sha256:5b95960ffacd",
+      "no_action_authority": true,
+      "payload_hash": "sha256:880fd7665b762d236ba0c173e536ad88530bf7eede401584574c243a08a6fb54",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_880fd7665b762d236ba0c173",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 3,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Continue is a real, independently distributed open coding-assistant with a context-provider model.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.75,
+          "ref": "github.com/continuedev/continue",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "VS Code Marketplace listing (independent channel)",
+          "source_family": "vscode_marketplace",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "JetBrains Plugins listing (independent channel)",
+          "source_family": "jetbrains_marketplace",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "3 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "jetbrains_marketplace",
+            "vscode_marketplace"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "jetbrains_marketplace",
+            "vscode_marketplace"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.65",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "jetbrains_marketplace",
+            "vscode_marketplace"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.281732Z",
+      "input_signal_hash": "sha256:92e09079e7ca",
+      "no_action_authority": true,
+      "payload_hash": "sha256:765813956d92a615d57df848c85fd3f80c3b6dd7a3fb9f8e03c5022359210e85",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_765813956d92a615d57df848",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 3,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Dify is a real, self-hostable OSS LLM workflow platform.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.78,
+          "ref": "github.com/langgenius/dify",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "independent docker/self-host distribution",
+          "source_family": "pkg_index",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.69",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.281993Z",
+      "input_signal_hash": "sha256:c53494da7984",
+      "no_action_authority": true,
+      "payload_hash": "sha256:aacbcf5d8f7491780611f53c21a362b63337ec267ecc18c2edc048259a52710e",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_aacbcf5d8f7491780611f53c",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Twenty is a real, self-hostable open CRM with a customizable object model.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.78,
+          "ref": "github.com/twentyhq/twenty",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "independent self-host/cloud distribution",
+          "source_family": "pkg_index",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.69",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.282277Z",
+      "input_signal_hash": "sha256:1254c2e718c3",
+      "no_action_authority": true,
+      "payload_hash": "sha256:625d0314b51ac7ab0d5796543bc78f913ef9888f6d06f584f7aca2061a2adcf8",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_625d0314b51ac7ab0d579654",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "DocuSeal is a real OSS e-signature/document tool with an API and JS SDK.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.78,
+          "ref": "github.com/docusealco/docuseal",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "github.com/docusealco/docuseal-js (independent SDK package)",
+          "source_family": "pkg_index",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.69",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.282513Z",
+      "input_signal_hash": "sha256:5061e0b22551",
+      "no_action_authority": true,
+      "payload_hash": "sha256:00fd7d138631f0283e94e276a92b9afde598bddcc3883faea3e238a72c4b49af",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_00fd7d138631f0283e94e276",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Anytype is a real local-first/E2EE knowledge OS with an independent sync protocol and clients.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.75,
+          "ref": "github.com/anyproto/anytype-ts",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "anyproto/any-sync + anytype-swift (separate components/app-store presence)",
+          "source_family": "independent_client",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_client"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_client"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.68",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "independent_client"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.282766Z",
+      "input_signal_hash": "sha256:da8e8534ae40",
+      "no_action_authority": true,
+      "payload_hash": "sha256:e91c2e43e1bb2cfd4cfd2530f961444930372cc40d53d8f0b075e503caf997ab",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_e91c2e43e1bb2cfd4cfd2530",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Papermark is a real OSS document-sharing tool with analytics and a published API/CLI.",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.72,
+          "ref": "github.com/papermark/papermark",
+          "source_family": "first_party_repo",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "npm @papermark/mcp-server + papermark CLI (independent packages)",
+          "source_family": "pkg_index",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.66",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "first_party_repo",
+            "pkg_index"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.283004Z",
+      "input_signal_hash": "sha256:3c3da443d4c0",
+      "no_action_authority": true,
+      "payload_hash": "sha256:69cdd61b2eb409b844dbf5b06665e9a755a6a0fd75129b6a288ae3d38d3403c0",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_69cdd61b2eb409b844dbf5b0",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Maybe is a usable finance-domain reference (complete AGPL Rails app, now archived).",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/maybe-finance/maybe (repo + release tags + LICENSE, single origin)",
+          "source_family": "first_party_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.283311Z",
+      "input_signal_hash": "sha256:ddb82187f36a",
+      "no_action_authority": true,
+      "payload_hash": "sha256:e50fcaa5112788e935a7c6c13ffcf083e07378aee26b7aae98c02bbed161e19b",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_e50fcaa5112788e935a7c6c1",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Headroom reduces agent context tokens by 60-95% while preserving answer quality.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.5,
+          "ref": "github.com/chopratejas/headroom README claim (unreproduced)",
+          "source_family": "vendor_self_report",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "vendor_self_report"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "vendor_self_report"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "vendor_self_report"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.283581Z",
+      "input_signal_hash": "sha256:665180af8cd9",
+      "no_action_authority": true,
+      "payload_hash": "sha256:26603104fe0c25dfe3f1bcb663df0111edef705b53269e6715c5cad3c6f5f332",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_26603104fe0c25dfe3f1bcb6",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Last30Days-Skill is a usable recent-discourse research skill across many surfaces.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.65,
+          "ref": "github.com/mvanhorn/last30days-skill (single origin)",
+          "source_family": "first_party_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.283799Z",
+      "input_signal_hash": "sha256:fbe3c46046f8",
+      "no_action_authority": true,
+      "payload_hash": "sha256:e7ff693c41f0e841b96bae7e8649dbb774b0bb891a82682a09d69ff55981cc07",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_e7ff693c41f0e841b96bae7e",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Taste-Skill is a usable design-quality skill for non-generic frontends.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.62,
+          "ref": "github.com/Leonxlnx/taste-skill (single origin; site same org)",
+          "source_family": "first_party_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.284005Z",
+      "input_signal_hash": "sha256:9a1444a2e866",
+      "no_action_authority": true,
+      "payload_hash": "sha256:0705085b701941f3a8ec72d6b6d3364b37261256126c95be03ab56f17a0eb3a0",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_0705085b701941f3a8ec72d6",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Agent-Reach is a usable source-access CLI bundle across many platforms.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/Panniantong/Agent-Reach (single origin; wraps other tools)",
+          "source_family": "first_party_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.284345Z",
+      "input_signal_hash": "sha256:44322f0cbe73",
+      "no_action_authority": true,
+      "payload_hash": "sha256:440eeb6699f912cf2e45883b7157d30092abe81e5f1d05706b2c4ee784b1b0c9",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_440eeb6699f912cf2e45883b",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Career-Ops is a usable agentic vertical-workflow operating system.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.55,
+          "ref": "github.com/santifer/career-ops (mirror; canonical 403 via proxy)",
+          "source_family": "mirror_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "mirror_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "mirror_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "mirror_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.284569Z",
+      "input_signal_hash": "sha256:ba3da5d8f24a",
+      "no_action_authority": true,
+      "payload_hash": "sha256:5433514e179049c8abd614b6523ccca590f45b5b32c6fd75ebd14e05b2f56e01",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_5433514e179049c8abd614b6",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "PM-Skills is a usable PM skill library for converting signals into bounded specs.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.62,
+          "ref": "github.com/product-on-purpose/pm-skills (single origin; docs same org)",
+          "source_family": "first_party_repo",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "first_party_repo"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.284776Z",
+      "input_signal_hash": "sha256:12cf4659f13b",
+      "no_action_authority": true,
+      "payload_hash": "sha256:57db8491ff211df1a0c42a24bb972127233061314926ba08639ce838ed59ffc5",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_57db8491ff211df1a0c42a24",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "The screenshot's labeled identity (Huly) matches its actual content.",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.5,
+          "ref": "slide caption says 'Huly'",
+          "source_family": "screenshot_label",
+          "supports": true
+        },
+        {
+          "quality": 0.9,
+          "ref": "rendered content is DocuSeal \u2014 high-quality contradiction of the label",
+          "source_family": "screenshot_content",
+          "supports": false
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "1 high-quality source(s) contradict the claim",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "insufficient",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "domain contradiction present",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.284997Z",
+      "input_signal_hash": "sha256:8e2ce8ac997f",
+      "no_action_authority": true,
+      "payload_hash": "sha256:ae7b5e7afc2badb90205c85333ac1ba689e3e3c91ab3cc9847148a5419f7e710",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_ae7b5e7afc2badb90205c853",
+      "refutation_count": 2,
+      "risks": [],
+      "source_family_count": 1,
+      "verdict": "refuted"
+    },
+    {
+      "claim": "Open-Notebook is a Jupyter/data-notebook alternative (as the screenshot labels it).",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.5,
+          "ref": "screenshot text: 'Jupyter alternative'",
+          "source_family": "screenshot_label",
+          "supports": true
+        },
+        {
+          "quality": 0.85,
+          "ref": "github.com/lfnovo/open-notebook is a NotebookLM-like research tool, not a Jupyter alternative",
+          "source_family": "first_party_repo",
+          "supports": false
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "1 high-quality source(s) contradict the claim",
+          "refuting_families": [
+            "first_party_repo"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [
+            "first_party_repo"
+          ],
+          "stance": "insufficient",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "domain contradiction present",
+          "refuting_families": [
+            "first_party_repo"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:43:09.285298Z",
+      "input_signal_hash": "sha256:512c4c0ed3a9",
+      "no_action_authority": true,
+      "payload_hash": "sha256:6e1e812b57c64d093ca5cc3e1a4ccf197ae846f7851c7ce086919f5c7bdf7d36",
+      "provenance": {
+        "agent": {
+          "id": "report:devin-2026-06-21-seed-batch"
+        }
+      },
+      "receipt_id": "world_sensemaking_6e1e812b57c64d093ca5cc3e",
+      "refutation_count": 2,
+      "risks": [],
+      "source_family_count": 1,
+      "verdict": "refuted"
+    }
+  ]
+}
