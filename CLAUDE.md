@@ -250,30 +250,30 @@ to main through the normal review path before it is called shipped.
 
 ### Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
 
-**Track id:** `provider-routing-consolidation-2026-06` · **Status:** SHIPPABLE (stages 1–5 landed on origin/main 2026-06-21; ready to close) · **Owner:** @AmitabhainArunachala
+**Track id:** `provider-routing-consolidation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-22 (TTL 21 days)
 **Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06
 **Owns surfaces:** dharma_swarm/providers.py, dharma_swarm/provider_policy.py, dharma_swarm/model_hierarchy.py, dharma_swarm/model_pool.py, dharma_swarm/model_defaults.py, dharma_swarm/runtime_provider.py, dharma_swarm/router_v1.py, dharma_swarm/smart_router.py, dharma_swarm/decision_router.py, docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md
 **Moves vital signs:** quality_gates, tool_coverage, cost_efficiency
 
 Operator directive 2026-06-21: consolidate the LLM provider/model routing
-subsystem into one coherent, malleable, intelligent router. **RESOLVED — all
-five stages landed on origin/main 2026-06-21; this section records what was
-fixed, not open work.** The DECISION layer had drifted: an explicit
-provider/model request was treated only as a constraint, not a selection
-(provider_policy did not read context["preferred_provider"]); the two rank
-systems disagreed (model_hierarchy.CANONICAL_SEED_ORDER free-first vs
-model_pool._PROVIDER_RANK first-party-first); and ~8 router files stacked
-reorder passes with no single documented precedence. All three are now fixed:
-provider_policy.py pins an explicit provider (pin + safe fallback,
-provider_policy.py:246–264), selection is power-first with CANONICAL_SEED_ORDER
-demoted to historical fallback, and the single precedence is documented in
-docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and locked by an invariant test.
+subsystem into one coherent, malleable, intelligent router. RESOLVED — all
+five stages landed on origin/main 2026-06-21; this records what was fixed,
+not open work. The DECISION layer had drifted: an explicit provider/model
+request was treated only as a constraint, not a selection (provider_policy
+did not read context["preferred_provider"]); the two rank systems disagreed
+(model_hierarchy.CANONICAL_SEED_ORDER free-first vs model_pool._PROVIDER_RANK
+first-party-first); and ~8 router files stacked reorder passes with no single
+documented precedence. All three are now fixed: provider_policy.py pins an
+explicit provider (pin + safe fallback), selection is power-first with
+CANONICAL_SEED_ORDER demoted to historical fallback, and the single
+precedence is documented in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and
+locked by an invariant test.
 
-The data/registry half (model_hierarchy -> model_pool -> model_defaults, keys
-in api_keys) was already consolidated and is preserved; this track fixed the
-decision half and the wiring gaps, converging on the existing registries
-(no new truth store).
+The data/registry half (model_hierarchy -> model_pool -> model_defaults,
+keys in api_keys) was already consolidated and is preserved; this track
+fixed the decision half and the wiring gaps, converging on the existing
+registries (no new truth store).
 
 Four operator decisions are LOCKED (2026-06-21):
   1. Default selection = POWER-FIRST (most capable model by default; cost
@@ -290,18 +290,14 @@ Precedence the router must follow, documented in one place:
   > learned (affinity/EWMA/reward/canary) > availability prune (first-party
   preferred, OpenRouter last) > fallback chain walk.
 
-**Shipped (all landed 2026-06-21 on origin/main):**
+**Next items:**
 
-- [docs] ✅ docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration.
-- [code] ✅ Stage 1: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback) — commit e7e0e55d.
-- [code] ✅ Stage 2: unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback — commit 508be78f.
-- [code] ✅ Stage 3: z.ai/Zhipu wired first-party (enum + resolution + factory + ZhipuProvider, default glm-5.2) — commits ccffd12b / bf8ee7cf.
-- [code] ✅ Stage 4: single precedence locked with an invariant test — commit bc110d84.
-- [code] ✅ Stage 5: env templates + deferred drift recorded — commit 04711efb.
-
-**Remaining (scoped-out, recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 — not blockers):**
-
-- AgentConfig.model default literal, per-model config literals (cost/TUI/CLI), and providers_extended.py (still imported by tests) are deliberately out of routing scope.
+- [docs] SHIPPED: docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration.
+- [code] SHIPPED (commit e7e0e55d): Stage 1 — provider_policy consults context['preferred_provider'] as SELECTION (pin + safe fallback).
+- [code] SHIPPED (commit 508be78f): Stage 2 — unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback.
+- [code] SHIPPED (commits ccffd12b/bf8ee7cf): Stage 3 — z.ai/Zhipu first-party provider (enum + resolution + factory + ZhipuProvider, default glm-5.2).
+- [code] SHIPPED (commit bc110d84): Stage 4 — single precedence locked with an invariant test.
+- [code] SHIPPED (commit 04711efb): Stage 5 — env templates + deferred drift recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 (AgentConfig.model literal, per-model config literals, providers_extended.py — scoped out, not blockers).
 
 **Non-goals:**
 
@@ -520,9 +516,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- **1 open BLOCKER: NEW-14** — world-model loop ↔ `WorldModelAgent` API mismatch (`state_dir`/`initialize`/`run_cycle` vs the real `WorldModelAgent(store, search_tool, arxiv_tool)`/`boot`/`run_loop`). Crashes the world-model loop on every daemon boot; a fix exists on an unmerged branch (commit `76f72204`). The 3 *original* BLOCKERs were resolved.
-- 3 DEGRADED/PARTIAL remaining (NEW-05 guarded, NEW-07/08 partial+; MM-05 now resolved)
-- 24 mismatch entries tracked in the map (verify counts against the map itself — the older "55 pairs" prose had drifted)
+- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count here** (that duplication is exactly how this section rotted). Read `INTERFACE_MISMATCH_MAP.md` for the current tally. As of 2026-06-22 the recent `NEW-14` blocker (world-model loop ↔ `WorldModelAgent` API mismatch, which crashed the loop on every daemon boot) has a fix in flight; the 3 original BLOCKERs are resolved; `NEW-05` (guarded) and `NEW-07/08` (partial+) remain DEGRADED.
 - A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
 **Rule for all sessions:** Before fixing a bug or adding a feature, check the mismatch map first. If the module pair you're touching has a known mismatch, fix the mismatch as part of your change. Do not add new callers to broken interfaces.

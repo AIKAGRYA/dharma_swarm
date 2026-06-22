@@ -768,18 +768,23 @@ active_tracks:
 
     description: |
       Operator directive 2026-06-21: consolidate the LLM provider/model routing
-      subsystem into one coherent, malleable, intelligent router. After weeks of
-      accretion the DECISION layer drifted: an explicit provider/model request is
-      treated only as a constraint and never as a selection (agent_runner stores
-      context["preferred_provider"] but provider_policy never reads it), two rank
-      systems disagree (model_hierarchy.CANONICAL_SEED_ORDER is free-first while
-      model_pool._PROVIDER_RANK is first-party-first), and ~8 router files stack
-      ~6 reorder passes with no single documented precedence.
+      subsystem into one coherent, malleable, intelligent router. RESOLVED — all
+      five stages landed on origin/main 2026-06-21; this records what was fixed,
+      not open work. The DECISION layer had drifted: an explicit provider/model
+      request was treated only as a constraint, not a selection (provider_policy
+      did not read context["preferred_provider"]); the two rank systems disagreed
+      (model_hierarchy.CANONICAL_SEED_ORDER free-first vs model_pool._PROVIDER_RANK
+      first-party-first); and ~8 router files stacked reorder passes with no single
+      documented precedence. All three are now fixed: provider_policy.py pins an
+      explicit provider (pin + safe fallback), selection is power-first with
+      CANONICAL_SEED_ORDER demoted to historical fallback, and the single
+      precedence is documented in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and
+      locked by an invariant test.
 
-      The data/registry half is already consolidated (model_hierarchy ->
-      model_pool -> model_defaults, keys in api_keys) and is preserved. This
-      track fixes the decision half and the wiring gaps, converging on the
-      existing registries (no new truth store).
+      The data/registry half (model_hierarchy -> model_pool -> model_defaults,
+      keys in api_keys) was already consolidated and is preserved; this track
+      fixed the decision half and the wiring gaps, converging on the existing
+      registries (no new truth store).
 
       Four operator decisions are LOCKED (2026-06-21):
         1. Default selection = POWER-FIRST (most capable model by default; cost

@@ -248,24 +248,29 @@ to main through the normal review path before it is called shipped.
 ### Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
 
 **Track id:** `provider-routing-consolidation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-21 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-22 (TTL 21 days)
 **Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06
 **Owns surfaces:** dharma_swarm/providers.py, dharma_swarm/provider_policy.py, dharma_swarm/model_hierarchy.py, dharma_swarm/model_pool.py, dharma_swarm/model_defaults.py, dharma_swarm/runtime_provider.py, dharma_swarm/router_v1.py, dharma_swarm/smart_router.py, dharma_swarm/decision_router.py, docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md
 **Moves vital signs:** quality_gates, tool_coverage, cost_efficiency
 
 Operator directive 2026-06-21: consolidate the LLM provider/model routing
-subsystem into one coherent, malleable, intelligent router. After weeks of
-accretion the DECISION layer drifted: an explicit provider/model request is
-treated only as a constraint and never as a selection (agent_runner stores
-context["preferred_provider"] but provider_policy never reads it), two rank
-systems disagree (model_hierarchy.CANONICAL_SEED_ORDER is free-first while
-model_pool._PROVIDER_RANK is first-party-first), and ~8 router files stack
-~6 reorder passes with no single documented precedence.
+subsystem into one coherent, malleable, intelligent router. RESOLVED — all
+five stages landed on origin/main 2026-06-21; this records what was fixed,
+not open work. The DECISION layer had drifted: an explicit provider/model
+request was treated only as a constraint, not a selection (provider_policy
+did not read context["preferred_provider"]); the two rank systems disagreed
+(model_hierarchy.CANONICAL_SEED_ORDER free-first vs model_pool._PROVIDER_RANK
+first-party-first); and ~8 router files stacked reorder passes with no single
+documented precedence. All three are now fixed: provider_policy.py pins an
+explicit provider (pin + safe fallback), selection is power-first with
+CANONICAL_SEED_ORDER demoted to historical fallback, and the single
+precedence is documented in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and
+locked by an invariant test.
 
-The data/registry half is already consolidated (model_hierarchy ->
-model_pool -> model_defaults, keys in api_keys) and is preserved. This
-track fixes the decision half and the wiring gaps, converging on the
-existing registries (no new truth store).
+The data/registry half (model_hierarchy -> model_pool -> model_defaults,
+keys in api_keys) was already consolidated and is preserved; this track
+fixed the decision half and the wiring gaps, converging on the existing
+registries (no new truth store).
 
 Four operator decisions are LOCKED (2026-06-21):
   1. Default selection = POWER-FIRST (most capable model by default; cost
@@ -284,11 +289,12 @@ Precedence the router must follow, documented in one place:
 
 **Next items:**
 
-- [docs] (blocker) Author docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration (locked decisions).
-- [code] (blocker) Stage 1 keystone: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback).
-- [code] (blocker) Stage 2: unify the two rank systems into one power-first, first-party-preferred order.
-- [code] (blocker) Stage 3: wire z.ai/Zhipu as a first-party provider (enum + resolution + factory + ZhipuProvider).
-- [code] Stage 5: drift cleanup — AgentConfig default model, hardcoded literals, providers_extended.py dead code, env templates.
+- [docs] SHIPPED: docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration.
+- [code] SHIPPED (commit e7e0e55d): Stage 1 — provider_policy consults context['preferred_provider'] as SELECTION (pin + safe fallback).
+- [code] SHIPPED (commit 508be78f): Stage 2 — unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback.
+- [code] SHIPPED (commits ccffd12b/bf8ee7cf): Stage 3 — z.ai/Zhipu first-party provider (enum + resolution + factory + ZhipuProvider, default glm-5.2).
+- [code] SHIPPED (commit bc110d84): Stage 4 — single precedence locked with an invariant test.
+- [code] SHIPPED (commit 04711efb): Stage 5 — env templates + deferred drift recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 (AgentConfig.model literal, per-model config literals, providers_extended.py — scoped out, not blockers).
 
 **Non-goals:**
 
@@ -407,6 +413,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
+| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1050** | find . -name "*.md" -type f |
+| Markdown total lines | **246,831** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -416,6 +427,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
+| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1050** | find . -name "*.md" -type f |
+| Markdown total lines | **246,831** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **312,264** | wc -l across dharma_swarm Python modules |
@@ -425,6 +441,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
+| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1050** | find . -name "*.md" -type f |
+| Markdown total lines | **246,831** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -434,6 +455,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
+| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1050** | find . -name "*.md" -type f |
+| Markdown total lines | **246,831** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -443,6 +469,11 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
+| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1050** | find . -name "*.md" -type f |
+| Markdown total lines | **246,831** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
