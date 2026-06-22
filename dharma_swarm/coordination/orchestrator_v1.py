@@ -52,7 +52,13 @@ class MapElitesArchive:
 
     def consider(self, entry: ArchiveEntry) -> bool:
         """Insert if the cell is empty or the entry beats the incumbent. Returns
-        True iff it was archived (illuminated a new cell or improved one)."""
+        True iff it was archived (illuminated a new cell or improved one).
+
+        Contaminated/quarantined genomes are NEVER archived — not even into an
+        empty cell — so a quarantined run can never become an elite or a mutation
+        parent (the 'contaminated genomes are never promotable' invariant)."""
+        if entry.closeout_state == "contaminated_quarantine" or entry.fitness < 0:
+            return False
         key = entry.genome.behavioral_descriptors.bin_key()
         incumbent = self.cells.get(key)
         if incumbent is None or entry.fitness > incumbent.fitness:

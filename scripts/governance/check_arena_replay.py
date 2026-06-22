@@ -58,6 +58,8 @@ def check() -> list[str]:
         findings.append("scorer_hash diverged (scorer is not frozen)")
     if r1["task_manifest_hash"] != r2["task_manifest_hash"]:
         findings.append("task_manifest_hash diverged (frozen slice moved)")
+    if r1["sealed_oracle_hash"] != r2["sealed_oracle_hash"]:
+        findings.append("sealed_oracle_hash diverged (sealed labels drifted)")
     # Budget parity must be logged for the candidate AND every control (§6.3).
     for arm in (
         "candidate",

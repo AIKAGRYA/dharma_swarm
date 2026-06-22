@@ -110,9 +110,22 @@ class Council:
         """
         inputs_hash = request.inputs_hash()
         findings: list[str] = []
+        evaluator_families: set[str] = set()
+        source_families: set[str] = set()
+
+        def receipt(verdict: Verdict, *, quarantined: bool = False) -> CouncilReceipt:
+            return CouncilReceipt(
+                profile=ORCHESTRATION_TRACE_VERIFICATION,
+                genome_id=request.genome_id,
+                verdict=verdict,
+                inputs_hash=inputs_hash,
+                evaluator_families=tuple(sorted(evaluator_families)),
+                source_families=tuple(sorted(source_families)),
+                findings=tuple(findings),
+                quarantined=quarantined,
+            )
 
         # --- Source families: independent origins of evidence present in the request.
-        source_families: set[str] = set()
         if request.route_receipts:
             source_families.add("route_receipts")
         if request.trace_receipts:
@@ -123,53 +136,48 @@ class Council:
         # --- Evaluator family 1: contamination boundary (runs first; can quarantine).
         contamination_findings = list(request.contamination_findings)
         if request.untrusted or contamination_findings:
+            evaluator_families.add("contamination_boundary")
             findings.append("contamination_boundary:quarantine")
             findings.extend(f"contamination:{c}" for c in contamination_findings)
-            return CouncilReceipt(
-                profile=ORCHESTRATION_TRACE_VERIFICATION,
-                genome_id=request.genome_id,
-                verdict="quarantined",
-                inputs_hash=inputs_hash,
-                evaluator_families=("contamination_boundary",),
-                source_families=tuple(sorted(source_families)),
-                findings=tuple(findings),
-                quarantined=True,
-            )
+            return receipt("quarantined", quarantined=True)
 
-        evaluator_families: set[str] = {"contamination_boundary"}
+        evaluator_families.add("contamination_boundary")
         findings.append("contamination_boundary:clear")
 
         # --- Evaluator family 2: trace integrity (receipts present & consistent).
+        # Every receipt offered as evidence MUST carry the requested genome_id —
+        # a missing or mismatched id means the receipt is not tied to this genome
+        # and cannot corroborate it (it must not silently count toward the moat).
         if request.route_receipts or request.trace_receipts:
             evaluator_families.add("trace_integrity")
-            mismatches = [
+            bad = [
                 r.get("genome_id")
                 for r in (request.route_receipts + request.trace_receipts)
-                if r.get("genome_id") not in (None, request.genome_id)
+                if r.get("genome_id") != request.genome_id
             ]
-            if mismatches:
-                findings.append("trace_integrity:genome_id_mismatch")
-                return CouncilReceipt(
-                    profile=ORCHESTRATION_TRACE_VERIFICATION,
-                    genome_id=request.genome_id,
-                    verdict="refuted",
-                    inputs_hash=inputs_hash,
-                    evaluator_families=tuple(sorted(evaluator_families)),
-                    source_families=tuple(sorted(source_families)),
-                    findings=tuple(findings),
-                    quarantined=False,
-                )
+            if bad:
+                findings.append("trace_integrity:genome_id_missing_or_mismatch")
+                return receipt("refuted")
             findings.append("trace_integrity:consistent")
 
         # --- Evaluator family 3: evidence sufficiency (scorer output present).
         # The Council reads the scorer's verdict as evidence; it never recomputes
-        # correctness (correctness-authority split, spec §2).
-        if request.scorecard is not None:
+        # correctness (correctness-authority split, spec §2). The scorecard must be
+        # tied to THIS genome to be admissible evidence.
+        scorecard = request.scorecard
+        if scorecard is not None:
             evaluator_families.add("evidence_sufficiency")
+            scorecard_genome = scorecard.get("genome_id")
+            if scorecard_genome is not None and scorecard_genome != request.genome_id:
+                findings.append("evidence_sufficiency:scorecard_genome_mismatch")
+                return receipt("refuted")
             findings.append("evidence_sufficiency:scorecard_present")
 
         # --- Evaluator family 4: promotion claim ("this genome beat controls").
-        # Verifies the CLAIM against the scorer numbers — not the answers.
+        # Verifies the CLAIM against the SCORER EVIDENCE — not the claim's own
+        # self-asserted numbers. A stale/forged claim cannot be corroborated: the
+        # claimed candidate_score must match the scorecard the scorer produced for
+        # this genome (spec §2/§6 — the Council never trusts the claimant's word).
         claim = request.promotion_claim
         if claim is not None:
             evaluator_families.add("promotion_claim")
@@ -178,63 +186,32 @@ class Council:
             parity = bool(claim.get("budget_parity_logged", False))
             if cand is None or base is None:
                 findings.append("promotion_claim:missing_scores")
-                return CouncilReceipt(
-                    profile=ORCHESTRATION_TRACE_VERIFICATION,
-                    genome_id=request.genome_id,
-                    verdict="insufficient",
-                    inputs_hash=inputs_hash,
-                    evaluator_families=tuple(sorted(evaluator_families)),
-                    source_families=tuple(sorted(source_families)),
-                    findings=tuple(findings),
-                    quarantined=False,
-                )
+                return receipt("insufficient")
+            # The claim must be backed by scorer evidence, not asserted in a vacuum.
+            if scorecard is None:
+                findings.append("promotion_claim:no_scorer_evidence")
+                return receipt("insufficient")
+            scorer_score = _as_float(scorecard.get("score"))
+            if scorer_score is None or abs(scorer_score - cand) > 1e-9:
+                findings.append("promotion_claim:candidate_score_disagrees_with_scorer")
+                return receipt("refuted")
             if not parity:
                 # Beating best-single by spending more is theater (spec §3).
                 findings.append("promotion_claim:budget_parity_not_logged")
-                return CouncilReceipt(
-                    profile=ORCHESTRATION_TRACE_VERIFICATION,
-                    genome_id=request.genome_id,
-                    verdict="refuted",
-                    inputs_hash=inputs_hash,
-                    evaluator_families=tuple(sorted(evaluator_families)),
-                    source_families=tuple(sorted(source_families)),
-                    findings=tuple(findings),
-                    quarantined=False,
-                )
+                return receipt("refuted")
             if cand <= base:
                 findings.append("promotion_claim:not_supported(candidate<=baseline)")
-                return CouncilReceipt(
-                    profile=ORCHESTRATION_TRACE_VERIFICATION,
-                    genome_id=request.genome_id,
-                    verdict="refuted",
-                    inputs_hash=inputs_hash,
-                    evaluator_families=tuple(sorted(evaluator_families)),
-                    source_families=tuple(sorted(source_families)),
-                    findings=tuple(findings),
-                    quarantined=False,
-                )
+                return receipt("refuted")
             findings.append("promotion_claim:supported")
 
         # --- Final verdict by the decorrelated moat.
         if meets_decorrelation(evaluator_families, source_families):
-            verdict: Verdict = "corroborated"
             findings.append("decorrelation:met")
-        else:
-            verdict = "insufficient"
-            findings.append(
-                f"decorrelation:not_met(eval={len(evaluator_families)},src={len(source_families)})"
-            )
-
-        return CouncilReceipt(
-            profile=ORCHESTRATION_TRACE_VERIFICATION,
-            genome_id=request.genome_id,
-            verdict=verdict,
-            inputs_hash=inputs_hash,
-            evaluator_families=tuple(sorted(evaluator_families)),
-            source_families=tuple(sorted(source_families)),
-            findings=tuple(findings),
-            quarantined=False,
+            return receipt("corroborated")
+        findings.append(
+            f"decorrelation:not_met(eval={len(evaluator_families)},src={len(source_families)})"
         )
+        return receipt("insufficient")
 
 
 def _as_float(value: Any) -> Optional[float]:

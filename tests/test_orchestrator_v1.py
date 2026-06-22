@@ -69,11 +69,14 @@ def test_contaminated_genome_never_wins_a_cell():
     assert entry.closeout_state == "contaminated_quarantine"
     assert entry.fitness < 0  # floored: cannot win any MAP-Elites cell
     archive = MapElitesArchive()
-    assert archive.consider(entry) is True  # empty cell
-    # a clean genome with any real score displaces the contaminated incumbent
+    # A contaminated genome is NEVER archived — not even into an empty cell — so it
+    # can never become an elite or a mutation parent (Codex P2 fix).
+    assert archive.consider(entry) is False
+    assert archive.cells == {}
+    assert entry not in archive.elites()
+    # a clean genome with a real score IS archived into the (still-empty) cell
     clean = orch.evaluate(orch.seed_population()[0])
-    if clean.genome.behavioral_descriptors.bin_key() == entry.genome.behavioral_descriptors.bin_key():
-        assert archive.consider(clean) is True
+    assert archive.consider(clean) is True
 
 
 def test_evolve_writes_route_receipts_and_decision_packet(tmp_path):

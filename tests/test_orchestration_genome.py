@@ -86,6 +86,25 @@ def test_validation_rejects_unknown_subtask_dependency():
         g.validate_structure()
 
 
+def test_validation_rejects_cyclic_decomposition():
+    """The decomposition is a dependency DAG — a cycle must be rejected even when
+    every dependency name exists (Codex P2 fix)."""
+    g = _genome(
+        task_decomposition=[
+            Subtask(subtask_id="a", depends_on=["b"]),
+            Subtask(subtask_id="b", depends_on=["a"]),
+        ]
+    )
+    with pytest.raises(ValueError, match="dependency cycle"):
+        g.validate_structure()
+
+
+def test_validation_rejects_self_cycle():
+    g = _genome(task_decomposition=[Subtask(subtask_id="a", depends_on=["a"])])
+    with pytest.raises(ValueError, match="dependency cycle"):
+        g.validate_structure()
+
+
 def test_budget_parity_cap_enforced():
     g = _genome()  # total tokens = 2000
     g.validate_structure(budget_parity_cap=2000)  # exactly at cap is fine

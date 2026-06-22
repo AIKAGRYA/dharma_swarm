@@ -176,6 +176,9 @@ class ArenaRunner:
             )
         sealed_access = len(self.taskpack.sealed_access_log) - sealed_before
         scorecard = score_submission(self.taskpack, submission, arm=arm)
+        # Tie the scorecard to its genome so the Council can verify the scorer
+        # evidence belongs to THIS genome (not a borrowed/forged scorecard).
+        scorecard["genome_id"] = genome.genome_id
         return ArmResult(
             arm=arm,
             submission=submission,
@@ -345,6 +348,7 @@ class ArenaRunner:
             "task_pack_id": self.taskpack.task_manifest_hash(),
             "task_manifest_hash": self.taskpack.task_manifest_hash(),
             "scorer_hash": scorer_hash(),
+            "sealed_oracle_hash": self.taskpack.sealed_oracle_hash(),
             "candidate_genome_id": candidate.genome_id,
             "candidate_behavioral_descriptors": candidate.behavioral_descriptors.model_dump(),
             "arm_scores": {name: r.score for name, r in arms.items()},
@@ -387,6 +391,12 @@ class ArenaRunner:
             return "measured_negative"
         if not sig["significant"]:
             return "inconclusive_low_power"
+        # The Council must affirmatively CORROBORATE the trace + "beat controls"
+        # claim before a positive promotion. A refuted/insufficient verdict (e.g.
+        # from a stricter injected Council) blocks promotion even on a high score —
+        # the verifier's word gates the closeout, it is not advisory (spec §6).
+        if council_verdict != "corroborated":
+            return "blocked_with_evidence"
         return "positive_lift_candidate"
 
     def _power_index(

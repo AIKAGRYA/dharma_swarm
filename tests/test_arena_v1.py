@@ -174,6 +174,50 @@ def test_frozen_slice_boundary_holds():
     assert len(tp.tasks) == 24
 
 
+def test_non_corroborating_council_blocks_promotion():
+    """A high-scoring candidate must NOT be promoted if the Council does not
+    corroborate it (Codex P2 — require corroboration before promotion)."""
+    from dharma_swarm.council import Council, CouncilReceipt
+
+    class RefutingCouncil(Council):
+        def verify_orchestration_trace(self, request):
+            base = super().verify_orchestration_trace(request)
+            if base.quarantined:
+                return base
+            return CouncilReceipt(
+                profile=base.profile,
+                genome_id=base.genome_id,
+                verdict="insufficient",
+                inputs_hash=base.inputs_hash,
+                evaluator_families=base.evaluator_families,
+                source_families=base.source_families,
+                findings=base.findings,
+                quarantined=False,
+            )
+
+    run = ArenaRunner(council=RefutingCouncil()).run(_router_genome())
+    assert run["council_verdict"] == "insufficient"
+    assert run["closeout_state"] == "blocked_with_evidence"
+
+
+def test_sealed_oracle_hash_detects_label_drift():
+    """task_manifest_hash omits labels (candidates never see them), so a sealed
+    answer changing under an unchanged prompt is invisible to it — the
+    sealed_oracle_hash catches it (Codex P2 fix)."""
+    from dharma_swarm.coordination.arena.taskpack import ArenaTask
+
+    tp = Taskpack()
+    base_manifest = tp.task_manifest_hash()
+    base_oracle = tp.sealed_oracle_hash()
+    drifted_tasks = list(tp.tasks)
+    t0 = drifted_tasks[0]
+    drifted_tasks[0] = ArenaTask(t0.task_id, t0.family, t0.prompt, "DRIFTED")
+    drifted = Taskpack(tasks=tuple(drifted_tasks))
+    assert drifted.task_manifest_hash() == base_manifest  # prompt unchanged
+    assert drifted.sealed_oracle_hash() != base_oracle  # label drift caught
+    assert "DRIFTED" not in drifted.sealed_oracle_hash()  # never leaks a label
+
+
 def test_curator_next_epoch_is_a_documented_seam():
     with pytest.raises(NotImplementedError, match="throat"):
         TaskCurator(Taskpack()).promote_next_epoch()

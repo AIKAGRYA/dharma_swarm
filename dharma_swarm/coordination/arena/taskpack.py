@@ -112,6 +112,26 @@ class Taskpack:
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    def sealed_oracle_hash(self) -> str:
+        """SCORER-SIDE digest of the sealed labels (NOT exposed to candidates).
+
+        ``task_manifest_hash`` deliberately omits labels so candidates never see
+        them — but that means a corrected/altered sealed answer under an unchanged
+        public prompt would NOT change the manifest hash, hiding label drift from
+        replay/governance. This digest closes that gap: it pins the oracle's
+        answer key as part of the frozen scorer identity. It returns only a hash
+        (never the labels) and does not touch ``sealed_access_log`` because it is
+        scorer/governance identity, not a per-task candidate-path read.
+        """
+        payload = json.dumps(
+            {
+                "task_pack_id": TASK_PACK_ID,
+                "labels": {t.task_id: normalize_answer(t.answer) for t in self.tasks},
+            },
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
     # ------------------------------------------------------------------ scorer-only
     def sealed_label(self, task_id: str) -> str:
         """SCORER-ONLY. Reading this from the candidate path is contamination.

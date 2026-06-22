@@ -114,7 +114,41 @@ def test_trace_integrity_refutes_genome_id_mismatch():
         _full_request(route_receipts=[{"genome_id": "WRONG", "role": "planner"}])
     )
     assert receipt.verdict == "refuted"
-    assert any("genome_id_mismatch" in f for f in receipt.findings)
+    assert any("genome_id_missing_or_mismatch" in f for f in receipt.findings)
+
+
+def test_trace_integrity_refutes_receipt_missing_genome_id():
+    """A receipt with no genome_id is not tied to the requested genome and must
+    not silently corroborate it (Codex P2 — reject receipts that lack ids)."""
+    receipt = Council().verify_orchestration_trace(
+        _full_request(route_receipts=[{}], trace_receipts=[{}])
+    )
+    assert receipt.verdict == "refuted"
+
+
+def test_promotion_claim_refuted_when_scorecard_disagrees():
+    """A forged claim whose candidate_score disagrees with the scorer evidence is
+    refuted (Codex P1 — derive promotion scores from scorer evidence)."""
+    receipt = Council().verify_orchestration_trace(
+        _full_request(
+            scorecard={"genome_id": "genome-abc", "score": 0.40},
+            promotion_claim={
+                "candidate_score": 0.99,  # lies about the score
+                "baseline_score": 0.70,
+                "budget_parity_logged": True,
+            },
+        )
+    )
+    assert receipt.verdict == "refuted"
+    assert any("disagrees_with_scorer" in f for f in receipt.findings)
+
+
+def test_promotion_claim_refuted_when_scorecard_belongs_to_other_genome():
+    receipt = Council().verify_orchestration_trace(
+        _full_request(scorecard={"genome_id": "SOMEONE-ELSE", "score": 0.9})
+    )
+    assert receipt.verdict == "refuted"
+    assert any("scorecard_genome_mismatch" in f for f in receipt.findings)
 
 
 def test_council_cannot_assert_correctness_of_wrong_outcome():

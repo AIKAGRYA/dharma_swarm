@@ -217,6 +217,12 @@ class OrchestrationGenome(BaseModel):
                 if dep not in seen_sub:
                     raise ValueError(f"subtask {sub.subtask_id} depends on unknown {dep}")
 
+        # The decomposition is a dependency DAG — reject cycles so a non-DAG can
+        # never enter the arena/archive (descriptor depth is otherwise ill-defined).
+        cyclic = _first_cycle_subtask(self.task_decomposition)
+        if cyclic is not None:
+            raise ValueError(f"task_decomposition has a dependency cycle involving {cyclic}")
+
         if budget_parity_cap is not None:
             total = self.total_token_budget()
             if total > budget_parity_cap:
@@ -379,6 +385,43 @@ class OrchestrationGenome(BaseModel):
             stop_condition=(topo.metadata or {}).get("stop_condition", "budget-exhausted"),
         )
         return genome.with_descriptors()
+
+
+def _first_cycle_subtask(subtasks: list[Subtask]) -> Optional[str]:
+    """Return a subtask_id participating in a dependency cycle, or None if the
+    decomposition is a DAG. Iterative DFS with a recursion stack."""
+    by_id = {s.subtask_id: s for s in subtasks}
+    WHITE, GREY, BLACK = 0, 1, 2
+    color: dict[str, int] = {s.subtask_id: WHITE for s in subtasks}
+
+    def visit(start: str) -> Optional[str]:
+        stack: list[tuple[str, int]] = [(start, 0)]
+        while stack:
+            node, idx = stack[-1]
+            if idx == 0:
+                color[node] = GREY
+            sub = by_id.get(node)
+            deps = sub.depends_on if sub else []
+            if idx < len(deps):
+                stack[-1] = (node, idx + 1)
+                dep = deps[idx]
+                if dep not in by_id:
+                    continue
+                if color[dep] == GREY:  # back-edge -> cycle
+                    return dep
+                if color[dep] == WHITE:
+                    stack.append((dep, 0))
+            else:
+                color[node] = BLACK
+                stack.pop()
+        return None
+
+    for s in subtasks:
+        if color[s.subtask_id] == WHITE:
+            found = visit(s.subtask_id)
+            if found is not None:
+                return found
+    return None
 
 
 def _decomposition_depth(subtasks: list[Subtask]) -> int:
