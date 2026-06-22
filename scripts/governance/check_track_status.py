@@ -238,6 +238,30 @@ def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
     )
 
 
+def check_file_not_contains(file_path: str, pattern: str) -> CriterionResult:
+    """Assert a pattern is ABSENT from an existing file — a hardening predicate.
+
+    A missing file is a FAIL, not a pass: the absence cannot be verified, and a
+    "pass on missing file" would let anyone satisfy the criterion by deleting
+    the witness. Used to harden gameable proxies — e.g. a closure receipt must
+    NOT contain "VERDICT: NOT CLOSED", a witness must NOT cite an operator-local
+    "/Users/" path.
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="file_not_contains", passed=False,
+                                detail=f"{file_path} missing (cannot verify absence)")
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        found = bool(re.search(pattern, text))
+    except re.error:
+        found = pattern in text
+    return CriterionResult(
+        id="", kind="file_not_contains", passed=not found,
+        detail=f"pattern {pattern!r} {'PRESENT (fail)' if found else 'absent (ok)'} in {file_path}",
+    )
+
+
 def check_pr_merged(pr_number: int) -> CriterionResult:
     """Best-effort PR merge check via gh CLI. UNKNOWN does not fail."""
     if shutil.which("gh") is None:
@@ -276,7 +300,7 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                                       detail="malformed criterion: 'file' must be a non-empty string")
             else:
                 res = check_file_exists(crit["file"])
-        elif kind == "file_contains":
+        elif kind in ("file_contains", "file_not_contains"):
             if not isinstance(crit.get("file"), str) or not isinstance(crit.get("pattern"), str):
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: 'file' and 'pattern' must be "
@@ -284,8 +308,10 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
             elif not crit.get("file") or not crit.get("pattern"):
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: empty 'file' or 'pattern'")
-            else:
+            elif kind == "file_contains":
                 res = check_file_contains(crit["file"], crit["pattern"])
+            else:
+                res = check_file_not_contains(crit["file"], crit["pattern"])
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
         else:

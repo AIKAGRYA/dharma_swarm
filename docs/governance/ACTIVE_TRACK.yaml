@@ -274,10 +274,17 @@ active_tracks:
       - id: nats_master_spec_present
         kind: file_exists
         file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-      - id: nats_transport_landed
-        kind: file_contains
-        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-        pattern: "NATS"
+      # HARDENED 2026-06-22 (Opus 4.8 panel, unanimous): the prior
+      # `nats_transport_landed` grepped "NATS" inside a file *named* NATS — a
+      # tautology that cannot fail. Replaced with the track's real deliverable:
+      # the two declared owned-surface contact modules must actually exist.
+      # Honestly FAILS today (neither module has been created).
+      - id: nats_contact_module_exists
+        kind: file_exists
+        file: dharma_swarm/a2a/a2a_nats_contact.py
+      - id: nats_core_contact_module_exists
+        kind: file_exists
+        file: dharma_swarm/a2a/a2a_core_contact.py
 
     non_goals:
       - Do not introduce Redis or gRPC as part of this track.
@@ -335,18 +342,24 @@ active_tracks:
         pattern: "async def invoke_agent"
 
     completion_criteria:
-      - id: a2a_bridge_calls_spine
+      # HARDENED 2026-06-22 (Opus 4.8 panel, unanimous): the prior
+      # `*_calls_spine` criteria grepped the IMPORT line `from dharma_swarm.spine`
+      # and so passed on a DEAD import (agent_runner.py:61 imports invoke_agent
+      # but run_task never calls it). Hardened to require an actual non-comment
+      # `invoke_agent(` call site. orchestrator/a2a_bridge genuinely call it and
+      # still pass; agent_runner honestly FAILS (largest surface, unmigrated).
+      - id: a2a_bridge_invokes_agent
         kind: file_contains
         file: dharma_swarm/a2a/a2a_bridge.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: orchestrator_calls_spine
+        pattern: '(?m)^\s*[^#\n]*invoke_agent\('
+      - id: orchestrator_invokes_agent
         kind: file_contains
         file: dharma_swarm/orchestrator.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: agent_runner_calls_spine
+        pattern: '(?m)^\s*[^#\n]*invoke_agent\('
+      - id: agent_runner_invokes_agent
         kind: file_contains
         file: dharma_swarm/agent_runner.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
+        pattern: '(?m)^\s*[^#\n]*invoke_agent\('
       - id: dispatch_emits_evidence_receipt
         kind: file_contains
         file: tests/test_spine_adoption_dispatch.py
@@ -372,6 +385,14 @@ active_tracks:
         # observes a live receipt land (count moves; sha16 of the receipt JSON
         # recorded, checkable against the DB). Wires the non-proxy gate into
         # completion: the track cannot flip SHIPPABLE on file/test proxies alone.
+      # HARDENED 2026-06-22 (Opus 4.8 panel, unanimous): the witness must be
+      # reproducible from THIS repo, not an operator-local machine. The panel
+      # found GATE1 cited /Users/dhyana/.dharma/state/runtime.db — unverifiable.
+      # FAILS until the witnessed receipt is checkable from the repo tree.
+      - id: gate1_witness_repo_checkable
+        kind: file_not_contains
+        file: reports/governance/GATE1_WITNESSED.md
+        pattern: "/Users/"
 
     non_goals:
       - Do not create new spine sub-modules. Adopt invoke/receipt/routing/persistence.
@@ -454,9 +475,15 @@ active_tracks:
         kind: file_contains
         file: reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
         pattern: "never let internal artifacts touch archive fitness"
-      - id: loop1_closure_receipt_exists
-        kind: file_exists
+      # HARDENED 2026-06-22 (Opus 4.8 panel, unanimous): the prior
+      # `loop1_closure_receipt_exists` passed on file existence while the
+      # receipt body itself reads "VERDICT: NOT CLOSED" (the fresh proof wrote
+      # to a lane-local sandbox DB, not the canonical runtime.db make orient
+      # reads). Hardened to require the CLOSED verdict; honestly FAILS today.
+      - id: loop1_closure_verdict_closed
+        kind: file_contains
         file: reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
+        pattern: "VERDICT: CLOSED"
       - id: campaign_retrospective_exists
         kind: file_exists
         file: reports/loop_closure/RETROSPECTIVE.md
@@ -714,6 +741,14 @@ active_tracks:
       - id: composer_wake_witness_pending
         kind: file_exists
         file: reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
+      # HARDENED 2026-06-22 (Opus 4.8 panel, unanimous): the wake witness must
+      # be reproducible from THIS repo. The panel found every wake/receipt path
+      # under /Users/dhyana (operator's Mac) — non-reproducible, one-shot.
+      # FAILS until the unattended wake leaves a repo-checkable receipt.
+      - id: composer_wake_repo_checkable
+        kind: file_not_contains
+        file: reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
+        pattern: "/Users/"
 
     non_goals:
       - Do not create a new durable receipt store; project over spine.EvidenceReceipt.

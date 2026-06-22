@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-22T19:49:23+00:00",
+  "generated_at": "2026-06-22T20:02:31+00:00",
   "rubric": {
     "axes": [
       "wired",
@@ -40,8 +40,6 @@
       "runtime-truth-reconciliation-2026-06"
     ],
     "overstated": [
-      "composer-holon-spine-longrun-2026-06",
-      "runtime-truth-nats-2026-06",
       "truth-graph-platform-2026-06"
     ]
   },
@@ -73,8 +71,8 @@
     },
     {
       "id": "runtime-truth-nats-2026-06",
-      "file_grade": "2/2",
-      "file_shippable": true,
+      "file_grade": "1/3",
+      "file_shippable": false,
       "serves": "substrate-nativeness",
       "signoff_count": 3,
       "families": [
@@ -94,13 +92,11 @@
       "consensus_verdict": "OVERSTATED",
       "dissent": [],
       "attested_shippable": false,
-      "notes": [
-        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
-      ]
+      "notes": []
     },
     {
       "id": "runtime-truth-spine-adoption-2026-06",
-      "file_grade": "7/8",
+      "file_grade": "6/9",
       "file_shippable": false,
       "serves": "substrate-nativeness",
       "signoff_count": 3,
@@ -125,7 +121,7 @@
     },
     {
       "id": "loop-closure-2026-06",
-      "file_grade": "10/11",
+      "file_grade": "9/11",
       "file_shippable": false,
       "serves": "substrate-nativeness",
       "signoff_count": 3,
@@ -179,8 +175,8 @@
     },
     {
       "id": "composer-holon-spine-longrun-2026-06",
-      "file_grade": "6/6",
-      "file_shippable": true,
+      "file_grade": "6/7",
+      "file_shippable": false,
       "serves": "substrate-nativeness",
       "signoff_count": 3,
       "families": [
@@ -202,9 +198,7 @@
         "opus-run-C:IN_PROGRESS"
       ],
       "attested_shippable": false,
-      "notes": [
-        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
-      ]
+      "notes": []
     },
     {
       "id": "provider-routing-consolidation-2026-06",

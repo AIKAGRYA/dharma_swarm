@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-21T10:55:41+00:00 (schema v2)
-Active tracks: **7** (warn 5, max 10) — shippable 5
+Generated: 2026-06-22T20:01:35+00:00 (schema v2)
+Active tracks: **7** (warn 5, max 10) — shippable 3
 
 ## Spine coverage
 
@@ -30,7 +30,7 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
 
-## `runtime-truth-nats-2026-06` — SHIPPABLE
+## `runtime-truth-nats-2026-06` — 1/3
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/a2a_nats_contact.py', 'dharma_swarm/a2a/a2a_core_contact.py']
@@ -38,9 +38,10 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
 
   - ✓ `nats_master_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
   - ✓ `nats_master_spec_present` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
-  - ✓ `nats_transport_landed` (file_contains) — pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+  - ✗ `nats_contact_module_exists` (file_exists) — dharma_swarm/a2a/a2a_nats_contact.py MISSING
+  - ✗ `nats_core_contact_module_exists` (file_exists) — dharma_swarm/a2a/a2a_core_contact.py MISSING
 
-## `runtime-truth-spine-adoption-2026-06` — 7/8
+## `runtime-truth-spine-adoption-2026-06` — 6/9
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['dharma_swarm/spine/**', 'dharma_swarm/a2a/a2a_bridge.py', 'dharma_swarm/orchestrator.py', 'dharma_swarm/agent_runner.py', 'scripts/uplift_guards/check_spine_ownership.py']
@@ -48,16 +49,17 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
 
   - ✓ `spine_package_exists` (file_exists) — dharma_swarm/spine/__init__.py present
   - ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
-  - ✓ `a2a_bridge_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/a2a/a2a_bridge.py
-  - ✓ `orchestrator_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/orchestrator.py
-  - ✓ `agent_runner_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/agent_runner.py
+  - ✓ `a2a_bridge_invokes_agent` (file_contains) — pattern '(?m)^\\s*[^#\\n]*invoke_agent\\(' found in dharma_swarm/a2a/a2a_bridge.py
+  - ✓ `orchestrator_invokes_agent` (file_contains) — pattern '(?m)^\\s*[^#\\n]*invoke_agent\\(' found in dharma_swarm/orchestrator.py
+  - ✗ `agent_runner_invokes_agent` (file_contains) — pattern '(?m)^\\s*[^#\\n]*invoke_agent\\(' NOT FOUND in dharma_swarm/agent_runner.py
   - ✓ `dispatch_emits_evidence_receipt` (file_contains) — pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py
   - ✓ `zero_dropoff_sources` (file_contains) — pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py
   - ✗ `bypass_allowlist_empty` (file_contains) — pattern '(?m)^_INTENTIONAL_BYPASS: dict\\[tuple\\[str, int\\], str\\] = \\{\\s*\\}' NOT FOUND in scripts/governance/spine_bypass_report.py
   - ✓ `adoption_narrative_docs` (file_exists) — docs/architecture/SPINE_ADOPTION_NARRATIVE.md present
   - ✓ `gate1_witnessed` (file_exists) — reports/governance/GATE1_WITNESSED.md present
+  - ✗ `gate1_witness_repo_checkable` (file_not_contains) — pattern '/Users/' PRESENT (fail) in reports/governance/GATE1_WITNESSED.md
 
-## `loop-closure-2026-06` — 10/11
+## `loop-closure-2026-06` — 9/11
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['reports/loop_closure/**', 'CYBERNETIC_LOOP_MAP.md']
@@ -68,7 +70,7 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `phase0_dossier_exists` (file_exists) — reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md present
   - ✓ `phase0_fresh_status_table` (file_contains) — pattern 'Fresh 13-loop status table' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
   - ✓ `one_wire_invariant_stated` (file_contains) — pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md
-  - ✓ `loop1_closure_receipt_exists` (file_exists) — reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present
+  - ✗ `loop1_closure_verdict_closed` (file_contains) — pattern 'VERDICT: CLOSED' NOT FOUND in reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md
   - ✗ `campaign_retrospective_exists` (file_exists) — reports/loop_closure/RETROSPECTIVE.md MISSING
   - ✓ `cybernetics_codex_manifest_registered` (file_contains) — pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml
   - ✓ `cybernetics_codex_seed_exists` (file_exists) — docs/agents/cybernetics_codex/agent.seed.yaml present
@@ -102,7 +104,7 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
 
-## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
+## `composer-holon-spine-longrun-2026-06` — 6/7
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06'] · depends_on: ['runtime-truth-spine-adoption-2026-06'] · conflicts_with: []
 - owned_surfaces: ['docs/sovereign_holons/**', 'reports/sovereign_holons/**', 'dharma_swarm/holon_*.py', 'scripts/holon_*.py', 'tests/test_holon_*.py']
@@ -117,6 +119,7 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
+  - ✗ `composer_wake_repo_checkable` (file_not_contains) — pattern '/Users/' PRESENT (fail) in reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
 
 ## `provider-routing-consolidation-2026-06` — SHIPPABLE
 
@@ -141,9 +144,9 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
-- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
+- **INFO** `track-in-progress:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 1/3 completion criteria pass.
+- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 6/9 completion criteria pass.
+- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 9/11 completion criteria pass.
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-in-progress:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] 6/7 completion criteria pass.
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 7 completion criteria pass — SHIPPABLE; close it (and optionally open the next).

@@ -42,6 +42,16 @@ DISCLAIMER — all three still agree the claim does **not** hold).
 
 ---
 
+> **HARDENING APPLIED 2026-06-22.** The 5 gameable criteria below were
+> converted to content/witness checks in `ACTIVE_TRACK.yaml` (new ids, so no
+> false regression), and `check_track_status.py` gained a `file_not_contains`
+> predicate. Result: the deterministic gate now AGREES with the panel for 4 of
+> the 5 — `nats` 2/2→1/3, `spine-adoption` 7/8→6/9, `loop-closure` 10/11→9/11,
+> `composer-holon` 6/6→6/7 (nats and composer-holon are no longer file-green).
+> `truth-graph` still reads 15/15 because its gap is "did the live NATS demo
+> actually run" — not expressible as a file check; the Opus-4.8 quorum remains
+> its backstop.
+
 ## Systemic finding — the gate is gameable (unanimous)
 
 All three runs independently flagged the same proxy/gamed/false criteria where

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T10:55:41+00:00",
+  "generated_at": "2026-06-22T20:01:35+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 7,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 5
+    "shippable": 3
   },
   "spine_objectives": [
     {
@@ -275,11 +275,11 @@
       "verified_at": "2026-06-07",
       "ttl_days": 21,
       "owner": "@codex",
-      "shippable": true,
+      "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 2,
-        "total": 2
+        "passed": 1,
+        "total": 3
       },
       "criteria": [
         {
@@ -295,10 +295,16 @@
           "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present"
         },
         {
-          "id": "nats_transport_landed",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"
+          "id": "nats_contact_module_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "dharma_swarm/a2a/a2a_nats_contact.py MISSING"
+        },
+        {
+          "id": "nats_core_contact_module_exists",
+          "kind": "file_exists",
+          "passed": false,
+          "detail": "dharma_swarm/a2a/a2a_core_contact.py MISSING"
         }
       ]
     },
@@ -330,8 +336,8 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 7,
-        "total": 8
+        "passed": 6,
+        "total": 9
       },
       "criteria": [
         {
@@ -347,22 +353,22 @@
           "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py"
         },
         {
-          "id": "a2a_bridge_calls_spine",
+          "id": "a2a_bridge_invokes_agent",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py"
+          "detail": "pattern '(?m)^\\\\s*[^#\\\\n]*invoke_agent\\\\(' found in dharma_swarm/a2a/a2a_bridge.py"
         },
         {
-          "id": "orchestrator_calls_spine",
+          "id": "orchestrator_invokes_agent",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
+          "detail": "pattern '(?m)^\\\\s*[^#\\\\n]*invoke_agent\\\\(' found in dharma_swarm/orchestrator.py"
         },
         {
-          "id": "agent_runner_calls_spine",
+          "id": "agent_runner_invokes_agent",
           "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
+          "passed": false,
+          "detail": "pattern '(?m)^\\\\s*[^#\\\\n]*invoke_agent\\\\(' NOT FOUND in dharma_swarm/agent_runner.py"
         },
         {
           "id": "dispatch_emits_evidence_receipt",
@@ -393,6 +399,12 @@
           "kind": "file_exists",
           "passed": true,
           "detail": "reports/governance/GATE1_WITNESSED.md present"
+        },
+        {
+          "id": "gate1_witness_repo_checkable",
+          "kind": "file_not_contains",
+          "passed": false,
+          "detail": "pattern '/Users/' PRESENT (fail) in reports/governance/GATE1_WITNESSED.md"
         }
       ]
     },
@@ -420,7 +432,7 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 10,
+        "passed": 9,
         "total": 11
       },
       "criteria": [
@@ -455,10 +467,10 @@
           "detail": "pattern 'never let internal artifacts touch archive fitness' found in reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md"
         },
         {
-          "id": "loop1_closure_receipt_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md present"
+          "id": "loop1_closure_verdict_closed",
+          "kind": "file_contains",
+          "passed": false,
+          "detail": "pattern 'VERDICT: CLOSED' NOT FOUND in reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md"
         },
         {
           "id": "campaign_retrospective_exists",
@@ -682,11 +694,11 @@
       "verified_at": "2026-06-11",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
+      "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 6,
-        "total": 6
+        "total": 7
       },
       "criteria": [
         {
@@ -742,6 +754,12 @@
           "kind": "file_exists",
           "passed": true,
           "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
+        },
+        {
+          "id": "composer_wake_repo_checkable",
+          "kind": "file_not_contains",
+          "passed": false,
+          "detail": "pattern '/Users/' PRESENT (fail) in reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md"
         }
       ]
     },
@@ -873,20 +891,20 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-in-progress:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] 1/3 completion criteria pass.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-in-progress:runtime-truth-spine-adoption-2026-06",
-      "message": "[runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.",
+      "message": "[runtime-truth-spine-adoption-2026-06] 6/9 completion criteria pass.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 10/11 completion criteria pass.",
+      "message": "[loop-closure-2026-06] 9/11 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -897,8 +915,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] 6/7 completion criteria pass.",
       "criterion_id": null
     },
     {
