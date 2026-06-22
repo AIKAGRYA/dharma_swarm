@@ -307,7 +307,7 @@ Precedence the router must follow, documented in one place:
 **Track id:** `seeing-organ-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
 **Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-21 (TTL 21 days)
 **Relations:** complements: loop-closure-2026-06, runtime-truth-reconciliation-2026-06
-**Owns surfaces:** dharma_swarm/world_radar/safety.py, dharma_swarm/world_radar/frontier_council.py, dharma_swarm/world_radar/sensemaking.py, dharma_swarm/world_radar/proposal.py, scripts/governance/check_world_quarantine.py, scripts/governance/check_world_sensemaking_closure.py, tests/test_world_radar_safety.py, tests/test_frontier_council.py, docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md
+**Owns surfaces:** dharma_swarm/world_radar/safety.py, dharma_swarm/world_radar/frontier_council.py, dharma_swarm/world_radar/warrant_handoff.py, dharma_swarm/world_radar/sensemaking.py, dharma_swarm/world_radar/proposal.py, scripts/governance/check_world_quarantine.py, scripts/governance/check_frontier_council_replay.py, scripts/governance/check_world_warrant_handoff.py, scripts/governance/run_world_signal_seed_batch.py, scripts/governance/run_world_signal_seed_batch_live.py, scripts/governance/check_world_sensemaking_closure.py, tests/test_world_radar_safety.py, tests/test_frontier_council.py, tests/test_world_warrant_handoff.py, docs/architecture/SENSEMAKING_ORGAN.md, docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md
 **Moves vital signs:** eval_coverage, tool_coverage, memory_persistence
 
 Operator directive 2026-06-21: before Dharma Swarm pushes outward, build
@@ -336,8 +336,8 @@ Full design: docs/vision_maps/2026-06-21_seeing_organ_master_synthesis.md.
 **Next items:**
 
 - [code] (blocker) Stage 0: safety substrate (world_radar/safety.py) + adversarial test + check_world_quarantine.py — instruction/data separation by construction. SHIPPED (PR-1).
-- [code] (blocker) Stage 1: Frontier Council verifier — cross-falsify across >=2 decorrelated model families + a steelman/refuter -> WorldSensemakingReceipt (corroboration metric), env-gated off by default, bounded-replay closure check.
-- [code] (blocker) Stage 2: Shakti reads the world READ-ONLY (warrant-pressure world-driven, DISPATCH_AUTHORITY unchanged).
+- [code] (blocker) Stage 1: Frontier Council verifier — cross-falsify across >=2 decorrelated model families + a steelman/refuter -> WorldSensemakingReceipt (corroboration metric), env-gated off by default, bounded-replay closure check. SHIPPED (PR-2).
+- [code] (blocker) Stage 2: Shakti reads the world READ-ONLY — corroborated receipts -> advisory WorldWarrantPressure (warrant_handoff.py), DISPATCH_AUTHORITY unchanged, bounded-replay closure check (WORLD_WARRANT_HANDOFF=pass). SHIPPED.
 - [code] Stage 3: WorldProposal (source/specialist/track/tool) -> existing Memory-Kernel/telos gates with 24h incubation + blast-radius-graded evidence. The first guarded motor neuron.
 - [code] Stage 4-5: World Pulse + Sensemaking Health read-only dashboards; then the self-improvement gym (corroborated signals -> scorable tasks -> DarwinEngine eval/RL).
 
