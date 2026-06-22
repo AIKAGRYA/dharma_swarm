@@ -1,0 +1,17 @@
+{
+  "schema": "dharma_track_signoff.v1",
+  "grader": "opus-run-C",
+  "model_family": "claude-opus",
+  "model": "claude-opus-4-8",
+  "timestamp": "2026-06-22T17:07:00+00:00",
+  "method": "independent Opus 4.8 review (run C of 3) — criterion-by-criterion repo verification; 5-axis grade + audit in one pass",
+  "tracks": {
+    "runtime-truth-reconciliation-2026-06": {"axes": {"wired": 3, "proven": 3, "live": 3, "world_class": 2, "balanced": 1}, "verdict": "SHIPPABLE"},
+    "runtime-truth-nats-2026-06": {"axes": {"wired": 0, "proven": 0, "live": 0, "world_class": 1, "balanced": 1}, "verdict": "OVERSTATED"},
+    "runtime-truth-spine-adoption-2026-06": {"axes": {"wired": 2, "proven": 3, "live": 1, "world_class": 2, "balanced": 1}, "verdict": "IN_PROGRESS"},
+    "loop-closure-2026-06": {"axes": {"wired": 1, "proven": 2, "live": 1, "world_class": 2, "balanced": 1}, "verdict": "IN_PROGRESS"},
+    "truth-graph-platform-2026-06": {"axes": {"wired": 2, "proven": 3, "live": 2, "world_class": 2, "balanced": 1}, "verdict": "IN_PROGRESS"},
+    "composer-holon-spine-longrun-2026-06": {"axes": {"wired": 2, "proven": 3, "live": 2, "world_class": 2, "balanced": 1}, "verdict": "IN_PROGRESS"},
+    "provider-routing-consolidation-2026-06": {"axes": {"wired": 3, "proven": 3, "live": 2, "world_class": 3, "balanced": 1}, "verdict": "SHIPPABLE"}
+  }
+}
