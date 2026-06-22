@@ -1,0 +1,137 @@
+{
+  "schema": "dharma_track_audit.v1",
+  "auditor": "audit-sonnet",
+  "model_family": "claude-sonnet",
+  "timestamp": "2026-06-22T16:12:00+00:00",
+  "lens": "audit-level critical review of each track's completion claims; every criterion classified SUBSTANTIVE/PROXY/GAMED/FALSE with materiality; per-track audit opinion CLEAN/QUALIFIED/ADVERSE/DISCLAIMER",
+  "tracks": {
+    "runtime-truth-reconciliation-2026-06": {
+      "audit_opinion": "CLEAN",
+      "completion_claim_holds": true,
+      "flagged_criteria": [],
+      "material_findings": [
+        "frozen+slots RuntimeTruthPacket with __post_init__ enforcing is_authoritative=False; RuntimeTruthState StrEnum with 23 axis values; no-write test SHA-256s owner files before/after; A2A single-persistence test uses a real SQLite store and asserts len==1 on double-submit. 31 tests pass.",
+        "All proxy checks are appropriate regression guards, not coverage gaps. The 3 open next_items are aspirational, not contradictions."
+      ],
+      "to_legitimately_complete": ["Legitimately SHIPPABLE as declared. No material gaps."]
+    },
+    "runtime-truth-nats-2026-06": {
+      "audit_opinion": "ADVERSE",
+      "completion_claim_holds": false,
+      "flagged_criteria": [
+        {"id": "nats_transport_landed", "status": "GAMED", "note": "greps 'NATS' inside NATS_SUBSTRATE_MASTER_SPEC.md — tautologically true; proves nothing about implementation"},
+        {"id": "nats_master_spec_present", "status": "PROXY", "note": "duplicates the prerequisite; proves only a doc exists"}
+      ],
+      "material_findings": [
+        "Both declared owned surfaces a2a_nats_contact.py and a2a_core_contact.py are MISSING from the repo.",
+        "Spec header itself disclaims liveness: 'not live until a JetStream health probe and ack-bearing hot-contact receipt exist.'",
+        "Actual NATS code (nats_transport.py, operator_core/ingest_nats.py, nats_live_contact.py) is OUTSIDE the track's owned_surfaces.",
+        "The sole next_item is the entire substantive deliverable and is openly unfinished."
+      ],
+      "to_legitimately_complete": [
+        "Create a2a_nats_contact.py and a2a_core_contact.py (or repoint owned_surfaces to nats_transport.py).",
+        "Wire both into A2A dispatch with end-to-end receipt emission.",
+        "Add criteria verifying files exist AND a JetStream health probe is green AND a real ack-bearing receipt is emitted.",
+        "Run the live contact proof against a running NATS broker."
+      ]
+    },
+    "runtime-truth-spine-adoption-2026-06": {
+      "audit_opinion": "ADVERSE",
+      "completion_claim_holds": false,
+      "flagged_criteria": [
+        {"id": "a2a_bridge_calls_spine", "status": "PROXY", "note": "ingest_trishula_inbox() at a2a_bridge.py:307 calls _server.submit() directly — Slice 2 bypass"},
+        {"id": "orchestrator_calls_spine", "status": "PROXY", "note": "dispatch gated behind DHARMA_SPINE_DISPATCH=='1' — default OFF (orchestrator.py:~2382)"},
+        {"id": "agent_runner_calls_spine", "status": "PROXY", "note": "import is dead; run_task() never calls invoke_agent; narrative says 'Not adopted'"},
+        {"id": "dispatch_emits_evidence_receipt", "status": "PROXY", "note": "tests exercise only submit_via_spine, not the default production path"},
+        {"id": "zero_dropoff_sources", "status": "PROXY", "note": "passes because bypass sites are ACCOUNTED FOR, not empty; misleading test name"},
+        {"id": "bypass_allowlist_empty", "status": "FALSE", "note": "_INTENTIONAL_BYPASS has 5 live entries; criterion correctly FAILS in evidence"},
+        {"id": "gate1_witnessed", "status": "DISCLAIMER", "note": "DB path /Users/dhyana/...; not reproducible from repo; file admits it could be hand-written"}
+      ],
+      "material_findings": [
+        "Core claim 'every production dispatch flows through invoke_agent' is false: orchestrator default-OFF, agent_runner unwired, 5 live bypasses (a2a_bridge.py:307, node_gateway.py:322, node_gateway.py:432, a2a_client.py:361, nats_transport.py:301).",
+        "Import-line criteria pass on dead/conditional imports, not live dispatch.",
+        "SPINE_ADOPTION_NARRATIVE.md is honest about incompleteness, yet its existence satisfies a criterion."
+      ],
+      "to_legitimately_complete": [
+        "Wire ingest_trishula_inbox() through invoke_agent (Slice 2).",
+        "Flip DHARMA_SPINE_DISPATCH default ON or route unconditionally.",
+        "Migrate agent_runner.run_task() through invoke_agent().",
+        "Drain _INTENTIONAL_BYPASS to {}.",
+        "Replace import-line criteria with checks that verify dispatch sites actually call invoke_agent; test the default path."
+      ]
+    },
+    "loop-closure-2026-06": {
+      "audit_opinion": "ADVERSE",
+      "completion_claim_holds": false,
+      "flagged_criteria": [
+        {"id": "loop1_closure_receipt_exists", "status": "PROXY", "note": "LOOP1_CLOSURE_RECEIPT.md content says 'VERDICT: NOT CLOSED'; criterion passes on file existence only"},
+        {"id": "campaign_retrospective_exists", "status": "FALSE", "note": "RETROSPECTIVE.md missing; correctly FAILS"}
+      ],
+      "material_findings": [
+        "Loop 1 receipt explicitly says NOT CLOSED (proof wrote to a lane-sandbox DB, not canonical runtime.db).",
+        "Loops 2-11 are PARTIAL with no closure receipts; Loops 12-13 BLOCKED behind One Wire quorum (currently N=3/5, M=1/3).",
+        "Phase 1a (typed provider failure classes) and the real provider key are open BLOCKERs.",
+        "Most passing criteria concern the cybernetics_codex persona (status declared_not_started), orthogonal to 'wire all 13 loops'."
+      ],
+      "to_legitimately_complete": [
+        "Close Loop 1 against canonical runtime.db with an unambiguous PASSED receipt.",
+        "Complete Phase 1a typed failure classes; obtain a real provider key.",
+        "Wire Loops 2-11 sense->...->adapt with real data + receipts; reach One Wire quorum before 12-13.",
+        "Write RETROSPECTIVE.md.",
+        "Change loop1 criterion to assert 'VERDICT: CLOSED' content, not file existence."
+      ]
+    },
+    "truth-graph-platform-2026-06": {
+      "audit_opinion": "QUALIFIED",
+      "completion_claim_holds": false,
+      "flagged_criteria": [
+        {"id": "nats_e2e_demo_exists", "status": "PROXY", "note": "nats_e2e_receipt.json was hand-authored and committed in commit 936d365, not generated by a live broker; demo fails connection-refused here"}
+      ],
+      "material_findings": [
+        "Core implementation is genuine and tested (22/22): receipt gate with on-disk quarantine, agent presence RED/GREEN staleness (age>2h), OrientationPacket, write_repo_context with idempotency.",
+        "SHIPPABLE claim is wrong only because the two BLOCKER next_items remain open and the NATS proof is pre-staged rather than earned."
+      ],
+      "to_legitimately_complete": [
+        "Run a live NATS broker, execute the e2e demo twice, replace the hand-authored receipt with the real generated one.",
+        "Clear next_item #1 (commit/confirm repo_context artifacts) and next_item #2 (live NATS round-trip) in ACTIVE_TRACK.yaml."
+      ]
+    },
+    "composer-holon-spine-longrun-2026-06": {
+      "audit_opinion": "ADVERSE",
+      "completion_claim_holds": false,
+      "flagged_criteria": [
+        {"id": "readiness_packet_exists", "status": "PROXY", "note": "packet self-states 'confidence-lift packet, not a launch receipt'; B-A3/B-A14 NOT closed"},
+        {"id": "frozen_verifier_runbook_present", "status": "PROXY", "note": "runbook exists as text; blocker #1 'run verifier set and publish output' not done"},
+        {"id": "composer_wake_witness_pending", "status": "PROXY", "note": "one-shot only; receipts at /Users/dhyana/; blocker #2 not closed per the doc itself"}
+      ],
+      "material_findings": [
+        "All 4 declared blockers remain open per the track's own documents.",
+        "holon_runtime.py uses an injected plain Callable — no spine import, no invoke_agent, no EvidenceReceipt; depends_on spine-adoption is not enforced in code.",
+        "living_agent_kernel import error (READINESS_VERDICT blocker #1: 'bridge fails on first import') unresolved; lane not reconciled to GitHub main.",
+        "In-repo genuine: holon_runtime.py, test_holon_bridge.py (29 pass/1 skip), test_holon_runtime.py."
+      ],
+      "to_legitimately_complete": [
+        "Run the frozen Build A verifier set and publish PASS output.",
+        "Resolve living_agent_kernel import; fix holon_bridge import chain.",
+        "Prove unattended fable+codex wakes with repo-verifiable EvidenceReceipt-profile receipts (not /Users/dhyana/).",
+        "Wire holon_runtime.py through invoke_agent() to honor the depends_on in code.",
+        "Reconcile the lane to GitHub main; require a PASSED verifier artifact in criteria."
+      ]
+    },
+    "provider-routing-consolidation-2026-06": {
+      "audit_opinion": "QUALIFIED",
+      "completion_claim_holds": true,
+      "flagged_criteria": [],
+      "material_findings": [
+        "Keystone genuinely fixed: _coerce_provider(context['preferred_provider']) pins at chain position 0 and short-circuits re-ranking (provider_policy.py:~251); power_first default True sorts by intelligence_order; ZhipuProvider fully wired (models.py enum, providers.py class -> api.z.ai, runtime_provider.py factory:475,571). 8 explicit-wins tests pass.",
+        "Partial-but-honest: _PROVIDER_RANK (model_pool) and CANONICAL_SEED_ORDER (model_hierarchy) still coexist; power_first overrides at routing time but the old structure was not deleted (documented as historical fallback).",
+        "No criterion verifies the live production call path (agent_runner -> ProviderPolicyRouter) exercises the new selection; unit tests prove router logic in isolation. Stage 5 drift cleanup appropriately deferred."
+      ],
+      "to_legitimately_complete": [
+        "Legitimately SHIPPABLE for declared scope.",
+        "Add an e2e production-path test (explicit request reaches ProviderPolicyRouter and pins).",
+        "Schedule Stage 2 full rank unification and Stage 5 drift cleanup as a follow-on."
+      ]
+    }
+  }
+}
