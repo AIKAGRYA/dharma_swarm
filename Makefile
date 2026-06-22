@@ -374,7 +374,7 @@ operator-prod-smoke:
 # convergence). It is intentionally NOT a separate governance-all
 # dependency — running it once via uplift-guards is enough. The standalone
 # `make spine-check` target stays as an operator-convenience alias only.
-governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity
+governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity criterion-lint
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"

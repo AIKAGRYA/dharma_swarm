@@ -65,3 +65,21 @@ make track-health ENFORCE=1  # fail if a file-green track is not quorum-attested
 A track may be closed on the file-grade only when the Opus 4.8+ panel **attests**
 it (quorum met, claim holds). A file-green track with no attesting quorum is
 PROVISIONAL; a file-green track the panel withholds is OVERSTATED.
+
+## The governance toolchain (4 read-models, one feed)
+
+All are stdlib-only, read-only projections under `scripts/governance/`. None
+owns truth; each projects from an existing owner.
+
+| Command | Tool | What it answers | Output |
+|---|---|---|---|
+| `check_track_status.py` | presence gate | do the declared criteria pass? (now incl. `file_not_contains`) | `active_track_evidence.json` |
+| `make track-health` | `track_health_grade.py` | does the Opus-4.8 quorum *attest* the claim? | `track_health.{json,md}` |
+| `make criterion-lint` | `criterion_lint.py` | would each criterion, if it passed, actually prove the capability? (gameability) | `criterion_lint.{json,md}` |
+| `make track-coherence` | `track_coherence.py` | **one fused per-track + per-umbrella view** of all of the above + spine coverage | `track_coherence.{json,md}` |
+
+For a coherence cockpit, consume **`reports/governance/track_coherence.json`** —
+it carries each track's `coherence_state` (CLOSE_READY / OVERSTATED / STALE /
+IN_PROGRESS), the umbrella rollup, and the uncovered spine objectives, so the
+cockpit doesn't re-join the four upstream feeds. `make track-coherence` refreshes
+the whole chain. `criterion-lint` also runs (advisory) inside `make governance-all`.
