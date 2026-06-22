@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-06-22T20:48:50+00:00",
+  "summary": {
+    "high": 2,
+    "med": 0,
+    "tracks": 7
+  },
+  "per_track": {
+    "runtime-truth-reconciliation-2026-06": {
+      "criteria": 11,
+      "smells": 0,
+      "high": 0
+    },
+    "runtime-truth-nats-2026-06": {
+      "criteria": 3,
+      "smells": 2,
+      "high": 2
+    },
+    "runtime-truth-spine-adoption-2026-06": {
+      "criteria": 9,
+      "smells": 0,
+      "high": 0
+    },
+    "loop-closure-2026-06": {
+      "criteria": 11,
+      "smells": 0,
+      "high": 0
+    },
+    "truth-graph-platform-2026-06": {
+      "criteria": 15,
+      "smells": 0,
+      "high": 0
+    },
+    "composer-holon-spine-longrun-2026-06": {
+      "criteria": 7,
+      "smells": 0,
+      "high": 0
+    },
+    "provider-routing-consolidation-2026-06": {
+      "criteria": 7,
+      "smells": 0,
+      "high": 0
+    }
+  },
+  "smells": [
+    {
+      "track": "runtime-truth-nats-2026-06",
+      "criterion": "owned_surface:dharma_swarm/a2a/a2a_nats_contact.py",
+      "smell": "missing_owned_surface",
+      "severity": "HIGH",
+      "detail": "declared owned surface 'dharma_swarm/a2a/a2a_nats_contact.py' does not exist on disk"
+    },
+    {
+      "track": "runtime-truth-nats-2026-06",
+      "criterion": "owned_surface:dharma_swarm/a2a/a2a_core_contact.py",
+      "smell": "missing_owned_surface",
+      "severity": "HIGH",
+      "detail": "declared owned surface 'dharma_swarm/a2a/a2a_core_contact.py' does not exist on disk"
+    }
+  ]
+}

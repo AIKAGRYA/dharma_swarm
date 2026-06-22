@@ -414,6 +414,14 @@ track-health:
 	-$(PYTHON) scripts/governance/check_track_status.py
 	$(PYTHON) scripts/governance/track_health_grade.py $(if $(ENFORCE),--enforce,)
 
+# Criterion smell linter: static hygiene over ACTIVE_TRACK.yaml completion
+# criteria — would each criterion, if it passed, actually prove the capability?
+# Catches tautological greps, dead-import checks, missing owned surfaces,
+# operator-local paths, and presence-proxies for runtime claims. Advisory;
+# pass STRICT=1 to fail on any HIGH smell.
+criterion-lint:
+	$(PYTHON) scripts/governance/criterion_lint.py $(if $(STRICT),--strict,)
+
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
 # ============================================================================
