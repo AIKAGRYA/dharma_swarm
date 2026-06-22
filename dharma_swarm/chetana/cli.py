@@ -36,7 +36,6 @@ from .revival import (
     revival_summary,
 )
 from .staging import (
-    QUARANTINE_ROOT,
     STAGING_ROOT,
     TRUSTED_DEFAULT,
     list_quarantine,
@@ -248,7 +247,7 @@ def _cmd_approve(args: argparse.Namespace) -> int:
 
     if is_staged:
         # Move to trusted layer; remove staged copy
-        trusted_path = write_trusted(new_schema, body=body)
+        _trusted_path = write_trusted(new_schema, body=body)
         try:
             path.unlink()
         except OSError as e:
@@ -373,7 +372,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp_ing.add_argument("source", help="path or inline text")
     sp_ing.add_argument(
         "--kind",
-        choices=["session", "webclip", "pdf", "note", "wiki_extract", "voice", "external", "synthesis"],
+        choices=[
+            "session",
+            "webclip",
+            "pdf",
+            "document",
+            "note",
+            "wiki_extract",
+            "voice",
+            "external",
+            "synthesis",
+        ],
         default="note",
     )
     sp_ing.add_argument("--title", default=None)
