@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 
 import pytest
 
-from api.routers import chat as chat_router
 from dharma_swarm.models import ProviderType
 from dharma_swarm.provider_smoke import (
     _classify_error,
@@ -338,7 +338,8 @@ def test_probe_qwen_dashboard_reports_missing_config(monkeypatch) -> None:
 def test_probe_qwen_dashboard_collects_tool_calls_and_content(
     monkeypatch,
 ) -> None:
-    settings = chat_router.ChatRuntimeSettings(
+    active_chat_router = importlib.import_module("api.routers.chat")
+    settings = active_chat_router.ChatRuntimeSettings(
         provider=ProviderType.TOGETHER,
         api_key="together-key",
         base_url="https://api.together.xyz/v1",

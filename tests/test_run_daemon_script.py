@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 RUN_DAEMON_SCRIPT = Path(__file__).resolve().parents[1] / "run_daemon.sh"
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-21T03:25:48+00:00",
+  "generated_at": "2026-06-21T10:55:41+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -420,8 +420,8 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 4,
-        "total": 5
+        "passed": 10,
+        "total": 11
       },
       "criteria": [
         {
@@ -465,6 +465,42 @@
           "kind": "file_exists",
           "passed": false,
           "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING"
+        },
+        {
+          "id": "cybernetics_codex_manifest_registered",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'id: cybernetics_codex' found in ACTIVE_SURFACE_MANIFEST.yaml"
+        },
+        {
+          "id": "cybernetics_codex_seed_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/agent.seed.yaml present"
+        },
+        {
+          "id": "cybernetics_codex_soul_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/SOUL.md present"
+        },
+        {
+          "id": "cybernetics_codex_context_desk_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md present"
+        },
+        {
+          "id": "cybernetics_codex_audit_script_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/cybernetics_codex_audit.py present"
+        },
+        {
+          "id": "cybernetics_codex_registration_script_exists",
+          "kind": "file_exists",
+          "passed": true,
+          "detail": "scripts/governance/register_cybernetics_codex.py present"
         }
       ]
     },
@@ -830,12 +866,6 @@
       "criterion_id": null
     },
     {
-      "severity": "ERROR",
-      "check": "track-stale:runtime-truth-reconciliation-2026-06",
-      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
-      "criterion_id": null
-    },
-    {
       "severity": "INFO",
       "check": "track-shippable:runtime-truth-reconciliation-2026-06",
       "message": "[runtime-truth-reconciliation-2026-06] all 11 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
@@ -856,7 +886,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 4/5 completion criteria pass.",
+      "message": "[loop-closure-2026-06] 10/11 completion criteria pass.",
       "criterion_id": null
     },
     {
