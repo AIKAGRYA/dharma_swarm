@@ -743,7 +743,7 @@ active_tracks:
     name: Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
     status: ACTIVE
     opened_at: "2026-06-21"
-    verified_at: "2026-06-21"
+    verified_at: "2026-06-22"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -844,25 +844,32 @@ active_tracks:
       - Do not commit provider API keys or any credentials.
       - Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
 
+    # Stages 1-5 all landed on origin/main 2026-06-21; track is SHIPPABLE.
+    # (Reconciled 2026-06-22 — the items below were listed as open blockers
+    # after the work had already merged; corrected to reflect reality.)
     next_items:
       - id: 1
-        what: "Author docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration (locked decisions)."
+        what: "SHIPPED: docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration."
         kind: docs
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Stage 1 keystone: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback)."
+        what: "SHIPPED (commit e7e0e55d): Stage 1 — provider_policy consults context['preferred_provider'] as SELECTION (pin + safe fallback)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 3
-        what: "Stage 2: unify the two rank systems into one power-first, first-party-preferred order."
+        what: "SHIPPED (commit 508be78f): Stage 2 — unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback."
         kind: code
-        blocker: true
+        blocker: false
       - id: 4
-        what: "Stage 3: wire z.ai/Zhipu as a first-party provider (enum + resolution + factory + ZhipuProvider)."
+        what: "SHIPPED (commits ccffd12b/bf8ee7cf): Stage 3 — z.ai/Zhipu first-party provider (enum + resolution + factory + ZhipuProvider, default glm-5.2)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 5
-        what: "Stage 5: drift cleanup — AgentConfig default model, hardcoded literals, providers_extended.py dead code, env templates."
+        what: "SHIPPED (commit bc110d84): Stage 4 — single precedence locked with an invariant test."
+        kind: code
+        blocker: false
+      - id: 6
+        what: "SHIPPED (commit 04711efb): Stage 5 — env templates + deferred drift recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 (AgentConfig.model literal, per-model config literals, providers_extended.py — scoped out, not blockers)."
         kind: code
         blocker: false
 

@@ -4,7 +4,7 @@
 **Previous version:** 2026-05-04 (provenance-completion audit against `74d015c`)
 **Maintainer:** Guardian Crew (`guardian_crew.py`) — auto-updates every 4 hours
 **How to read this:** Severity = BLOCKER (crashes at runtime), DEGRADED (silent failure / wrong behavior), WARNING (structural smell).
-**Status:** All BLOCKERs resolved. 3 items remain (NEW-05 GUARDED, NEW-07/08 PARTIAL+) — actively monitored, not stale.
+**Status:** 1 OPEN BLOCKER — **NEW-14** (world-model loop ↔ `WorldModelAgent` API mismatch; crashes the world-model loop on every daemon boot). A fix exists on an unmerged branch (commit `76f72204`) but is NOT on `main`. The 3 *original* BLOCKERs are resolved; 3 DEGRADED/PARTIAL items also remain (MM-05 resolved; NEW-05 GUARDED, NEW-07/08 PARTIAL+) — actively monitored, not stale. (Reconciled 2026-06-22 against HEAD; the standalone "All BLOCKERs resolved" line was stale.)
 
 ---
 

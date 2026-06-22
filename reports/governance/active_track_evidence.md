@@ -2,6 +2,8 @@
 
 Generated: 2026-06-23T23:39:22+09:00 (schema v2)
 Active tracks: **8** (warn 5, max 10) — shippable 6
+Generated: 2026-06-22T23:31:34+00:00 (schema v2)
+Active tracks: **7** (warn 5, max 10) — shippable 5
 
 ## Spine coverage
 
