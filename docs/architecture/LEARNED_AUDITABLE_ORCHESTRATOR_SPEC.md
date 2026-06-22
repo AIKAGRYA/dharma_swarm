@@ -90,8 +90,13 @@ evaluator families AND ≥2 decorrelated source families** to corroborate; repla
 explicitly transformed by a later warrant layer**; explicit verdicts
 (corroborated/refuted/insufficient/quarantined). **The Council verifies and quarantines; it does
 NOT become the scorer, the planner, or the dispatcher** (that conflation is a fitness-corruption
-vector — see §6). Different profiles differ only in schema + thresholds. Adopt #662's
-`frontier_council.py` as the first profile and generalize.
+vector — see §6). **Correctness-authority split (Codex's G sharpening):** for Arena v1's
+verifiable tasks the **deterministic scorer / test-oracle is the SOLE correctness authority**; the
+Council verifies *trace integrity, contamination boundaries, evidence sufficiency, and the "this
+genome beat controls" promotion claim* — **never correctness itself.** Different profiles differ
+only in schema + thresholds. **Adopt the MINIMAL Council interface (the
+`orchestration_trace_verification` profile) from #662 first — Arena v1 is NOT gated on full #662
+or the world-ingestion seam.**
 
 ---
 
@@ -228,31 +233,38 @@ Any cost term in our DPI is *our* extension, not copied.
 
 ---
 
-## 10. Locked build order
+## 10. Locked build order (Refinement G RESOLVED — Claude proposed, Codex ratified + sharpened)
+
+G is locked: **the throat and the Arena are sibling consumers of the Council, not parent/child.**
+Arena v1's critical path is *only*: reconcile → minimal shared Council interface → genome → frozen
+Arena scorer/controls. The throat is for world-signal ingestion / research curation / Arena-v2 task
+generation, and runs **in parallel** — it does not gate Arena v1.
 
 0. **Reconciliation / preservation / off-machine backup** (Lane C + Fugu) — *step zero, underway;
    the orchestrator is gated on a trustworthy `origin/main`.* **Preserve the local-only
    `TopologyGenome` work explicitly** — the genome contract (§1) extends it.
-1. **Verifier + throat substrate.** Adopt/rebase/fix **#662's** `frontier_council` + safety
-   substrate — *not a blind merge* (CI/review/safety caveats). Adopt/fix **#663's** document
-   ingest *only if* it's part of world/research ingestion — repairing its MCP-ingest gap,
-   MarkItDown-executable check, dependency extras, and stale DocOps counts. Wire boundary ledger →
-   Council → warrant receipt with **no dispatch authority**.
-2. **Generalize the Council** into the multi-profile substrate (§2).
-3. **Genome contract.** `OrchestrationGenome` as an extension/wrapper of `TopologyGenome` (§1):
-   serialization, validation, stable hash/id, receipt refs, and the topology→orchestration
-   metadata conversion. Backward-compatible with existing topology-genome tests.
-4. **Arena v1** — **upgrade Forge Arena v0** (§3), verifiable-only tasks, the **best-single gate**,
-   genome-aware arms + outputs + closeout states. *Throat seam runs in parallel as a sibling
-   Council consumer and feeds the v2 task curator — it does NOT gate arena v1.* (Refinement G —
-   Fugu to confirm.)
-5. **Zero-weight orchestrator v1** emitting `OrchestrationGenome` (prompted generator + simple
-   mutation ops + bandit/routing-memory roster choice + Darwin archive selection + Council + route
-   receipts). **No SFT/GRPO/GPU; no production-router mutation.**
-6. **Run controls**, including the best-single gate → first `decision_packet.md`.
-7. **Start the flywheel** — promote winning genomes to the MAP-Elites archive; turn on the
-   research-ingestion loop (ingest → Council verify → Darwin proposes integration trial as a genome
-   → arena scores → promote only with receipts).
+1. **Extract/adopt the MINIMAL Council interface** — the `orchestration_trace_verification`
+   profile from **#662** (not a blind merge; *not* gated on full #662 or the world-ingestion seam).
+   This is the smallest verifier interface Arena v1 needs.
+2. **Genome contract.** `OrchestrationGenome` as an extension/wrapper of `TopologyGenome` (§1):
+   serialization, validation, stable hash/id, receipt refs, topology→orchestration conversion,
+   backward-compatible with existing topology-genome tests.
+3. **Arena v1** — **upgrade Forge Arena v0** (§3) on **frozen verifiable taskpacks**. Authority
+   split: **deterministic scorer/test-oracle = correctness authority; Council = trace/contamination/
+   "beat-controls" claim verifier, never correctness.** Best-single gate; genome-aware arms +
+   outputs + closeout states.
+4. **Zero-weight orchestrator v1** emits `OrchestrationGenome` (prompted generator + simple mutation
+   ops + bandit/routing-memory roster choice + Darwin archive selection + route receipts). **No
+   SFT/GRPO/GPU; no production-router mutation.** **Run controls** incl. the best-single gate →
+   first `decision_packet.md`.
+5. **Throat seam — IN PARALLEL** (Bronze→Council→warrant, no dispatch authority). Adopt/fix **#663's**
+   document ingest *only if* part of world/research ingestion (repair its MCP-ingest gap,
+   MarkItDown-executable check, dependency extras, stale DocOps). Feeds the **v2 task curator** +
+   research-genes — **off the Arena v1 critical path.**
+6. **Flywheel** — promote winning genomes to the MAP-Elites archive; turn on the research-ingestion
+   loop (ingest → Council verify → Darwin proposes integration trial as a genome → arena scores →
+   promote only with receipts).
+7. **Unify** the arena and throat under the same Council profiles.
 8. **Distill the small coordinator** (TRINITY-style head) on arena-labeled genome traces.
 9. **Surgical GRPO** spike (4–14B) once labels are real → scale to 30/32B after proof → 70B apex-only.
 
