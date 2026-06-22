@@ -1,0 +1,22 @@
+{
+  "fetched_at": "2026-06-22T02:55:19Z",
+  "repos": {
+    "anytype": {"slug": "anyproto/anytype-ts", "exists": true, "head": "64f2d34363a4", "tag_count": 2252},
+    "dspy": {"slug": "stanfordnlp/dspy", "exists": true, "head": "498760149b23", "tag_count": 116},
+    "docuseal": {"slug": "docusealco/docuseal", "exists": true, "head": "da44d51a3bcd", "tag_count": 157},
+    "open_notebook": {"slug": "lfnovo/open-notebook", "exists": true, "head": "cac4e01975ca", "tag_count": 57},
+    "last30days_skill": {"slug": "mvanhorn/last30days-skill", "exists": true, "head": "b8122a28d88e", "tag_count": 36},
+    "papermark": {"slug": "papermark/papermark", "exists": true, "head": "e03809c6ca96", "tag_count": 15},
+    "dify": {"slug": "langgenius/dify", "exists": true, "head": "ff81e7b393af", "tag_count": 197},
+    "pm_skills": {"slug": "product-on-purpose/pm-skills", "exists": true, "head": "1e171384b3df", "tag_count": 112},
+    "twenty": {"slug": "twentyhq/twenty", "exists": true, "head": "82f6597dc367", "tag_count": 603},
+    "markitdown": {"slug": "microsoft/markitdown", "exists": true, "head": "e144e0a2be95", "tag_count": 41},
+    "huly": {"slug": "hcengineering/platform", "exists": true, "head": "5e03566ea284", "tag_count": 1456},
+    "headroom": {"slug": "chopratejas/headroom", "exists": true, "head": "d480c464e96d", "tag_count": 159},
+    "maybe": {"slug": "maybe-finance/maybe", "exists": true, "head": "77b546983275", "tag_count": 29},
+    "agent_reach": {"slug": "Panniantong/Agent-Reach", "exists": true, "head": "22d7f03a5940", "tag_count": 7},
+    "continue": {"slug": "continuedev/continue", "exists": true, "head": "d0a3c0b626b5", "tag_count": 890},
+    "career_ops": {"slug": "santifer/career-ops", "exists": true, "head": "9d1404f32022", "tag_count": 13},
+    "taste_skill": {"slug": "Leonxlnx/taste-skill", "exists": true, "head": "06d6028b5c62", "tag_count": 0}
+  }
+}

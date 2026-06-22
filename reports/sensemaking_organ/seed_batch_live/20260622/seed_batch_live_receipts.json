@@ -1,0 +1,1250 @@
+{
+  "summary": {
+    "run": "world_signal_seed_batch_LIVE (evidence from real public repos)",
+    "fetched_at": "2026-06-22T02:55:19Z",
+    "signals": 17,
+    "stage0": {
+      "all_safe": true,
+      "all_fenced": true
+    },
+    "verdict_counts": {
+      "corroborated": 3,
+      "insufficient": 12,
+      "refuted": 2
+    },
+    "verdicts": {
+      "corroborated": [
+        "markitdown",
+        "dspy",
+        "papermark"
+      ],
+      "insufficient": [
+        "continue",
+        "headroom",
+        "maybe",
+        "dify",
+        "twenty",
+        "docuseal",
+        "anytype",
+        "last30days_skill",
+        "taste_skill",
+        "agent_reach",
+        "career_ops",
+        "pm_skills"
+      ],
+      "refuted": [
+        "open_notebook_identity",
+        "huly_docuseal_identity"
+      ]
+    },
+    "advisory_pressures": [
+      {
+        "id": "markitdown",
+        "weight": 0.5488,
+        "eval_families": 3,
+        "source_families": 3,
+        "dispatch_authority": false
+      },
+      {
+        "id": "dspy",
+        "weight": 0.432,
+        "eval_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      },
+      {
+        "id": "papermark",
+        "weight": 0.384,
+        "eval_families": 3,
+        "source_families": 2,
+        "dispatch_authority": false
+      }
+    ],
+    "dispatch_authority_held_false": true,
+    "collisions_rejected": {
+      "headroom": "pypi 'headroom' -> SUNKENDREAMS/headroom (different project; NOT counted)",
+      "continue": "npm 'continue' -> scottcorgan/continue (different project; NOT counted)"
+    },
+    "rows": [
+      {
+        "id": "markitdown",
+        "verdict": "corroborated",
+        "eval_families": 3,
+        "source_families": 3,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "dspy",
+        "verdict": "corroborated",
+        "eval_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "papermark",
+        "verdict": "corroborated",
+        "eval_families": 3,
+        "source_families": 2,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "continue",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": [
+          "npm 'continue' -> scottcorgan/continue (different project; NOT counted)"
+        ]
+      },
+      {
+        "id": "headroom",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": [
+          "pypi 'headroom' -> SUNKENDREAMS/headroom (different project; NOT counted)"
+        ]
+      },
+      {
+        "id": "maybe",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "dify",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "twenty",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "docuseal",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "anytype",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "last30days_skill",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "taste_skill",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "agent_reach",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "career_ops",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "pm_skills",
+        "verdict": "insufficient",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 0,
+        "notes": []
+      },
+      {
+        "id": "open_notebook_identity",
+        "verdict": "refuted",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 2,
+        "notes": []
+      },
+      {
+        "id": "huly_docuseal_identity",
+        "verdict": "refuted",
+        "eval_families": 0,
+        "source_families": 1,
+        "refutations": 2,
+        "notes": []
+      }
+    ],
+    "observed_at": "2026-06-22T02:57:01.416600Z"
+  },
+  "receipts": [
+    {
+      "claim": "MarkItDown is a real, independently-distributed document->Markdown tool usable for ingestion",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/microsoft/markitdown HEAD=e144e0a2be95 tags=41",
+          "source_family": "git_remote",
+          "supports": true
+        },
+        {
+          "quality": 0.65,
+          "ref": "pypi/markitdown -> github.com/microsoft/markitdown (verified)",
+          "source_family": "pypi",
+          "supports": true
+        },
+        {
+          "quality": 0.85,
+          "ref": "Devin ran a real CLI E2E ingest into isolated Chetana (PR #663)",
+          "source_family": "independent_repro",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "3 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "independent_repro",
+            "pypi"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "independent_repro",
+            "pypi"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.70",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "independent_repro",
+            "pypi"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.411123Z",
+      "input_signal_hash": "sha256:9628a98bd794",
+      "no_action_authority": true,
+      "payload_hash": "sha256:b1eb84eaa0fd63c5813fb2c3bb87cea744aa2038eb708c163f2cf3b897eb0b05",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_b1eb84eaa0fd63c5813fb2c3",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 3,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "DSPy is a real, independently-distributed framework for typed/evaluable LLM modules",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.7,
+          "ref": "github.com/stanfordnlp/dspy HEAD=498760149b23 tags=116",
+          "source_family": "git_remote",
+          "supports": true
+        },
+        {
+          "quality": 0.65,
+          "ref": "pypi/dspy -> github.com/stanfordnlp/dspy (verified)",
+          "source_family": "pypi",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "pypi"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "pypi"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.68",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "pypi"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.412669Z",
+      "input_signal_hash": "sha256:70492a6b1da2",
+      "no_action_authority": true,
+      "payload_hash": "sha256:520d01ba9106f403ae31259205a702e28386a14b976ef8269660e94ad21b797f",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_520d01ba9106f403ae312592",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Papermark is a real OSS doc-sharing tool with an independently-published CLI",
+      "corroboration_count": 3,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/papermark/papermark HEAD=e03809c6ca96 tags=15",
+          "source_family": "git_remote",
+          "supports": true
+        },
+        {
+          "quality": 0.6,
+          "ref": "npm/papermark -> github.com/papermark/papermark-cli (verified, same org)",
+          "source_family": "npm",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "2 decorrelated sources support and none refute",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "npm"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "two or more independent supports, no strong contradiction",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "npm"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "two+ decorrelated families, avg quality 0.60",
+          "refuting_families": [],
+          "stance": "corroborate",
+          "supporting_families": [
+            "git_remote",
+            "npm"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.412955Z",
+      "input_signal_hash": "sha256:c2531b8ad8f6",
+      "no_action_authority": true,
+      "payload_hash": "sha256:e6b5c319bf0693614cae6af0f4bdac9911e890a3d0f4765ea9cd172b8c01bd15",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_e6b5c319bf0693614cae6af0",
+      "refutation_count": 0,
+      "risks": [],
+      "source_family_count": 2,
+      "verdict": "corroborated"
+    },
+    {
+      "claim": "Continue is a real, independently-distributed open coding assistant",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/continuedev/continue HEAD=d0a3c0b626b5 tags=890",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.413252Z",
+      "input_signal_hash": "sha256:bde7c9dca0e5",
+      "no_action_authority": true,
+      "payload_hash": "sha256:6e9d4b84f0052f5033fff25a978c14934ce21604014e3613f61edcf740e3250c",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_6e9d4b84f0052f5033fff25a",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Headroom reduces agent context tokens by 60-95% while preserving quality",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.7,
+          "ref": "github.com/chopratejas/headroom HEAD=d480c464e96d tags=159",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.413485Z",
+      "input_signal_hash": "sha256:2a8565cb9abd",
+      "no_action_authority": true,
+      "payload_hash": "sha256:cf404fb4e4733721bcd9fba98bfaace1b2fae7e25c3d81edd36c9b0cad29cbd4",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_cf404fb4e4733721bcd9fba9",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Maybe is a usable finance-domain reference (complete AGPL Rails app, archived)",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/maybe-finance/maybe HEAD=77b546983275 tags=29",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.413712Z",
+      "input_signal_hash": "sha256:39e641cfcb71",
+      "no_action_authority": true,
+      "payload_hash": "sha256:58be88f0901fb3c957ea082c8fbbc15325e1b48705483d39997fe170c0a26fc8",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_58be88f0901fb3c957ea082c",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Dify is a real, self-hostable OSS LLM workflow platform",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.7,
+          "ref": "github.com/langgenius/dify HEAD=ff81e7b393af tags=197",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.413933Z",
+      "input_signal_hash": "sha256:d68105d30182",
+      "no_action_authority": true,
+      "payload_hash": "sha256:d0bdd84d02e62d553a5bfee9535ef1629cdbc5996998190702101e3ea28ecbbd",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_d0bdd84d02e62d553a5bfee9",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Twenty is a real, self-hostable open CRM",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/twentyhq/twenty HEAD=82f6597dc367 tags=603",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.414190Z",
+      "input_signal_hash": "sha256:467b74d5d403",
+      "no_action_authority": true,
+      "payload_hash": "sha256:b76bbcc5df30df867d9c94451094a4272c33e3917b444773dcc4da5216b38208",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_b76bbcc5df30df867d9c9445",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "DocuSeal is a real OSS e-signature/document tool",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.7,
+          "ref": "github.com/docusealco/docuseal HEAD=da44d51a3bcd tags=157",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.414404Z",
+      "input_signal_hash": "sha256:9eaee090a7b7",
+      "no_action_authority": true,
+      "payload_hash": "sha256:0ac58da63552cba0a8e0dcf9ef065160dd6307096cd465ea262aee8bb7a01d91",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_0ac58da63552cba0a8e0dcf9",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Anytype is a real local-first/E2EE knowledge OS",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.8,
+          "ref": "github.com/anyproto/anytype-ts HEAD=64f2d34363a4 tags=2252",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.414627Z",
+      "input_signal_hash": "sha256:30b8f76cd45a",
+      "no_action_authority": true,
+      "payload_hash": "sha256:7ac755b379a1f012fee98abaae3d22f2c2fe04cf437b38a3331e83fcd2f1563b",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_7ac755b379a1f012fee98aba",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Last30Days-Skill is a usable recent-discourse research skill",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/mvanhorn/last30days-skill HEAD=b8122a28d88e tags=36",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.414861Z",
+      "input_signal_hash": "sha256:05a536ef93a2",
+      "no_action_authority": true,
+      "payload_hash": "sha256:2d956955657f0dde901bbdc0ab0903aadbcb3feaee797562e748d43254a3aba5",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_2d956955657f0dde901bbdc0",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Taste-Skill is a usable design-quality skill for non-generic frontends",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/Leonxlnx/taste-skill HEAD=06d6028b5c62 tags=0",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.415110Z",
+      "input_signal_hash": "sha256:110fd3b0e931",
+      "no_action_authority": true,
+      "payload_hash": "sha256:7cb2a4f9b6da2e3602ea83d47177e141d52404b4d3127920ba1eaea7bd777c80",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_7cb2a4f9b6da2e3602ea83d4",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Agent-Reach is a usable source-access CLI bundle across many platforms",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/Panniantong/Agent-Reach HEAD=22d7f03a5940 tags=7",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.415440Z",
+      "input_signal_hash": "sha256:2a2468e909e0",
+      "no_action_authority": true,
+      "payload_hash": "sha256:65687c8577a504796b9424144256253529805d650e9ed45db2cb1ef83a8fe428",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_65687c8577a504796b942414",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Career-Ops is a usable agentic vertical-workflow operating system",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.6,
+          "ref": "github.com/santifer/career-ops HEAD=9d1404f32022 tags=13",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.415653Z",
+      "input_signal_hash": "sha256:7f4188b21d49",
+      "no_action_authority": true,
+      "payload_hash": "sha256:c64d6b0c37de497cbd5b58c51ca317bd6d181eee4f340184ff5c8a80fa412bc2",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_c64d6b0c37de497cbd5b58c5",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "PM-Skills is a usable PM skill library for converting signals into specs",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.7,
+          "ref": "github.com/product-on-purpose/pm-skills HEAD=1e171384b3df tags=112",
+          "source_family": "git_remote",
+          "supports": true
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "fewer than two decorrelated supporting sources",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "insufficient decorrelated/quality support",
+          "refuting_families": [],
+          "stance": "insufficient",
+          "supporting_families": [
+            "git_remote"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.415893Z",
+      "input_signal_hash": "sha256:3f78115c8fc0",
+      "no_action_authority": true,
+      "payload_hash": "sha256:c061ea844bae3ab0193c8fc44fbc203beddf2e9b4c888d1bb1a384a00e9009a8",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_c061ea844bae3ab0193c8fc4",
+      "refutation_count": 0,
+      "risks": [
+        "fewer than two decorrelated source families"
+      ],
+      "source_family_count": 1,
+      "verdict": "insufficient"
+    },
+    {
+      "claim": "Open-Notebook is a Jupyter/data-notebook alternative (as the screenshot labels it)",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.5,
+          "ref": "screenshot text: 'Jupyter alternative'",
+          "source_family": "screenshot_label",
+          "supports": true
+        },
+        {
+          "quality": 0.85,
+          "ref": "lfnovo/open-notebook README: 'privacy-focused alternative to Google's Notebook LM' (not Jupyter)",
+          "source_family": "repo_readme",
+          "supports": false
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "1 high-quality source(s) contradict the claim",
+          "refuting_families": [
+            "repo_readme"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [
+            "repo_readme"
+          ],
+          "stance": "insufficient",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "domain contradiction present",
+          "refuting_families": [
+            "repo_readme"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.416154Z",
+      "input_signal_hash": "sha256:76b08b5f0020",
+      "no_action_authority": true,
+      "payload_hash": "sha256:e54ec65f76edcc27b7c5fbdf9f640ba08ff585190b37ae68df57b2653d0dcbfd",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_e54ec65f76edcc27b7c5fbdf",
+      "refutation_count": 2,
+      "risks": [],
+      "source_family_count": 1,
+      "verdict": "refuted"
+    },
+    {
+      "claim": "The screenshot's labeled identity (Huly) matches its actual content",
+      "corroboration_count": 0,
+      "dispatch_authority": false,
+      "evidence_refs": [
+        {
+          "quality": 0.5,
+          "ref": "slide caption says 'Huly' (hcengineering/platform exists)",
+          "source_family": "screenshot_label",
+          "supports": true
+        },
+        {
+          "quality": 0.9,
+          "ref": "rendered content is DocuSeal \u2014 high-quality contradiction",
+          "source_family": "screenshot_content",
+          "supports": false
+        }
+      ],
+      "findings": [
+        {
+          "evaluator_family": "skeptic",
+          "rationale": "1 high-quality source(s) contradict the claim",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "builder",
+          "rationale": "support not decorrelated enough to act on",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "insufficient",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        },
+        {
+          "evaluator_family": "domain_reader",
+          "rationale": "domain contradiction present",
+          "refuting_families": [
+            "screenshot_content"
+          ],
+          "stance": "refute",
+          "supporting_families": [
+            "screenshot_label"
+          ]
+        }
+      ],
+      "generated_at": "2026-06-22T02:57:01.416388Z",
+      "input_signal_hash": "sha256:39a0b09bef9a",
+      "no_action_authority": true,
+      "payload_hash": "sha256:bc4eabadfc448ea55d3a11387f52279f2f2fb07f878f657b31725d36ef4f0864",
+      "provenance": {
+        "agent": {
+          "id": "public_repo:seed-batch-live"
+        }
+      },
+      "receipt_id": "world_sensemaking_bc4eabadfc448ea55d3a1138",
+      "refutation_count": 2,
+      "risks": [],
+      "source_family_count": 1,
+      "verdict": "refuted"
+    }
+  ]
+}
