@@ -1657,18 +1657,20 @@ async def run_conductor_loop(shutdown_event: asyncio.Event) -> None:
 
 
 async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
-    """World Model: living Forrester-style world state, updated every 6h by research agents.
+    """World Model: living Forrester-style world state, snapshot-persisted every 6h.
 
-    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional trust...),
-    8 flows, 6 feedback loops. Each cycle: update stocks via web_search, assess
-    telos pressure, emit algedonic signal if any stock crosses critical threshold.
+    Seeded with 15 stocks (CO2, biodiversity, AI capability, institutional
+    trust...), 8 flows, 6 feedback loops. Stock research via web_search is not
+    built yet — a cycle currently refreshes state and persists a versioned
+    snapshot (see WorldModelAgent.run_cycle).
     """
     try:
-        from dharma_swarm.world_model import WorldModelAgent
-        agent = WorldModelAgent(state_dir=STATE_DIR)
+        from dharma_swarm.world_model import WorldModelAgent, WorldModelStore
+        store = WorldModelStore(base_path=STATE_DIR / "world_model")
+        agent = WorldModelAgent(store=store, search_tool=None, arxiv_tool=None)
         # Seed on first boot
         try:
-            await asyncio.wait_for(agent.initialize(), timeout=60.0)
+            await asyncio.wait_for(agent.boot(), timeout=60.0)
             _log("world-model", "World model initialized and seeded")
         except Exception as exc:
             _log("world-model", f"World model init failed (non-fatal): {exc}")
