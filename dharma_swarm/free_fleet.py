@@ -113,16 +113,12 @@ def _pool_free_tiers() -> dict[int, list[str]]:
         if mid.endswith(":free"):
             result[_assign_tier(mid)].append(mid)
 
-    # Backfill empty tiers from the next-best populated tier so every tier is
-    # non-empty (the same invariant discover_free_models_sync guarantees).
-    if not result[1] and result[2]:
-        result[1] = [result[2][0]]
-    if not result[2] and result[3]:
-        result[2] = [result[3][0]]
-    if not result[3] and result[2]:
-        result[3] = [result[2][-1]]
-
-    if not any(result.values()):
+    # A clean fleet is a PARTITION: each model lives in exactly one tier. If live
+    # discovery is too thin to fill all three tiers, copying a model into an empty
+    # tier (the old backfill) would duplicate it across tiers and break the
+    # ALL_FREE_MODELS no-duplicates + tier-isolation invariants. Fall back to the
+    # known-good disjoint offline partition instead of self-inflicting a duplicate.
+    if not all(result.values()):
         return {k: list(v) for k, v in _FREE_FLEET_OFFLINE_FALLBACK.items()}
     return result
 
@@ -157,15 +153,12 @@ def discover_free_models_sync() -> dict[int, list[str]]:
             tiers[t].sort(key=lambda x: -x[1])
             result[t] = [mid for mid, _ in tiers[t]]
 
-        # Ensure every tier has at least something
-        if not result[1] and result[2]:
-            result[1] = [result[2][0]]
-        if not result[2] and result[3]:
-            result[2] = [result[3][0]]
-
-        # Live discovery returned an empty roster (e.g. all free models gone) —
-        # fall back to the pool-derived tiers, not a self-inflicted empty fleet.
-        if not any(result.values()):
+        # A clean fleet is a PARTITION (each model in exactly one tier). If live
+        # discovery is too thin to fill all three tiers, fall back to the
+        # pool-derived tiers rather than copying a model into an empty tier — the
+        # old backfill duplicated a model across tiers and broke the
+        # no-duplicates / tier-isolation invariants.
+        if not all(result.values()):
             return _pool_free_tiers()
         return result
     except Exception:
