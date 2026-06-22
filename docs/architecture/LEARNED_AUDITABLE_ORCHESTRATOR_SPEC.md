@@ -38,16 +38,23 @@ own organs. All receipted where Fugu is opaque.
 
 ---
 
-## 1. `OrchestrationGenome` — the central abstraction
+## 1. `OrchestrationGenome` — the central abstraction (EXTENDS existing `TopologyGenome`)
 
 Every arena attempt is a genome. Evolution mutates genomes; the arena scores genomes; the
 Council verifies genome outcomes; the DPI ranks genome-level techniques; the learned coordinator
 (later) learns to *emit* genomes. This is what makes the system DGM-like instead of a pile of
 prompt experiments.
 
+**Do not create a parallel abstraction (honors the SSOT naming rule).** `OrchestrationGenome`
+**extends/wraps the existing `TopologyGenome`** with a conversion from current topology-genome
+dispatch metadata → orchestration-genome metadata. Codex (local) confirms `TopologyGenome` exists.
+**Lane B caveat:** `TopologyGenome` is **NOT on `origin/main`** — it is local-only work in the
+dirty tree, so the genome contract is **gated on reconciliation preserving and landing it.** If
+that work is lost, "extend not replace" loses its base; preserve it explicitly (Phase 0).
+
 ```
-OrchestrationGenome:
-  genome_id:            str
+OrchestrationGenome  (extends TopologyGenome):
+  genome_id:            str                # stable hash/id; backward-compatible with TopologyGenome
   task_decomposition:   [subtask, ...]
   role_graph:           communication topology (who talks to whom, in what order)
   roster:               [model|tool|organ|human, ...]   # drawn from existing model_pool
@@ -57,14 +64,17 @@ OrchestrationGenome:
   verification_plan:    which Council profile(s) gate which steps
   adjudication_rule:    how candidate outputs combine (vote / debate / moat-gate / synthesize)
   stop_condition:       accept-on-Council-ACCEPT | max-turns | budget-exhausted
+  fallback_rules:       what to do on role failure / timeout / refusal
+  permissions:          per-role tool/data permissions (least-privilege)
   # refinement B — quality-diversity, not top-k:
   lineage:              {parent_genome_id, mutation_op}
   behavioral_descriptors: [...]   # MAP-Elites bins (decomposition depth, roster diversity, topology shape, ...)
 ```
 
-A **newly-ingested research technique is just a candidate gene** (a prompt fragment, a roster
-member, a topology, an adjudication rule). Research ingestion and orchestration evolution are the
-*same flywheel*. (Refinement D.)
+Every arena attempt is **keyed by `genome_id`** and emits route, trace, Council, score, and
+decision receipts. A **newly-ingested research technique is just a candidate gene** (a prompt
+fragment, a roster member, a topology, an adjudication rule). Research ingestion and orchestration
+evolution are the *same flywheel*. (Refinement D.)
 
 ---
 
@@ -76,16 +86,25 @@ Do **not** build five partial stomachs. One verifier substrate, multiple profile
 
 **Shared invariants (all profiles):** quarantine untrusted input; require **≥2 decorrelated
 evaluator families AND ≥2 decorrelated source families** to corroborate; replayable receipts;
-**no hidden action authority** (`dispatch_authority=False`); explicit verdicts
-(corroborated/refuted/insufficient/quarantined). Different profiles differ only in schema +
-thresholds. Adopt #662's `frontier_council.py` as the first profile and generalize.
+**no hidden action authority** — Council receipts preserve `dispatch_authority=False` **unless
+explicitly transformed by a later warrant layer**; explicit verdicts
+(corroborated/refuted/insufficient/quarantined). **The Council verifies and quarantines; it does
+NOT become the scorer, the planner, or the dispatcher** (that conflation is a fitness-corruption
+vector — see §6). Different profiles differ only in schema + thresholds. Adopt #662's
+`frontier_council.py` as the first profile and generalize.
 
 ---
 
-## 3. The two-layer arena (the keystone)
+## 3. The two-layer arena (the keystone) — UPGRADE Forge Arena v0, don't build fresh
 
-Split, with a hard boundary between them, so the system can never improve at its own moving
-target:
+Forge Arena v0 already exists on `origin/main`
+(`scripts/runtime/forge_swarm_evolution_arena_v0_{measurement_runner,preflight,taskpack_builder}.py`,
+spec `docs/specs/forge_packets/FORGE_SWARM_EVOLUTION_ARENA_V0_MEASUREMENT_10H_LAUNCH.md`, plus the
+`reports/agentops/work_packets/forge-reality-arena-*` corpus). **Reuse its runner/scorer**; add
+genome-aware arms + outputs. We already learned the closeout discipline from Forge v0 — keep it.
+
+Split the arena into two layers, with a hard boundary between them, so the system can never
+improve at its own moving target:
 
 - **(A) Scorer — frozen, hermetic, replayable.** Sealed labels where possible, baseline controls,
   **budget parity**, scorer_hash + task_manifest_hash, candidate-visible / scorer-only split,
@@ -212,28 +231,57 @@ Any cost term in our DPI is *our* extension, not copied.
 ## 10. Locked build order
 
 0. **Reconciliation / preservation / off-machine backup** (Lane C + Fugu) — *step zero, underway;
-   the orchestrator is gated on a trustworthy `origin/main`.*
-1. **Adopt/rebase/fix #662's verifier substrate** — not a blind merge (it has CI/review/safety
-   caveats). This becomes the Council engine.
+   the orchestrator is gated on a trustworthy `origin/main`.* **Preserve the local-only
+   `TopologyGenome` work explicitly** — the genome contract (§1) extends it.
+1. **Verifier + throat substrate.** Adopt/rebase/fix **#662's** `frontier_council` + safety
+   substrate — *not a blind merge* (CI/review/safety caveats). Adopt/fix **#663's** document
+   ingest *only if* it's part of world/research ingestion — repairing its MCP-ingest gap,
+   MarkItDown-executable check, dependency extras, and stale DocOps counts. Wire boundary ledger →
+   Council → warrant receipt with **no dispatch authority**.
 2. **Generalize the Council** into the multi-profile substrate (§2).
-3. **Arena v1** (verifiable-only) with the **best-single gate** (§3). *Throat seam
-   (Bronze→Council→warrant) runs in parallel as a sibling Council consumer and feeds the v2 task
-   curator — it does NOT gate arena v1.* (Refinement G — Fugu to confirm.)
-4. **Zero-weight orchestrator v1** emitting `OrchestrationGenome` (prompted + Darwin-evolved +
-   bandit routing + Council + route receipts). **No SFT/GRPO/GPU.**
-5. **Run controls**, including the best-single gate → first `decision_packet.md`.
-6. **Start the flywheel** — promote winning genomes to the MAP-Elites archive; turn on
-   research-as-gene ingestion.
-7. **Distill the small coordinator** (TRINITY-style head) on arena-labeled genome traces.
-8. **Surgical GRPO** spike (4–14B) once labels are real → scale to 30/32B after proof → 70B apex-only.
+3. **Genome contract.** `OrchestrationGenome` as an extension/wrapper of `TopologyGenome` (§1):
+   serialization, validation, stable hash/id, receipt refs, and the topology→orchestration
+   metadata conversion. Backward-compatible with existing topology-genome tests.
+4. **Arena v1** — **upgrade Forge Arena v0** (§3), verifiable-only tasks, the **best-single gate**,
+   genome-aware arms + outputs + closeout states. *Throat seam runs in parallel as a sibling
+   Council consumer and feeds the v2 task curator — it does NOT gate arena v1.* (Refinement G —
+   Fugu to confirm.)
+5. **Zero-weight orchestrator v1** emitting `OrchestrationGenome` (prompted generator + simple
+   mutation ops + bandit/routing-memory roster choice + Darwin archive selection + Council + route
+   receipts). **No SFT/GRPO/GPU; no production-router mutation.**
+6. **Run controls**, including the best-single gate → first `decision_packet.md`.
+7. **Start the flywheel** — promote winning genomes to the MAP-Elites archive; turn on the
+   research-ingestion loop (ingest → Council verify → Darwin proposes integration trial as a genome
+   → arena scores → promote only with receipts).
+8. **Distill the small coordinator** (TRINITY-style head) on arena-labeled genome traces.
+9. **Surgical GRPO** spike (4–14B) once labels are real → scale to 30/32B after proof → 70B apex-only.
+
+## 10a. Test plan (from codex's plan)
+
+- **Unit:** `OrchestrationGenome` validation / serialization / stable hash-id / **backward-compat
+  with `TopologyGenome`**; Council profiles preserve no-action-authority + domain thresholds; DPI
+  including the correctness-gated decorrelation bonus; arena closeout-state selection.
+- **Integration:** one genome runs orchestrator → spine receipt → Council verification → arena
+  score → decision packet; **candidate cannot read sealed labels / scorer-only files**; budget
+  parity logged for candidate *and* controls; winning genome archives **without mutating
+  production routing**; contaminated/high-risk input → quarantine closeout.
+- **Regression:** existing topology-genome, spine-receipt, and Forge Arena v0 tests stay green;
+  adopted #662/#663 code gets targeted tests for quarantine, replay, document/MCP ingest, DocOps.
+
+**Standing assumptions:** no model trained until arena-labeled traces exist; no blind merge of
+#662/#663 (adopt/rebase/fix); `TopologyGenome` is the base, `OrchestrationGenome` extends it;
+capability is the headline, receipts are proof/replay; the Council verifies, it is not the reward
+model by itself; **frozen-arena integrity outranks rapid self-improvement.**
 
 ---
 
 ## 11. Owned surfaces + track declaration
 
-New, non-colliding surfaces (consult/reuse `provider_policy`, `model_hierarchy`, `orchestrator.py`,
-`evolution.py`, `diversity_archive.py`, `ginko_brier.py` — do not own them). The **Council is shared
-substrate** with the seeing-organ track; coordinate (single substrate, not two).
+New, non-colliding surfaces. **Extend, don't own:** `TopologyGenome` (local-only, preserve+land
+first), Forge Arena v0 (`scripts/runtime/forge_swarm_evolution_arena_v0_*.py`). **Consult/reuse,
+don't own:** `provider_policy`, `model_hierarchy`, `orchestrator.py`, `evolution.py`,
+`diversity_archive.py`, `ginko_brier.py`. The **Council is shared substrate** with the seeing-organ
+track; coordinate (single substrate, not two).
 
 ```yaml
 - id: orchestration-substrate-2026-06
@@ -279,4 +327,5 @@ substrate** with the seeing-organ track; coordinate (single substrate, not two).
 TRINITY arXiv 2512.04695 · Conductor arXiv 2512.04388 (OpenReview U23A2BUKYt) · Sakana Fugu
 (sakana.ai/fugu, SakanaAI/fugu) · Graph-GRPO 2603.02701 · AgentConductor 2602.17100 ·
 Krogh-Vedelsby 1995 · Zhang et al. NeurIPS 2024 · Abreu et al. 2025. Convergence record: Claude
-(Lane B) ↔ Codex ↔ Fugu, 2026-06-22.
+(Lane B) ↔ Codex ↔ Fugu, 2026-06-22 (codex's implementation plan + test plan integrated:
+extend `TopologyGenome`, upgrade Forge Arena v0, Council-not-scorer invariant).
