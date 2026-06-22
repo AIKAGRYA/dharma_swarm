@@ -620,7 +620,7 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "holon_talk.talk_receipts",
             "scripts.holon_talk",
             "talk",
-            ("home.agents",),
+            ("home.holon_agents",),
             WriteMode.APPEND_ONLY,
             WriterClassification.REVIEW_REQUIRED,
             RiskLevel.HIGH,
