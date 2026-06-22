@@ -1,0 +1,242 @@
+{
+  "generated_at": "2026-06-22T15:48:18+00:00",
+  "rubric": {
+    "axes": [
+      "wired",
+      "proven",
+      "live",
+      "world_class",
+      "balanced"
+    ],
+    "weights": {
+      "wired": 0.3,
+      "proven": 0.3,
+      "live": 0.15,
+      "world_class": 0.15,
+      "balanced": 0.1
+    },
+    "min_signoffs": 3,
+    "min_families": 2
+  },
+  "graders": [
+    "track-grader-haiku",
+    "track-grader-opus",
+    "track-grader-sonnet"
+  ],
+  "portfolio": {
+    "track_mean": 57.7,
+    "objective_coverage": 0.33,
+    "coverage_cap": 84.9,
+    "portfolio_score": 57.7,
+    "portfolio_grade": "F",
+    "attested_shippable": [
+      "provider-routing-consolidation-2026-06",
+      "runtime-truth-reconciliation-2026-06",
+      "truth-graph-platform-2026-06"
+    ],
+    "overstated": [
+      "composer-holon-spine-longrun-2026-06",
+      "runtime-truth-nats-2026-06"
+    ]
+  },
+  "tracks": [
+    {
+      "id": "runtime-truth-reconciliation-2026-06",
+      "file_grade": "11/11",
+      "file_shippable": true,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 3.0,
+        "proven": 3.0,
+        "live": 3.0,
+        "world_class": 3.0,
+        "balanced": 1.0
+      },
+      "score": 70.0,
+      "grade": "C",
+      "consensus_verdict": "SHIPPABLE",
+      "dissent": [
+        "track-grader-sonnet:IN_PROGRESS"
+      ],
+      "attested_shippable": true,
+      "notes": []
+    },
+    {
+      "id": "runtime-truth-nats-2026-06",
+      "file_grade": "2/2",
+      "file_shippable": true,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 2.0,
+        "proven": 3.0,
+        "live": 1.0,
+        "world_class": 2.0,
+        "balanced": 1.0
+      },
+      "score": 51.2,
+      "grade": "F",
+      "consensus_verdict": "OVERSTATED",
+      "dissent": [
+        "track-grader-haiku:SHIPPABLE"
+      ],
+      "attested_shippable": false,
+      "notes": [
+        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
+      ]
+    },
+    {
+      "id": "runtime-truth-spine-adoption-2026-06",
+      "file_grade": "7/8",
+      "file_shippable": false,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 2.0,
+        "proven": 3.0,
+        "live": 2.0,
+        "world_class": 3.0,
+        "balanced": 1.0
+      },
+      "score": 58.8,
+      "grade": "F",
+      "consensus_verdict": "IN_PROGRESS",
+      "dissent": [],
+      "attested_shippable": false,
+      "notes": []
+    },
+    {
+      "id": "loop-closure-2026-06",
+      "file_grade": "10/11",
+      "file_shippable": false,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 2.0,
+        "proven": 2.0,
+        "live": 1.0,
+        "world_class": 2.0,
+        "balanced": 1.0
+      },
+      "score": 43.8,
+      "grade": "F",
+      "consensus_verdict": "IN_PROGRESS",
+      "dissent": [
+        "track-grader-sonnet:OVERSTATED"
+      ],
+      "attested_shippable": false,
+      "notes": []
+    },
+    {
+      "id": "truth-graph-platform-2026-06",
+      "file_grade": "15/15",
+      "file_shippable": true,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 3.0,
+        "proven": 3.0,
+        "live": 3.0,
+        "world_class": 3.0,
+        "balanced": 1.0
+      },
+      "score": 70.0,
+      "grade": "C",
+      "consensus_verdict": "SHIPPABLE",
+      "dissent": [
+        "track-grader-sonnet:IN_PROGRESS"
+      ],
+      "attested_shippable": true,
+      "notes": []
+    },
+    {
+      "id": "composer-holon-spine-longrun-2026-06",
+      "file_grade": "6/6",
+      "file_shippable": true,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 2.0,
+        "proven": 2.0,
+        "live": 1.0,
+        "world_class": 2.0,
+        "balanced": 1.0
+      },
+      "score": 43.8,
+      "grade": "F",
+      "consensus_verdict": "OVERSTATED",
+      "dissent": [
+        "track-grader-haiku:SHIPPABLE"
+      ],
+      "attested_shippable": false,
+      "notes": [
+        "file-grade says SHIPPABLE but quality quorum does NOT attest it (OVERSTATED): presence passed, capability not proven live"
+      ]
+    },
+    {
+      "id": "provider-routing-consolidation-2026-06",
+      "file_grade": "7/7",
+      "file_shippable": true,
+      "serves": "substrate-nativeness",
+      "signoff_count": 3,
+      "families": [
+        "claude-haiku",
+        "claude-opus",
+        "claude-sonnet"
+      ],
+      "quorum_met": true,
+      "median_axes": {
+        "wired": 3.0,
+        "proven": 3.0,
+        "live": 2.0,
+        "world_class": 3.0,
+        "balanced": 1.0
+      },
+      "score": 66.2,
+      "grade": "D",
+      "consensus_verdict": "SHIPPABLE",
+      "dissent": [
+        "track-grader-sonnet:IN_PROGRESS"
+      ],
+      "attested_shippable": true,
+      "notes": []
+    }
+  ]
+}

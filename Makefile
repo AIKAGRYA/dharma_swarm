@@ -405,6 +405,15 @@ orient:
 status:
 	$(PYTHON) scripts/governance/repo_status.py
 
+# Track health: deterministic presence grade (check_track_status) then the
+# quality layer (track_health_grade) — a sign-off-gated, quorum-aggregated
+# grade that distinguishes "file-green" from "capability proven live". Reads
+# independent grader attestations in reports/governance/track_signoffs/.
+# Advisory by default; pass ENFORCE=1 to fail on an OVERSTATED track.
+track-health:
+	-$(PYTHON) scripts/governance/check_track_status.py
+	$(PYTHON) scripts/governance/track_health_grade.py $(if $(ENFORCE),--enforce,)
+
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
 # ============================================================================
