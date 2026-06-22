@@ -1,130 +1,243 @@
-# Learned Auditable Orchestrator — Build Spec (TRACK PROPOSAL)
+# Auditable Evolutionary Orchestration Substrate — MASTER BUILD PLAN (LOCKED)
 
-**Status:** PROPOSAL — not yet admitted to the active portfolio.
+**Status:** LOCKED THESIS · TRACK PROPOSAL (not yet admitted — see Governance).
 **Serves spine objective:** `substrate-nativeness`.
-**Author:** Claude remote (Lane B). **Drafted:** 2026-06-22.
+**Converged:** 2026-06-22 by Claude (Lane B, remote), Codex (local), and Fugu (architect),
+at ~95% on a sharpened thesis. **Drafted by:** Claude remote.
 
-> **Governance note (read first).** The portfolio is mid-reconciliation and already
-> over the WIP cap (13 candidate tracks vs `max_active: 10`). This track is a
-> **proposal**, deliberately NOT wired into `ACTIVE_TRACK.yaml` yet. Admit it only
-> after the reconciliation frees a slot (close/fold a stale or local-only track).
-> The declaration block below is ready to paste when that happens.
+> **Reconciliation note.** An egress collaborator produced a richer local copy of the
+> *Verified paper details* at `/Users/dhyana/dharma_swarm` (sources + SHA-256 under
+> `/private/tmp/fugu_sources/`). This document is the build plan; merge that copy's
+> `## Verified paper details (collaborator handoff)` section in before first commit so the
+> exact constants aren't stranded. Committing this file will require a docops inventory regen.
 
 ---
 
-## Why
+## 0. Locked thesis
 
-Sakana shipped **Fugu** (2026-06-22): orchestration-as-a-model — a learned coordinator
-that selects the best model per sub-task, delegates, verifies, and synthesizes behind one
-API. It is the productized form of the **Transcendence Principle already written into our
-`CLAUDE.md`** (diverse competent agents + decorrelated errors + quality aggregation).
+> **Dharma Swarm becomes an auditable evolutionary orchestration substrate. A zero-weight v1
+> coordinator emits `OrchestrationGenome`s; one decorrelated Council (multi-profile) verifies;
+> a two-layer arena — frozen hermetic scorer + evolving task curator — scores *verified
+> capability delta under budget parity*, where success means beating the best single model at
+> equal compute; a MAP-Elites archive promotes winning genomes (including newly-ingested
+> research techniques as genes); and only after enough arena-labeled traces exist do we distill
+> a small learned coordinator. The moat is not a model — it is the receipt-backed,
+> corruption-resistant flywheel that learns to compose many models, tools, organs, and world
+> signals without lying to itself about fitness.**
 
-We already own most of the organs Fugu needed to invent. What we lack is the *learned
-coordinator* that ties them. This track builds that coordinator — and makes it **better
-than Fugu on the two axes where Sakana is structurally weak**: verification rigor and
-auditability. Fugu's routing is proprietary/opaque ("users cannot see which models are
-selected") and its numbers are self-reported. Ours will be **receipted and
-moat-verified** — every routing decision provable.
+**The product is the substrate, not the coordinator.** The learned model is one replaceable
+organ. Build the environment (frozen arena, strict receipts, decorrelated verification, budget
+parity, external truth boundaries, evolution archive) and even a small coordinator becomes
+powerful; without it, any coordinator is a vibes router.
 
-## Research basis (the two recipes we fuse)
+**Power claim, precisely:** *not* 2–10× on a benchmark (Fugu is already ~93–95; no room).
+2–10× on **verified system-power over time** — value-per-decision × trust × self-improvement ×
+breadth — on the axes Fugu structurally cannot follow: reward grounded in verified reality,
+self-modification under telos gates, real-time research integration, and orchestration of our
+own organs. All receipted where Fugu is opaque.
 
-**TRINITY** (arXiv 2512.04695, ICLR 2026) — the *cheap, evolved, reactive* router:
-- Coordinator = small SLM (Qwen3-0.6B class) + a lightweight head after the final hidden
-  layer emitting **`L` model-logits (pick 1 of L agents) + 3 role-logits**
-  (Thinker / Executor / Verifier). No generation for routing — one forward pass.
-- Head adapted via SVF (singular-value fine-tuning, Transformer²), optimized by
-  **separable CMA-ES**: sample perturbed parameter vectors → fitness → fitness-weighted
-  recombine into next parent. Beats RL/imitation/random under tight budget + high dim.
-- Multi-turn **accept-driven loop**: Executor solves → Verifier ACCEPT/reject → Thinker
-  plans if stuck, until ACCEPT or max turns.
+---
 
-**Conductor** (arXiv 2512.04388, ICLR 2026) — the *rich, RL-trained, generative* planner:
-- Base = Qwen2.5-7B, fine-tuned with **GRPO**. Writes a workflow as a sequence of steps,
-  each = **(natural-language instruction, assigned agent, access-list of what that agent
-  can see)** — designing both topology and per-worker prompt.
-- Reward = **correctness + cost penalty**. Trained with **randomized agent pools** → adapts
-  to arbitrary open/closed workers. **Recursive** (self-as-worker). Emergent: problem
-  decomposition + independent attempts + final debate rounds.
+## 1. `OrchestrationGenome` — the central abstraction
 
-The two are complementary: TRINITY = near-free per-turn role routing; Conductor = rich
-upfront planned topology. Fugu ships both layered.
+Every arena attempt is a genome. Evolution mutates genomes; the arena scores genomes; the
+Council verifies genome outcomes; the DPI ranks genome-level techniques; the learned coordinator
+(later) learns to *emit* genomes. This is what makes the system DGM-like instead of a pile of
+prompt experiments.
 
-## Substrate mapping — what we already have
+```
+OrchestrationGenome:
+  genome_id:            str
+  task_decomposition:   [subtask, ...]
+  role_graph:           communication topology (who talks to whom, in what order)
+  roster:               [model|tool|organ|human, ...]   # drawn from existing model_pool
+  prompt_fragments:     per-role NL instructions / program fragments
+  context_plan:         retrieval / what each role sees ("access_list": [] | "all" | [idx,...])
+  budget_allocation:    per-role token/compute/latency budget (must sum within parity cap)
+  verification_plan:    which Council profile(s) gate which steps
+  adjudication_rule:    how candidate outputs combine (vote / debate / moat-gate / synthesize)
+  stop_condition:       accept-on-Council-ACCEPT | max-turns | budget-exhausted
+  # refinement B — quality-diversity, not top-k:
+  lineage:              {parent_genome_id, mutation_op}
+  behavioral_descriptors: [...]   # MAP-Elites bins (decomposition depth, roster diversity, topology shape, ...)
+```
 
-| Fugu/paper component | We already own |
-|---|---|
-| Evolved coordinator (sep-CMA-ES) | `DarwinEngine` (`evolution.py`) — evolutionary, diversity-preserving |
-| Topology execution (fan-out/in/pipeline/debate) | `orchestrator.py` topology primitives |
-| Verifier role / debate | `world_radar/frontier_council.py` — decorrelated cross-falsification moat |
-| Reward (correctness + cost) | `ginko_brier.py` (Brier) + `telos_gates.py` + `cost_efficiency` vital sign |
-| Randomized diverse pool | multi-provider pool + `diversity_archive.py` (MAP-Elites, measured) |
-| Recursion (self-as-worker) | `cascade.py` LoopEngine `F(S)=S` |
-| **Audit (Fugu has none)** | `spine` **EvidenceReceipt** — per-dispatch proof |
+A **newly-ingested research technique is just a candidate gene** (a prompt fragment, a roster
+member, a topology, an adjudication rule). Research ingestion and orchestration evolution are the
+*same flywheel*. (Refinement D.)
 
-## The build — staged, lowest-risk first
+---
 
-### Stage 0 — Auditable + moat-verified wrapper (NO training; weeks)
-Wrap the **existing** power-first router with two things already built:
-- Emit a **`RoutingReceipt`** (read-only projection of `spine.EvidenceReceipt`) for every
-  selection: which provider, why (precedence trace), cost, verdict. No new authority.
-- Gate any multi-candidate answer through the **Frontier Council moat** as the aggregator
-  → one corroborated verdict + receipt.
+## 2. One Council substrate (multi-profile)
 
-**Result: already beats Fugu on auditability + verification rigor, with zero learned model.**
+Do **not** build five partial stomachs. One verifier substrate, multiple profiles:
+`world_signal_verification`, `orchestration_trace_verification`, `code_patch_verification`,
+`external_receipt_verification`, `research_claim_verification`, `promotion_gate`.
 
-*Owned new surfaces:* `dharma_swarm/coordination/routing_receipt.py`,
-`dharma_swarm/coordination/verified_aggregator.py`,
-`scripts/governance/check_routing_receipt.py`,
-`tests/test_routing_receipt.py`, `tests/test_verified_aggregator.py`.
-*Acceptance:* every routing decision in a fixture run carries a `RoutingReceipt`;
-multi-candidate fixtures resolve through the moat to one verdict; hermetic replay check
-green; `dispatch_authority` stays False; no edits to `provider_policy.py` (consult only).
+**Shared invariants (all profiles):** quarantine untrusted input; require **≥2 decorrelated
+evaluator families AND ≥2 decorrelated source families** to corroborate; replayable receipts;
+**no hidden action authority** (`dispatch_authority=False`); explicit verdicts
+(corroborated/refuted/insufficient/quarantined). Different profiles differ only in schema +
+thresholds. Adopt #662's `frontier_council.py` as the first profile and generalize.
 
-### Stage 1 — TRINITY layer: an evolved CoordinationHead (DarwinEngine IS the optimizer)
-A small hidden-state head emitting `(provider_logits[L], role_logits[3])` per turn, with
-the Thinker/Executor/Verifier accept-loop. **Evolve it with `DarwinEngine`** (we have the
-evolutionary substrate TRINITY needed CMA-ES for), fitness = **Brier-scored task success**
-on a frozen offline eval set, decorrelation preserved via `diversity_archive`. The Verifier
-role is the **Frontier Council moat** (stronger than a single Verifier role).
+---
 
-*Owned new surfaces:* `dharma_swarm/coordination/coordination_head.py`,
-`dharma_swarm/coordination/accept_loop.py`,
-`dharma_swarm/coordination/evolve_coordinator.py` (DarwinEngine harness),
-`scripts/governance/check_coordinator_replay.py`,
-`tests/test_coordination_head.py`, `tests/test_accept_loop.py`.
-*Acceptance:* head is a pure deterministic function of (context embedding, weights);
-offline eval harness runs on a **fixture pool with no live provider calls**; evolved head
-beats the hand-tuned precedence baseline on the frozen eval (Brier); accept-loop terminates
-on moat-ACCEPT; every turn receipted.
+## 3. The two-layer arena (the keystone)
 
-### Stage 2 — Conductor layer: generative topology planner (DEFERRED; research lane)
-A planner that writes `(instruction, agent, access-list)` steps for `orchestrator.py` to
-execute, trained with **GRPO + pool randomization**, reward = telos-gated Brier + receipted
-external-acted outcomes; recursion via LoopEngine. **Out of initial scope** — needs a rollout
-harness + compute. Hold behind Stage 0/1 proof and a flag. De-risk training stability with
-Graph-GRPO (arXiv 2603.02701).
+Split, with a hard boundary between them, so the system can never improve at its own moving
+target:
 
-## Differentiators (why this is *higher quality than Sakana*, not equal)
-1. **Verification:** decorrelated cross-falsification moat > a single Verifier role.
-2. **Auditability:** per-decision EvidenceReceipt > Fugu's opaque routing.
-3. **Measured decorrelation:** `diversity_archive` Krogh-Vedelsby term > unpublished pool diversity.
-4. **Honest eval:** receipted, third-party-verifiable benchmark loop > self-reported numbers
-   (recall Fable 5 still beats Fugu Ultra 80.3 vs 73.7 on SWE-Bench Pro).
+- **(A) Scorer — frozen, hermetic, replayable.** Sealed labels where possible, baseline controls,
+  **budget parity**, scorer_hash + task_manifest_hash, candidate-visible / scorer-only split,
+  anti-contamination checks. The scored slice is **frozen per evaluation epoch.**
+- **(B) Task curator — evolving, world-fed** (eventually via the throat/Bronze ingestion). May
+  expand freely, but cannot mutate the frozen slice mid-epoch.
 
-## Non-goals
-- Do NOT own or modify `provider_policy.py`, `model_hierarchy.py`, or `orchestrator.py`
-  routing wiring — **consult/reuse only** (avoids overlap with provider-routing-consolidation
-  and runtime-truth-spine-adoption).
-- Do NOT change the `EvidenceReceipt` schema; project over it.
-- Do NOT make live provider calls in CI or unit tests (fixture pool only).
-- Do NOT flip dispatch authority or touch archive fitness.
-- Do NOT copy Sakana internals; implement the shared principle on our substrate, citing
-  Krogh-Vedelsby / Zhang 2024 / Abreu 2025 as the theory.
+**Success is defined by the existence test (refinement A):** a genome is `positive_lift_candidate`
+**only if it beats `best_single_full_budget` at equal total compute, with significance.** This is
+the Krogh-Vedelsby claim made falsifiable. Beating best-single by spending more is theater.
 
-## Track declaration block (paste into ACTIVE_TRACK.yaml when a slot frees)
+**Arena v1 = ONLY programmatically-verifiable tasks** (code passing tests, math with known
+answers) so correctness is objective and the "Council judges instead of verifies" corruption
+vector is eliminated at cold start (refinement C). Open-ended / Council-adjudicated tasks → v2.
+
+**Arena v1 MVP** (keep it small; we learned this from Forge v0):
+- 10–30 tasks · 3 controls · 1 candidate · strict receipts · budget parity · replayable scorer · bootstrap CI
+- **Controls:** `best_single_full_budget` (the GATE), `same_budget_self_moa`, `random_or_static_ensemble`
+- **Candidate:** prompted/evolved coordinator genome
+- **Outputs:** `arena_run.json`, `scorecard.json`, `trace_receipts.jsonl`, `route_receipts.jsonl`,
+  `council_receipts.jsonl`, `power_index.json`, `decision_packet.md`
+- **Closeout states:** `positive_lift_candidate` · `measured_negative` · `inconclusive_low_power`
+  · `contaminated_quarantine` · `blocked_with_evidence`
+
+---
+
+## 4. Decorrelation reward — *decorrelated correctness*, not disagreement (refinement, Fugu+Claude)
+
+Reward error-covariance reduction, never debate theater:
+```
+decorrelated_correctness_bonus =
+    leave_one_out_marginal_contribution(role)      # did adding it help the FINAL answer?
+  × nonredundancy(role.evidence / error_mode)      # is its error decorrelated from the others?
+  × final_correctness_gate                         # 0 if the final outcome is wrong
+if final_outcome_wrong: decorrelation_bonus <= 0
+```
+Folded into `VerifiedCapabilityDelta`. This is where we structurally out-*think* Fugu (it rewards
+correctness only); not just out-integrate it.
+
+---
+
+## 5. Dharma Power Index (capability in the numerator, trust as multiplier)
+
+```
+DPI = VerifiedCapabilityDelta × Trust × ReuseOrLearningValue
+      / (Cost × Latency × Fragility × Complexity)
+```
+- **VerifiedCapabilityDelta:** error-reduction vs best-single-at-budget · value-per-decision ·
+  task-family breadth · research-integration velocity · self-improvement rate. (Tricks.)
+- **Trust** (multiplier, never the headline): receipt coverage · replay pass rate · corroboration
+  strength · auditability.
+- **ReuseOrLearningValue (refinement F): retroactive-only.** Counts when a promoted,
+  arena-verified reusable artifact *actually results later* — never self-declared at runtime
+  (else it becomes a failure-laundering loophole). Log it before activating it.
+
+---
+
+## 6. Anti-corruption invariants — THE moat (biggest risk is fitness corruption, not model quality)
+
+These are load-bearing. Every one closes a way the system could lie to itself:
+1. Frozen scored slice per epoch — tasks never move after results are seen.
+2. Council **verifies**, never judges-for-reward; v1 correctness comes from sealed labels.
+3. Budget parity enforced and logged on every run.
+4. **External truth boundary:** internal receipts never count as external proof — only
+   countersigned external acted receipts above the One-Wire quorum touch archive fitness.
+5. No verbose-debate reward — reward error-covariance reduction, correctness-gated (§4).
+6. Trust is a multiplier, never the numerator (§5).
+7. Routing cannot hide failures — every failure is receipted.
+8. The local dirty checkout is never truth — `origin/main` + receipts are.
+9. `LearningValue` is retroactive-only (§5).
+
+---
+
+## 7. Cold-start flywheel + training-example schema
+
+```
+prompted v1 generates OrchestrationGenome attempts
+  → arena scores them (objective, verifiable tasks)
+  → winners enter the MAP-Elites archive (quality-diversity, not top-k)
+  → archive becomes the SFT corpus
+  → small coordinator is distilled, then generates better genomes
+  → repeat;  research techniques enter as candidate genes throughout
+```
+Early labels are **arena outcomes, not model judgments.** Training example:
+```json
+{ "task_id":"...", "orchestration_genome":{...}, "trace":[...], "outcome":{...},
+  "score":0.73, "baseline_scores":{...}, "capability_delta":0.18, "trust_multiplier":0.91,
+  "cost":1.42, "latency":38.0, "fragility":0.2, "receipt_refs":[...] }
+```
+The M5 fills the arena with local rollouts immediately; no GPU needed for the flywheel to start.
+
+---
+
+## 8. Optimizer + model ladder (Darwin-first; GRPO surgical; small-before-large)
+
+- **DarwinEngine / MAP-Elites is the daily optimizer** — topology/routing/roster are discrete,
+  sparse, cheap to search; evolution beats RL here (TRINITY's own sep-CMA-ES finding).
+- **GRPO is a surgical scalpel**, valid the moment the arena produces real labels (M5 local +
+  rented-GPU bursts). Not the default; not "someday" either.
+- **Model ladder:** 0.6–1.7B TRINITY-style reactive head (cheap routing) → 8–14B Conductor-style
+  planner for first SFT/GRPO → **30B-A3B / 32B = serious sweet spot once labels exist** → 70B as
+  apex teacher/critic/distiller only, never the always-on router. Candidates: Qwen3 8/14/32B,
+  Qwen3 30B-A3B, Qwen2.5-Coder-32B. Our own corpus = orientation/self-modeling data only; the
+  training core is orchestration traces, receipts, arena outcomes, failures, promotion decisions.
+
+---
+
+## 9. Verified paper constants (from egress; merge richer copy before commit)
+
+**TRINITY (2512.04695):** ~0.6B coordinator SLM + lightweight head (<20K trainable); hidden-state →
+**L model-logits + 3 role-logits** (Thinker/Executor/Verifier); for 7 agents = 10 logits; head
+adapted via SVF (Transformer²); **sep-CMA-ES** population λ=`ceil(4+3·ln n)` (≈32 for n≈10k),
+budget ~1.5k–40k evals; accept-driven termination; sep-CMA-ES beats RL/imitation under high-dim,
+sparse-terminal-reward, tight-budget.
+**Conductor (2512.04388):** Qwen2.5-7B + **GRPO**, 200 iterations, 4 questions × 64 rollouts =
+batch 256, conductor temp 1.0, AdamW lr 1e-6 cosine warmup 0.03, **KL penalty 0**, up to 5 workflow
+steps; output = **three Python lists `model_id`, `subtasks`, `access_list`**; `access_list` ∈
+`[] | "all" | [idx,...]` (binary chosen — fine-grained didn't materially help). **Correction:**
+the paper has **no explicit correctness−λ·cost reward**; cost is handled by rollout budgets/limits.
+Any cost term in our DPI is *our* extension, not copied.
+
+---
+
+## 10. Locked build order
+
+0. **Reconciliation / preservation / off-machine backup** (Lane C + Fugu) — *step zero, underway;
+   the orchestrator is gated on a trustworthy `origin/main`.*
+1. **Adopt/rebase/fix #662's verifier substrate** — not a blind merge (it has CI/review/safety
+   caveats). This becomes the Council engine.
+2. **Generalize the Council** into the multi-profile substrate (§2).
+3. **Arena v1** (verifiable-only) with the **best-single gate** (§3). *Throat seam
+   (Bronze→Council→warrant) runs in parallel as a sibling Council consumer and feeds the v2 task
+   curator — it does NOT gate arena v1.* (Refinement G — Fugu to confirm.)
+4. **Zero-weight orchestrator v1** emitting `OrchestrationGenome` (prompted + Darwin-evolved +
+   bandit routing + Council + route receipts). **No SFT/GRPO/GPU.**
+5. **Run controls**, including the best-single gate → first `decision_packet.md`.
+6. **Start the flywheel** — promote winning genomes to the MAP-Elites archive; turn on
+   research-as-gene ingestion.
+7. **Distill the small coordinator** (TRINITY-style head) on arena-labeled genome traces.
+8. **Surgical GRPO** spike (4–14B) once labels are real → scale to 30/32B after proof → 70B apex-only.
+
+---
+
+## 11. Owned surfaces + track declaration
+
+New, non-colliding surfaces (consult/reuse `provider_policy`, `model_hierarchy`, `orchestrator.py`,
+`evolution.py`, `diversity_archive.py`, `ginko_brier.py` — do not own them). The **Council is shared
+substrate** with the seeing-organ track; coordinate (single substrate, not two).
+
 ```yaml
-- id: learned-auditable-orchestrator-2026-06
-  name: Learned Auditable Orchestrator — receipted, moat-verified model coordination
+- id: orchestration-substrate-2026-06
+  name: Auditable Evolutionary Orchestration Substrate — genome arena + one Council + flywheel
   status: ACTIVE
   opened_at: "2026-06-22"
   verified_at: "2026-06-22"
@@ -132,22 +245,38 @@ Graph-GRPO (arXiv 2603.02701).
   owner: "@AmitabhainArunachala"
   serves: substrate-nativeness
   complements:
-    - provider-routing-consolidation-2026-06
-    - runtime-truth-spine-adoption-2026-06
-    - seeing-organ-2026-06
+    - provider-routing-consolidation-2026-06   # feeds the genome roster (dozens of models)
+    - seeing-organ-2026-06                      # shares the one Council substrate
+    - runtime-truth-spine-adoption-2026-06      # EvidenceReceipt = route/trace receipts
+    - loop-closure-2026-06
   owned_surfaces:
-    - dharma_swarm/coordination/**
+    - dharma_swarm/coordination/**              # genome.py, arena/, dpi.py, flywheel/, routing_receipt.py
+    - dharma_swarm/council/**                   # shared multi-profile Council (adopts #662's frontier_council as profile 1)
+    - scripts/governance/check_arena_replay.py
     - scripts/governance/check_routing_receipt.py
-    - scripts/governance/check_coordinator_replay.py
-    - tests/test_routing_receipt.py
-    - tests/test_verified_aggregator.py
-    - tests/test_coordination_head.py
-    - tests/test_accept_loop.py
+    - scripts/governance/check_council_invariants.py
+    - tests/test_orchestration_genome.py
+    - tests/test_arena_v1.py
+    - tests/test_council_profiles.py
+    - tests/test_dpi.py
     - docs/architecture/LEARNED_AUDITABLE_ORCHESTRATOR_SPEC.md
-  moves_vital_signs: [quality_gates, tool_coverage, cost_efficiency]
+  moves_vital_signs: [quality_gates, tool_coverage, eval_coverage, cost_efficiency]
 ```
 
+---
+
+## 12. Governance
+
+- **Do not admit this track yet.** The portfolio is mid-reconciliation and over the WIP cap
+  (`max_active: 10`). Admit only after a slot frees — the clean baton-pass is closing
+  `provider-routing-consolidation` (substantially landed on `origin/main`), with
+  `orientation-graph` reactivation dropped and `cybernetics-codex-stewardship` folded into
+  loop-closure as two further free slots.
+- The Council is co-owned with `seeing-organ`; treat it as one substrate (coordinate, don't fork).
+- Committing this file changes the tracked markdown count → run docops inventory regen.
+
 ## Sources
-TRINITY arXiv 2512.04695 · Conductor arXiv 2512.04388 (OpenReview U23A2BUKYt) ·
-Sakana Fugu (sakana.ai/fugu) · Graph-GRPO arXiv 2603.02701 · AgentConductor arXiv 2602.17100 ·
-Krogh-Vedelsby 1995 · Zhang et al. NeurIPS 2024 · Abreu et al. 2025 (cited in CLAUDE.md).
+TRINITY arXiv 2512.04695 · Conductor arXiv 2512.04388 (OpenReview U23A2BUKYt) · Sakana Fugu
+(sakana.ai/fugu, SakanaAI/fugu) · Graph-GRPO 2603.02701 · AgentConductor 2602.17100 ·
+Krogh-Vedelsby 1995 · Zhang et al. NeurIPS 2024 · Abreu et al. 2025. Convergence record: Claude
+(Lane B) ↔ Codex ↔ Fugu, 2026-06-22.
