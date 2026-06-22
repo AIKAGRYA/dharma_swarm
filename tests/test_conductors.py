@@ -21,7 +21,7 @@ class TestConductorConfigs:
         assert cfg["name"] == "conductor_claude"
         assert cfg["role"] == AgentRole.CONDUCTOR
         assert cfg["provider_type"] == _resolve_conductor_provider()
-        assert cfg["model"] == "claude-opus-4-6"
+        assert cfg["model"] == canonical_default_model(ProviderType.ANTHROPIC)
         assert cfg["wake_interval_seconds"] == 3600.0
         assert cfg["max_turns"] == 15
         assert "v7" in cfg["system_prompt"].lower() or "non-negotiable" in cfg["system_prompt"].lower()

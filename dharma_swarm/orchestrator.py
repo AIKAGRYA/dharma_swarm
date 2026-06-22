@@ -914,6 +914,15 @@ class Orchestrator:
         td: TaskDispatch,
         meta: dict[str, Any],
     ) -> dict[str, Any]:
+        if str(os.environ.get("DHARMA_FAST_BOOT", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            meta["context_bundle_status"] = "fast_boot_skipped"
+            td.metadata["context_bundle_status"] = "fast_boot_skipped"
+            return meta
         if task is None:
             meta["context_bundle_status"] = "missing_task"
             td.metadata["context_bundle_status"] = "missing_task"
