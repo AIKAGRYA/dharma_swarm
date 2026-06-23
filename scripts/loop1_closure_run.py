@@ -12,15 +12,24 @@ dispatch_dropoff occurrences, and stigmergy hot paths (the ADAPT half of
 Loop 1 — routing in tick N+1 reads outcomes of tick N).
 
 Usage:
+    # KEYLESS close — no API key needed. The claude_code lane is live whenever
+    # the `claude` binary is present (every Claude Code web/remote/CI session).
+    # Proven 2026-06-23: 2/2 tasks completed, 0 dropoffs, served_provider=claude_code
+    # (reports/loop_closure/2026-06-23_loop1_keyless_claude_code_close.json).
+    .venv/bin/python scripts/loop1_closure_run.py \
+        --provider claude_code --model claude-sonnet-4-5 --tasks 2
+    # Check what is dispatchable first (NEVER assume 'no provider'):
+    #   python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"
+
     # Throwaway smoke/load run (sandbox tempdir — NOT witnessed by make orient):
     .venv/bin/python scripts/loop1_closure_run.py --tasks 3
     .venv/bin/python scripts/loop1_closure_run.py --tasks 100 --agents 3 \
         --timeout-per-task 240 --report reports/loop_closure/run.json
 
     # Real closure run (writes to the canonical runtime.db make orient reads,
-    # so a green run flips loop1_live). Needs a reachable provider/key:
+    # so a green run flips loop1_live). Keyless via claude_code, or any keyed lane:
     .venv/bin/python scripts/loop1_closure_run.py --canonical \
-        --provider openrouter --model z-ai/glm-4.6 --tasks 1
+        --provider claude_code --model claude-sonnet-4-5 --tasks 1
     # then: make orient   →   "Loop 1 (provider chain + dispatch): LIVE"
 """
 

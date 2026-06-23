@@ -1,0 +1,50 @@
+{
+  "provider": "claude_code",
+  "model": "claude-sonnet-4-5",
+  "spine_dispatch": "1",
+  "read_only_boot": "1",
+  "ollama_force_local": "1",
+  "agents": 1,
+  "tasks_requested": 2,
+  "tasks_completed": 2,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "served_provider_truth": {
+    "runtime_db": "/tmp/loop1-closure-70tacmw5/state/runtime.db",
+    "exists": true,
+    "completed_runs_with_truth": 2,
+    "delegation_receipts_with_truth": 2,
+    "runtime_receipts_with_truth": 0,
+    "sample": {
+      "source": "receipt_json",
+      "run_id": "run_fb9661e61aa14c9c",
+      "served_provider": "claude_code",
+      "served_model": "claude-sonnet-4-5"
+    }
+  },
+  "evidence_receipts": {
+    "bd9deb74-4d80-428b-87f6-11912ab4a434": "ok",
+    "62f5291e-5ef6-4826-a929-9d9729bb1e0a": "ok"
+  },
+  "tick_errors": [],
+  "ticks": 119,
+  "stigmergy_hot_paths": [],
+  "state_dir": "/tmp/loop1-closure-70tacmw5",
+  "canonical_state": false,
+  "tasks": [
+    {
+      "task_id": "713e0d4c4e0a4fdf",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "<mem>\nconfidence: 0.9\nkey_facts:\n- Task requires two-sentence summary of why feedback loops need both sensing and acting\n- Sandbox restrictions prevent writing "
+    },
+    {
+      "task_id": "b4d63364d7414f18",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "<mem>\nconfidence: 0.95\nkey_facts:\n- Three failure modes identified: lost tasks, duplicate processing, head-of-line blocking\n- Each has a standard mitigation fro"
+    }
+  ]
+}
