@@ -280,21 +280,21 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 | Loop | Status | Update |
 |------|--------|--------|
 | 9: Conductors | PARTIAL | Cron health tracks 7 jobs. Conductor configs use proper enums. Blocked on LLM provider for actual conductor work. |
-| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved but no real provider. |
+| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved. Dispatch IS available (keyless claude_code). |
 | 11: Replication Monitor | PARTIAL | MM-02/03 RESOLVED. Replication path structurally correct. No trigger events yet. |
-| 12: Self-Improvement | NO | DarwinEngine instantiable. `auto_evolve()` fixed. Requires `DHARMA_SELF_IMPROVE` + provider. |
-| 13: Free Evolution Grind | NO | Requires provider chain. Router works but OPENROUTER_API_KEY not set, ollama unreachable. |
+| 12: Self-Improvement | NO | DarwinEngine instantiable. `auto_evolve()` fixed. Requires `DHARMA_SELF_IMPROVE` (dispatch is available, see below). |
+| 13: Free Evolution Grind | NO | Router works AND dispatch is available keyless (claude_code); needs the evolution cadence wired, not a key. |
 
 ---
 
-## Which Loops Close First After Provider Configuration
+## Which Loops Close First — dispatch is ALREADY available (no key needed)
 
-With 0 BLOCKERs remaining, the cascade is now purely operational:
+**Correction (2026-06-23):** the long-standing "needs a provider key / no real provider" claim was FALSE. The `claude_code` lane is **keyless** and live whenever the `claude` binary is on PATH (every Claude Code web/remote/CI session) — verified by a real completion. The single source of truth is `key_oracle.dispatchable_now()` (surfaced in `make onboard`), NOT a frozen line in this map. With 0 BLOCKERs remaining, the cascade is purely operational and a key is **optional** (only to add OTHER providers).
 
-**Step 1: Configure one LLM provider** (set OPENROUTER_API_KEY or start local ollama)
+**Step 1: confirm dispatch** — `python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"` (claude_code = keyless). Add `OPENROUTER_API_KEY` / ollama only to widen the roster.
 
-**Immediately closeable (provider only):**
-- Loop 1 (Swarm Task) — routing works, dispatch path clear, just needs `AgentRunner` with a real provider
+**Immediately closeable (dispatch already available, keyless):**
+- Loop 1 (Swarm Task) — routing works, dispatch path clear, keyless claude_code lane is live; just needs `AgentRunner` wired into the live loop
 - Loop 6 (Witness) — already works on test data, will audit real actions immediately
 - Loop 2 (Organism Heartbeat) — invariants will compute real data
 
