@@ -23,21 +23,27 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shutil
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-ACTIVE_TRACK_PATH = Path("docs/governance/ACTIVE_TRACK.yaml")
-REPORTS_DIR = Path("reports/governance")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ACTIVE_TRACK_PATH = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+REPORTS_DIR = REPO_ROOT / "reports/governance"
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
+
+
+def repo_path(path: str | Path) -> Path:
+    """Resolve track-authored relative paths against the repository root."""
+    p = Path(path)
+    return p if p.is_absolute() else REPO_ROOT / p
 
 
 @dataclass
@@ -210,7 +216,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
 
 
 def check_file_exists(file_path: str) -> CriterionResult:
-    path = Path(file_path)
+    path = repo_path(file_path)
     return CriterionResult(
         id="", kind="file_exists",
         passed=path.exists(),
@@ -219,7 +225,7 @@ def check_file_exists(file_path: str) -> CriterionResult:
 
 
 def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
-    path = Path(file_path)
+    path = repo_path(file_path)
     if not path.exists():
         return CriterionResult(id="", kind="file_contains", passed=False,
                                 detail=f"{file_path} missing")
@@ -284,12 +290,12 @@ def check_commit_on_main(commit: str) -> CriterionResult:
                                detail="git unavailable; cannot verify commit on main")
     ref = "origin/main"
     probe = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{ref}^{{commit}}"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, cwd=REPO_ROOT)
     if probe.returncode != 0:
         ref = "HEAD"
     try:
         res = subprocess.run(["git", "merge-base", "--is-ancestor", commit, ref],
-                             capture_output=True, text=True, timeout=15)
+                             capture_output=True, text=True, timeout=15, cwd=REPO_ROOT)
     except (subprocess.TimeoutExpired, OSError) as exc:
         return CriterionResult(id="", kind="commit_on_main", passed=False,
                                detail=f"commit_on_main: {type(exc).__name__}")
@@ -308,7 +314,7 @@ def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
         res = subprocess.run(
             [sys.executable, "-m", "pytest", test_target, "-q", "--no-header",
              "-p", "no:cacheprovider"],
-            capture_output=True, text=True, timeout=timeout,
+            capture_output=True, text=True, timeout=timeout, cwd=REPO_ROOT,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return CriterionResult(id="", kind="test_passes", passed=False,
@@ -323,7 +329,7 @@ def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
 def check_receipt_valid(file_path: str, requires_keys: list[str]) -> CriterionResult:
     """A receipt artifact must EXIST and carry the required structural keys —
     behavioral evidence, not just file presence."""
-    path = Path(file_path)
+    path = repo_path(file_path)
     if not path.exists():
         return CriterionResult(id="", kind="receipt_valid", passed=False,
                                detail=f"receipt {file_path} MISSING")

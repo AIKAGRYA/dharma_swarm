@@ -147,3 +147,20 @@ def test_provider_routing_track_earns_rigorous_shippable():
     r = evaluate_track(track)
     assert r["has_rigorous_evidence"] is True, r["ship_blocks"]
     assert r["shippable"] is True, r["ship_blocks"]
+
+
+def test_provider_routing_track_eval_is_repo_root_anchored(tmp_path, monkeypatch):
+    """Track criteria are authored as repo-relative paths and pytest targets.
+    Evaluation must not depend on the caller's current working directory."""
+    from check_track_status import _parse_minimal_yaml, normalize_portfolio
+
+    monkeypatch.chdir(tmp_path)
+    raw = _parse_minimal_yaml((REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml").read_text())
+    portfolio = normalize_portfolio(raw)
+    track = next(
+        t for t in portfolio["active_tracks"]
+        if t.get("id") == "provider-routing-consolidation-2026-06"
+    )
+    r = evaluate_track(track)
+    assert r["criteria_pass"] is True, [c.detail for c in r["completion"] if not c.passed]
+    assert r["shippable"] is True, r["ship_blocks"]
