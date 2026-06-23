@@ -29,13 +29,13 @@ def _probe_live_ops(ctx: ProbeContext) -> dict[str, Any]:
         sys.path.insert(0, repo_root_str)
     try:
         from scripts.runtime.live_ops_census import build_live_ops_census
-    except Exception as exc:  # pragma: no cover - import-path defensive
-        ctx.error("live_ops_census.import", str(exc))
+    except Exception:  # pragma: no cover - import-path defensive
+        ctx.error("live_ops_census.import", "live-ops census import failed")
         return {"enabled": False, "reason": "import_failed", "summary": {}, "surfaces": []}
     try:
         census = build_live_ops_census(repo_root=ctx.repo_root, run_probes=ctx.include_live_probes)
-    except Exception as exc:  # pragma: no cover - runtime defensive
-        ctx.error("live_ops_census.build", str(exc))
+    except Exception:  # pragma: no cover - runtime defensive
+        ctx.error("live_ops_census.build", "live-ops census build failed")
         return {"enabled": False, "reason": "build_failed", "summary": {}, "surfaces": []}
 
     surfaces = census.get("surfaces", []) if isinstance(census, dict) else []
@@ -384,11 +384,11 @@ def _sqlite_table_summary(path: Path) -> dict[str, Any]:
             for table in tables[:10]:
                 try:
                     counts[table] = int(conn.execute(f'select count(*) from "{table}"').fetchone()[0])
-                except Exception as exc:  # pragma: no cover - table-specific defensive
-                    counts[table] = f"unreadable: {exc}"
+                except Exception:  # pragma: no cover - table-specific defensive
+                    counts[table] = "unreadable"
             return {"readable": True, "tables": tables[:30], "table_counts": counts}
-    except Exception as exc:
-        return {"readable": False, "error": str(exc), "tables": [], "table_counts": {}}
+    except Exception:
+        return {"readable": False, "error": "database probe failed", "tables": [], "table_counts": {}}
 
 
 def _probe_runtime_db_and_receipts(ctx: ProbeContext) -> dict[str, Any]:

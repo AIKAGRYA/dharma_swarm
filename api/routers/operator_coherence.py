@@ -56,4 +56,4 @@ def operator_coherence_report(
         return _envelope(payload, payload.get("source_errors", []))
     except Exception as exc:  # pragma: no cover - defensive API boundary
         logger.exception("operator-coherence/report failed")
-        return _envelope(None, [{"source": "operator_coherence_projection", "error": str(exc)}])
+        return _envelope(None, [{"source": "operator_coherence_projection", "error": "internal error"}])

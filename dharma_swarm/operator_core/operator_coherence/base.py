@@ -162,8 +162,8 @@ def _run(cmd: list[str], *, cwd: Path, timeout: float = 6.0) -> dict[str, Any]:
     try:
         proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False)
         return {"ok": proc.returncode == 0, "returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"ok": False, "returncode": -1, "stdout": "", "stderr": str(exc)}
+    except (OSError, subprocess.TimeoutExpired):
+        return {"ok": False, "returncode": -1, "stdout": "", "stderr": "command execution failed"}
 
 
 def _evidence(
@@ -246,4 +246,5 @@ class ProbeContext:
     track_keywords: dict[str, list[str]] = field(default_factory=dict)
 
     def error(self, source: str, error: str) -> None:
-        self.source_errors.append({"source": source, "error": error, "timestamp": _iso()})
+        _ = error
+        self.source_errors.append({"source": source, "error": "probe failed", "timestamp": _iso()})
