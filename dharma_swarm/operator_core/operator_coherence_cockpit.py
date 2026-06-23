@@ -1438,7 +1438,6 @@ def _compute_readiness(
     if active == 0:
         governance_score = min(governance_score, 35)
 
-    prs = github.get("prs", [])
     if github.get("enabled"):
         failed_prs = sum(1 for c in cards if c["kind"] == "pull_request" and c["risk"] == "ci_failed")
         stale_prs = sum(1 for c in cards if c["kind"] == "pull_request" and c["risk"] == "stale_pr")
