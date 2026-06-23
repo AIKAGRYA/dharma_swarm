@@ -65,7 +65,7 @@ Bounded Loop 1 replay proof (current code/provider lane):
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
 | 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 6 | Witness Auditor | 3600s | **PARTIAL** | Audit/receipt activity exists, but current Loop 1 production tie-in is not proven. |
+| 6 | Witness Auditor | 3600s | **CLOSED** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
 | 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
@@ -239,7 +239,7 @@ ADAPT:   Record witness observation to ~/.dharma/witness/
          Evolution engine uses witness scores as fitness signal
 ```
 
-**Current state (updated):** **Fully functional in test context.** 1,013 witness entries recorded across 2 days. Correctly BLOCKED destructive filesystem commands (AHIMSA violation). PASSED 444 actions, BLOCKED 230, WARNED 4. Provider mismatch (MM-11) RESOLVED — uses `OpenRouterFreeProvider`. Phases audited: before_write (394), before_complete (144), before_pivot (134), conductor_wake (2), before_git (2), before_debug (2). **This loop closes when real agent actions replace test-generated actions.**
+**Current state (updated 2026-06-23): CLOSED via bounded replay.** The gap was an interface mismatch: task completions emitted progress/lifecycle/bus events but never a `task_completed` *trace*, so the Witness (which senses from `TraceStore`) only ever saw `boot`/`heartbeat` and never real agent work. Fixed by wiring `orchestrator._emit_completion_trace` so every completion lands a `task_completed` trace carrying duration and gate_results. With that, `scripts/loop6_witness_closure_run.py` drives the full cycle on real data: dispatch real tasks keyless (claude_code) → Witness samples the real completion traces (sense) → evaluates telos alignment / mimicry / gate sufficiency (interpret) → classifies actionable findings (constrain) → publishes them to the stigmergy governance channel + operator memory (act) → governance marks strictly grow, feeding governance and downstream loops (adapt). The cybernetics-codex audit independently recomputes `CLOSED_BOUNDED_REPLAY` from the receipt (real_data, all 5 transitions, adapt before≠after fed forward, no tick errors). Prior history: 1,013 witness entries across 2 days; correctly BLOCKED destructive filesystem commands (AHIMSA).
 
 ---
 

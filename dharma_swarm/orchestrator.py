@@ -600,6 +600,49 @@ class Orchestrator:
                         "Lifecycle event ingestion failed (non-critical): %s", exc
                     )
 
+    async def _emit_completion_trace(
+        self,
+        *,
+        task: Any,
+        agent_id: str,
+        duration_sec: float,
+        result: str | None,
+        success: bool,
+    ) -> None:
+        """Write a task_completed trace into the TraceStore (best-effort).
+
+        The orchestrator already records progress/lifecycle/bus events on
+        completion, but none of those land in the TraceStore the Witness
+        auditor (Loop 6) and other trace-reading cascade loops sense from — so
+        the auditor only ever saw boot/heartbeat traces and never real agent
+        work. This emits the missing trace so the fed cascade can audit actual
+        completions. Carries gate_results when the task recorded them, so the
+        Witness can honestly evaluate telos-gate sufficiency.
+        """
+        try:
+            from dharma_swarm.traces import TraceEntry, TraceStore
+
+            meta = getattr(task, "metadata", {}) or {}
+            gate_results = meta.get("gate_results") or {}
+            store = TraceStore()
+            await store.init()
+            await store.log_entry(
+                TraceEntry(
+                    agent=str(agent_id),
+                    action="task_completed" if success else "task_failed",
+                    state="completed" if success else "failed",
+                    metadata={
+                        "task_id": getattr(task, "id", ""),
+                        "task_title": getattr(task, "title", ""),
+                        "duration_seconds": round(duration_sec, 4),
+                        "result_chars": len(result or ""),
+                        "gate_results": gate_results,
+                    },
+                )
+            )
+        except Exception:
+            logger.debug("Completion trace emit failed (non-critical)", exc_info=True)
+
     @staticmethod
     def _failure_signature(error: str) -> str:
         base = (error or "").strip().splitlines()[0] if error else "unknown_error"
@@ -2618,6 +2661,16 @@ class Orchestrator:
                 task_id=td.task_id,
                 agent_id=td.agent_id,
                 extra={"duration_sec": round(duration_sec, 4)},
+            )
+            # Land a trace the Witness auditor (Loop 6) and trace-reading cascade
+            # loops can sense — otherwise they only ever see boot/heartbeat and
+            # never real agent work.
+            await self._emit_completion_trace(
+                task=task,
+                agent_id=td.agent_id,
+                duration_sec=duration_sec,
+                result=result,
+                success=True,
             )
             # Emit durable event for evolution loop consumption
             if self._bus is not None:
