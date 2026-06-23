@@ -2,6 +2,8 @@
 
 Generated: 2026-06-21T14:27:15+00:00 (schema v2)
 Active tracks: **7** (warn 5, max 10) — shippable 5
+Generated: 2026-06-24T00:16:22+09:00 (schema v2)
+Active tracks: **8** (warn 5, max 10) — shippable 4
 
 ## Spine coverage
 
@@ -29,8 +31,9 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
+  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.38s
 
-## `runtime-truth-nats-2026-06` — SHIPPABLE
+## `runtime-truth-nats-2026-06` — 2/2
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/a2a_nats_contact.py', 'dharma_swarm/a2a/a2a_core_contact.py']
@@ -101,6 +104,8 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
+  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 1.20s
+  - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
 
 ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
 
@@ -117,6 +122,8 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
+  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 16 passed in 0.18s
+  - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
 
 ## `provider-routing-consolidation-2026-06` — SHIPPABLE
 
@@ -134,16 +141,38 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
+  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.23s
+  - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
+
+## `orchestration-arena-v1-2026-06` — 9/9
+
+- serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
+- moves_vital_signs: ['eval_coverage', 'quality_gates']
+
+  - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
+  - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
+  - ✓ `orchestration_genome_exists` (file_exists) — dharma_swarm/coordination/genome.py present
+  - ✓ `frozen_taskpack_present` (file_contains) — pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py
+  - ✓ `deterministic_scorer_hash` (file_contains) — pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py
+  - ✓ `orchestration_genome_class` (file_contains) — pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py
+  - ✓ `zero_weight_orchestrator_map_elites` (file_contains) — pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py
+  - ✓ `dpi_decorrelation_gated_on_correctness` (file_contains) — pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py
+  - ✓ `council_trace_verification` (file_contains) — pattern 'class Council' found in dharma_swarm/council/council.py
+  - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
+  - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
+  - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
 
 ## Findings
 
-- **WARN** `wip-high`: 7 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+- **WARN** `wip-high`: 8 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
-- **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-provisional:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] 2/2 criteria pass but NOT shippable under the rigorous bar: no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
 - **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
-- **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
-- **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 7 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).

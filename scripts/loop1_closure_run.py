@@ -12,15 +12,25 @@ dispatch_dropoff occurrences, and stigmergy hot paths (the ADAPT half of
 Loop 1 — routing in tick N+1 reads outcomes of tick N).
 
 Usage:
+    # KEYLESS close — no project API key needed. The claude_code lane is live
+    # only when headless `claude -p` can complete now; a binary on PATH is not
+    # sufficient.
+    .venv/bin/python scripts/loop1_closure_run.py \
+        --provider claude_code --model claude-sonnet-4-5 --tasks 2
+    # Check what is dispatchable first (NEVER assume 'no provider'):
+    #   python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"
+
     # Throwaway smoke/load run (sandbox tempdir — NOT witnessed by make orient):
     .venv/bin/python scripts/loop1_closure_run.py --tasks 3
     .venv/bin/python scripts/loop1_closure_run.py --tasks 100 --agents 3 \
         --timeout-per-task 240 --report reports/loop_closure/run.json
 
     # Real closure run (writes to the canonical runtime.db make orient reads,
-    # so a green run flips loop1_live). Needs a reachable provider/key:
+    # so a green run flips loop1_live). Use any provider returned by
+    # key_oracle.dispatchable_now(); on this host that is usually local Ollama:
     .venv/bin/python scripts/loop1_closure_run.py --canonical \
-        --provider openrouter --model z-ai/glm-4.6 --tasks 1
+        --provider ollama --model llama3.2:latest --tasks 3 \
+        --report reports/loop_closure/cybernetics_codex/$(date -u +%F)_loop1_ollama_fresh_spine_dispatch.json
     # then: make orient   →   "Loop 1 (provider chain + dispatch): LIVE"
 """
 
@@ -103,10 +113,18 @@ async def run(args: argparse.Namespace) -> dict:
 
     state_dir, is_canonical = _resolve_state_dir(args)
     args._is_canonical = is_canonical
+    provider_type = ProviderType(args.provider)
+    from dharma_swarm.key_oracle import dispatchable_now
+
+    live = dispatchable_now()
+    if provider_type.value not in live:
+        raise RuntimeError(
+            f"provider {provider_type.value!r} is not dispatchable now "
+            f"(dispatchable={sorted(live)}); refusing to create a fake closure receipt"
+        )
+
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
-
-    provider_type = ProviderType(args.provider)
     agents = []
     for i in range(args.agents):
         agent = await swarm.spawn_agent(
@@ -132,6 +150,23 @@ async def run(args: argparse.Namespace) -> dict:
             },
         )
         task_ids.append(task.id)
+
+    # ADAPT baseline: count stigmergic marks BEFORE dispatch. The adapt arm of
+    # Loop 1 is agents leaving stigmergic marks on task outcomes (which feed
+    # future routing). hot_paths() is the wrong probe for a short run (it needs
+    # >=3 marks on the SAME path, but each task marks a unique task:<id> path), so
+    # measure the honest signal: marks deposited during the run (after > before).
+    #
+    # CRITICAL: measure the store agents ACTUALLY write to. agent_runner's
+    # _leave_task_mark() deposits via stigmergy._get_default_store()
+    # (~/.dharma/stigmergy), NOT swarm._stigmergy — swarm.init() does not even
+    # construct _stigmergy (that is a separate Gödel-Claw boot path), so the old
+    # `swarm._stigmergy.density()` probe always read 0 and the adapt arm looked
+    # dead while marks were landing. Read the real store.
+    from dharma_swarm.stigmergy import _get_default_store
+
+    _mark_store = _get_default_store()
+    marks_before = _mark_store.density()
 
     deadline = time.monotonic() + args.timeout_per_task * args.tasks
     receipts: dict[str, str] = {}
@@ -176,11 +211,24 @@ async def run(args: argparse.Namespace) -> dict:
             }
         )
 
-    hot_paths = []
+    marks_after = _mark_store.density()
+    marks_deposited = max(0, marks_after - marks_before)
+
+    # Exact attribution: count marks whose connections reference THIS run's task
+    # ids. This proves the deposited marks are the adapt traces of our dispatch,
+    # not unrelated background activity racing the density delta.
+    task_id_set = set(task_ids)
+    adapt_marks_for_run = 0
+    hot_paths: list[dict[str, object]] = []
     try:
+        run_marks = await _mark_store._load_marks()
+        for mark in run_marks:
+            if task_id_set.intersection(getattr(mark, "connections", []) or []):
+                adapt_marks_for_run += 1
         hot_paths = [
-            {"path": mark.path, "intensity": round(mark.intensity, 4)}
-            for mark in swarm._stigmergy.hot_paths(limit=5)
+            {"path": getattr(mark, "path", getattr(mark, "file_path", "")),
+             "intensity": round(getattr(mark, "intensity", getattr(mark, "salience", 0.0)), 4)}
+            for mark in (await _mark_store.hot_paths(limit=5))
         ]
     except Exception:
         pass
@@ -205,6 +253,14 @@ async def run(args: argparse.Namespace) -> dict:
         "evidence_receipts": receipts,
         "tick_errors": tick_errors,
         "ticks": ticks,
+        # ADAPT arm: marks deposited during the run prove the sense->...->adapt
+        # feedback fired (agents left stigmergic traces that feed future routing).
+        "stigmergy_marks_before": marks_before,
+        "stigmergy_marks_after": marks_after,
+        "stigmergy_marks_deposited": marks_deposited,
+        # Exact adapt attribution: marks connected to THIS run's task ids.
+        "stigmergy_marks_for_run": adapt_marks_for_run,
+        "adapt_fired": adapt_marks_for_run > 0,
         "stigmergy_hot_paths": hot_paths,
         "state_dir": str(state_dir),
         "canonical_state": bool(getattr(args, "_is_canonical", False)),

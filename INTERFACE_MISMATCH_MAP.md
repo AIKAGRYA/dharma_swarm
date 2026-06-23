@@ -37,7 +37,7 @@
 | BR-008: VentureCell room/ontology split | BLOCKER | ✅ RESOLVED | `fractal/room_bridge.py` uses deterministic room IDs for ontology objects, updates through `put_object()`, preserves `room_status`, and room-health persists ontology sync. |
 | NEW-12: cross-lane test↔module drift broke suite collection | BLOCKER | ⚠️ GUARDED (2026-06-12) | `tests/test_a2a_readiness_gate.py` (untracked) imports `operator_core.a2a_task_lifecycle` and `tests/test_autonomous_agent.py` (modified) imports `_resolve_agent_model_override` — both exist only on the holon/spine-v1 lane (`946e876e9`/`6b9b51e1b`), not this branch. Collection of the entire suite hard-failed. Guarded with `pytest.importorskip`/`skipif` so they activate when the lane lands. |
 | NEW-13: cli_wake mutates shared PRESET_AGENTS | DEGRADED | ✅ FIXED (2026-06-12) | `cli_wake(model=...)` set `identity.model` directly on the shared preset object, corrupting every later wake of that preset in-process (runtime-proven: reviewer preset became `model="gemini"`). Now copies via `dataclasses.replace`. |
-| NEW-14: world-model loop ↔ WorldModelAgent total API mismatch | BLOCKER (loop dead) | 🔴 OPEN | `orchestrate_live.py:1657` calls `WorldModelAgent(state_dir=...)` / `.initialize()` / `.run_cycle()`; `world_model.py:265` actually takes `(store, search_tool, arxiv_tool)` with `.boot()` / `.run_loop()`. Runtime-proven 2026-06-12 02:07 swarm.log: `TypeError: unexpected keyword argument 'state_dir'` → 5 restarts → "exceeded max restarts, abandoning" on every daemon boot. Fix needs a tool-injection decision (which search/arxiv tools to wire) — left to the loop owner. Abandoned loops are now visible via `dgc status` "Daemon loops" line (loop_liveness.json projection). |
+| NEW-14: world-model loop ↔ WorldModelAgent total API mismatch | BLOCKER (loop dead) | ✅ RESOLVED (2026-06-22) | `orchestrate_live._run_world_model_loop` now builds `WorldModelStore(base_path=STATE_DIR / "world_model")` + `WorldModelAgent(store, search_tool=None, arxiv_tool=None)` and calls `boot()`; `WorldModelAgent.run_cycle()` added with honest scope (state refresh + versioned snapshot persist; stock research via search tools still unbuilt). Fixes the `TypeError: unexpected keyword argument 'state_dir'` → 5-restart abandonment on every daemon boot. Brought to main by cherry-picking the H02-P3.1 fix (commit `76f72204`, originally on organ/03-seat). Regression: `tests/test_world_model.py` 37/37; construction smoke verified. Same issue tracked as MM-13 below (RESOLVED). |
 | NEW-15: F821 sweep — 17 undefined names, all fixed | DEGRADED (silent failures) | ✅ FIXED (2026-06-12) | All 16 `dharma_swarm/` F821s + 1 in `scripts/` fixed and runtime-verified. Notable: `archaeology_ingestion.py` missing `PalaceQuery` import meant ALL 5 lessons-learned palace queries silently failed since NEW-01 (anti-amnesia dead); `orchestrate_live.py` `_evo_allowed` was used 38 lines before its definition (meta-evolution feed NameError'd every cycle, swallowed); `orchestrator.py:2567` `agent_name` → catalytic graph never recorded completion edges; `semantic.py` `_DEFAULT_GRAPH_PATH` lost in the dgc_cli extraction (8a5a8cd52, restored from d7af817ac); `verify_holon_harness_prod.py` called unaliased `holon_wake_cycle`. Guard: `make lint-blockers` (F821, blocking) wired into `make verifier-selfcheck` and `agent-build-preflight`. |
 
 **Net change:** 12 resolved, 5 fixed prior sessions, 6 new entries (NEW-05 guarded, NEW-07/NEW-08 partially resolved, NEW-09/10/11 fixed), plus BR-007/BR-008 closure notes from PR #187. 0 open BLOCKERs, 1 structural degraded remains (message_bus semantics).
@@ -45,6 +45,13 @@
 ---
 
 ## Current Live Mismatches
+
+### MM-13 — RESOLVED: WorldModelAgent constructor + method mismatch
+
+**File:** `orchestrate_live.py:1656-1660` ↔ `world_model.py:265`
+**Status:** ✅ RESOLVED (H02 P3.1, branch organ/02-wounds) — the world-model loop called `WorldModelAgent(state_dir=...)` + `initialize()`/`run_cycle()` against a class exposing `(store, search_tool, arxiv_tool)` + `boot()`. 147 crashes on 2026-06-10 alone, then loop abandoned by max-restarts. Loop now constructs `WorldModelStore(base_path=STATE_DIR / "world_model")` with real kwargs and calls `boot()`; `run_cycle()` added to the agent (honest scope: state refresh + versioned snapshot persist; stock research via search tools still unbuilt). Regression test: `tests/test_world_model.py::test_run_cycle_persists_snapshot`.
+
+---
 
 ### MM-02/03 — RESOLVED: PersistentAgent enum deserialization
 

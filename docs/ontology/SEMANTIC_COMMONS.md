@@ -51,3 +51,15 @@ NATS is the internal fleet transport. A2A HTTP and public Agent Cards remain
 the external discovery and cross-vendor edge. Internal A2A cards may advertise
 external HTTP interfaces, but their durable fleet contact binding must include
 `A2AInboxRoute`.
+
+## Model Routing Vocabulary
+
+Model and provider routing names resolve through `ModelKeyRouting`. Provider
+credentials belong behind `DKeysKeyStore` and `RuntimeProvider`; model ordering
+belongs behind `ModelHierarchy`; policy routing belongs behind
+`ProviderPolicyRouter`; runtime routing belongs behind `ModelRouter`; and
+routing outcomes belong behind `RoutingMemory`.
+
+Do not introduce deprecated aliases such as `parallel model routing layer`,
+`project .env keys`, `direct provider factory`, or `scattered model order` as
+live architecture names.

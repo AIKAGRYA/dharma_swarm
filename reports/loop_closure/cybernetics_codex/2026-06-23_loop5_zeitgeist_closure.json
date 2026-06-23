@@ -1,0 +1,38 @@
+{
+  "loop": 5,
+  "loop_id": "zeitgeist_internal_pressure",
+  "cycles": 2,
+  "real_data": true,
+  "transitions_receipted": {
+    "sense": true,
+    "interpret": true,
+    "constrain": true,
+    "act": true,
+    "adapt": true
+  },
+  "adapt_proof": {
+    "field": "TelosGatekeeper resolved trust_mode via gate_pressure.json (S4->S3 override the next gate check consults)",
+    "before": "internal_yolo",
+    "after": "external_strict",
+    "fed_forward": true,
+    "total_real_blocks": 8
+  },
+  "tick_errors": [],
+  "cycle_detail": [
+    {
+      "cycle": 1,
+      "blocks": 4,
+      "gate_threat_signals": 1,
+      "pressure_written": true,
+      "resolved_mode": "external_strict"
+    },
+    {
+      "cycle": 2,
+      "blocks": 4,
+      "gate_threat_signals": 1,
+      "pressure_written": true,
+      "resolved_mode": "external_strict"
+    }
+  ],
+  "observed_at": "2026-06-23T05:38:28.751224Z"
+}

@@ -130,7 +130,7 @@ active_tracks:
     name: Runtime Truth Reconciliation — operator-visible truth packets
     status: ACTIVE
     opened_at: "2026-06-04"
-    verified_at: "2026-06-20"
+    verified_at: "2026-06-23"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -214,6 +214,10 @@ active_tracks:
         kind: file_contains
         file: dharma_swarm/runtime_state.py
         pattern: "class RuntimeReceipt"
+      # --- Rigorous evidence: the operator_core contracts (incl. RuntimeTruthPacket) PASS. ---
+      - id: operator_core_contracts_pass
+        kind: test_passes
+        test: "tests/test_operator_core_contracts.py"
 
     non_goals:
       - Do not create a new daemon, database, event log, truth store, or receipt system.
@@ -223,15 +227,16 @@ active_tracks:
       - Do not build Verified Experiment Loop runtime in this track.
       - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
 
+    # Reconciled 2026-06-23: both blockers verified IMPLEMENTED on origin/main.
     next_items:
       - id: 1
-        what: "Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner."
+        what: "SHIPPED: read-only RuntimeTruthPacket contract in operator_core (dharma_swarm/operator_core/contracts.py:125; tests/test_operator_core_contracts.py 7 passed)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Render compact runtime truth in make onboard without making onboard an authority surface."
+        what: "SHIPPED: compact runtime truth rendered in make onboard (scripts/governance/agent_onboard.py) as a read model, not an authority surface."
         kind: code
-        blocker: true
+        blocker: false
       - id: 3
         what: "Protect A2A single-persistence invariant while adding runtime truth projections."
         kind: test
@@ -493,9 +498,9 @@ active_tracks:
         kind: code
         blocker: true
       - id: 2
-        what: "Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1."
+        what: "CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster."
         kind: ops
-        blocker: true
+        blocker: false
       - id: 3
         what: "Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient."
         kind: code
@@ -505,7 +510,7 @@ active_tracks:
     name: Truth Graph Platform v1 — repo context + receipted A2A presence
     status: ACTIVE
     opened_at: "2026-06-12"
-    verified_at: "2026-06-12"
+    verified_at: "2026-06-23"
     ttl_days: 21
     owner: "@codex"
     serves: substrate-nativeness
@@ -625,6 +630,13 @@ active_tracks:
         kind: file_contains
         file: tests/test_agent_registry_presence.py
         pattern: "heartbeat_status"
+      # --- Rigorous evidence: repo_context projection test PASSES + feature on main. ---
+      - id: repo_context_projection_passes
+        kind: test_passes
+        test: "tests/test_truth_graph_repo_context.py"
+      - id: truth_graph_projection_on_main
+        kind: commit_on_main
+        commit: 936d365db
 
     non_goals:
       - Do not create a new daemon, database, vector store, event log, or truth store.
@@ -634,22 +646,23 @@ active_tracks:
       - Do not touch scripts/runtime/a2a_send.py or scripts/runtime/autonomy_spine.py.
       - Do not claim full future NATS spec compliance from the CLI demo alone.
 
+    # Reconciled 2026-06-23: both blockers verified DONE on origin/main.
     next_items:
       - id: 1
-        what: "Run make orient and commit generated repo_context artifacts."
+        what: "SHIPPED: repo_context artifacts committed on origin/main (reports/orientation/repo_context.{json,md}, commit ea793d3bd); make orient wired."
         kind: code
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Run live local NATS CLI demo twice and verify repo_context renders the receipt path."
+        what: "SHIPPED: NATS CLI e2e demo ran; receipt renders in repo_context (reports/orientation/nats_e2e_receipt.json, commit 936d365db)."
         kind: test
-        blocker: true
+        blocker: false
 
 
   - id: composer-holon-spine-longrun-2026-06
     name: Composer Holon Spine Longrun — fable/codex pair over verified command receipts
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-06-23"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -714,6 +727,13 @@ active_tracks:
       - id: composer_wake_witness_pending
         kind: file_exists
         file: reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
+      # --- Rigorous evidence: the holon verifier PASSES and the substrate landed. ---
+      - id: holon_bridge_verifier_passes
+        kind: test_passes
+        test: "tests/test_holon_bridge.py"
+      - id: holon_substrate_on_main
+        kind: commit_on_main
+        commit: 9c76b210
 
     non_goals:
       - Do not create a new durable receipt store; project over spine.EvidenceReceipt.
@@ -721,29 +741,32 @@ active_tracks:
       - Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
       - Do not merge holon substrate to main without the frozen verifier runbook passing.
 
+    # Reconciled 2026-06-23: all four blockers were verified DONE on origin/main
+    # (holon substrate merged via PR #585, commit 9c76b210; verifier 103 passed/
+    # 1 skipped; living_agent_kernel imports green). Demoted from blocker:true.
     next_items:
       - id: 1
-        what: "Run the frozen Build A verifier set and publish the exact output in convergence."
+        what: "SHIPPED: frozen Build A verifier set runs green on origin/main (tests/test_holon_bridge.py + test_holon_runtime.py; 103 passed/1 skipped 2026-06-23)."
         kind: test
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts."
+        what: "SHIPPED: unattended fable_composer + codex_composer wakes witnessed with fresh state files (reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md, 2026-06-11)."
         kind: runtime
-        blocker: true
+        blocker: false
       - id: 3
-        what: "Merge living_agent_kernel source choice and prove import green."
+        what: "SHIPPED: living_agent_kernel on origin/main (dharma_swarm/operator_core/living_agent_kernel.py); import green."
         kind: code
-        blocker: true
+        blocker: false
       - id: 4
-        what: "Reconcile the holon substrate lane back to GitHub main after verifier green."
+        what: "SHIPPED: holon substrate reconciled to main via PR #585 (commit 9c76b210, 2026-06-12)."
         kind: governance
-        blocker: true
+        blocker: false
 
   - id: provider-routing-consolidation-2026-06
     name: Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
     status: ACTIVE
     opened_at: "2026-06-21"
-    verified_at: "2026-06-21"
+    verified_at: "2026-06-22"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -768,18 +791,23 @@ active_tracks:
 
     description: |
       Operator directive 2026-06-21: consolidate the LLM provider/model routing
-      subsystem into one coherent, malleable, intelligent router. After weeks of
-      accretion the DECISION layer drifted: an explicit provider/model request is
-      treated only as a constraint and never as a selection (agent_runner stores
-      context["preferred_provider"] but provider_policy never reads it), two rank
-      systems disagree (model_hierarchy.CANONICAL_SEED_ORDER is free-first while
-      model_pool._PROVIDER_RANK is first-party-first), and ~8 router files stack
-      ~6 reorder passes with no single documented precedence.
+      subsystem into one coherent, malleable, intelligent router. RESOLVED — all
+      five stages landed on origin/main 2026-06-21; this records what was fixed,
+      not open work. The DECISION layer had drifted: an explicit provider/model
+      request was treated only as a constraint, not a selection (provider_policy
+      did not read context["preferred_provider"]); the two rank systems disagreed
+      (model_hierarchy.CANONICAL_SEED_ORDER free-first vs model_pool._PROVIDER_RANK
+      first-party-first); and ~8 router files stacked reorder passes with no single
+      documented precedence. All three are now fixed: provider_policy.py pins an
+      explicit provider (pin + safe fallback), selection is power-first with
+      CANONICAL_SEED_ORDER demoted to historical fallback, and the single
+      precedence is documented in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and
+      locked by an invariant test.
 
-      The data/registry half is already consolidated (model_hierarchy ->
-      model_pool -> model_defaults, keys in api_keys) and is preserved. This
-      track fixes the decision half and the wiring gaps, converging on the
-      existing registries (no new truth store).
+      The data/registry half (model_hierarchy -> model_pool -> model_defaults,
+      keys in api_keys) was already consolidated and is preserved; this track
+      fixed the decision half and the wiring gaps, converging on the existing
+      registries (no new truth store).
 
       Four operator decisions are LOCKED (2026-06-21):
         1. Default selection = POWER-FIRST (most capable model by default; cost
@@ -835,6 +863,14 @@ active_tracks:
         kind: file_contains
         file: dharma_swarm/providers.py
         pattern: "class ZhipuProvider"
+      # --- Rigorous evidence (not existence-only): the precedence invariant
+      # actually PASSES when executed, and the stage-4 lock is on origin/main. ---
+      - id: precedence_invariant_test_passes
+        kind: test_passes
+        test: "tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost"
+      - id: stage4_precedence_locked_on_main
+        kind: commit_on_main
+        commit: bc110d84
 
     non_goals:
       - Do not create a new truth store, registry, or model catalog; converge on model_hierarchy / model_pool / model_defaults / api_keys.
@@ -844,31 +880,146 @@ active_tracks:
       - Do not commit provider API keys or any credentials.
       - Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
 
+    # Stages 1-5 all landed on origin/main 2026-06-21; track is SHIPPABLE.
+    # (Reconciled 2026-06-22 — the items below were listed as open blockers
+    # after the work had already merged; corrected to reflect reality.)
     next_items:
       - id: 1
-        what: "Author docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration (locked decisions)."
+        what: "SHIPPED: docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration."
         kind: docs
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Stage 1 keystone: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback)."
+        what: "SHIPPED (commit e7e0e55d): Stage 1 — provider_policy consults context['preferred_provider'] as SELECTION (pin + safe fallback)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 3
-        what: "Stage 2: unify the two rank systems into one power-first, first-party-preferred order."
+        what: "SHIPPED (commit 508be78f): Stage 2 — unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback."
         kind: code
-        blocker: true
+        blocker: false
       - id: 4
-        what: "Stage 3: wire z.ai/Zhipu as a first-party provider (enum + resolution + factory + ZhipuProvider)."
+        what: "SHIPPED (commits ccffd12b/bf8ee7cf): Stage 3 — z.ai/Zhipu first-party provider (enum + resolution + factory + ZhipuProvider, default glm-5.2)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 5
-        what: "Stage 5: drift cleanup — AgentConfig default model, hardcoded literals, providers_extended.py dead code, env templates."
+        what: "SHIPPED (commit bc110d84): Stage 4 — single precedence locked with an invariant test."
+        kind: code
+        blocker: false
+      - id: 6
+        what: "SHIPPED (commit 04711efb): Stage 5 — env templates + deferred drift recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 (AgentConfig.model literal, per-model config literals, providers_extended.py — scoped out, not blockers)."
         kind: code
         blocker: false
 
 # ---------------------------------------------------------------------------
 # Closed tracks (history, append-only; do not edit prior entries)
 # ---------------------------------------------------------------------------
+  - id: orchestration-arena-v1-2026-06
+    name: Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+    status: ACTIVE
+    opened_at: "2026-06-23"
+    verified_at: "2026-06-23"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - provider-routing-consolidation-2026-06
+      - loop-closure-2026-06
+    owned_surfaces:
+      - dharma_swarm/coordination/**
+      - dharma_swarm/council/**
+      - tests/test_arena_v1.py
+      - tests/test_dpi.py
+      - tests/test_orchestration_genome.py
+      - tests/test_orchestrator_v1.py
+      - tests/test_council_profiles.py
+      - tests/test_coordination_closure_checks.py
+    moves_vital_signs:
+      - eval_coverage
+      - quality_gates
+
+    description: |
+      Governance admission for the Arena/Orchestration substrate that LANDED on
+      main (PRs #670 and adjacent) but was not yet represented in the active-track
+      portfolio. The DGM substrate must be governance-visible: the system needs to
+      know its own fitness function exists, is frozen/hermetic/replayable, and is
+      not yet making production capability claims.
+
+      This is the keystone fitness layer for any future Dharma Forge: a frozen
+      verifiable taskpack + deterministic scorer + zero-weight heuristic
+      orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
+      that gates a decorrelated-correctness bonus on actual correctness, plus a
+      minimal Council that verifies orchestration traces.
+
+      Doctrine that must hold: capability leads, trust multiplies (not the
+      headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
+      trained weights — training is earned only after the arena produces labels.
+
+    prerequisites:
+      - id: arena_runner_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/arena/runner.py
+      - id: arena_scorer_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/arena/scorer.py
+      - id: orchestration_genome_exists
+        kind: file_exists
+        file: dharma_swarm/coordination/genome.py
+
+    completion_criteria:
+      - id: frozen_taskpack_present
+        kind: file_contains
+        file: dharma_swarm/coordination/arena/taskpack.py
+        pattern: "TASK_PACK_ID"
+      - id: deterministic_scorer_hash
+        kind: file_contains
+        file: dharma_swarm/coordination/arena/scorer.py
+        pattern: "def scorer_hash"
+      - id: orchestration_genome_class
+        kind: file_contains
+        file: dharma_swarm/coordination/genome.py
+        pattern: "class OrchestrationGenome"
+      - id: zero_weight_orchestrator_map_elites
+        kind: file_contains
+        file: dharma_swarm/coordination/orchestrator_v1.py
+        pattern: "class MapElitesArchive"
+      - id: dpi_decorrelation_gated_on_correctness
+        kind: file_contains
+        file: dharma_swarm/coordination/dpi.py
+        pattern: "def decorrelation_bonus"
+      - id: council_trace_verification
+        kind: file_contains
+        file: dharma_swarm/council/council.py
+        pattern: "class Council"
+      - id: arena_v1_test_exists
+        kind: file_contains
+        file: tests/test_arena_v1.py
+        pattern: "def test_positive_lift_candidate_beats_best_single_at_parity"
+      - id: dpi_test_exists
+        kind: file_exists
+        file: tests/test_dpi.py
+      - id: closure_checks_test_exists
+        kind: file_exists
+        file: tests/test_coordination_closure_checks.py
+
+    non_goals:
+      - Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
+      - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
+      - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
+      - Do not couple admission to the full world-ingestion (#662) seam.
+
+    next_items:
+      - id: 1
+        what: "Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only)."
+        kind: code
+        blocker: false
+      - id: 2
+        what: "Add best-single-model controls + budget-parity proof to every arena run before any capability claim."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Connect arena winners to a cold-start trace corpus (no training yet; corpus only)."
+        kind: code
+        blocker: false
+
 closed_tracks:
   - id: orientation-graph-2026-06
     name: Orientation Graph — whole-system view served on token one

@@ -357,7 +357,6 @@ async def test_task_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     from dharma_swarm.models import (
         AgentState,
         AgentStatus,
-        Task,
         TaskPriority,
         TaskStatus,
     )
@@ -571,11 +570,22 @@ async def test_task_failure_records_runtime_run(tmp_path: Path, monkeypatch: pyt
 
     assert _runtime_table_count(runtime_db_path, "task_claims") == 1
     assert _runtime_table_count(runtime_db_path, "delegation_runs") == 1
-    with sqlite3.connect(runtime_db_path) as db:
-        claim_status = db.execute("SELECT status FROM task_claims").fetchone()[0]
-        run_status, failure_code = db.execute(
-            "SELECT status, failure_code FROM delegation_runs"
-        ).fetchone()
+
+    claim_status = run_status = failure_code = None
+    for _ in range(20):
+        with sqlite3.connect(runtime_db_path) as db:
+            claim_status = db.execute("SELECT status FROM task_claims").fetchone()[0]
+            run_status, failure_code = db.execute(
+                "SELECT status, failure_code FROM delegation_runs"
+            ).fetchone()
+        if (
+            claim_status == "failed"
+            and run_status == "failed"
+            and failure_code == "execution_error"
+        ):
+            break
+        await asyncio.sleep(0.1)
+
     assert claim_status == "failed"
     assert run_status == "failed"
     assert failure_code == "execution_error"
@@ -754,14 +764,18 @@ def test_economic_spine_mission_lifecycle() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_swarm_tick_dispatches_task(tmp_path: Path) -> None:
-    """Verify SwarmManager.tick() dispatches a queued task via the orchestrator.
+async def test_swarm_tick_dispatches_task(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verify SwarmManager.tick() delegates queued-task dispatch to the orchestrator.
 
-    Loop closed when: a task sits on the board, tick() calls orchestrator to
-    route it to an idle agent, and the dispatch count > 0.
+    Loop closed when: a task sits on the board, tick() calls orchestrator,
+    and the orchestrator dispatch count is surfaced by SwarmManager.
 
-    This test wires together SwarmManager with a minimal mock provider
-    (no real LLM calls) and verifies the dispatch path works end-to-end.
+    This test wires together SwarmManager with mocked slow subsystems
+    (no real LLM/runtime I/O) and verifies the tick contract. The real
+    Orchestrator dispatch lifecycle is covered by test_task_lifecycle.
 
     Signatures verified in dharma_swarm/swarm.py:
       - SwarmManager(state_dir, daemon_config=None)
@@ -771,6 +785,30 @@ async def test_swarm_tick_dispatches_task(tmp_path: Path) -> None:
     """
     from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import TaskStatus
+
+    async def _offline_run_task(self, task):  # noqa: ANN001
+        return "Mocked LLM response"
+
+    async def _skip_runtime_record(self, *args, **kwargs):  # noqa: ANN001
+        return None
+
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setattr(
+        "dharma_swarm.agent_runner.AgentRunner.run_task",
+        _offline_run_task,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_lifecycle.RuntimeLifecycle.record_task_claim",
+        _skip_runtime_record,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_lifecycle.RuntimeLifecycle.record_delegation_run",
+        _skip_runtime_record,
+    )
+    monkeypatch.setattr(
+        "dharma_swarm.runtime_lifecycle.RuntimeLifecycle.record_artifact",
+        _skip_runtime_record,
+    )
 
     state_dir = tmp_path / ".dharma"
 
@@ -786,28 +824,39 @@ async def test_swarm_tick_dispatches_task(tmp_path: Path) -> None:
 
         swarm = SwarmManager(state_dir=state_dir)
 
-        # Patch heavy optional subsystems to avoid real I/O during init
-        with patch.dict("os.environ", {"DHARMA_FAST_BOOT": "1"}):
+        try:
+            # Patch heavy optional subsystems to avoid real I/O during init/tick.
             await swarm.init()
 
-        # Verify core subsystems are up
-        assert swarm.is_ready("task_board"), "task_board must be initialized"
-        assert swarm.is_ready("orchestrator"), "orchestrator must be initialized"
+            # Verify core subsystems are up
+            assert swarm.is_ready("task_board"), "task_board must be initialized"
+            assert swarm.is_ready("orchestrator"), "orchestrator must be initialized"
 
-        # Create a task
-        task = await swarm.create_task(
-            title="Bootstrap validation task",
-            description="Run one tick to verify dispatch path",
-        )
-        assert task.status == TaskStatus.PENDING
+            # Create a task
+            task = await swarm.create_task(
+                title="Bootstrap validation task",
+                description="Run one tick to verify dispatch path",
+            )
+            assert task.status == TaskStatus.PENDING
 
-        # Tick the swarm — may dispatch 0 if no idle agents, but must not crash
-        tick_result = await swarm.tick()
-        assert isinstance(tick_result, dict)
-        # The tick result always has these keys regardless of agent count
-        assert "dispatched" in tick_result
-        assert "paused" in tick_result
-        assert "circuit_broken" in tick_result
+            swarm.rescue_recent_failures = AsyncMock(return_value=[])
+            swarm.reap_orphaned_tasks = AsyncMock(return_value=[])
+            swarm.spawn_latent_gold_tasks = AsyncMock(return_value=[])
+            swarm.spawn_coordination_tasks = AsyncMock(return_value=[])
+            swarm._orchestrator.tick = AsyncMock(
+                return_value={"dispatched": 1, "settled": 0},
+            )
+
+            # Tick the swarm and surface the orchestrator dispatch result.
+            tick_result = await asyncio.wait_for(swarm.tick(), timeout=10.0)
+            assert isinstance(tick_result, dict)
+            # The tick result always has these keys regardless of agent count
+            assert "dispatched" in tick_result
+            assert "paused" in tick_result
+            assert "circuit_broken" in tick_result
+            assert tick_result["dispatched"] == 1
+        finally:
+            await asyncio.wait_for(swarm.shutdown(), timeout=5.0)
 
 
 # ---------------------------------------------------------------------------
@@ -837,7 +886,6 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     from dharma_swarm.models import (
         AgentState,
         AgentStatus,
-        Task,
         TaskPriority,
         TaskStatus,
     )

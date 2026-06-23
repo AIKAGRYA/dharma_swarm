@@ -600,6 +600,60 @@ class Orchestrator:
                         "Lifecycle event ingestion failed (non-critical): %s", exc
                     )
 
+    async def _emit_completion_trace(
+        self,
+        *,
+        task: Any,
+        agent_id: str,
+        duration_sec: float,
+        result: str | None,
+        success: bool,
+    ) -> None:
+        """Write a task_completed trace into the TraceStore (best-effort).
+
+        The orchestrator already records progress/lifecycle/bus events on
+        completion, but none of those land in the TraceStore the Witness
+        auditor (Loop 6) and other trace-reading cascade loops sense from — so
+        the auditor only ever saw boot/heartbeat traces and never real agent
+        work. This emits the missing trace so the fed cascade can audit actual
+        completions. Carries gate_results when the task recorded them, so the
+        Witness can honestly evaluate telos-gate sufficiency.
+        """
+        async def _write() -> None:
+            from dharma_swarm.traces import TraceEntry, TraceStore
+
+            raw_meta = getattr(task, "metadata", {}) or {}
+            meta = dict(raw_meta) if isinstance(raw_meta, dict) else {}
+            gate_results = meta.get("gate_results") or {}
+            store = TraceStore()
+            await store.init()
+            await store.log_entry(
+                TraceEntry(
+                    agent=str(agent_id),
+                    action="task_completed" if success else "task_failed",
+                    state="completed" if success else "failed",
+                    metadata={
+                        "task_id": getattr(task, "id", ""),
+                        "task_title": getattr(task, "title", ""),
+                        "duration_seconds": round(duration_sec, 4),
+                        "result_chars": len(result or ""),
+                        "gate_results": gate_results,
+                        "failure_source": meta.get("last_failure_source"),
+                        "failure_class": meta.get("last_failure_class"),
+                    },
+                )
+            )
+
+        try:
+            # Best-effort means bounded as well as fail-open: TraceStore I/O must
+            # never become a new dispatch-tail failure mode.
+            await asyncio.wait_for(_write(), timeout=2.0)
+        except Exception:
+            self._completion_trace_emit_failures = (
+                int(getattr(self, "_completion_trace_emit_failures", 0)) + 1
+            )
+            logger.debug("Completion trace emit failed (non-critical)", exc_info=True)
+
     @staticmethod
     def _failure_signature(error: str) -> str:
         base = (error or "").strip().splitlines()[0] if error else "unknown_error"
@@ -914,6 +968,15 @@ class Orchestrator:
         td: TaskDispatch,
         meta: dict[str, Any],
     ) -> dict[str, Any]:
+        if str(os.environ.get("DHARMA_FAST_BOOT", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            meta["context_bundle_status"] = "fast_boot_skipped"
+            td.metadata["context_bundle_status"] = "fast_boot_skipped"
+            return meta
         if task is None:
             meta["context_bundle_status"] = "missing_task"
             td.metadata["context_bundle_status"] = "missing_task"
@@ -1873,6 +1936,17 @@ class Orchestrator:
                 "max_retries": max_retries,
             },
         )
+        await self._emit_completion_trace(
+            task=task,
+            agent_id=td.agent_id,
+            duration_sec=max(
+                0.0,
+                time.monotonic()
+                - float(td.metadata.get("run_started_monotonic", time.monotonic())),
+            ),
+            result=error,
+            success=False,
+        )
         # ── Algedonic signal: task exhausted all retries → pain to S5 ──
         try:
             from dharma_swarm.signal_bus import SignalBus
@@ -2609,6 +2683,16 @@ class Orchestrator:
                 task_id=td.task_id,
                 agent_id=td.agent_id,
                 extra={"duration_sec": round(duration_sec, 4)},
+            )
+            # Land a trace the Witness auditor (Loop 6) and trace-reading cascade
+            # loops can sense — otherwise they only ever see boot/heartbeat and
+            # never real agent work.
+            await self._emit_completion_trace(
+                task=task,
+                agent_id=td.agent_id,
+                duration_sec=duration_sec,
+                result=result,
+                success=True,
             )
             # Emit durable event for evolution loop consumption
             if self._bus is not None:

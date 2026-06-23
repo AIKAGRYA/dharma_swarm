@@ -140,6 +140,21 @@ _DEFAULT_QWEN_DASHBOARD_TASK = (
 )
 
 
+async def _iter_qwen_dashboard_stream(
+    chat_router: Any,
+    api_messages: list[dict[str, Any]],
+    settings: Any,
+    *,
+    profile_id: str,
+):
+    async for chunk in chat_router._agentic_stream(
+        api_messages,
+        settings,
+        profile_id=profile_id,
+    ):
+        yield chunk
+
+
 def _classify_error(exc: Exception | str) -> str:
     text = str(exc).strip().lower()
     if "operation not permitted" in text or "permission denied" in text:
@@ -672,7 +687,8 @@ async def _probe_qwen_dashboard(provider_name: str, task: str) -> dict[str, Any]
     errors: list[str] = []
     raw_events: list[dict[str, Any]] = []
     try:
-        async for chunk in chat_router._agentic_stream(
+        async for chunk in _iter_qwen_dashboard_stream(
+            chat_router,
             api_messages,
             settings,
             profile_id=profile.profile_id,

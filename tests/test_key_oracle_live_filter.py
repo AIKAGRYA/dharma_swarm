@@ -61,8 +61,8 @@ def test_live_providers_oauth_counts_live(tmp_path: Path) -> None:
     assert "anthropic" in live
     assert "claude_code" in live
     assert "codex" in live
-    # keyless-live providers are always present in a real (non-None) answer.
-    assert "local" in live
+    # Host-detected keyless providers (local/ollama/claude_code smoke) are
+    # intentionally environment-dependent; this test isolates oauth/key rows.
 
 
 def test_live_providers_429_is_pruned(tmp_path: Path) -> None:
@@ -101,8 +101,15 @@ def test_live_providers_dead_glyphs_not_live(tmp_path: Path) -> None:
     assert "deepseek" in live
 
 
-def test_live_providers_all_dead_returns_real_empty_not_none(tmp_path: Path) -> None:
+def test_live_providers_all_dead_returns_real_empty_not_none(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     """All keys dead is a VALID answer (empty-but-for-keyless), not None."""
+    # Keep the assertion about keyed-provider semantics independent of host
+    # tools. A developer machine with Ollama installed legitimately contributes
+    # {"local", "ollama"} to keyless liveness.
+    monkeypatch.setattr("dharma_swarm.key_oracle._detect_keyless_live", lambda: {"local"})
     _write_status(
         tmp_path,
         {

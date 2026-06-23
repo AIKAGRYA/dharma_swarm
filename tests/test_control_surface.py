@@ -826,11 +826,12 @@ class TestDashboardControlSurfacePage:
         page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
         assert page.exists(), f"cockpit page missing: {page}"
 
-    def test_cockpit_aliases_control_surface_page(self) -> None:
+    def test_cockpit_renders_operator_coherence_page(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent
         page = repo_root / "dashboard" / "src" / "app" / "dashboard" / "cockpit" / "page.tsx"
         text = page.read_text(encoding="utf-8")
-        assert 'export { default } from "../control-surface/page";' in text
+        assert "OperatorCoherenceCockpit" in text
+        assert 'from "@/components/operator-coherence/OperatorCoherenceCockpit"' in text
 
     def test_control_surface_renders_ops_runbook_panel(self) -> None:
         repo_root = Path(__file__).resolve().parent.parent

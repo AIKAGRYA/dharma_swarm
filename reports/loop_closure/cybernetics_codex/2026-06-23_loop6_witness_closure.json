@@ -1,0 +1,106 @@
+{
+  "loop": 6,
+  "loop_id": "witness_auditor",
+  "cycles": 4,
+  "real_data": true,
+  "dispatch": {
+    "dispatched": 3,
+    "completed": 3
+  },
+  "transitions_receipted": {
+    "sense": true,
+    "interpret": true,
+    "constrain": true,
+    "act": true,
+    "adapt": true
+  },
+  "adapt_proof": {
+    "field": "stigmergy governance channel marks authored by 'witness' (strictly-growing adaptive state governance + downstream loops consult)",
+    "before": 12,
+    "after": 28,
+    "fed_forward": true,
+    "total_actionable": 16
+  },
+  "tick_errors": [],
+  "cycle_detail": [
+    {
+      "cycle": 1,
+      "findings": 9,
+      "actionable": 5,
+      "actions": [
+        "task_completed",
+        "heartbeat",
+        "task_completed",
+        "heartbeat",
+        "task_completed",
+        "task_completed",
+        "heartbeat",
+        "task_completed",
+        "boot"
+      ],
+      "severities": [
+        "info",
+        "warning"
+      ]
+    },
+    {
+      "cycle": 2,
+      "findings": 9,
+      "actionable": 2,
+      "actions": [
+        "boot",
+        "boot",
+        "task_completed",
+        "heartbeat",
+        "heartbeat",
+        "task_completed",
+        "heartbeat",
+        "heartbeat",
+        "boot"
+      ],
+      "severities": [
+        "info",
+        "warning"
+      ]
+    },
+    {
+      "cycle": 3,
+      "findings": 6,
+      "actionable": 4,
+      "actions": [
+        "heartbeat",
+        "task_completed",
+        "task_completed",
+        "task_completed",
+        "boot",
+        "task_completed"
+      ],
+      "severities": [
+        "info",
+        "warning"
+      ]
+    },
+    {
+      "cycle": 4,
+      "findings": 10,
+      "actionable": 5,
+      "actions": [
+        "boot",
+        "heartbeat",
+        "task_completed",
+        "task_completed",
+        "task_completed",
+        "task_completed",
+        "heartbeat",
+        "boot",
+        "heartbeat",
+        "task_completed"
+      ],
+      "severities": [
+        "info",
+        "warning"
+      ]
+    }
+  ],
+  "observed_at": "2026-06-23T05:31:56.664638Z"
+}

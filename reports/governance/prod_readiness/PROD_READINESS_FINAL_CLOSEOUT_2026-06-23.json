@@ -1,0 +1,54 @@
+{
+  "schema": "dharma.prod_readiness.final_closeout.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "mutations_performed": {
+    "closed_tracks": false,
+    "active_track_yaml_edited": false,
+    "destructive_cleanup": false,
+    "cockpit_extracted": false
+  },
+  "authority": {
+    "canonical_ref": "origin/main",
+    "canonical_commit": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "canonical_active_tracks": 7,
+    "canonical_max_active": 10,
+    "orchestration_track_capacity_allowed": true
+  },
+  "final_track_actions": [
+    {"track_id": "runtime-truth-reconciliation-2026-06", "verdict": "CLOSE_READY_WITH_FOLLOWUP", "action": "candidate_closure_after_dependency_honesty_and_fresh_runtime_db_receipt"},
+    {"track_id": "runtime-truth-nats-2026-06", "verdict": "KEEP_ACTIVE_PROD_HARDENING", "action": "keep_active_live_nats_ack_and_owned_surface_reconciliation"},
+    {"track_id": "truth-graph-platform-2026-06", "verdict": "KEEP_ACTIVE_PROD_HARDENING", "action": "keep_active_fresh_presence_and_nats_proof"},
+    {"track_id": "composer-holon-spine-longrun-2026-06", "verdict": "SPLIT_BEFORE_CLOSE", "action": "split_build_a_readiness_from_standing_wake_proof"},
+    {"track_id": "provider-routing-consolidation-2026-06", "verdict": "CLOSE_READY_WITH_FOLLOWUP", "action": "candidate_closure_after_live_provider_canary_or_environment_gated_followup"}
+  ],
+  "render_check_discrepancy": {
+    "resolved": true,
+    "repo_defect": false,
+    "root_cause": "system_python_without_pyyaml_uses_fallback_parser_that_emits_spurious_whitespace_diff",
+    "venv_python_result": "PASS",
+    "action": "do_not_rerender_managed_blocks_for_this; fix_dependency_honesty"
+  },
+  "operator_coherence_cockpit": {
+    "status": "CANDIDATE_HIGH_PRIORITY_NOT_CANONICAL",
+    "location": "/Users/dhyana/dharma_swarm",
+    "branch": "telos-ai-seed-v0-from-sandbox",
+    "present_on_origin_main": false,
+    "full_verification_rerun": "PASS",
+    "latest_readiness_score": 40.8,
+    "latest_card_count": 185,
+    "canonical_caveat": "currently generated from dirty checkout; track_portfolio reflects local 11/max11, not canonical origin/main 7/max10"
+  },
+  "next_seam": [
+    "Operator Coherence Cockpit",
+    "Agent Lane Admission Packet",
+    "Production Readiness / Candidate Promotion",
+    "Orchestration Arena v1",
+    "Forge/DGM shadow loop"
+  ],
+  "operator_decisions_needed": [
+    "approve_or_reject_cockpit_as_main_control_tower_candidate",
+    "approve_dedicated_branch_extraction_for_cockpit",
+    "provide_github_auth_or_off_machine_preservation_before_cleanup",
+    "approve_dependency_honesty_followup_scope"
+  ]
+}

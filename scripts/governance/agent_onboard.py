@@ -1322,6 +1322,22 @@ def render_spine_bypass() -> None:
 
 def render_model_key_routing() -> None:
     section("MODEL & KEY ROUTING — THE ONE WAY")
+    # Dispatch availability RIGHT NOW — the canonical, runtime-computed answer.
+    # This line exists to kill the recurring "we have no provider" lie without
+    # replacing it with a new one: claude_code is KEYLESS only when headless
+    # `claude -p` smokes green; local/ollama are also detected here.
+    try:
+        from dharma_swarm.key_oracle import dispatchable_now  # noqa: PLC0415
+
+        live = sorted(dispatchable_now())
+        if live:
+            keyless_note = " (claude_code = KEYLESS — no API key needed)" if "claude_code" in live else ""
+            print(f"  Dispatch: LIVE NOW -> {', '.join(live)}{keyless_note}")
+            print("            'no provider' is almost always FALSE — check key_oracle.dispatchable_now(), not a frozen doc")
+        else:
+            print("  Dispatch: no keyless lane detected and no keyed providers live — run `dkeys test` / add a key")
+    except Exception as exc:  # pragma: no cover - onboarding must never crash on this
+        print(f"  Dispatch: unavailable ({type(exc).__name__}: {str(exc)[:120]})")
     print("  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)")
     print("         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env")
     print("  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()")
