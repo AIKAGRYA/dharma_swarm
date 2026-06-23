@@ -840,6 +840,14 @@ active_tracks:
         kind: file_contains
         file: dharma_swarm/providers.py
         pattern: "class ZhipuProvider"
+      # --- Rigorous evidence (not existence-only): the precedence invariant
+      # actually PASSES when executed, and the stage-4 lock is on origin/main. ---
+      - id: precedence_invariant_test_passes
+        kind: test_passes
+        test: "tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost"
+      - id: stage4_precedence_locked_on_main
+        kind: commit_on_main
+        commit: bc110d84
 
     non_goals:
       - Do not create a new truth store, registry, or model catalog; converge on model_hierarchy / model_pool / model_defaults / api_keys.

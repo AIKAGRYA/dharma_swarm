@@ -417,7 +417,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,831** | wc -l across all .md |
+| Markdown total lines | **246,833** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -431,7 +431,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,831** | wc -l across all .md |
+| Markdown total lines | **246,833** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **312,264** | wc -l across dharma_swarm Python modules |
@@ -445,7 +445,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,831** | wc -l across all .md |
+| Markdown total lines | **246,833** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -459,7 +459,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,831** | wc -l across all .md |
+| Markdown total lines | **246,833** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -473,7 +473,7 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,831** | wc -l across all .md |
+| Markdown total lines | **246,833** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
