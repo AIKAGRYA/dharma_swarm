@@ -142,6 +142,13 @@ async def run(args: argparse.Namespace) -> dict:
         )
         task_ids.append(task.id)
 
+    # ADAPT baseline: count stigmergic marks BEFORE dispatch. The adapt arm of
+    # Loop 1 is agents leaving stigmergic marks on task outcomes (which feed
+    # future routing). hot_paths() is the wrong probe for a short run (it needs
+    # >=3 marks on the SAME path, but each task marks a unique task:<id> path), so
+    # measure the honest signal: marks deposited during the run (after > before).
+    marks_before = swarm._stigmergy.density() if swarm._stigmergy else 0
+
     deadline = time.monotonic() + args.timeout_per_task * args.tasks
     receipts: dict[str, str] = {}
     tick_errors: list[dict[str, str]] = []
@@ -194,6 +201,9 @@ async def run(args: argparse.Namespace) -> dict:
     except Exception:
         pass
 
+    marks_after = swarm._stigmergy.density() if swarm._stigmergy else 0
+    marks_deposited = max(0, marks_after - marks_before)
+
     dropoffs = sum(
         1 for entry in tasks_out if entry["failure_source"] == "dispatch_dropoff"
     )
@@ -214,6 +224,12 @@ async def run(args: argparse.Namespace) -> dict:
         "evidence_receipts": receipts,
         "tick_errors": tick_errors,
         "ticks": ticks,
+        # ADAPT arm: marks deposited during the run prove the sense->...->adapt
+        # feedback fired (agents left stigmergic traces that feed future routing).
+        "stigmergy_marks_before": marks_before,
+        "stigmergy_marks_after": marks_after,
+        "stigmergy_marks_deposited": marks_deposited,
+        "adapt_fired": marks_deposited > 0,
         "stigmergy_hot_paths": hot_paths,
         "state_dir": str(state_dir),
         "canonical_state": bool(getattr(args, "_is_canonical", False)),
