@@ -1,0 +1,53 @@
+{
+  "schema": "dharma.lane_admission_packet.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "lane_id": "operator-coherence-cockpit-2026-06-23",
+  "status": "CANDIDATE_HIGH_PRIORITY",
+  "canonical": false,
+  "location": {
+    "checkout": "/Users/dhyana/dharma_swarm",
+    "branch": "telos-ai-seed-v0-from-sandbox",
+    "head_short": "cd610be3ccef",
+    "canonical_origin_main": "839fd25f43c76375f49e45012fe8f20a324aa74c"
+  },
+  "surfaces": {
+    "modified": [
+      "api/main.py",
+      "dashboard/src/app/dashboard/cockpit/page.tsx"
+    ],
+    "added_or_untracked": [
+      "api/routers/operator_coherence.py",
+      "dharma_swarm/operator_core/operator_coherence_cockpit.py",
+      "scripts/runtime/operator_coherence_cockpit.py",
+      "dashboard/src/lib/operatorCoherence.ts",
+      "dashboard/src/hooks/useOperatorCoherence.ts",
+      "dashboard/src/components/operator-coherence/",
+      "tests/test_operator_coherence_cockpit.py",
+      "reports/governance/operator_coherence_cockpit.json",
+      "reports/governance/operator_coherence_cockpit.md"
+    ]
+  },
+  "verification_this_continuation": [
+    {
+      "command": "python3 -m json.tool reports/governance/operator_coherence_cockpit.json",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run python -m compileall -q api/routers/operator_coherence.py dharma_swarm/operator_core/operator_coherence_cockpit.py scripts/runtime/operator_coherence_cockpit.py",
+      "result": "PASS"
+    },
+    {
+      "command": "uv run pytest -q tests/test_operator_coherence_cockpit.py",
+      "result": "PASS",
+      "detail": "1 passed in 0.54s"
+    }
+  ],
+  "promotion_recommendation": "extract_to_dedicated_branch_then_review_pr_or_admit_as_successor_control_tower_track",
+  "dgm_impact": "direct_prerequisite_for_safe_forge_dgm_parallel_lane_visibility",
+  "open_concerns": [
+    "dirty_checkout_not_canonical",
+    "full_npm_build_not_re_run_by_this_continuation",
+    "github_auth_pr_ci_uncertain",
+    "must_remain_read_only_projection_not_authority_store"
+  ]
+}
