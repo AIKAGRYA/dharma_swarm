@@ -32,7 +32,7 @@ If this file disagrees with that output on anything live (track id, prereqs, rec
 ### Runtime Truth Reconciliation — operator-visible truth packets
 
 **Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-20 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 14 days)
 **Relations:** complements: runtime-truth-nats-2026-06
 **Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
 **Moves vital signs:** quality_gates, memory_persistence
@@ -53,8 +53,8 @@ Doctrine line that must hold:
 
 **Next items:**
 
-- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
-- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
+- [code] SHIPPED: read-only RuntimeTruthPacket contract in operator_core (dharma_swarm/operator_core/contracts.py:125; tests/test_operator_core_contracts.py 7 passed).
+- [code] SHIPPED: compact runtime truth rendered in make onboard (scripts/governance/agent_onboard.py) as a read model, not an authority surface.
 - [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
 **Non-goals:**
@@ -156,7 +156,7 @@ Invariant that must hold throughout:
 **Next items:**
 
 - [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
-- [ops] (blocker) Operator escalation: one real provider key (OPENROUTER recommended) to close Loop 1.
+- [ops] CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster.
 - [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
 
 **Non-goals:**
@@ -170,7 +170,7 @@ Invariant that must hold throughout:
 ### Truth Graph Platform v1 — repo context + receipted A2A presence
 
 **Track id:** `truth-graph-platform-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-12 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: orientation-graph-2026-06
 **Owns surfaces:** scripts/governance/orientation_graph.py, scripts/governance/truth_graph_nats_e2e_demo.py, scripts/governance/run_truth_graph_nats_e2e_demo.sh, tests/test_orientation_graph.py, tests/test_truth_graph_repo_context.py, dharma_swarm/a2a/task_receipt.py, dharma_swarm/a2a/agent_presence.py, tests/test_a2a_gate.py, tests/test_agent_registry_presence.py, reports/orientation/**
 **Moves vital signs:** quality_gates, tool_coverage, memory_persistence
@@ -203,8 +203,8 @@ claim, evidence, verdict, next_action, files_changed.
 
 **Next items:**
 
-- [code] (blocker) Run make orient and commit generated repo_context artifacts.
-- [test] (blocker) Run live local NATS CLI demo twice and verify repo_context renders the receipt path.
+- [code] SHIPPED: repo_context artifacts committed on origin/main (reports/orientation/repo_context.{json,md}, commit ea793d3bd); make orient wired.
+- [test] SHIPPED: NATS CLI e2e demo ran; receipt renders in repo_context (reports/orientation/nats_e2e_receipt.json, commit 936d365db).
 
 **Non-goals:**
 
@@ -218,7 +218,7 @@ claim, evidence, verdict, next_action, files_changed.
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 
 **Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 14 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
 **Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
 **Moves vital signs:** quality_gates, tool_coverage, memory_persistence
@@ -236,10 +236,10 @@ to main through the normal review path before it is called shipped.
 
 **Next items:**
 
-- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
-- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
-- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
-- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+- [test] SHIPPED: frozen Build A verifier set runs green on origin/main (tests/test_holon_bridge.py + test_holon_runtime.py; 103 passed/1 skipped 2026-06-23).
+- [runtime] SHIPPED: unattended fable_composer + codex_composer wakes witnessed with fresh state files (reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md, 2026-06-11).
+- [code] SHIPPED: living_agent_kernel on origin/main (dharma_swarm/operator_core/living_agent_kernel.py); import green.
+- [governance] SHIPPED: holon substrate reconciled to main via PR #585 (commit 9c76b210, 2026-06-12).
 
 **Non-goals:**
 
@@ -251,24 +251,29 @@ to main through the normal review path before it is called shipped.
 ### Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths
 
 **Track id:** `provider-routing-consolidation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-21 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-22 (TTL 21 days)
 **Relations:** complements: runtime-truth-spine-adoption-2026-06, loop-closure-2026-06
 **Owns surfaces:** dharma_swarm/providers.py, dharma_swarm/provider_policy.py, dharma_swarm/model_hierarchy.py, dharma_swarm/model_pool.py, dharma_swarm/model_defaults.py, dharma_swarm/runtime_provider.py, dharma_swarm/router_v1.py, dharma_swarm/smart_router.py, dharma_swarm/decision_router.py, docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md
 **Moves vital signs:** quality_gates, tool_coverage, cost_efficiency
 
 Operator directive 2026-06-21: consolidate the LLM provider/model routing
-subsystem into one coherent, malleable, intelligent router. After weeks of
-accretion the DECISION layer drifted: an explicit provider/model request is
-treated only as a constraint and never as a selection (agent_runner stores
-context["preferred_provider"] but provider_policy never reads it), two rank
-systems disagree (model_hierarchy.CANONICAL_SEED_ORDER is free-first while
-model_pool._PROVIDER_RANK is first-party-first), and ~8 router files stack
-~6 reorder passes with no single documented precedence.
+subsystem into one coherent, malleable, intelligent router. RESOLVED — all
+five stages landed on origin/main 2026-06-21; this records what was fixed,
+not open work. The DECISION layer had drifted: an explicit provider/model
+request was treated only as a constraint, not a selection (provider_policy
+did not read context["preferred_provider"]); the two rank systems disagreed
+(model_hierarchy.CANONICAL_SEED_ORDER free-first vs model_pool._PROVIDER_RANK
+first-party-first); and ~8 router files stacked reorder passes with no single
+documented precedence. All three are now fixed: provider_policy.py pins an
+explicit provider (pin + safe fallback), selection is power-first with
+CANONICAL_SEED_ORDER demoted to historical fallback, and the single
+precedence is documented in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md and
+locked by an invariant test.
 
-The data/registry half is already consolidated (model_hierarchy ->
-model_pool -> model_defaults, keys in api_keys) and is preserved. This
-track fixes the decision half and the wiring gaps, converging on the
-existing registries (no new truth store).
+The data/registry half (model_hierarchy -> model_pool -> model_defaults,
+keys in api_keys) was already consolidated and is preserved; this track
+fixed the decision half and the wiring gaps, converging on the existing
+registries (no new truth store).
 
 Four operator decisions are LOCKED (2026-06-21):
   1. Default selection = POWER-FIRST (most capable model by default; cost
@@ -287,11 +292,12 @@ Precedence the router must follow, documented in one place:
 
 **Next items:**
 
-- [docs] (blocker) Author docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration (locked decisions).
-- [code] (blocker) Stage 1 keystone: provider_policy consults context['preferred_provider'] + requested model as SELECTION (pin + safe fallback).
-- [code] (blocker) Stage 2: unify the two rank systems into one power-first, first-party-preferred order.
-- [code] (blocker) Stage 3: wire z.ai/Zhipu as a first-party provider (enum + resolution + factory + ZhipuProvider).
-- [code] Stage 5: drift cleanup — AgentConfig default model, hardcoded literals, providers_extended.py dead code, env templates.
+- [docs] SHIPPED: docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md — the one precedence + module map + migration.
+- [code] SHIPPED (commit e7e0e55d): Stage 1 — provider_policy consults context['preferred_provider'] as SELECTION (pin + safe fallback).
+- [code] SHIPPED (commit 508be78f): Stage 2 — unified power-first, first-party-preferred order; CANONICAL_SEED_ORDER demoted to historical fallback.
+- [code] SHIPPED (commits ccffd12b/bf8ee7cf): Stage 3 — z.ai/Zhipu first-party provider (enum + resolution + factory + ZhipuProvider, default glm-5.2).
+- [code] SHIPPED (commit bc110d84): Stage 4 — single precedence locked with an invariant test.
+- [code] SHIPPED (commit 04711efb): Stage 5 — env templates + deferred drift recorded in PROVIDER_ROUTING_ARCHITECTURE.md §7 (AgentConfig.model literal, per-model config literals, providers_extended.py — scoped out, not blockers).
 
 **Non-goals:**
 
@@ -498,7 +504,7 @@ bash run_operator.sh
 
 ## Navigation
 
-See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (500+ modules, 12 architectural layers).
+See [`docs/architecture/NAVIGATION.md`](docs/architecture/NAVIGATION.md) for the full module map (770+ modules under `dharma_swarm/`, 12 architectural layers; run `make xray` for the live count).
 See [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) for the ten highest-system onboarding maps and their current status.
 See `README.md` for repo map and common commands.
 See `foundations/` for the 10-pillar intellectual genome.
@@ -510,9 +516,7 @@ See `foundations/` for the 10-pillar intellectual genome.
 **Highest-system map:** Read [`docs/MEGAFILE_INDEX.md`](docs/MEGAFILE_INDEX.md) before treating any large map as canonical. It points to the Attractor Closure synthesis, live ops dashboard, broken register, and missing slots.
 
 See [`INTERFACE_MISMATCH_MAP.md`](INTERFACE_MISMATCH_MAP.md) for the complete map of every interface mismatch between modules. **This is the #1 source of runtime failures.** The map documents:
-- 0 BLOCKER mismatches (all 3 original BLOCKERs resolved)
-- 4 DEGRADED mismatches remaining (MM-05 private coupling, NEW-05 guarded, NEW-07/08 partial)
-- 55 module pairs verified, 11 resolved, 6 new entries added and fixed
+- **Live BLOCKER/DEGRADED status lives in the map itself — do not freeze a count here** (that duplication is exactly how this section rotted). Read `INTERFACE_MISMATCH_MAP.md` for the current tally. As of 2026-06-22 the recent `NEW-14` blocker (world-model loop ↔ `WorldModelAgent` API mismatch, which crashed the loop on every daemon boot) has a fix in flight; the 3 original BLOCKERs are resolved; `NEW-05` (guarded) and `NEW-07/08` (partial+) remain DEGRADED.
 - A prioritized **Bootstrap Sequence** of fixes (most now resolved)
 
 **Rule for all sessions:** Before fixing a bug or adding a feature, check the mismatch map first. If the module pair you're touching has a known mismatch, fix the mismatch as part of your change. Do not add new callers to broken interfaces.

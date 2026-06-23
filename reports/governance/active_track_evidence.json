@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-06-23T23:39:22+09:00",
+  "generated_at": "2026-06-24T00:16:22+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 11,
-    "total": 11
+    "passed": 12,
+    "total": 12
   },
   "criteria": [
     {
@@ -92,13 +92,19 @@
       "kind": "file_contains",
       "passed": true,
       "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
+    },
+    {
+      "id": "operator_core_contracts_pass",
+      "kind": "test_passes",
+      "passed": true,
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s"
     }
   ],
   "portfolio_summary": {
     "active": 8,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 6
+    "shippable": 4
   },
   "spine_objectives": [
     {
@@ -158,14 +164,17 @@
         "quality_gates",
         "memory_persistence"
       ],
-      "verified_at": "2026-06-20",
+      "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
       "shippable": true,
+      "criteria_pass": true,
+      "ship_blocks": [],
+      "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 11,
-        "total": 11
+        "passed": 12,
+        "total": 12
       },
       "criteria": [
         {
@@ -251,6 +260,12 @@
           "kind": "file_contains",
           "passed": true,
           "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py"
+        },
+        {
+          "id": "operator_core_contracts_pass",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s"
         }
       ]
     },
@@ -275,7 +290,12 @@
       "verified_at": "2026-06-07",
       "ttl_days": 21,
       "owner": "@codex",
-      "shippable": true,
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+      ],
+      "has_rigorous_evidence": false,
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 2,
@@ -328,6 +348,12 @@
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "4 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+      ],
+      "has_rigorous_evidence": false,
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 7,
@@ -418,6 +444,12 @@
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "1 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+      ],
+      "has_rigorous_evidence": false,
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 10,
@@ -534,14 +566,17 @@
         "tool_coverage",
         "memory_persistence"
       ],
-      "verified_at": "2026-06-12",
+      "verified_at": "2026-06-23",
       "ttl_days": 21,
       "owner": "@codex",
       "shippable": true,
+      "criteria_pass": true,
+      "ship_blocks": [],
+      "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 15,
-        "total": 15
+        "passed": 17,
+        "total": 17
       },
       "criteria": [
         {
@@ -651,6 +686,18 @@
           "kind": "file_contains",
           "passed": true,
           "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py"
+        },
+        {
+          "id": "repo_context_projection_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.20s"
+        },
+        {
+          "id": "truth_graph_projection_on_main",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "936d365db is an ancestor of origin/main"
         }
       ]
     },
@@ -679,14 +726,17 @@
         "tool_coverage",
         "memory_persistence"
       ],
-      "verified_at": "2026-06-11",
+      "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
       "shippable": true,
+      "criteria_pass": true,
+      "ship_blocks": [],
+      "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 6,
-        "total": 6
+        "passed": 8,
+        "total": 8
       },
       "criteria": [
         {
@@ -742,6 +792,18 @@
           "kind": "file_exists",
           "passed": true,
           "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present"
+        },
+        {
+          "id": "holon_bridge_verifier_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.18s"
+        },
+        {
+          "id": "holon_substrate_on_main",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "9c76b210 is an ancestor of origin/main"
         }
       ]
     },
@@ -773,14 +835,17 @@
         "tool_coverage",
         "cost_efficiency"
       ],
-      "verified_at": "2026-06-21",
+      "verified_at": "2026-06-22",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": true,
+      "criteria_pass": true,
+      "ship_blocks": [],
+      "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 7,
-        "total": 7
+        "passed": 9,
+        "total": 9
       },
       "criteria": [
         {
@@ -842,6 +907,18 @@
           "kind": "file_contains",
           "passed": true,
           "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py"
+        },
+        {
+          "id": "precedence_invariant_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.23s"
+        },
+        {
+          "id": "stage4_precedence_locked_on_main",
+          "kind": "commit_on_main",
+          "passed": true,
+          "detail": "bc110d84 is an ancestor of origin/main"
         }
       ]
     },
@@ -873,7 +950,13 @@
       "verified_at": "2026-06-23",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
+      "shippable": false,
+      "criteria_pass": true,
+      "ship_blocks": [
+        "1 open blocker next-item(s)",
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+      ],
+      "has_rigorous_evidence": false,
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 9,
@@ -977,13 +1060,13 @@
     {
       "severity": "INFO",
       "check": "track-shippable:runtime-truth-reconciliation-2026-06",
-      "message": "[runtime-truth-reconciliation-2026-06] all 11 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 2 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-provisional:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] 2/2 criteria pass but NOT shippable under the rigorous bar: no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {
@@ -1001,25 +1084,25 @@
     {
       "severity": "INFO",
       "check": "track-shippable:truth-graph-platform-2026-06",
-      "message": "[truth-graph-platform-2026-06] all 15 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "message": "[truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
       "check": "track-shippable:provider-routing-consolidation-2026-06",
-      "message": "[provider-routing-consolidation-2026-06] all 7 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "message": "[provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:orchestration-arena-v1-2026-06",
-      "message": "[orchestration-arena-v1-2026-06] all 9 completion criteria pass \u2014 SHIPPABLE; close it (and optionally open the next).",
+      "check": "track-provisional:orchestration-arena-v1-2026-06",
+      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     }
   ]

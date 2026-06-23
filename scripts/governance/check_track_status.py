@@ -23,21 +23,27 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shutil
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-ACTIVE_TRACK_PATH = Path("docs/governance/ACTIVE_TRACK.yaml")
-REPORTS_DIR = Path("reports/governance")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ACTIVE_TRACK_PATH = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+REPORTS_DIR = REPO_ROOT / "reports/governance"
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
 EDGE_KINDS = ("complements", "depends_on", "conflicts_with")
+
+
+def repo_path(path: str | Path) -> Path:
+    """Resolve track-authored relative paths against the repository root."""
+    p = Path(path)
+    return p if p.is_absolute() else REPO_ROOT / p
 
 
 @dataclass
@@ -210,7 +216,7 @@ def _parse_minimal_yaml(text: str) -> dict[str, Any]:
 
 
 def check_file_exists(file_path: str) -> CriterionResult:
-    path = Path(file_path)
+    path = repo_path(file_path)
     return CriterionResult(
         id="", kind="file_exists",
         passed=path.exists(),
@@ -219,7 +225,7 @@ def check_file_exists(file_path: str) -> CriterionResult:
 
 
 def check_file_contains(file_path: str, pattern: str) -> CriterionResult:
-    path = Path(file_path)
+    path = repo_path(file_path)
     if not path.exists():
         return CriterionResult(id="", kind="file_contains", passed=False,
                                 detail=f"{file_path} missing")
@@ -264,6 +270,82 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
                                 detail=f"PR #{pr_number}: {type(exc).__name__}, skipped")
 
 
+# --- Rigor classification (the antidote to existence-only "shippable") --------
+# Existence checks prove a file/string is present; they do NOT prove the work
+# behaves or landed. A track is only shippable under the RIGOROUS bar if it
+# carries at least one of these stronger, evidence-computed criteria AND has no
+# open blocker next-items. Pattern borrowed from
+# cybernetics_codex._evaluate_loop_closure_replay (compute closure from
+# structural evidence; never trust a bare boolean) and REALITY_DEBT_LEDGER.md.
+RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged"})
+EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
+
+
+def check_commit_on_main(commit: str) -> CriterionResult:
+    """A cited commit must be an ancestor of origin/main — proves the work
+    actually LANDED, not just that a side branch claims it. Conservative: if it
+    cannot be verified, it does NOT pass (unproven != done)."""
+    if shutil.which("git") is None:
+        return CriterionResult(id="", kind="commit_on_main", passed=False,
+                               detail="git unavailable; cannot verify commit on main")
+    ref = "origin/main"
+    probe = subprocess.run(["git", "rev-parse", "--verify", "-q", f"{ref}^{{commit}}"],
+                           capture_output=True, text=True, cwd=REPO_ROOT)
+    if probe.returncode != 0:
+        ref = "HEAD"
+    try:
+        res = subprocess.run(["git", "merge-base", "--is-ancestor", commit, ref],
+                             capture_output=True, text=True, timeout=15, cwd=REPO_ROOT)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return CriterionResult(id="", kind="commit_on_main", passed=False,
+                               detail=f"commit_on_main: {type(exc).__name__}")
+    if res.returncode == 0:
+        return CriterionResult(id="", kind="commit_on_main", passed=True,
+                               detail=f"{commit[:10]} is an ancestor of {ref}")
+    return CriterionResult(id="", kind="commit_on_main", passed=False,
+                           detail=f"{commit[:10]} is NOT on {ref} — work not landed")
+
+
+def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
+    """Run a specific pytest target and require it to PASS — not merely exist.
+    This is what stops `def test_x(): pass` from satisfying a file_contains check.
+    Conservative: an un-runnable / failing test does NOT pass."""
+    try:
+        res = subprocess.run(
+            [sys.executable, "-m", "pytest", test_target, "-q", "--no-header",
+             "-p", "no:cacheprovider"],
+            capture_output=True, text=True, timeout=timeout, cwd=REPO_ROOT,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return CriterionResult(id="", kind="test_passes", passed=False,
+                               detail=f"pytest {test_target}: {type(exc).__name__} (could not execute)")
+    passed = res.returncode == 0
+    lines = [ln for ln in (res.stdout or res.stderr or "").splitlines() if ln.strip()]
+    tail = lines[-1] if lines else ""
+    return CriterionResult(id="", kind="test_passes", passed=passed,
+                           detail=f"pytest {test_target}: {'PASS' if passed else 'FAIL'} — {tail}")
+
+
+def check_receipt_valid(file_path: str, requires_keys: list[str]) -> CriterionResult:
+    """A receipt artifact must EXIST and carry the required structural keys —
+    behavioral evidence, not just file presence."""
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="receipt_valid", passed=False,
+                               detail=f"receipt {file_path} MISSING")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="receipt_valid", passed=False,
+                               detail=f"receipt {file_path} unreadable: {type(exc).__name__}")
+    missing = [k for k in (requires_keys or []) if k not in data]
+    if missing:
+        return CriterionResult(id="", kind="receipt_valid", passed=False,
+                               detail=f"receipt {file_path} missing keys: {', '.join(missing)}")
+    return CriterionResult(id="", kind="receipt_valid", passed=True,
+                           detail=f"receipt {file_path} valid ({len(requires_keys or [])} keys present)")
+
+
 def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
     """Evaluate one predicate. A malformed criterion becomes a failing result,
     never an exception — a governance gate must convert bad config into a
@@ -288,6 +370,24 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 res = check_file_contains(crit["file"], crit["pattern"])
         elif kind == "pr_merged":
             res = check_pr_merged(int(crit["pr"]))
+        elif kind == "commit_on_main":
+            if not isinstance(crit.get("commit"), str) or not crit.get("commit"):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'commit' must be a non-empty string")
+            else:
+                res = check_commit_on_main(crit["commit"])
+        elif kind == "test_passes":
+            if not isinstance(crit.get("test"), str) or not crit.get("test"):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'test' must be a non-empty pytest target")
+            else:
+                res = check_test_passes(crit["test"])
+        elif kind == "receipt_valid":
+            if not isinstance(crit.get("file"), str) or not crit.get("file"):
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file' must be a non-empty string")
+            else:
+                res = check_receipt_valid(crit["file"], crit.get("requires_keys") or [])
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")
@@ -522,15 +622,35 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     comps = [evaluate_criterion(c) for c in (t.get("completion_criteria") or [])]
     prereqs_ok = all(c.passed for c in prereqs) if prereqs else True
     completion_ok = all(c.passed for c in comps) if comps else False
+    # Lenient bar (legacy): all completion criteria pass while the track occupies
+    # the portfolio. Kept for reporting, but NO LONGER sufficient for "shippable".
+    criteria_pass = prereqs_ok and completion_ok and _is_active(t)
+
+    # --- RIGOROUS bar (the antidote to existence-only sign-off) ----------------
+    # "all criteria pass" is not closure when every criterion is file_exists /
+    # file_contains and blocker next-items are still open. Compute shippability
+    # from evidence strength + blocker state, not from a bare boolean.
+    next_items = [ni for ni in (t.get("next_items") or []) if isinstance(ni, dict)]
+    open_blockers = [ni for ni in next_items if ni.get("blocker") is True]
+    has_rigorous_evidence = any(c.passed and c.kind in RIGOROUS_KINDS for c in comps)
+    ship_blocks: list[str] = []
+    if open_blockers:
+        ship_blocks.append(f"{len(open_blockers)} open blocker next-item(s)")
+    if not has_rigorous_evidence:
+        ship_blocks.append("no rigorous evidence (criteria are existence-only: "
+                           "file_exists/file_contains — add test_passes / commit_on_main / receipt_valid)")
+    shippable = criteria_pass and not ship_blocks
+
     return {
         "id": t.get("id"),
         "prereqs": prereqs,
         "completion": comps,
         "prereqs_ok": prereqs_ok,
-        # A track is "shippable" when prereqs hold and all completion criteria
-        # pass while it occupies the portfolio (ACTIVE or already SHIPPABLE) —
-        # consistent with _is_active, so a SHIPPABLE track stays reported shippable.
-        "shippable": prereqs_ok and completion_ok and _is_active(t),
+        "shippable": shippable,            # RIGOROUS bar
+        "criteria_pass": criteria_pass,    # legacy lenient bar (existence checks)
+        "ship_blocks": ship_blocks,
+        "has_rigorous_evidence": has_rigorous_evidence,
+        "open_blocker_count": len(open_blockers),
         "passed": sum(1 for c in comps if c.passed),
         "total": len(comps),
     }
@@ -628,8 +748,14 @@ def run(args: argparse.Namespace) -> int:
 
         if r["shippable"]:
             findings.append(Finding("INFO", f"track-shippable:{tid}",
-                f"[{tid}] all {r['total']} completion criteria pass — SHIPPABLE; "
-                "close it (and optionally open the next)."))
+                f"[{tid}] all {r['total']} criteria pass, rigorous evidence present, "
+                "no open blockers — SHIPPABLE (rigorous bar). Close it."))
+        elif r.get("criteria_pass"):
+            findings.append(Finding("INFO", f"track-provisional:{tid}",
+                f"[{tid}] {r['passed']}/{r['total']} criteria pass but NOT shippable "
+                f"under the rigorous bar: {'; '.join(r['ship_blocks'])}. "
+                "Existence checks are not closure (see REALITY_DEBT_LEDGER.md / "
+                "cybernetics_codex._evaluate_loop_closure_replay)."))
         elif r["completion"]:
             findings.append(Finding("INFO", f"track-in-progress:{tid}",
                 f"[{tid}] {r['passed']}/{r['total']} completion criteria pass."))
@@ -655,6 +781,9 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "ttl_days": t.get("ttl_days"),
         "owner": t.get("owner"),
         "shippable": r["shippable"],
+        "criteria_pass": r.get("criteria_pass", r["shippable"]),
+        "ship_blocks": r.get("ship_blocks", []),
+        "has_rigorous_evidence": r.get("has_rigorous_evidence", False),
         "prerequisites_ok": r["prereqs_ok"],
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],

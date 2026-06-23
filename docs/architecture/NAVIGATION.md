@@ -88,7 +88,7 @@ curation:
 # dharma_swarm Navigation Map
 
 Generated: 2026-03-29 | 500 Python modules | 494 test files | 8,848 tests
-**⚠️ STALE (2026-05-20):** Counts above are from generation date. Current measured reality: ~610+ Python modules, 585+ test files, 10,287+ tests. For live counts use `make xray` or `docs/governance/SOVEREIGN_MANIFEST.md`. Module structure below remains directionally correct but not exhaustive.
+**⚠️ STALE (counts refreshed 2026-06-22):** Counts on the line above are from the generation date. Current measured reality: **770+ Python modules under `dharma_swarm/`, ~745 test files, ~12,060 tests collected**. For live counts use `make xray` or `docs/governance/SOVEREIGN_MANIFEST.md`. Module structure below remains directionally correct but not exhaustive.
 
 ---
 
