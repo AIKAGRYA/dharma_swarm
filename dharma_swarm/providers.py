@@ -730,10 +730,11 @@ class _SubprocessProvider(LLMProvider):
             return LLMResponse(content="TIMEOUT: exceeded limit", model=self._cli_label)
 
         content = stdout.decode()[:50_000] if stdout else ""
-        if proc.returncode != 0 and not content:
-            content = (
-                f"ERROR (rc={proc.returncode}): "
-                f"{stderr.decode()[:500] if stderr else 'unknown'}"
+        if proc.returncode != 0:
+            stderr_text = stderr.decode()[:500] if stderr else ""
+            detail = content or stderr_text or "unknown"
+            raise RuntimeError(
+                f"{self._cli_label} exited {proc.returncode}: {detail[:500]}"
             )
 
         return LLMResponse(content=content, model=self._cli_label)

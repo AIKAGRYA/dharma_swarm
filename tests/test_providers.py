@@ -209,7 +209,7 @@ async def test_claude_code_provider_timeout():
 
 @pytest.mark.asyncio
 async def test_claude_code_provider_error():
-    """Verify non-zero exit code with no stdout returns error content."""
+    """Verify non-zero exit code is a provider failure, not a fake completion."""
 
     async def fake_exec(*args, **kwargs):
         mock_proc = AsyncMock()
@@ -220,12 +220,31 @@ async def test_claude_code_provider_error():
 
     provider = ClaudeCodeProvider(timeout=10)
     with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
-        result = await provider.complete(
-            LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
-        )
+        with pytest.raises(RuntimeError, match="claude-code exited 1"):
+            await provider.complete(
+                LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
+            )
 
-    assert "ERROR (rc=1)" in result.content
-    assert "something broke" in result.content
+
+@pytest.mark.asyncio
+async def test_claude_code_provider_nonzero_stdout_is_failure():
+    """Auth errors can arrive on stdout; they must not complete a task."""
+
+    async def fake_exec(*args, **kwargs):
+        mock_proc = AsyncMock()
+        mock_proc.communicate = AsyncMock(
+            return_value=(b"Failed to authenticate. API Error: 401", b"")
+        )
+        mock_proc.returncode = 1
+        mock_proc.terminate = AsyncMock()
+        return mock_proc
+
+    provider = ClaudeCodeProvider(timeout=10)
+    with patch("dharma_swarm.providers.asyncio.create_subprocess_exec", side_effect=fake_exec):
+        with pytest.raises(RuntimeError, match="Failed to authenticate"):
+            await provider.complete(
+                LLMRequest(model="claude-code", messages=[{"role": "user", "content": "test"}])
+            )
 
 
 @pytest.mark.asyncio
