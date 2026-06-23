@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 7 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 8 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -328,6 +328,43 @@ Precedence the router must follow, documented in one place:
 - Do not wire Moonshot/DeepSeek/Perplexity first-party in this track (only z.ai/Zhipu).
 - Do not commit provider API keys or any credentials.
 - Do not remove the learning overlays (affinity/EWMA/reward/canary); unify them under one precedence.
+
+### Orchestration Arena v1 — frozen hermetic fitness + zero-weight orchestrator + DPI
+
+**Track id:** `orchestration-arena-v1-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
+**Relations:** complements: provider-routing-consolidation-2026-06, loop-closure-2026-06
+**Owns surfaces:** dharma_swarm/coordination/**, dharma_swarm/council/**, tests/test_arena_v1.py, tests/test_dpi.py, tests/test_orchestration_genome.py, tests/test_orchestrator_v1.py, tests/test_council_profiles.py, tests/test_coordination_closure_checks.py
+**Moves vital signs:** eval_coverage, quality_gates
+
+Governance admission for the Arena/Orchestration substrate that LANDED on
+main (PRs #670 and adjacent) but was not yet represented in the active-track
+portfolio. The DGM substrate must be governance-visible: the system needs to
+know its own fitness function exists, is frozen/hermetic/replayable, and is
+not yet making production capability claims.
+
+This is the keystone fitness layer for any future Dharma Forge: a frozen
+verifiable taskpack + deterministic scorer + zero-weight heuristic
+orchestrator over a MAP-Elites archive + a Decorrelation-Power-Index (DPI)
+that gates a decorrelated-correctness bonus on actual correctness, plus a
+minimal Council that verifies orchestration traces.
+
+Doctrine that must hold: capability leads, trust multiplies (not the
+headline); only CANONICAL_ORIGIN_MAIN facts feed fitness; v1 carries ZERO
+trained weights — training is earned only after the arena produces labels.
+
+**Next items:**
+
+- [code] Wire arena scorecard + DPI receipts into a governance-visible report surface (read-only).
+- [code] (blocker) Add best-single-model controls + budget-parity proof to every arena run before any capability claim.
+- [code] Connect arena winners to a cold-start trace corpus (no training yet; corpus only).
+
+**Non-goals:**
+
+- Do not make production capability claims; arena reports candidate lift only with budget-parity controls and significance gating.
+- Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
+- Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
+- Do not couple admission to the full world-ingestion (#662) seam.
 
 **Recently closed tracks:**
 

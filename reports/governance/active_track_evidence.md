@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-21T15:29:40+00:00 (schema v2)
-Active tracks: **7** (warn 5, max 10) — shippable 5
+Generated: 2026-06-23T23:39:22+09:00 (schema v2)
+Active tracks: **8** (warn 5, max 10) — shippable 6
 
 ## Spine coverage
 
@@ -135,9 +135,28 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
 
+## `orchestration-arena-v1-2026-06` — SHIPPABLE
+
+- serves: `substrate-nativeness` · complements: ['provider-routing-consolidation-2026-06', 'loop-closure-2026-06'] · depends_on: [] · conflicts_with: []
+- owned_surfaces: ['dharma_swarm/coordination/**', 'dharma_swarm/council/**', 'tests/test_arena_v1.py', 'tests/test_dpi.py', 'tests/test_orchestration_genome.py', 'tests/test_orchestrator_v1.py', 'tests/test_council_profiles.py', 'tests/test_coordination_closure_checks.py']
+- moves_vital_signs: ['eval_coverage', 'quality_gates']
+
+  - ✓ `arena_runner_exists` (file_exists) — dharma_swarm/coordination/arena/runner.py present
+  - ✓ `arena_scorer_exists` (file_exists) — dharma_swarm/coordination/arena/scorer.py present
+  - ✓ `orchestration_genome_exists` (file_exists) — dharma_swarm/coordination/genome.py present
+  - ✓ `frozen_taskpack_present` (file_contains) — pattern 'TASK_PACK_ID' found in dharma_swarm/coordination/arena/taskpack.py
+  - ✓ `deterministic_scorer_hash` (file_contains) — pattern 'def scorer_hash' found in dharma_swarm/coordination/arena/scorer.py
+  - ✓ `orchestration_genome_class` (file_contains) — pattern 'class OrchestrationGenome' found in dharma_swarm/coordination/genome.py
+  - ✓ `zero_weight_orchestrator_map_elites` (file_contains) — pattern 'class MapElitesArchive' found in dharma_swarm/coordination/orchestrator_v1.py
+  - ✓ `dpi_decorrelation_gated_on_correctness` (file_contains) — pattern 'def decorrelation_bonus' found in dharma_swarm/coordination/dpi.py
+  - ✓ `council_trace_verification` (file_contains) — pattern 'class Council' found in dharma_swarm/council/council.py
+  - ✓ `arena_v1_test_exists` (file_contains) — pattern 'def test_positive_lift_candidate_beats_best_single_at_parity' found in tests/test_arena_v1.py
+  - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
+  - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
+
 ## Findings
 
-- **WARN** `wip-high`: 7 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
+- **WARN** `wip-high`: 8 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
@@ -147,3 +166,4 @@ Active tracks: **7** (warn 5, max 10) — shippable 5
 - **INFO** `track-shippable:truth-graph-platform-2026-06`: [truth-graph-platform-2026-06] all 15 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 7 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
+- **INFO** `track-shippable:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] all 9 completion criteria pass — SHIPPABLE; close it (and optionally open the next).
