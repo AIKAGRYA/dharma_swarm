@@ -648,9 +648,11 @@ def _runtime_db_path() -> Any:
 def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
     """Project Loop 1 closure from the latest delegation_runs receipt.
 
-    LIVE only when the most recent receipt (by started_at, then rowid) carries
-    a non-empty provider AND model. This view owns nothing — it reads the
-    receipt_json column the spine dispatch writes (runtime_state owner)."""
+    LIVE only when the most recent COMPLETED receipt (by started_at, then rowid)
+    carries a non-empty provider AND model. This view owns nothing — it reads the
+    receipt_json column the spine dispatch writes (runtime_state owner). Only
+    `completed` runs count: a stale `running`/in-flight receipt is not closure
+    evidence (it would otherwise let an orphaned dispatch outrank a real one)."""
     import sqlite3
 
     path = Path(db_path) if db_path is not None else _runtime_db_path()
@@ -664,9 +666,15 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
         except Exception as exc:  # pragma: no cover - defensive
             return Loop1Closure(live=False, detail=f"db unreadable: {exc}")
     try:
+        # status filter is applied only when the column exists (older schemas omit it).
+        has_status = any(
+            r[1] == "status" for r in conn.execute("pragma table_info(delegation_runs)")
+        )
+        status_clause = "AND status = 'completed' " if has_status else ""
         row = conn.execute(
             "SELECT receipt_json FROM delegation_runs "
             "WHERE receipt_json IS NOT NULL AND receipt_json != '' "
+            f"{status_clause}"
             "ORDER BY started_at DESC, rowid DESC LIMIT 1"
         ).fetchone()
     except Exception as exc:
