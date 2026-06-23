@@ -380,8 +380,8 @@ class DGMLoop:
 
             # Pick a provider that is ACTUALLY dispatchable right now — decided by
             # the oracle, NOT a hardcoded env-key check. dispatchable_now()
-            # includes the KEYLESS claude_code lane (live whenever the claude
-            # binary is present), so this loop no longer falsely reports
+            # includes the KEYLESS claude_code lane (live only when headless
+            # `claude -p` smokes green), so this loop no longer falsely reports
             # "no provider" when dispatch is available with zero keys.
             provider = None
             live = dispatchable_now()

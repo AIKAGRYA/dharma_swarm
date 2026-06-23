@@ -12,10 +12,9 @@ dispatch_dropoff occurrences, and stigmergy hot paths (the ADAPT half of
 Loop 1 — routing in tick N+1 reads outcomes of tick N).
 
 Usage:
-    # KEYLESS close — no API key needed. The claude_code lane is live whenever
-    # the `claude` binary is present (every Claude Code web/remote/CI session).
-    # Proven 2026-06-23: 2/2 tasks completed, 0 dropoffs, served_provider=claude_code
-    # (reports/loop_closure/2026-06-23_loop1_keyless_claude_code_close.json).
+    # KEYLESS close — no project API key needed. The claude_code lane is live
+    # only when headless `claude -p` can complete now; a binary on PATH is not
+    # sufficient.
     .venv/bin/python scripts/loop1_closure_run.py \
         --provider claude_code --model claude-sonnet-4-5 --tasks 2
     # Check what is dispatchable first (NEVER assume 'no provider'):
@@ -27,9 +26,11 @@ Usage:
         --timeout-per-task 240 --report reports/loop_closure/run.json
 
     # Real closure run (writes to the canonical runtime.db make orient reads,
-    # so a green run flips loop1_live). Keyless via claude_code, or any keyed lane:
+    # so a green run flips loop1_live). Use any provider returned by
+    # key_oracle.dispatchable_now(); on this host that is usually local Ollama:
     .venv/bin/python scripts/loop1_closure_run.py --canonical \
-        --provider claude_code --model claude-sonnet-4-5 --tasks 1
+        --provider ollama --model llama3.2:latest --tasks 3 \
+        --report reports/loop_closure/cybernetics_codex/$(date -u +%F)_loop1_ollama_fresh_spine_dispatch.json
     # then: make orient   →   "Loop 1 (provider chain + dispatch): LIVE"
 """
 
@@ -112,10 +113,18 @@ async def run(args: argparse.Namespace) -> dict:
 
     state_dir, is_canonical = _resolve_state_dir(args)
     args._is_canonical = is_canonical
+    provider_type = ProviderType(args.provider)
+    from dharma_swarm.key_oracle import dispatchable_now
+
+    live = dispatchable_now()
+    if provider_type.value not in live:
+        raise RuntimeError(
+            f"provider {provider_type.value!r} is not dispatchable now "
+            f"(dispatchable={sorted(live)}); refusing to create a fake closure receipt"
+        )
+
     swarm = SwarmManager(state_dir=state_dir)
     await swarm.init()
-
-    provider_type = ProviderType(args.provider)
     agents = []
     for i in range(args.agents):
         agent = await swarm.spawn_agent(

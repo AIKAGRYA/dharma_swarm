@@ -9,7 +9,8 @@ completions land as traces the Witness audits.
 
 This run drives the full cycle on real data — no mocks:
 
-  sense      : dispatch real tasks keyless (claude_code) so completions land
+  sense      : dispatch real tasks through a provider proven live by
+               key_oracle.dispatchable_now() so completions land
                task_completed traces; WitnessAuditor.run_cycle() samples them.
   interpret  : _evaluate_trace reads each trace for telos alignment, mimicry,
                and gate sufficiency.
@@ -48,7 +49,9 @@ os.environ.setdefault("DHARMA_SPINE_DISPATCH", "1")
 os.environ.setdefault("DHARMA_READ_ONLY_BOOT", "1")
 os.environ.setdefault("OLLAMA_FORCE_LOCAL", "1")
 
-from dharma_swarm import api_keys as _api_keys  # noqa: E402,F401  (load keystore front door)
+from dharma_swarm import api_keys as _api_keys  # noqa: E402  (load keystore front door)
+
+_api_keys.bootstrap_runtime_env()
 
 TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 
@@ -63,12 +66,21 @@ async def _dispatch_real_tasks(provider: str, model: str, n_tasks: int, timeout_
     """Drive n real tasks through the swarm so completions land task_completed traces."""
     from dharma_swarm.swarm import SwarmManager
     from dharma_swarm.models import AgentRole, TaskPriority, ProviderType
+    from dharma_swarm.key_oracle import dispatchable_now
 
+    provider_type = ProviderType(provider)
+    live = dispatchable_now()
+    if provider_type.value not in live:
+        raise RuntimeError(
+            f"provider {provider_type.value!r} is not dispatchable now "
+            f"(dispatchable={sorted(live)}); refusing to create a fake witness closure"
+        )
     swarm = SwarmManager()
     await swarm.init()
+    tick_errors: list[str] = []
     await swarm.spawn_agent(
         name="loop6-agent-1", role=AgentRole.GENERAL, model=model,
-        provider_type=ProviderType(provider),
+        provider_type=provider_type,
     )
     task_ids: list[str] = []
     for i in range(n_tasks):
@@ -89,7 +101,12 @@ async def _dispatch_real_tasks(provider: str, model: str, n_tasks: int, timeout_
     deadline = time.monotonic() + timeout_per_task * n_tasks
     completed = 0
     while time.monotonic() < deadline:
-        await swarm.tick()
+        try:
+            await swarm.tick()
+        except Exception as exc:
+            tick_errors.append(f"{type(exc).__name__}: {exc}")
+            await asyncio.sleep(0.5)
+            continue
         statuses = []
         for tid in task_ids:
             t = await swarm._task_board.get(tid)
@@ -102,7 +119,7 @@ async def _dispatch_real_tasks(provider: str, model: str, n_tasks: int, timeout_
         if t and t.status == TaskStatus.COMPLETED:
             completed += 1
     await swarm.shutdown()
-    return {"dispatched": len(task_ids), "completed": completed}
+    return {"dispatched": len(task_ids), "completed": completed, "tick_errors": tick_errors}
 
 
 async def _witness_governance_mark_count() -> int:
@@ -137,7 +154,7 @@ async def run(args: argparse.Namespace) -> dict:
     )
 
     transitions_seen = {t: False for t in TRANSITIONS}
-    tick_errors: list[str] = []
+    tick_errors: list[str] = list(dispatch.get("tick_errors") or [])
     cycle_rows: list[dict] = []
     total_actionable = 0
 

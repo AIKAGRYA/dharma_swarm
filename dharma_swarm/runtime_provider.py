@@ -661,7 +661,7 @@ async def complete_via_preferred_runtime_providers(
     if not configs:
         raise RuntimeError(
             "No dispatchable provider in the preferred chain. Dispatch is normally "
-            "keyless via claude_code (live when the claude binary is present) — "
+            "keyless via claude_code when headless `claude -p` smokes green — "
             "check key_oracle.dispatchable_now(); add Ollama/NVIDIA NIM/OpenRouter "
             "keys only to widen the roster."
         )

@@ -408,7 +408,7 @@ class AutoResearchLoop:
         # Dispatch via the canonical live-fallback chain (most-powerful-first),
         # which includes the KEYLESS claude_code lane — never hardcode OpenRouter.
         # Proposal generation no longer dies with "no provider" when keys are
-        # unset: claude_code dispatches keyless whenever the claude binary is present.
+        # unset: claude_code dispatches keyless when headless `claude -p` smokes green.
         try:
             from dharma_swarm.runtime_provider import (
                 complete_via_preferred_runtime_providers,

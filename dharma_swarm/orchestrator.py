@@ -619,10 +619,11 @@ class Orchestrator:
         completions. Carries gate_results when the task recorded them, so the
         Witness can honestly evaluate telos-gate sufficiency.
         """
-        try:
+        async def _write() -> None:
             from dharma_swarm.traces import TraceEntry, TraceStore
 
-            meta = getattr(task, "metadata", {}) or {}
+            raw_meta = getattr(task, "metadata", {}) or {}
+            meta = dict(raw_meta) if isinstance(raw_meta, dict) else {}
             gate_results = meta.get("gate_results") or {}
             store = TraceStore()
             await store.init()
@@ -637,10 +638,20 @@ class Orchestrator:
                         "duration_seconds": round(duration_sec, 4),
                         "result_chars": len(result or ""),
                         "gate_results": gate_results,
+                        "failure_source": meta.get("last_failure_source"),
+                        "failure_class": meta.get("last_failure_class"),
                     },
                 )
             )
+
+        try:
+            # Best-effort means bounded as well as fail-open: TraceStore I/O must
+            # never become a new dispatch-tail failure mode.
+            await asyncio.wait_for(_write(), timeout=2.0)
         except Exception:
+            self._completion_trace_emit_failures = (
+                int(getattr(self, "_completion_trace_emit_failures", 0)) + 1
+            )
             logger.debug("Completion trace emit failed (non-critical)", exc_info=True)
 
     @staticmethod
@@ -1924,6 +1935,17 @@ class Orchestrator:
                 "retry_count": retry_count,
                 "max_retries": max_retries,
             },
+        )
+        await self._emit_completion_trace(
+            task=task,
+            agent_id=td.agent_id,
+            duration_sec=max(
+                0.0,
+                time.monotonic()
+                - float(td.metadata.get("run_started_monotonic", time.monotonic())),
+            ),
+            result=error,
+            success=False,
         )
         # ── Algedonic signal: task exhausted all retries → pain to S5 ──
         try:

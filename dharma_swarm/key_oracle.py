@@ -24,6 +24,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import time
 from pathlib import Path
 
@@ -71,26 +72,83 @@ _PROVIDER_TO_ROW: dict[str, str] = {
     "zai_global": "zai_global",
 }
 
-# Providers that need no remote key to be "live" — detected at RUNTIME, not
-# assumed. This is the fix for the recurring "we have no provider" lie: the
-# dispatcher (runtime_provider.py) treats claude_code as "always available if the
-# claude binary is installed", but this oracle used to omit it — so a fresh
-# session with no keys_status.json reported nothing and every reader concluded
-# "no provider". claude_code IS keyless-live whenever the `claude` binary is on
-# PATH (verified: it dispatches real completions with zero keys set).
+# Providers that need no project API key to be "live" — detected at RUNTIME,
+# not assumed. A binary on PATH is not enough: `claude auth status` can report a
+# Max login while headless `claude -p` still fails with a 401.  The liveness
+# oracle must answer "can this lane complete a headless dispatch now?", not "is
+# a binary installed?".
 _KEYLESS_LIVE = frozenset({"local"})  # legacy static fallback; prefer detection
+_CLAUDE_CODE_SMOKE_TTL_S = 300.0
+_claude_code_smoke_cache: tuple[float, bool, str] | None = None
+
+
+def _claude_code_dispatchable_now(*, now: float | None = None) -> bool:
+    """Return True only when the Claude CLI can complete a headless prompt now.
+
+    This intentionally probes the same headless surface the provider uses
+    (`claude -p`).  It is cached briefly in-process to avoid re-smoking on every
+    router decision, and it never reads or logs secrets.
+    """
+    global _claude_code_smoke_cache
+
+    binary = shutil.which("claude")
+    if not binary:
+        return False
+
+    current = time.time() if now is None else now
+    if _claude_code_smoke_cache is not None:
+        checked_at, ok, _detail = _claude_code_smoke_cache
+        if current - checked_at <= _CLAUDE_CODE_SMOKE_TTL_S:
+            return ok
+
+    env = dict(os.environ)
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+    env.pop("CLAUDECODE", None)
+    env.pop("CLAUDE_CODE_ENTRYPOINT", None)
+    env.pop("CLAUDE_CODE_INCLUDE_PARTIAL_MESSAGES", None)
+    try:
+        result = subprocess.run(
+            [
+                binary,
+                "-p",
+                "Reply with exactly: OK_DHARMA_CLAUDE_CODE_SMOKE",
+                "--output-format",
+                "text",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            check=False,
+        )
+    except Exception as exc:  # noqa: BLE001 - liveness probe must fail closed
+        _claude_code_smoke_cache = (current, False, f"{type(exc).__name__}: {exc}")
+        logger.debug("claude_code headless smoke failed", exc_info=True)
+        return False
+
+    output = (result.stdout or result.stderr or "").strip()
+    ok = result.returncode == 0 and "OK_DHARMA_CLAUDE_CODE_SMOKE" in output
+    if not ok:
+        logger.warning(
+            "claude_code binary exists but headless dispatch is not live "
+            "(rc=%s, output=%r)",
+            result.returncode,
+            output[:160],
+        )
+    _claude_code_smoke_cache = (current, ok, output[:160])
+    return ok
 
 
 def _detect_keyless_live() -> set[str]:
     """The keyless lanes usable RIGHT NOW, detected from the environment.
 
-    - ``claude_code`` whenever the ``claude`` CLI is on PATH (the keyless
-      Max-plan dispatch lane; this is what makes Claude Code web/remote/CI
-      sessions able to dispatch with no API key at all).
+    - ``claude_code`` only when the ``claude`` CLI can complete a headless
+      `claude -p` smoke now. Binary presence and `auth status` are insufficient.
     - ``local`` / ``ollama`` when an ollama runtime is reachable.
     """
     live: set[str] = set()
-    if shutil.which("claude"):
+    if _claude_code_dispatchable_now():
         live.add("claude_code")
     if shutil.which("ollama") or os.environ.get("OLLAMA_HOST"):
         live.add("local")
@@ -145,7 +203,8 @@ def live_providers(
 
     The returned set uses ProviderType *value* strings (e.g. ``"openai"``,
     ``"anthropic"``, ``"ollama"``) so callers can intersect directly with
-    ``ProviderType`` members, plus the keyless-live providers (``"local"``).
+    ``ProviderType`` members, plus the keyless-live providers
+    (``"local"``, ``"ollama"``, and only-smoke-proven ``"claude_code"``).
     """
     data = _load_status(home)
     if data is None:
@@ -192,9 +251,8 @@ def is_provider_live(
 ) -> bool | None:
     """Liveness for a single provider. None = unknown (fail-open).
 
-    Keyless lanes detected at runtime (claude_code if the claude binary is
-    present, local/ollama) are LIVE regardless of the status file — so a fresh
-    session can never report claude_code as 'no provider' when it is right there.
+    Keyless lanes detected at runtime (claude_code only if headless dispatch
+    smokes green, local/ollama) are LIVE regardless of the status file.
     """
     name = _provider_name(provider)
     if name in _detect_keyless_live():
@@ -213,13 +271,11 @@ def dispatchable_now(
 ) -> set[str]:
     """The honest set of providers usable RIGHT NOW — never None, never blind.
 
-    Keyless lanes detected from the environment (claude_code if the claude binary
-    is on PATH, local/ollama) UNION any keyed providers proven live by the last
-    ``dkeys test``. Unlike :func:`live_providers` (which returns None when the
-    status file is missing), this always reflects the keyless lanes — so onboard
-    and agents can never again conclude "we have no provider" when claude_code is
-    present. This is the single canonical, repo-wide answer to "what can I
-    dispatch to?".
+    Keyless lanes detected from the environment (claude_code only if a headless
+    smoke completes, local/ollama) UNION any keyed providers proven live by the
+    last ``dkeys test``. Unlike :func:`live_providers` (which returns None when
+    the status file is missing), this always reflects proven keyless lanes. This
+    is the single canonical, repo-wide answer to "what can I dispatch to?".
     """
     keyed = live_providers(ttl_s, home=home, now=now)
     return _detect_keyless_live() | (keyed or set())

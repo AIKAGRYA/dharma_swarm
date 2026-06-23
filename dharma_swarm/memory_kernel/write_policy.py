@@ -418,6 +418,8 @@ def default_reviewed_write_baseline() -> tuple[ReviewedWriteBaselineEntry, ...]:
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'build_lattice_db', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/lattice_test.py', 'main', 'path_write', 'e7f43d056757', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/loop2_heartbeat_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop5_zeitgeist_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
+        ReviewedWriteBaselineEntry('scripts/loop6_witness_closure_run.py', 'main', 'path_write', 'eebcfa85ce76', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/merge_snapshot.py', 'write_canonical_outputs', 'path_write', 'b75b71c07cd1', 'generated_artifact', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/mirror_test.py', 'build_sqlite_graph', 'sqlite_connect', '7b7dd5543675', 'test_or_experiment', occurrences=1),
         ReviewedWriteBaselineEntry('scripts/onboard_cybernetics_stewards.py', 'main', 'path_write', '46fbb16ffdbd', 'operational_state', occurrences=1),

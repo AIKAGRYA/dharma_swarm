@@ -1,13 +1,13 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-06-18T16:49:32Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Last audit:** 2026-06-23T14:15:48Z by `scripts/governance/cybernetics_codex_audit.py --json`
 **Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
 
 > **Re-verification pass 2026-06-15 (perplexity-computer):** 26 days / 232 commits since last audit. Code-structural status of all 13 loops is unchanged in the static surface. Two notable code changes since 2026-05-20 worth flagging here without flipping status (runtime closure still depends on live `~/.dharma/` data not visible from cloud seat):
 >
-> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate documented here (working LLM provider with valid API key) is unchanged — a runtime configuration concern, not a code-path concern.
+> - **Loop 1 (Swarm Task Loop) — spine is wired.** `dharma_swarm/agent_runner.py:55-62` now imports `invoke_agent` and `EvidenceReceipt` directly. The runtime-truth-spine-adoption-2026-06 track stands at 7/8 SHIPPABLE per `docs/governance/ACTIVE_TRACK.yaml`. The remaining gate is a *proven dispatchable provider in the live seat*; `claude_code` is keyless only when headless `claude -p` smokes green, and local Ollama may be the current live fallback.
 > - **Loop 8 (Recognition).** Wiring from 2026-05-20 (`cascade.py:386-491`, `shakti_executive/inputs.py:100`, `meta_daemon.py`) re-verified present. Status PARTIAL unchanged.
 >
 > No new BLOCKERs surfaced. The full re-running of "Evidence From ~/.dharma/" section requires live-seat access and is deferred.
@@ -27,32 +27,33 @@ It is not the universal closure witness. A2A-surface rows can be successful with
 empty `receipt_json` because their canonical witness is `runtime_receipts` plus
 idempotency records. For Loop 1, the current production acceptance bar is actual
 served provider/model truth in the audited scope, zero `dispatch_dropoff`, and a
-bounded replay proving tick N affects tick N+1.
+bounded replay proving completed tasks leave an adaptive signal for later routing.
 
 Live runtime truth from the latest audit:
 
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 5,222 total, 2,027 completed, 3,144 failed, 50 running, 1 claimed |
-| `runtime_receipts` | 17,410 rows, latest 2026-06-18T16:45:05Z |
-| `receipt_json` | 669 rows, orchestrator surface only |
-| served provider/model truth | 599 completed delegation runs, 1,716 runtime receipts |
-| `dispatch_dropoff` | 1,428 failures, latest 2026-06-18T15:02:59Z |
+| `delegation_runs` | 6,441 total, 3,034 completed, 3,349 failed, 57 running, 1 claimed |
+| `runtime_receipts` | 47,895 rows, latest 2026-06-23T14:15:48Z |
+| `receipt_json` | 1,225 rows, orchestrator surface only |
+| served provider/model truth | 999 completed delegation runs, 7,018 runtime receipts |
+| `dispatch_dropoff` | 1,486 failures, latest 2026-06-23T11:04:36Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
-| evolution archive | 11,591 entries, 11,145 internal-positive-fitness risk rows, 0 external authority markers |
+| evolution archive | 11,726 entries, 11,227 internal-positive-fitness risk rows, 0 external authority markers |
 
 Bounded Loop 1 replay proof (current code/provider lane):
 
 | Surface | Current value |
 |---------|---------------|
-| report | `reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
-| command | `python3 scripts/loop1_closure_run.py --tasks 3 --agents 1 --provider ollama --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/2026-06-18_loop1_bounded_spine_dispatch.json` |
+| report | `reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json` |
+| command | `uv run python scripts/loop1_closure_run.py --canonical --provider ollama --model llama3.2:latest --tasks 3 --agents 1 --timeout-per-task 180 --tick-sleep 1.0 --report reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json` |
 | result | `LOOP1_CLOSED=yes` |
 | completed tasks | 3/3 |
 | dispatch dropoff | 0 |
 | evidence receipts | 3 ok |
-| served provider/model truth | 3/3 completed delegation receipts, source `receipt_json` |
+| served provider/model truth | 3/3 new task receipts verified in `delegation_runs.receipt_json` with `provider=ollama`, `model=llama3.2:latest`, `operation=invoke_agent`, `status=ok` |
 | tick errors | 0 |
+| adapt signal | 3 run-attributed stigmergy marks; `adapt_fired=true` |
 
 ---
 
@@ -60,12 +61,12 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 | # | Loop | Interval | Closed? | Remaining Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1428`, so do not call the whole daemon history clean. |
-| 2 | Organism Heartbeat | 300s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
+| 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 5 | Zeitgeist Scanner | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
-| 6 | Witness Auditor | 3600s | **CLOSED** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
+| 5 | Zeitgeist Scanner | configurable | **CLOSED in bounded replay (internal S3↔S4 arm only)** | `scripts/loop5_zeitgeist_closure_run.py` proves real internal gate-pressure feedback. This is not external-world zeitgeist closure; no real-world/external eyes are proven. |
+| 6 | Witness Auditor | 3600s | **CLOSED in bounded replay** | Bounded replay closes Loop 6: orchestrator now lands task_completed traces, the Witness senses real completions, flags telos-gate-coverage gaps, and appends governance marks (adapt fed forward). `scripts/loop6_witness_closure_run.py`. |
 | 7 | Training Flywheel | 300s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 8 | Recognition Loop / eigenform | 7200s | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 9 | Conductors | 120s | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
@@ -74,7 +75,7 @@ Bounded Loop 1 replay proof (current code/provider lane):
 | 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 | 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 
-**Summary: standing all-history audit is still 0 fully clean, 11 PARTIAL, 2 BLOCKED. Current bounded production replay closes Loop 1 only. The old "1 of 13 closed" reading came from mixing a historical harness receipt, this stale prose map, and live runtime truth; the current map separates standing history from bounded replay proof.**
+**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, and 6 (with Loop 5 explicitly internal-arm-only); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
 
 ---
 
@@ -224,7 +225,7 @@ ADAPT:   Next cycle: telos gates read gate_pressure.json and adjust strictness
          This closes VSM Gap #1: S3↔S4 bidirectional feedback
 ```
 
-**Current state (updated 2026-06-23): CLOSED via bounded replay.** The internal S3↔S4 arm now closes end-to-end on real data. `scripts/loop5_zeitgeist_closure_run.py` drives real gate checks on genuinely harmful actions through the `TelosGatekeeper` (each BLOCK lands a real `BLOCKED` witness entry — sense), the `InternalPressureScanner` reads the block rate (interpret), a high block rate becomes a "High gate block rate" threat signal (constrain), `_write_gate_pressure` writes `gate_pressure.json` (act), and the gatekeeper's `_apply_gate_pressure` then resolves trust mode `internal_yolo → external_strict` on its next check (adapt — VSM Gap #1 closed). Proof: 8 real blocks, `before=internal_yolo / after=external_strict`, fed forward, no tick errors; cybernetics-codex audit recomputes `CLOSED_BOUNDED_REPLAY`.
+**Current state (updated 2026-06-23): CLOSED via bounded replay for the internal S3↔S4 arm only.** The internal S3↔S4 arm now closes end-to-end on real data. `scripts/loop5_zeitgeist_closure_run.py` drives real gate checks on genuinely harmful actions through the `TelosGatekeeper` (each BLOCK lands a real `BLOCKED` witness entry — sense), the `InternalPressureScanner` reads the block rate (interpret), a high block rate becomes a "High gate block rate" threat signal (constrain), `_write_gate_pressure` writes `gate_pressure.json` (act), and the gatekeeper's `_apply_gate_pressure` then resolves trust mode `internal_yolo → external_strict` on its next check (adapt — VSM Gap #1 closed). Proof: 8 real blocks, `before=internal_yolo / after=external_strict`, fed forward, no tick errors; cybernetics-codex audit recomputes `CLOSED_BOUNDED_REPLAY`. This does **not** prove real-world/external zeitgeist sensing.
 
 ---
 
@@ -239,7 +240,7 @@ ADAPT:   Record witness observation to ~/.dharma/witness/
          Evolution engine uses witness scores as fitness signal
 ```
 
-**Current state (updated 2026-06-23): CLOSED via bounded replay.** The gap was an interface mismatch: task completions emitted progress/lifecycle/bus events but never a `task_completed` *trace*, so the Witness (which senses from `TraceStore`) only ever saw `boot`/`heartbeat` and never real agent work. Fixed by wiring `orchestrator._emit_completion_trace` so every completion lands a `task_completed` trace carrying duration and gate_results. With that, `scripts/loop6_witness_closure_run.py` drives the full cycle on real data: dispatch real tasks keyless (claude_code) → Witness samples the real completion traces (sense) → evaluates telos alignment / mimicry / gate sufficiency (interpret) → classifies actionable findings (constrain) → publishes them to the stigmergy governance channel + operator memory (act) → governance marks strictly grow, feeding governance and downstream loops (adapt). The cybernetics-codex audit independently recomputes `CLOSED_BOUNDED_REPLAY` from the receipt (real_data, all 5 transitions, adapt before≠after fed forward, no tick errors). Prior history: 1,013 witness entries across 2 days; correctly BLOCKED destructive filesystem commands (AHIMSA).
+**Current state (updated 2026-06-23): CLOSED via bounded replay.** The gap was an interface mismatch: task completions emitted progress/lifecycle/bus events but never a `task_completed` *trace*, so the Witness (which senses from `TraceStore`) only ever saw `boot`/`heartbeat` and never real agent work. Fixed by wiring `orchestrator._emit_completion_trace` so every completion lands a `task_completed` trace carrying duration and gate_results. With that, `scripts/loop6_witness_closure_run.py` drives the full cycle on real data: dispatch real tasks through a provider proven live by `dispatchable_now()` → Witness samples the real completion traces (sense) → evaluates telos alignment / mimicry / gate sufficiency (interpret) → classifies actionable findings (constrain) → publishes them to the stigmergy governance channel + operator memory (act) → governance marks strictly grow, feeding governance and downstream loops (adapt). The cybernetics-codex audit independently recomputes `CLOSED_BOUNDED_REPLAY` from the receipt (real_data, all 5 transitions, adapt before≠after fed forward, no tick errors). Prior history: 1,013 witness entries across 2 days; correctly BLOCKED destructive filesystem commands (AHIMSA).
 
 ---
 
@@ -280,21 +281,21 @@ ADAPT:   Write recognition_seed.md to ~/.dharma/meta/
 | Loop | Status | Update |
 |------|--------|--------|
 | 9: Conductors | PARTIAL | Cron health tracks 7 jobs. Conductor configs use proper enums. Blocked on LLM provider for actual conductor work. |
-| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved. Dispatch IS available (keyless claude_code). |
+| 10: Context Agent | NO | Depends on Loop 1 (running AgentRunner). MM-01 resolved. Dispatch requires a provider proven by `dispatchable_now()`. |
 | 11: Replication Monitor | PARTIAL | MM-02/03 RESOLVED. Replication path structurally correct. No trigger events yet. |
 | 12: Self-Improvement | NO | DarwinEngine instantiable. `auto_evolve()` fixed. Requires `DHARMA_SELF_IMPROVE` (dispatch is available, see below). |
-| 13: Free Evolution Grind | NO | Router works AND dispatch is available keyless (claude_code); needs the evolution cadence wired, not a key. |
+| 13: Free Evolution Grind | NO | Router works; dispatch requires a provider proven by `dispatchable_now()`. Still gated by One Wire before archive-fitness authority. |
 
 ---
 
-## Which Loops Close First — dispatch is ALREADY available (no key needed)
+## Which Loops Close First — first prove live dispatch in this seat
 
-**Correction (2026-06-23):** the long-standing "needs a provider key / no real provider" claim was FALSE. The `claude_code` lane is **keyless** and live whenever the `claude` binary is on PATH (every Claude Code web/remote/CI session) — verified by a real completion. The single source of truth is `key_oracle.dispatchable_now()` (surfaced in `make onboard`), NOT a frozen line in this map. With 0 BLOCKERs remaining, the cascade is purely operational and a key is **optional** (only to add OTHER providers).
+**Correction (2026-06-23):** the long-standing "needs a provider key / no real provider" claim was too broad. The `claude_code` lane uses the Claude Code login rather than a project API key, but it is live only when headless `claude -p` can complete now; a binary on PATH is not enough. The single source of truth is `key_oracle.dispatchable_now()` (surfaced in `make onboard`), NOT a frozen line in this map. If `claude -p` fails authentication, Loop 1 is not live on that host until Claude Code auth is repaired or another provider is proven live.
 
-**Step 1: confirm dispatch** — `python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"` (claude_code = keyless). Add `OPENROUTER_API_KEY` / ollama only to widen the roster.
+**Step 1: confirm dispatch** — `python3 -c "from dharma_swarm.key_oracle import dispatchable_now; print(dispatchable_now())"`. `claude_code` is keyless only if the command's headless smoke proves it; add/repair Ollama or keyed providers to widen the roster.
 
-**Immediately closeable (dispatch already available, keyless):**
-- Loop 1 (Swarm Task) — routing works, dispatch path clear, keyless claude_code lane is live; just needs `AgentRunner` wired into the live loop
+**Immediately closeable when `dispatchable_now()` is non-empty:**
+- Loop 1 (Swarm Task) — routing works and dispatch path is clear; needs a proven live provider and `AgentRunner` wired into the live loop
 - Loop 6 (Witness) — already works on test data, will audit real actions immediately
 - Loop 2 (Organism Heartbeat) — invariants will compute real data
 

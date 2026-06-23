@@ -625,8 +625,8 @@ class AutonomousAgent:
         from dharma_swarm.models import LLMRequest
 
         # The same Claude model serves via the metered Anthropic API OR — keyless —
-        # via the claude_code Max-plan lane (live whenever the claude binary is
-        # present). Order ANTHROPIC first, then fall back to the KEYLESS claude_code
+        # via the claude_code Max-plan lane (live only when headless `claude -p`
+        # smokes green). Order ANTHROPIC first, then fall back to the KEYLESS claude_code
         # lane, so this never dies with "configure ANTHROPIC_API_KEY" when dispatch
         # is actually available with zero keys.
         configs = preferred_runtime_provider_configs(
@@ -638,8 +638,9 @@ class AutonomousAgent:
         )
         if not configs:
             raise RuntimeError(
-                "No Claude provider available. claude_code is KEYLESS when the claude "
-                "binary is present — check key_oracle.dispatchable_now(); set "
+                "No Claude provider available. claude_code is KEYLESS only when "
+                "headless `claude -p` dispatch smokes green — check "
+                "key_oracle.dispatchable_now(); set "
                 "ANTHROPIC_API_KEY only for the metered API path."
             )
 
