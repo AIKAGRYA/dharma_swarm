@@ -372,15 +372,31 @@ class DGMLoop:
 
         # Step 4: Run auto_evolve with the selected source file and parent context
         try:
-            from dharma_swarm.providers import OpenRouterProvider
-            import os as _os
+            from dharma_swarm.key_oracle import dispatchable_now
+            from dharma_swarm.runtime_provider import (
+                create_runtime_provider,
+                preferred_runtime_provider_configs,
+            )
 
+            # Pick a provider that is ACTUALLY dispatchable right now — decided by
+            # the oracle, NOT a hardcoded env-key check. dispatchable_now()
+            # includes the KEYLESS claude_code lane (live whenever the claude
+            # binary is present), so this loop no longer falsely reports
+            # "no provider" when dispatch is available with zero keys.
             provider = None
-            if _os.environ.get("OPENROUTER_API_KEY"):
-                provider = OpenRouterProvider()
+            live = dispatchable_now()
+            for cfg in preferred_runtime_provider_configs():
+                name = str(getattr(cfg.provider, "value", cfg.provider)).lower()
+                if name in live:
+                    provider = create_runtime_provider(cfg)
+                    break
 
             if provider is None:
-                result.error = "No LLM provider available (set OPENROUTER_API_KEY)"
+                result.error = (
+                    "No dispatchable LLM provider. Dispatch is normally keyless via "
+                    "claude_code — check key_oracle.dispatchable_now(); add a key only "
+                    "to widen the roster."
+                )
                 result.duration_seconds = time.monotonic() - start
                 return result
 
