@@ -224,7 +224,7 @@ ADAPT:   Next cycle: telos gates read gate_pressure.json and adjust strictness
          This closes VSM Gap #1: S3↔S4 bidirectional feedback
 ```
 
-**Current state (updated):** Local scanning works. Witness logs now exist (1,013 entries) providing real gate check data for local scanning to consume. No `gate_pressure.json` written yet. The S3↔S4 loop is structurally present with data now flowing into the sense path.
+**Current state (updated 2026-06-23): CLOSED via bounded replay.** The internal S3↔S4 arm now closes end-to-end on real data. `scripts/loop5_zeitgeist_closure_run.py` drives real gate checks on genuinely harmful actions through the `TelosGatekeeper` (each BLOCK lands a real `BLOCKED` witness entry — sense), the `InternalPressureScanner` reads the block rate (interpret), a high block rate becomes a "High gate block rate" threat signal (constrain), `_write_gate_pressure` writes `gate_pressure.json` (act), and the gatekeeper's `_apply_gate_pressure` then resolves trust mode `internal_yolo → external_strict` on its next check (adapt — VSM Gap #1 closed). Proof: 8 real blocks, `before=internal_yolo / after=external_strict`, fed forward, no tick errors; cybernetics-codex audit recomputes `CLOSED_BOUNDED_REPLAY`.
 
 ---
 
