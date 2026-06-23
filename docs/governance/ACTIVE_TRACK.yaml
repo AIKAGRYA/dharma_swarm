@@ -130,7 +130,7 @@ active_tracks:
     name: Runtime Truth Reconciliation — operator-visible truth packets
     status: ACTIVE
     opened_at: "2026-06-04"
-    verified_at: "2026-06-20"
+    verified_at: "2026-06-23"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -214,6 +214,10 @@ active_tracks:
         kind: file_contains
         file: dharma_swarm/runtime_state.py
         pattern: "class RuntimeReceipt"
+      # --- Rigorous evidence: the operator_core contracts (incl. RuntimeTruthPacket) PASS. ---
+      - id: operator_core_contracts_pass
+        kind: test_passes
+        test: "tests/test_operator_core_contracts.py"
 
     non_goals:
       - Do not create a new daemon, database, event log, truth store, or receipt system.
@@ -223,15 +227,16 @@ active_tracks:
       - Do not build Verified Experiment Loop runtime in this track.
       - Do not create standalone BetCard, Experiment, SwarmRun, DecisionRecord, LineageRecord, WikiUpdate, or cost-tracker classes.
 
+    # Reconciled 2026-06-23: both blockers verified IMPLEMENTED on origin/main.
     next_items:
       - id: 1
-        what: "Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner."
+        what: "SHIPPED: read-only RuntimeTruthPacket contract in operator_core (dharma_swarm/operator_core/contracts.py:125; tests/test_operator_core_contracts.py 7 passed)."
         kind: code
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Render compact runtime truth in make onboard without making onboard an authority surface."
+        what: "SHIPPED: compact runtime truth rendered in make onboard (scripts/governance/agent_onboard.py) as a read model, not an authority surface."
         kind: code
-        blocker: true
+        blocker: false
       - id: 3
         what: "Protect A2A single-persistence invariant while adding runtime truth projections."
         kind: test
@@ -505,7 +510,7 @@ active_tracks:
     name: Truth Graph Platform v1 — repo context + receipted A2A presence
     status: ACTIVE
     opened_at: "2026-06-12"
-    verified_at: "2026-06-12"
+    verified_at: "2026-06-23"
     ttl_days: 21
     owner: "@codex"
     serves: substrate-nativeness
@@ -625,6 +630,13 @@ active_tracks:
         kind: file_contains
         file: tests/test_agent_registry_presence.py
         pattern: "heartbeat_status"
+      # --- Rigorous evidence: repo_context projection test PASSES + feature on main. ---
+      - id: repo_context_projection_passes
+        kind: test_passes
+        test: "tests/test_truth_graph_repo_context.py"
+      - id: truth_graph_projection_on_main
+        kind: commit_on_main
+        commit: 936d365db
 
     non_goals:
       - Do not create a new daemon, database, vector store, event log, or truth store.
@@ -634,22 +646,23 @@ active_tracks:
       - Do not touch scripts/runtime/a2a_send.py or scripts/runtime/autonomy_spine.py.
       - Do not claim full future NATS spec compliance from the CLI demo alone.
 
+    # Reconciled 2026-06-23: both blockers verified DONE on origin/main.
     next_items:
       - id: 1
-        what: "Run make orient and commit generated repo_context artifacts."
+        what: "SHIPPED: repo_context artifacts committed on origin/main (reports/orientation/repo_context.{json,md}, commit ea793d3bd); make orient wired."
         kind: code
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Run live local NATS CLI demo twice and verify repo_context renders the receipt path."
+        what: "SHIPPED: NATS CLI e2e demo ran; receipt renders in repo_context (reports/orientation/nats_e2e_receipt.json, commit 936d365db)."
         kind: test
-        blocker: true
+        blocker: false
 
 
   - id: composer-holon-spine-longrun-2026-06
     name: Composer Holon Spine Longrun — fable/codex pair over verified command receipts
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-06-23"
     ttl_days: 14
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -714,6 +727,13 @@ active_tracks:
       - id: composer_wake_witness_pending
         kind: file_exists
         file: reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md
+      # --- Rigorous evidence: the holon verifier PASSES and the substrate landed. ---
+      - id: holon_bridge_verifier_passes
+        kind: test_passes
+        test: "tests/test_holon_bridge.py"
+      - id: holon_substrate_on_main
+        kind: commit_on_main
+        commit: 9c76b210
 
     non_goals:
       - Do not create a new durable receipt store; project over spine.EvidenceReceipt.
@@ -721,23 +741,26 @@ active_tracks:
       - Do not claim unattended 90% confidence until fable and codex both leave fresh wake receipts.
       - Do not merge holon substrate to main without the frozen verifier runbook passing.
 
+    # Reconciled 2026-06-23: all four blockers were verified DONE on origin/main
+    # (holon substrate merged via PR #585, commit 9c76b210; verifier 103 passed/
+    # 1 skipped; living_agent_kernel imports green). Demoted from blocker:true.
     next_items:
       - id: 1
-        what: "Run the frozen Build A verifier set and publish the exact output in convergence."
+        what: "SHIPPED: frozen Build A verifier set runs green on origin/main (tests/test_holon_bridge.py + test_holon_runtime.py; 103 passed/1 skipped 2026-06-23)."
         kind: test
-        blocker: true
+        blocker: false
       - id: 2
-        what: "Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts."
+        what: "SHIPPED: unattended fable_composer + codex_composer wakes witnessed with fresh state files (reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md, 2026-06-11)."
         kind: runtime
-        blocker: true
+        blocker: false
       - id: 3
-        what: "Merge living_agent_kernel source choice and prove import green."
+        what: "SHIPPED: living_agent_kernel on origin/main (dharma_swarm/operator_core/living_agent_kernel.py); import green."
         kind: code
-        blocker: true
+        blocker: false
       - id: 4
-        what: "Reconcile the holon substrate lane back to GitHub main after verifier green."
+        what: "SHIPPED: holon substrate reconciled to main via PR #585 (commit 9c76b210, 2026-06-12)."
         kind: governance
-        blocker: true
+        blocker: false
 
   - id: provider-routing-consolidation-2026-06
     name: Provider Routing Consolidation — one power-first router, explicit-wins, first-party paths

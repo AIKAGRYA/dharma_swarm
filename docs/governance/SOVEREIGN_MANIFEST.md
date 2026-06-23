@@ -29,7 +29,7 @@
 ### Runtime Truth Reconciliation — operator-visible truth packets
 
 **Track id:** `runtime-truth-reconciliation-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-20 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 14 days)
 **Relations:** complements: runtime-truth-nats-2026-06
 **Owns surfaces:** dharma_swarm/operator_core/**, scripts/governance/agent_onboard.py, dharma_swarm/runtime_state.py
 **Moves vital signs:** quality_gates, memory_persistence
@@ -50,8 +50,8 @@ Doctrine line that must hold:
 
 **Next items:**
 
-- [code] (blocker) Define the smallest read-only RuntimeTruthPacket contract in the existing operator_core owner.
-- [code] (blocker) Render compact runtime truth in make onboard without making onboard an authority surface.
+- [code] SHIPPED: read-only RuntimeTruthPacket contract in operator_core (dharma_swarm/operator_core/contracts.py:125; tests/test_operator_core_contracts.py 7 passed).
+- [code] SHIPPED: compact runtime truth rendered in make onboard (scripts/governance/agent_onboard.py) as a read model, not an authority surface.
 - [test] Protect A2A single-persistence invariant while adding runtime truth projections.
 
 **Non-goals:**
@@ -167,7 +167,7 @@ Invariant that must hold throughout:
 ### Truth Graph Platform v1 — repo context + receipted A2A presence
 
 **Track id:** `truth-graph-platform-2026-06` · **Status:** ACTIVE · **Owner:** @codex
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-12 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: orientation-graph-2026-06
 **Owns surfaces:** scripts/governance/orientation_graph.py, scripts/governance/truth_graph_nats_e2e_demo.py, scripts/governance/run_truth_graph_nats_e2e_demo.sh, tests/test_orientation_graph.py, tests/test_truth_graph_repo_context.py, dharma_swarm/a2a/task_receipt.py, dharma_swarm/a2a/agent_presence.py, tests/test_a2a_gate.py, tests/test_agent_registry_presence.py, reports/orientation/**
 **Moves vital signs:** quality_gates, tool_coverage, memory_persistence
@@ -200,8 +200,8 @@ claim, evidence, verdict, next_action, files_changed.
 
 **Next items:**
 
-- [code] (blocker) Run make orient and commit generated repo_context artifacts.
-- [test] (blocker) Run live local NATS CLI demo twice and verify repo_context renders the receipt path.
+- [code] SHIPPED: repo_context artifacts committed on origin/main (reports/orientation/repo_context.{json,md}, commit ea793d3bd); make orient wired.
+- [test] SHIPPED: NATS CLI e2e demo ran; receipt renders in repo_context (reports/orientation/nats_e2e_receipt.json, commit 936d365db).
 
 **Non-goals:**
 
@@ -215,7 +215,7 @@ claim, evidence, verdict, next_action, files_changed.
 ### Composer Holon Spine Longrun — fable/codex pair over verified command receipts
 
 **Track id:** `composer-holon-spine-longrun-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 14 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-23 (TTL 14 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06 · depends_on: runtime-truth-spine-adoption-2026-06
 **Owns surfaces:** docs/sovereign_holons/**, reports/sovereign_holons/**, dharma_swarm/holon_*.py, scripts/holon_*.py, tests/test_holon_*.py
 **Moves vital signs:** quality_gates, tool_coverage, memory_persistence
@@ -233,10 +233,10 @@ to main through the normal review path before it is called shipped.
 
 **Next items:**
 
-- [test] (blocker) Run the frozen Build A verifier set and publish the exact output in convergence.
-- [runtime] (blocker) Prove one unattended fable_composer wake and one unattended codex_composer wake with fresh state files and EvidenceReceipt-profile command receipts.
-- [code] (blocker) Merge living_agent_kernel source choice and prove import green.
-- [governance] (blocker) Reconcile the holon substrate lane back to GitHub main after verifier green.
+- [test] SHIPPED: frozen Build A verifier set runs green on origin/main (tests/test_holon_bridge.py + test_holon_runtime.py; 103 passed/1 skipped 2026-06-23).
+- [runtime] SHIPPED: unattended fable_composer + codex_composer wakes witnessed with fresh state files (reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md, 2026-06-11).
+- [code] SHIPPED: living_agent_kernel on origin/main (dharma_swarm/operator_core/living_agent_kernel.py); import green.
+- [governance] SHIPPED: holon substrate reconciled to main via PR #585 (commit 9c76b210, 2026-06-12).
 
 **Non-goals:**
 
@@ -414,10 +414,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
 | Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **751** | find tests -name "*.py" -type f |
+| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,833** | wc -l across all .md |
+| Markdown total lines | **246,838** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -428,10 +430,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
 | Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **751** | find tests -name "*.py" -type f |
+| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,833** | wc -l across all .md |
+| Markdown total lines | **246,838** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **312,264** | wc -l across dharma_swarm Python modules |
@@ -442,10 +446,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
 | Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **751** | find tests -name "*.py" -type f |
+| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,833** | wc -l across all .md |
+| Markdown total lines | **246,838** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -456,10 +462,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
 | Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **751** | find tests -name "*.py" -type f |
+| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,833** | wc -l across all .md |
+| Markdown total lines | **246,838** | wc -l across all .md |
 | Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
@@ -470,10 +478,12 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Markdown files | **1050** | find . -name "*.md" -type f |
 | Markdown total lines | **246,822** | wc -l across all .md |
 | Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **751** | find tests -name "*.py" -type f |
+| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,833** | wc -l across all .md |
+| Markdown total lines | **246,838** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
