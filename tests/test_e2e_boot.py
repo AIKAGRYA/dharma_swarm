@@ -25,10 +25,18 @@ def state_dir(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_full_lifecycle_boot(state_dir):
+async def test_full_lifecycle_boot(state_dir, monkeypatch: pytest.MonkeyPatch):
     """Boot swarm → tick → dispatch tasks → verify completion pipeline."""
     from dharma_swarm.swarm import SwarmManager
     from pathlib import Path
+
+    async def _offline_run_task(self, task):  # noqa: ANN001
+        return "DHARMA SWARM ALIVE"
+
+    monkeypatch.setattr(
+        "dharma_swarm.agent_runner.AgentRunner.run_task",
+        _offline_run_task,
+    )
 
     logger.info("=== PHASE 1: Init SwarmManager ===")
     swarm = SwarmManager(state_dir=state_dir)
