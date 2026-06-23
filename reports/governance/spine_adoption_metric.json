@@ -1,5 +1,5 @@
 {
-  "audit_sha": "a511aa684f9137747c7ad7c9b9b233278e4851e5",
+  "audit_sha": "48e965c1be5341d4e0c5f8aec57bdd338ed816c7",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -11,205 +11,8 @@
   "doc_anchor_status": "ok",
   "metric": "spine_adoption_metric",
   "missing_doc_anchors": [],
-  "source_status": "dirty",
-  "source_status_entries": [
-    " M Makefile",
-    " M api/main.py",
-    " M api/routers/control_surface.py",
-    " M dashboard/src/app/dashboard/control-surface/page.tsx",
-    " M dashboard/src/components/ui/ErrorBanner.tsx",
-    " M dashboard/src/hooks/useControlSurface.ts",
-    " M dashboard/src/lib/api.test.ts",
-    " M dashboard/src/lib/api.ts",
-    " M dashboard/src/lib/types.ts",
-    " M dharma_swarm/agent_runner.py",
-    " M dharma_swarm/archaeology_ingestion.py",
-    " M dharma_swarm/autonomous_agent.py",
-    " M dharma_swarm/board/adapters/__init__.py",
-    " M dharma_swarm/board/adapters/ds_goal_adapter.py",
-    " M dharma_swarm/ontology_hub.py",
-    " M dharma_swarm/operator_core/a2a_task_lifecycle.py",
-    " M dharma_swarm/operator_core/control_surface.py",
-    " M dharma_swarm/operator_core/control_surface_memory.py",
-    " M dharma_swarm/operator_core/nats_substrate_status.py",
-    " M dharma_swarm/operator_core/operating_facts.py",
-    " M dharma_swarm/operator_core/runtime_truth.py",
-    " M dharma_swarm/orchestrate_live.py",
-    " M dharma_swarm/orchestrator.py",
-    " M dharma_swarm/provider_policy.py",
-    " M dharma_swarm/providers.py",
-    " M dharma_swarm/runtime_state.py",
-    " M dharma_swarm/scout_framework.py",
-    " M dharma_swarm/spine/__init__.py",
-    " M dharma_swarm/spine/persistence.py",
-    " M dharma_swarm/terminal_commands/_status_helpers.py",
-    " M dharma_swarm/terminal_commands/semantic.py",
-    " M dharma_swarm/terminal_commands/status.py",
-    " M docs/docops/AUTO_INVENTORY.md",
-    " M docs/docops/assertions.yaml",
-    " M docs/governance/CANONICAL_DOC_STACK.md",
-    " M docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
-    " M docs/governance/SOVEREIGN_MANIFEST.md",
-    " M docs/ops/TMUX_AGENT_SUBSTRATE.md",
-    " M reports/governance/active_track_evidence.json",
-    " M reports/governance/active_track_evidence.md",
-    " M reports/governance/spine_adoption_metric.json",
-    " M reports/governance/track_portfolio.json",
-    " M scripts/governance/agent_onboard.py",
-    " M scripts/runtime/a2a_send.py",
-    " M scripts/runtime/autonomy_spine.py",
-    " M tests/test_a2a_send.py",
-    " M tests/test_autonomy_spine_cli.py",
-    " M tests/test_control_surface.py",
-    " M tests/test_ds_goal_board_adapter.py",
-    " M tests/test_ontology_hub.py",
-    " M tests/test_operating_facts.py",
-    " M tests/test_operator_core_contracts.py",
-    " M tests/test_spine_adoption_metric.py",
-    "?? QWEN.md",
-    "?? dashboard/src/components/cockpit/A2ASendCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/AgentOpsWorkPacketCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/DsGoalMissionCardsPanel.tsx",
-    "?? dashboard/src/components/cockpit/SemanticReceiptCardsPanel.tsx",
-    "?? dharma_swarm/board/adapters/a2a_send_adapter.py",
-    "?? dharma_swarm/board/adapters/agentops_adapter.py",
-    "?? dharma_swarm/board/adapters/semantic_receipt_adapter.py",
-    "?? dharma_swarm/operator_core/semantic_receipt.py",
-    "?? dharma_swarm/spine/warrant.py",
-    "?? docs/governance/REALITY_DEBT_LEDGER.md",
-    "?? docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md",
-    "?? docs/governance/SWARM_GENOME.md",
-    "?? reports/a2a/domain_reply_artifacts/20260611T091552Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T084959Z-hermes-m5-35b2bfe0cd9a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T085443Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081444Z-hermes-m5-5c240f25f123.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081514Z-hermes-m5-da875663532a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T081532Z-hermes-m5-bbc6a4fa7685.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T082442Z-hermes-m5-35b2bfe0cd9a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T085421Z-hermes-m5-3a0e3081da8a.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T093005Z-hermes-m5-38f66a7e393b.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T102926Z-hermes-m5-bb9b7e2470f8.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T140622Z-hermes-m5-2447b9f8573d.json",
-    "?? reports/a2a/inbox_bridge_receipts/20260611T160543Z-hermes-m5-c2725729740e.json",
-    "?? reports/a2a/reply_receipts/20260611T083232Z-hermes-35b2bfe0cd9a.json",
-    "?? reports/a2a/reply_receipts/20260611T085445Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/reply_receipts/20260611T093026Z-hermes-38f66a7e393b.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-devin-cd12cf637177.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-fable_5_cursor-0a53b307f889.json",
-    "?? reports/a2a/reply_receipts/20260611T093053Z-fable_composer-4263af62684b.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-devin-cf8618dc738c.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-fable_5_cursor-eb84b96dd201.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-fable_composer-a73376e259af.json",
-    "?? reports/a2a/reply_receipts/20260611T102954Z-hermes-bb9b7e2470f8.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-devin-1bb40416ff29.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-fable_5_cursor-a63e2cc94491.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-fable_composer-63a05082bd85.json",
-    "?? reports/a2a/send_receipts/20260611T054426Z-hermes-m5-f428bec4c6f7.json",
-    "?? reports/a2a/send_receipts/20260611T064610Z-fable_5_cursor-41506f93b1f1.json",
-    "?? reports/a2a/send_receipts/20260611T075455Z-fable_5_cursor-09b036810cbc.json",
-    "?? reports/a2a/send_receipts/20260611T075533Z-fable_5_cursor-e269c7ca86be.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-devin-162d4825b1cb.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-fable_composer-3f8f5c489beb.json",
-    "?? reports/a2a/send_receipts/20260611T075558Z-hermes-m5-410b8033ebab.json",
-    "?? reports/a2a/send_receipts/20260611T080609Z-hermes-5c240f25f123.json",
-    "?? reports/a2a/send_receipts/20260611T081514Z-hermes-da875663532a.json",
-    "?? reports/a2a/send_receipts/20260611T081540Z-hermes-bbc6a4fa7685.json",
-    "?? reports/a2a/send_receipts/20260611T082450Z-hermes-35b2bfe0cd9a.json",
-    "?? reports/a2a/send_receipts/20260611T085429Z-hermes-3a0e3081da8a.json",
-    "?? reports/a2a/send_receipts/20260611T093013Z-hermes-38f66a7e393b.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-devin-cd12cf637177.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-fable_5_cursor-0a53b307f889.json",
-    "?? reports/a2a/send_receipts/20260611T093041Z-fable_composer-4263af62684b.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-devin-cf8618dc738c.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-fable_5_cursor-eb84b96dd201.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-fable_composer-a73376e259af.json",
-    "?? reports/a2a/send_receipts/20260611T102934Z-hermes-bb9b7e2470f8.json",
-    "?? reports/a2a/send_receipts/20260611T140630Z-hermes-2447b9f8573d.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-devin-7fb13d7cacee.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-fable_5_cursor-ba48121f1060.json",
-    "?? reports/a2a/send_receipts/20260611T140648Z-fable_composer-f668f21708cc.json",
-    "?? reports/a2a/send_receipts/20260611T160551Z-hermes-c2725729740e.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-devin-1de47697c9fc.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-fable_5_cursor-64922c4ccd5d.json",
-    "?? reports/a2a/send_receipts/20260611T160605Z-fable_composer-2681004234fe.json",
-    "?? reports/agentops/build_announcements/20260611T140418Z-codex-semantic-receipt-runner-v7-build-start.md",
-    "?? reports/agentops/build_announcements/20260611T160525Z-codex-semantic-receipt-runner-v7-goal-run-start.md",
-    "?? reports/agentops/open_model_council/20260611T102512Z-deepseek_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-glm_ollama_cloud.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-glm_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-minimax_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102512Z-qwen_openrouter.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-gemini_google_ai.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-nvidia_nim_llama.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_cerebras.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_groq.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_openrouter_free.json",
-    "?? reports/agentops/open_model_council/20260611T102636Z-qwen_siliconflow.json",
-    "?? reports/agentops/open_model_council/20260611T104000Z-qwen_deepseek_v4_pro_review.md",
-    "?? reports/agentops/open_model_council/20260611T104337Z-deepseek_v4_flash_direct.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-deepseek_v4_pro_direct.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-moonshot_auto.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-moonshot_kimi_k26.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_deepseek_v32.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_glm5.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_kimi_k25.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_minimax_m27.json",
-    "?? reports/agentops/open_model_council/20260611T104337Z-ollama_qwen3_coder_480b.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-moonshot-provider-quota-blocked.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-deepseek-v32.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-glm5.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-ollama-qwen3-coder-480b.json",
-    "?? reports/agentops/open_model_council/20260611T160525Z-fresh-qwen-code-deepseek-v4-pro.json",
-    "?? reports/agentops/open_model_council/council_probe_summary_20260611T102512Z.md",
-    "?? reports/agentops/open_model_council/council_probe_summary_20260611T102636Z.md",
-    "?? reports/agentops/open_model_council/council_synthesis_20260611T103030Z.md",
-    "?? reports/agentops/open_model_council/strong_council_synthesis_20260611T105200Z.md",
-    "?? reports/agentops/open_model_council/strong_model_council_summary_20260611T104337Z.md",
-    "?? reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json",
-    "?? reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json",
-    "?? reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.json",
-    "?? reports/agentops/semantic_reviews/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
-    "?? reports/agentops/work_packets/codex-composer-agent-inbox-hot-contact-route.json",
-    "?? reports/agentops/work_packets/codex-composer-agent-owned-domain-reply-worker.json",
-    "?? reports/agentops/work_packets/codex-composer-holon-a2a-send-portability.json",
-    "?? reports/agentops/work_packets/codex-workhorse-semantic-review-a2a-gate.json",
-    "?? reports/agentops/workhorse_prompts/codex-workhorse-a2a-semantic-gate-20260611T092107Z.md",
-    "?? reports/agentops/workhorse_prompts/open-model-council-a2a-missing-systems-20260611T102326Z.md",
-    "?? reports/agentops/workhorse_prompts/qwen-deepseek-semantic-receipt-council-20260611T104000Z.md",
-    "?? reports/agentops/workhorse_prompts/semantic-receipt-runner-v7-fresh-critic-20260611T160525Z.md",
-    "?? reports/governance/command_cutover_metric.json",
-    "?? reports/governance/runtime_truth_command_cutover_after_action_2026-06-12.md",
-    "?? reports/governance/runtime_truth_command_cutover_baseline_2026-06-12.md",
-    "?? scripts/governance/check_nats_substrate_contract.py",
-    "?? scripts/runtime/a2a_domain_reply_artifact.py",
-    "?? scripts/runtime/a2a_domain_reply_worker.py",
-    "?? scripts/runtime/a2a_inbox_bridge.py",
-    "?? scripts/runtime/a2a_reply_capture.py",
-    "?? scripts/runtime/model_critic_runner.py",
-    "?? scripts/start_a2a_inbox_bridge_tmux.sh",
-    "?? scripts/status_a2a_inbox_bridge_tmux.sh",
-    "?? scripts/stop_a2a_inbox_bridge_tmux.sh",
-    "?? tests/test_a2a_domain_reply_artifact.py",
-    "?? tests/test_a2a_domain_reply_worker.py",
-    "?? tests/test_a2a_inbox_bridge.py",
-    "?? tests/test_a2a_inbox_bridge_tmux_scripts.py",
-    "?? tests/test_a2a_reply_capture.py",
-    "?? tests/test_a2a_send_board_adapter.py",
-    "?? tests/test_agentops_board_adapter.py",
-    "?? tests/test_control_surface_a2a_cards.py",
-    "?? tests/test_control_surface_agentops_cards.py",
-    "?? tests/test_control_surface_ds_goal_cards.py",
-    "?? tests/test_control_surface_router_threadpool.py",
-    "?? tests/test_control_surface_semantic_receipt_cards.py",
-    "?? tests/test_model_critic_runner.py",
-    "?? tests/test_runtime_truth_command_cutover.py",
-    "?? tests/test_runtime_truth_projection_fields.py",
-    "?? tests/test_runtime_warrant.py",
-    "?? tests/test_semantic_receipt.py",
-    "?? tests/test_semantic_receipt_board_adapter.py"
-  ],
+  "source_status": "clean",
+  "source_status_entries": [],
   "summary": {
     "adapter_ready_count": 3,
     "adoption_pct": 93.8,
@@ -314,7 +117,7 @@
           "description": "runtime store symbol is present",
           "hits": [
             {
-              "line": 1062,
+              "line": 1070,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -334,7 +137,7 @@
           "description": "RuntimeStateStore type exists",
           "hits": [
             {
-              "line": 1062,
+              "line": 1070,
               "path": "dharma_swarm/runtime_state.py",
               "text": "class RuntimeStateStore:"
             }
@@ -386,7 +189,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3467,
+              "line": 3475,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -402,7 +205,7 @@
           "description": "legacy identity bypass flag is present",
           "hits": [
             {
-              "line": 907,
+              "line": 915,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             }
@@ -459,7 +262,7 @@
           "description": "task claim lifecycle path exists",
           "hits": [
             {
-              "line": 206,
+              "line": 211,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_task_claim("
             }
@@ -472,7 +275,7 @@
           "description": "delegation run lifecycle path exists",
           "hits": [
             {
-              "line": 285,
+              "line": 290,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_delegation_run("
             }
@@ -485,7 +288,7 @@
           "description": "artifact lifecycle path exists",
           "hits": [
             {
-              "line": 394,
+              "line": 399,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_artifact("
             }
@@ -629,7 +432,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2004,
+              "line": 2027,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -642,7 +445,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 1766,
+              "line": 1777,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -655,7 +458,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 1773,
+              "line": 1784,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -1250,7 +1053,7 @@
           "description": "proposal model exists",
           "hits": [
             {
-              "line": 95,
+              "line": 96,
               "path": "dharma_swarm/evolution.py",
               "text": "class Proposal(BaseModel):"
             }
@@ -1263,9 +1066,9 @@
           "description": "gate phase exists",
           "hits": [
             {
-              "line": 1200,
+              "line": 147,
               "path": "dharma_swarm/evolution.py",
-              "text": "await self.gate_check(candidate)"
+              "text": "# as a hard REJECT (see DarwinEngine.gate_check) \u2014 a self-mod proposal must"
             }
           ],
           "key": "gate_check",
@@ -1281,7 +1084,7 @@
               "text": "async def apply_and_test("
             },
             {
-              "line": 1218,
+              "line": 1258,
               "path": "dharma_swarm/evolution.py",
               "text": "candidate, test_results = await self.apply_diff_and_test("
             }
@@ -1299,7 +1102,7 @@
               "text": "\"\"\"Apply unified diffs to files with rollback and test integration."
             },
             {
-              "line": 1009,
+              "line": 1049,
               "path": "dharma_swarm/evolution.py",
               "text": "return (\"rollback\", \"rollback:apply_or_test\")"
             },
@@ -1844,7 +1647,7 @@
           "description": "legacy bypass must stay explicit",
           "hits": [
             {
-              "line": 907,
+              "line": 915,
               "path": "dharma_swarm/runtime_state.py",
               "text": "\"legacy_no_identity_allowed\": True,"
             },
@@ -1956,5 +1759,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 3077
+  "tracked_file_count": 3802
 }
