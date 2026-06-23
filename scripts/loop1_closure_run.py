@@ -147,7 +147,17 @@ async def run(args: argparse.Namespace) -> dict:
     # future routing). hot_paths() is the wrong probe for a short run (it needs
     # >=3 marks on the SAME path, but each task marks a unique task:<id> path), so
     # measure the honest signal: marks deposited during the run (after > before).
-    marks_before = swarm._stigmergy.density() if swarm._stigmergy else 0
+    #
+    # CRITICAL: measure the store agents ACTUALLY write to. agent_runner's
+    # _leave_task_mark() deposits via stigmergy._get_default_store()
+    # (~/.dharma/stigmergy), NOT swarm._stigmergy — swarm.init() does not even
+    # construct _stigmergy (that is a separate Gödel-Claw boot path), so the old
+    # `swarm._stigmergy.density()` probe always read 0 and the adapt arm looked
+    # dead while marks were landing. Read the real store.
+    from dharma_swarm.stigmergy import _get_default_store
+
+    _mark_store = _get_default_store()
+    marks_before = _mark_store.density()
 
     deadline = time.monotonic() + args.timeout_per_task * args.tasks
     receipts: dict[str, str] = {}
@@ -192,17 +202,27 @@ async def run(args: argparse.Namespace) -> dict:
             }
         )
 
-    hot_paths = []
+    marks_after = _mark_store.density()
+    marks_deposited = max(0, marks_after - marks_before)
+
+    # Exact attribution: count marks whose connections reference THIS run's task
+    # ids. This proves the deposited marks are the adapt traces of our dispatch,
+    # not unrelated background activity racing the density delta.
+    task_id_set = set(task_ids)
+    adapt_marks_for_run = 0
+    hot_paths: list[dict[str, object]] = []
     try:
+        run_marks = await _mark_store._load_marks()
+        for mark in run_marks:
+            if task_id_set.intersection(getattr(mark, "connections", []) or []):
+                adapt_marks_for_run += 1
         hot_paths = [
-            {"path": mark.path, "intensity": round(mark.intensity, 4)}
-            for mark in swarm._stigmergy.hot_paths(limit=5)
+            {"path": getattr(mark, "path", getattr(mark, "file_path", "")),
+             "intensity": round(getattr(mark, "intensity", getattr(mark, "salience", 0.0)), 4)}
+            for mark in (await _mark_store.hot_paths(limit=5))
         ]
     except Exception:
         pass
-
-    marks_after = swarm._stigmergy.density() if swarm._stigmergy else 0
-    marks_deposited = max(0, marks_after - marks_before)
 
     dropoffs = sum(
         1 for entry in tasks_out if entry["failure_source"] == "dispatch_dropoff"
@@ -229,7 +249,9 @@ async def run(args: argparse.Namespace) -> dict:
         "stigmergy_marks_before": marks_before,
         "stigmergy_marks_after": marks_after,
         "stigmergy_marks_deposited": marks_deposited,
-        "adapt_fired": marks_deposited > 0,
+        # Exact adapt attribution: marks connected to THIS run's task ids.
+        "stigmergy_marks_for_run": adapt_marks_for_run,
+        "adapt_fired": adapt_marks_for_run > 0,
         "stigmergy_hot_paths": hot_paths,
         "state_dir": str(state_dir),
         "canonical_state": bool(getattr(args, "_is_canonical", False)),

@@ -1,0 +1,63 @@
+{
+  "provider": "claude_code",
+  "model": "claude-sonnet-4-5",
+  "spine_dispatch": "1",
+  "read_only_boot": "1",
+  "ollama_force_local": "1",
+  "agents": 2,
+  "tasks_requested": 3,
+  "tasks_completed": 3,
+  "tasks_failed": 0,
+  "dispatch_dropoffs": 0,
+  "served_provider_truth": {
+    "runtime_db": "/root/.dharma/state/runtime.db",
+    "exists": true,
+    "completed_runs_with_truth": 9,
+    "delegation_receipts_with_truth": 9,
+    "runtime_receipts_with_truth": 0,
+    "sample": {
+      "source": "receipt_json",
+      "run_id": "run_6ec98770008647e9",
+      "served_provider": "claude_code",
+      "served_model": "claude-sonnet-4-5"
+    }
+  },
+  "evidence_receipts": {
+    "7c377ef3-2da1-4621-95fc-f6adb77c7c41": "ok",
+    "193fd376-fcf9-46cc-a38e-7b96ca6b90ef": "ok",
+    "cca8dceb-a88e-4f08-b03b-bd07db33e29a": "ok"
+  },
+  "tick_errors": [],
+  "ticks": 132,
+  "stigmergy_marks_before": 59,
+  "stigmergy_marks_after": 64,
+  "stigmergy_marks_deposited": 5,
+  "stigmergy_marks_for_run": 3,
+  "adapt_fired": true,
+  "stigmergy_hot_paths": [],
+  "state_dir": "/root/.dharma",
+  "canonical_state": true,
+  "tasks": [
+    {
+      "task_id": "6c7c08a4ce4d4203",
+      "title": "loop1-closure-0001",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "**Task Result:**\n\nA feedback loop requires **sensing** to measure the current state against a desired goal, detecting deviation or error. It then requires **act"
+    },
+    {
+      "task_id": "f8eedf1cdfbe4770",
+      "title": "loop1-closure-0002",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "<mem>\nconfidence: 0.85\nkey_facts:\n- Answered question: 3 failure modes (Lost Task, Poison Message, Work Duplication) + mitigations\n- Memory write blocked due to"
+    },
+    {
+      "task_id": "13a382f52d274850",
+      "title": "loop1-closure-0003",
+      "status": "completed",
+      "failure_source": null,
+      "result_preview": "**Exponential Backoff Principle:** After each failed retry attempt, double the wait time before the next retry (`delay = base_delay * 2^attempt_number`, capped "
+    }
+  ]
+}
