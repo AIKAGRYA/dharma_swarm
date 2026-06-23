@@ -316,3 +316,16 @@ class TestWorldModelAgent:
         await agent.boot()
         assert agent._state is not None
         assert agent._state is INITIAL_WORLD_STATE
+
+
+    async def test_run_cycle_persists_snapshot(self, tmp_path):
+        # Regression (H02 P3.1): orchestrate_live called WorldModelAgent
+        # (state_dir=...) + initialize()/run_cycle() against a class exposing
+        # (store, search_tool, arxiv_tool) + boot() — 147 crashes/day, loop
+        # abandoned. This mirrors the orchestrator construction path exactly.
+        store = WorldModelStore(base_path=tmp_path / 'wm_cycle')
+        agent = WorldModelAgent(store=store, search_tool=None, arxiv_tool=None)
+        await agent.boot()
+        await agent.run_cycle()
+        snaps = list((tmp_path / 'wm_cycle').glob('snapshot_*.json'))
+        assert len(snaps) == 1
