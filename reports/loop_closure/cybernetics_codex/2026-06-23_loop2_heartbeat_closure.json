@@ -1,0 +1,63 @@
+{
+  "loop": 2,
+  "loop_id": "organism_heartbeat",
+  "cycles": 3,
+  "real_data": true,
+  "transitions_receipted": {
+    "sense": true,
+    "interpret": true,
+    "constrain": true,
+    "act": true,
+    "adapt": true
+  },
+  "adapt_proof": {
+    "field": "algedonic_activation.recent_activations (adaptive memory the next cycle consults)",
+    "before": 0,
+    "after": 6,
+    "fed_forward": true,
+    "total_actions": 3
+  },
+  "tick_errors": [],
+  "cycle_detail": [
+    {
+      "cycle": 1,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.43,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence"
+      ],
+      "actions": [
+        "rebalance_priorities"
+      ],
+      "activation_log_len": 2
+    },
+    {
+      "cycle": 2,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.43,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence"
+      ],
+      "actions": [
+        "rebalance_priorities"
+      ],
+      "activation_log_len": 4
+    },
+    {
+      "cycle": 3,
+      "fleet_health": 1.0,
+      "identity_coherence": 0.43,
+      "audit_failure_rate": 0.0,
+      "pain_signals": [
+        "omega_divergence"
+      ],
+      "actions": [
+        "rebalance_priorities"
+      ],
+      "activation_log_len": 6
+    }
+  ],
+  "observed_at": "2026-06-23T04:53:44.275013Z"
+}
