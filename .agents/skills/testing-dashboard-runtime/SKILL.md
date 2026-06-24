@@ -40,7 +40,7 @@ npm --prefix dashboard install --legacy-peer-deps
 Use an isolated state dir for repeatable sqlite assertions:
 
 ```bash
-export DHARMA_STATE_DIR=/home/ubuntu/test-artifacts/inside-out-state
+export DHARMA_STATE_DIR="$PWD/.e2e_state/inside-out-state"
 export DHARMA_SWARM_INIT_TIMEOUT_SECONDS=3
 uvicorn api.main:app --host 127.0.0.1 --port 8420
 ```
