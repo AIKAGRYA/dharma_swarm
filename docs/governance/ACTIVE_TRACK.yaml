@@ -1033,6 +1033,7 @@ active_tracks:
       - runtime-truth-spine-adoption-2026-06
     owned_surfaces:
       - docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+      - docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md
       - dharma_swarm/fs_substrate/**
       - tests/test_stage_contracts.py
       - tests/test_okf_projection.py
