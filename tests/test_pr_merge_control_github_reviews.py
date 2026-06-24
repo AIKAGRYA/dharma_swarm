@@ -1,0 +1,103 @@
+"""Tests for the native-GitHub-review -> Mike receipt bridge (D4 always-on).
+
+The bridge lets a trusted installed reviewer-App's GitHub review stand in as
+that agent's review receipt when no local receipt file exists — the credential-
+free, machine-independent cloud source. These tests are hermetic: they exercise
+the pure verdict/selection/resolution logic, no network or gh calls.
+
+The safety invariant under test: the bridge is ADDITIVE. It can satisfy a
+MISSING receipt, but a CHANGES_REQUESTED review still blocks, an untrusted
+login is never honored, and `claude` (no native reviewer) never bridges.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from scripts.runtime.pr_merge_control import (
+    agent_review_blockers,
+    github_review_status,
+    resolve_agent_review_status,
+)
+
+
+def _review(login: str, state: str, when: str = "2026-06-24T00:00:00Z") -> dict:
+    return {"author": {"login": login}, "state": state, "submittedAt": when}
+
+
+def test_codex_commented_review_counts_as_clean_receipt():
+    status = github_review_status("codex", [_review("chatgpt-codex-connector[bot]", "COMMENTED")])
+    assert status is not None
+    assert status["source"] == "github_review"
+    assert status["verdict"] == "PASS"
+    # A commented (non-blocking) review from the trusted app satisfies the gate.
+    assert agent_review_blockers(status, human_approved=False) == []
+
+
+def test_copilot_approved_review_counts_as_clean_receipt():
+    status = github_review_status("copilot", [_review("Copilot", "APPROVED")])
+    assert status is not None
+    assert status["verdict"] == "APPROVE"
+    assert agent_review_blockers(status, human_approved=False) == []
+
+
+def test_changes_requested_still_blocks():
+    status = github_review_status("codex", [_review("chatgpt-codex-connector[bot]", "CHANGES_REQUESTED")])
+    assert status is not None
+    assert status["verdict"] == "REQUEST_CHANGES"
+    assert agent_review_blockers(status, human_approved=False)  # non-empty: blocks
+
+
+def test_latest_review_wins():
+    reviews = [
+        _review("chatgpt-codex-connector[bot]", "CHANGES_REQUESTED", "2026-06-24T00:00:00Z"),
+        _review("chatgpt-codex-connector[bot]", "APPROVED", "2026-06-24T05:00:00Z"),
+    ]
+    status = github_review_status("codex", reviews)
+    assert status["verdict"] == "APPROVE"
+
+
+def test_dismissed_review_is_ignored():
+    assert github_review_status("codex", [_review("chatgpt-codex-connector[bot]", "DISMISSED")]) is None
+
+
+def test_untrusted_login_is_never_a_receipt():
+    # A human or random bot pretending to be a reviewer is not honored.
+    assert github_review_status("codex", [_review("random-user", "APPROVED")]) is None
+    assert github_review_status("codex", [_review("greptile-apps[bot]", "APPROVED")]) is None
+
+
+def test_claude_never_bridges_no_native_reviewer():
+    # claude has no trusted cloud reviewer login -> always None (deep/backup lane).
+    assert github_review_status("claude", [_review("claude", "APPROVED")]) is None
+
+
+def test_resolve_off_keeps_blocked_local(tmp_path: Path):
+    # accept_github_reviews=False -> local (missing) status, with its blockers.
+    status = resolve_agent_review_status(
+        tmp_path, "codex",
+        pr_reviews=[_review("chatgpt-codex-connector[bot]", "COMMENTED")],
+        accept_github_reviews=False,
+    )
+    assert status["source"] == "local"
+    assert agent_review_blockers(status, human_approved=False)  # missing receipt blocks
+
+
+def test_resolve_on_bridges_missing_local(tmp_path: Path):
+    status = resolve_agent_review_status(
+        tmp_path, "codex",
+        pr_reviews=[_review("chatgpt-codex-connector[bot]", "COMMENTED")],
+        accept_github_reviews=True,
+    )
+    assert status["source"] == "github_review"
+    assert agent_review_blockers(status, human_approved=False) == []
+
+
+def test_resolve_on_no_trusted_review_keeps_local_blocked(tmp_path: Path):
+    # accept on, but no trusted review present -> stays local/blocked (fails closed).
+    status = resolve_agent_review_status(
+        tmp_path, "codex",
+        pr_reviews=[_review("random-user", "APPROVED")],
+        accept_github_reviews=True,
+    )
+    assert status["source"] == "local"
+    assert agent_review_blockers(status, human_approved=False)

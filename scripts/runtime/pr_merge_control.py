@@ -871,6 +871,110 @@ def agent_review_blockers(status: dict[str, Any], *, human_approved: bool) -> li
     return blockers
 
 
+# Native GitHub reviews that may count as an agent's review receipt — the
+# always-on cloud SOURCE. Keyed by reviewer agent -> the trusted installed
+# reviewer-App logins (lowercased, "[bot]" suffix stripped). ONLY these logins
+# are trusted; a review from any other login is never a receipt. `claude` has no
+# native cloud reviewer login, so it never bridges (it stays the deep/backup
+# lane). This is strictly ADDITIVE: it can satisfy a missing receipt, never
+# waives any other gate check (CI, conflict, unresolved threads, CHANGES_REQUESTED).
+TRUSTED_REVIEW_LOGINS: dict[str, frozenset[str]] = {
+    "codex": frozenset({"chatgpt-codex-connector", "codex"}),
+    "copilot": frozenset({"copilot-pull-request-reviewer", "copilot", "github-copilot"}),
+    "github_copilot": frozenset({"copilot-pull-request-reviewer", "copilot", "github-copilot"}),
+}
+
+
+def _normalize_login(login: str) -> str:
+    login = (login or "").strip().lower()
+    if login.endswith("[bot]"):
+        login = login[: -len("[bot]")]
+    return login
+
+
+def fetch_pr_reviews(pr_number: int) -> list[dict[str, Any]]:
+    """Native GitHub reviews on a PR (author login + state + submittedAt)."""
+    data = gh_json(["pr", "view", str(pr_number), "--json", "reviews"])
+    if isinstance(data, dict):
+        reviews = data.get("reviews")
+        if isinstance(reviews, list):
+            return reviews
+    return []
+
+
+def _github_review_verdict(state: str) -> str:
+    state = (state or "").strip().upper()
+    if state == "APPROVED":
+        return "APPROVE"
+    if state == "CHANGES_REQUESTED":
+        return "REQUEST_CHANGES"
+    if state in {"COMMENTED", "REVIEWED"}:
+        # A trusted reviewer looked and did not request changes. Any findings it
+        # raised live as review THREADS, which the gate blocks on separately, so
+        # a comment review safely counts as "reviewed" here.
+        return "PASS"
+    return "UNKNOWN"
+
+
+def github_review_status(agent: str, reviews: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Status dict synthesized from the latest trusted GitHub review for *agent*,
+    shaped like load_agent_review_status(). None if no trusted, non-dismissed review."""
+    trusted = TRUSTED_REVIEW_LOGINS.get(agent)
+    if not trusted:
+        return None
+    matched = [
+        review
+        for review in reviews
+        if _normalize_login(str((review.get("author") or {}).get("login") or "")) in trusted
+        and str(review.get("state") or "").upper() != "DISMISSED"
+    ]
+    if not matched:
+        return None
+    matched.sort(key=lambda r: str(r.get("submittedAt") or ""))
+    latest = matched[-1]
+    state = str(latest.get("state") or "")
+    return {
+        "agent": agent,
+        "output": "",
+        "output_present": True,
+        "receipt": "",
+        "receipt_present": True,
+        "receipt_valid": True,
+        "receipt_error": "",
+        "receipt_status": "ok",
+        "exit_code": 0,
+        "timed_out": False,
+        "timeout_s": None,
+        "duration_s": None,
+        "verdict": _github_review_verdict(state),
+        "source": "github_review",
+        "github_login": _normalize_login(str((latest.get("author") or {}).get("login") or "")),
+        "github_state": state,
+    }
+
+
+def resolve_agent_review_status(
+    out_dir: Path,
+    agent: str,
+    *,
+    pr_reviews: list[dict[str, Any]],
+    accept_github_reviews: bool,
+    human_approved: bool = False,
+) -> dict[str, Any]:
+    """Local receipt first; if it is absent/blocked and accept_github_reviews is
+    on, fall back to a trusted native GitHub review as the receipt SOURCE."""
+    local = load_agent_review_status(out_dir, agent)
+    local.setdefault("source", "local")
+    if not accept_github_reviews:
+        return local
+    if not agent_review_blockers(local, human_approved=human_approved):
+        return local  # local receipt already satisfies the gate
+    gh = github_review_status(agent, pr_reviews)
+    if gh is not None and not agent_review_blockers(gh, human_approved=human_approved):
+        return gh
+    return local  # neither source clean; keep local so its blockers surface
+
+
 def run_agent_process(
     command: list[str],
     prompt: str,
@@ -1048,12 +1152,26 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             f"({', '.join(required_reviewers)}) — trusted automation merges when green"
         )
         required_reviewers = []
+    accept_github_reviews = getattr(args, "accept_github_reviews", False)
+    pr_reviews = fetch_pr_reviews(args.pr) if accept_github_reviews and required_reviewers else []
     review_statuses = {
-        agent: load_agent_review_status(out_dir, agent)
+        agent: resolve_agent_review_status(
+            out_dir,
+            agent,
+            pr_reviews=pr_reviews,
+            accept_github_reviews=accept_github_reviews,
+            human_approved=args.human_approved,
+        )
         for agent in required_reviewers
     }
     backup_statuses = {
-        agent: load_agent_review_status(out_dir, agent)
+        agent: resolve_agent_review_status(
+            out_dir,
+            agent,
+            pr_reviews=pr_reviews,
+            accept_github_reviews=accept_github_reviews,
+            human_approved=args.human_approved,
+        )
         for agent in backup_reviewer_agents(args)
     }
     claude_blockers: list[str] = []
@@ -1120,6 +1238,11 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         "coherence": current_coherence,
         "ci_truth": current_ci_truth,
         "required_reviewers": required_reviewers,
+        "accept_github_reviews": accept_github_reviews,
+        "review_sources": {
+            agent: status.get("source", "local")
+            for agent, status in review_statuses.items()
+        },
         "head_sha": current_pr.get("headRefOid") or "",
         "review_threads": {
             "ok": current_threads.get("ok"),
@@ -2270,6 +2393,19 @@ def build_parser() -> argparse.ArgumentParser:
             "--required-reviewers",
             default=os.environ.get("DHARMA_PR_REQUIRED_REVIEWERS", ",".join(DEFAULT_REQUIRED_REVIEWERS)),
             help="Comma-separated required reviewer receipt names before merge.",
+        )
+        command.add_argument(
+            "--accept-github-reviews",
+            action="store_true",
+            default=os.environ.get("DHARMA_PR_ACCEPT_GITHUB_REVIEWS", "").strip().lower()
+            in {"1", "true", "yes", "on"},
+            help=(
+                "Count a trusted installed reviewer-App's native GitHub review "
+                "(Codex App = codex, Copilot = copilot) as that agent's review "
+                "receipt when no local receipt file exists. ADDITIVE: never waives "
+                "any other gate check. Lets the quorum clear in the cloud with no "
+                "credential or operator machine."
+            ),
         )
 
     def add_ci_truth_flags(command: argparse.ArgumentParser) -> None:
