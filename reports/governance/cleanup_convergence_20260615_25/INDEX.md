@@ -1,0 +1,87 @@
+# Dharma Swarm Cleanup Convergence Index
+
+Generated: 2026-06-25 JST
+Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
+Branch: `cleanup/convergence-20260615-25`
+Baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
+
+## Purpose
+
+This packet turns the June 15-25 local Dharma Swarm sprawl into one clinical
+cleanup map. It does not merge dirty worktrees, delete anything, prune branches,
+or claim source packets are production-ready. Its job is to preserve the map,
+classify the work, and point each keeper toward an active track, proposed track,
+operator surface, archive bucket, or explicit decision bucket.
+
+## Evidence Read
+
+| Source | Current evidence |
+|---|---|
+| User task | `/Users/dhyana/.codex/attachments/809c3c2d-7eb1-4001-ac3d-ce7a7384917c/pasted-text-1.txt` |
+| Fresh baseline | `git fetch origin main` completed; `origin/main` is `a46522040cc6d4ec80cf9f1466a81c7dac33c616` |
+| Onboarding | `make onboard` ran in `/Users/dhyana/dharma_swarm` and in this convergence worktree |
+| Worktree list | `git -C /Users/dhyana/dharma_swarm worktree list --porcelain` now shows 19 registered worktrees including this convergence worktree |
+| Preservation root | `/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST` exists |
+| Backup root | `/Users/dhyana/dharma_recover_backups` exists |
+| Backup receipt | `receipts/BACKUP_RECEIPT.md` says bundles verified, 686 stable files checksum-verified, and archive copied to `agni` |
+| Triangulation summary | `receipts/TRIANGULATION_SUMMARY.md` says preservation is no longer local-only and cleanup should classify before removal |
+| Preservation table | `trees/tree_preservation_summary.tsv` covers 19 June 24 trees/clones |
+| Read-only audit | `/private/tmp/dharma_swarm_readonly_audit_20260624_84785/CONSOLIDATED_REPORT.md` covers 19 trees and 1,098 unique at-risk file instances |
+| Sprawl memory | `/Users/dhyana/.claude/projects/-Users-dhyana/memory/local-tree-sprawl-backup-2026-06-24.md` records corrected keeper/junk verdicts |
+| PR truth checked | GitHub connector checked PR #648, #674, and #685 |
+
+## Deliverables
+
+- `worktree_inventory.tsv` - current and preserved status for each major worktree/clone.
+- `keeper_matrix.md` - keeper packets, classes, evidence, and proposed landing route.
+- `decision_log.md` - decisions made while building this convergence packet.
+- `OPERATOR_MAP.md` - short operator-facing answer map.
+- `PALANTIR_SEMANTIC_ONTOLOGY_META_SCRATCHPAD.md` - proposed-only ontology notes and typed object candidates.
+- `CLOSEOUT.md` - final receipt for this convergence packet.
+
+## Current High-Level Verdict
+
+Preservation is verified enough to continue non-destructive cleanup planning.
+The dirty work is not one coherent merge. It separates into a few real keeper
+lanes and a lot of preserved-but-not-promoted output:
+
+- A2A/NATS preflight is real active runtime substrate and needs its own rebase
+  and PR lane.
+- Reconciliation reports are real governance membrane material, but raw command
+  dumps should stay archived.
+- Helm closeout and terminal branch are real operator surface work, but need a
+  live-use gate before landing.
+- Cashclaw has a real revenue branch history, but the 714 preserved untracked
+  June 24 files are generated run output and should not be promoted.
+- The old independent clone is archive-only unless the operator explicitly
+  revives the March autonomy line.
+- Anti-slop promotion membrane is a compact governance packet already open as
+  draft PR #685.
+- The clean cockpit extraction and PR #674 repair branches are already on main
+  or superseded by merged PRs.
+
+## Classification Taxonomy
+
+Every worktree or packet in this convergence map is assigned exactly one class:
+
+- `CANONICALIZE_NOW`
+- `PORT_TO_TRACK`
+- `DASHBOARD_OPERATOR_SURFACE`
+- `GOVERNANCE_MEMBRANE`
+- `ACTIVE_RUNTIME_SUBSTRATE`
+- `REVENUE_OR_CAPITAL_EXPERIMENT`
+- `ARCHIVE_ONLY`
+- `GENERATED_REPORT_JUNK`
+- `DUPLICATE_OR_SUPERSEDED`
+- `NEEDS_OPERATOR_DECISION`
+
+## Boundaries
+
+- No destructive operations were performed.
+- No dirty worktree was merged wholesale.
+- No source packet from another dirty worktree was copied into this convergence
+  branch.
+- Generated reports are treated as evidence or archive material, not as source
+  code.
+- "Done", "live", "shippable", and "closed" are used only where evidence
+  supports that exact claim.
