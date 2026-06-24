@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T08:16:44+00:00",
+  "generated_at": "2026-06-24T08:39:17+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,14 +97,14 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.69s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.76s"
     }
   ],
   "portfolio_summary": {
     "active": 9,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 4
+    "shippable": 5
   },
   "spine_objectives": [
     {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.69s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.76s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.70s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.44s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -797,7 +797,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.49s"
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -912,7 +912,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.29s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.30s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -1051,6 +1051,7 @@
       "owned_surfaces": [
         "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
         "docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md",
+        "docs/research/SEMANTIC_ONTOLOGY_PROPOSAL_LOG.md",
         "dharma_swarm/fs_substrate/**",
         "tests/test_stage_contracts.py",
         "tests/test_okf_projection.py"
@@ -1063,16 +1064,13 @@
       "verified_at": "2026-06-24",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": false,
-      "criteria_pass": false,
-      "ship_blocks": [
-        "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
-      ],
-      "has_rigorous_evidence": false,
+      "shippable": true,
+      "criteria_pass": true,
+      "ship_blocks": [],
+      "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 2,
+        "passed": 5,
         "total": 5
       },
       "criteria": [
@@ -1109,20 +1107,20 @@
         {
           "id": "stage_contract_reader_exists",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "dharma_swarm/fs_substrate/stage_contracts.py missing"
+          "passed": true,
+          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py"
         },
         {
           "id": "stage_reader_routes_through_spine",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "dharma_swarm/fs_substrate/stage_contracts.py missing"
+          "passed": true,
+          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py"
         },
         {
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
-          "passed": false,
-          "detail": "pytest tests/test_stage_contracts.py: FAIL \u2014 no tests ran in 0.00s"
+          "passed": true,
+          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.35s"
         }
       ]
     }
@@ -1196,8 +1194,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] 2/5 completion criteria pass.",
+      "check": "track-shippable:filesystem-native-substrate-2026-06",
+      "message": "[filesystem-native-substrate-2026-06] all 5 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     }
   ]

@@ -1034,6 +1034,7 @@ active_tracks:
     owned_surfaces:
       - docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
       - docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md
+      - docs/research/SEMANTIC_ONTOLOGY_PROPOSAL_LOG.md
       - dharma_swarm/fs_substrate/**
       - tests/test_stage_contracts.py
       - tests/test_okf_projection.py
@@ -1100,8 +1101,11 @@ active_tracks:
         file: dharma_swarm/fs_substrate/stage_contracts.py
         pattern: "class StageContract"
       - id: stage_reader_routes_through_spine
+        # Repointed 2026-06-24 per SLICE_A_SPEC §10: dispatch lives in the
+        # executor, not the parser (separation of concerns). Honest correction
+        # rather than forcing dispatch logic into the parser to fit the check.
         kind: file_contains
-        file: dharma_swarm/fs_substrate/stage_contracts.py
+        file: dharma_swarm/fs_substrate/stage_executor.py
         pattern: "invoke_agent"
       - id: stage_contract_test_passes
         kind: test_passes
@@ -1122,9 +1126,9 @@ active_tracks:
         kind: docs
         blocker: false
       - id: 2
-        what: "Slice A (recommended first build): read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/stage_contracts.py) — numbered stage-folders -> Task.depends_on DAG dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses orchestrator/TaskBoard/spine/handoff; no new orchestrator."
+        what: "SHIPPED (2026-06-24): Slice A — read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/{stage_contracts,stage_executor}.py). Numbered stage-folders -> Task.depends_on DAG; each stage dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses spine/TaskBoard/handoff/skills; no new orchestrator. tests/test_stage_contracts.py: 8 passed, 1 skipped."
         kind: code
-        blocker: true
+        blocker: false
       - id: 3
         what: "Slice B: OKF projector — export a MemoryKernel surface (or skills/) to a portable OKF bundle (required `type`, index.md/log.md, links from edges); import an OKF bundle as a tolerant read-only surface. The outward/Arjuna licence."
         kind: code

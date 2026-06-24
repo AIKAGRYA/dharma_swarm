@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-24T08:16:44+00:00 (schema v2)
-Active tracks: **9** (warn 5, max 10) — shippable 4
+Generated: 2026-06-24T08:39:17+00:00 (schema v2)
+Active tracks: **9** (warn 5, max 10) — shippable 5
 
 ## Spine coverage
 
@@ -29,7 +29,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 1.69s
+  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.76s
 
 ## `runtime-truth-nats-2026-06` — 2/2
 
@@ -102,7 +102,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.70s
+  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.44s
   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
 
 ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
@@ -120,7 +120,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
-  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.49s
+  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.34s
   - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
 
 ## `provider-routing-consolidation-2026-06` — SHIPPABLE
@@ -139,7 +139,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `power_first_default` (file_contains) — pattern 'power_first' found in dharma_swarm/provider_policy.py
   - ✓ `zhipu_provider_enum` (file_contains) — pattern 'ZHIPU' found in dharma_swarm/models.py
   - ✓ `zhipu_provider_class` (file_contains) — pattern 'class ZhipuProvider' found in dharma_swarm/providers.py
-  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.29s
+  - ✓ `precedence_invariant_test_passes` (test_passes) — pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS — 1 passed in 0.30s
   - ✓ `stage4_precedence_locked_on_main` (commit_on_main) — bc110d84 is an ancestor of origin/main
 
 ## `orchestration-arena-v1-2026-06` — 9/9
@@ -161,10 +161,10 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `dpi_test_exists` (file_exists) — tests/test_dpi.py present
   - ✓ `closure_checks_test_exists` (file_exists) — tests/test_coordination_closure_checks.py present
 
-## `filesystem-native-substrate-2026-06` — 2/5
+## `filesystem-native-substrate-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['truth-graph-platform-2026-06', 'runtime-truth-spine-adoption-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py']
+- owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'docs/research/SEMANTIC_ONTOLOGY_PROPOSAL_LOG.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py']
 - moves_vital_signs: ['context_efficiency', 'tool_coverage', 'memory_persistence']
 
   - ✓ `dossier_exists` (file_exists) — docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present
@@ -172,9 +172,9 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
   - ✓ `handoff_owner_exists` (file_exists) — dharma_swarm/handoff.py present
   - ✓ `dossier_consolidates_four_powers` (file_contains) — pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
   - ✓ `dossier_carries_organism_tie` (file_contains) — pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
-  - ✗ `stage_contract_reader_exists` (file_contains) — dharma_swarm/fs_substrate/stage_contracts.py missing
-  - ✗ `stage_reader_routes_through_spine` (file_contains) — dharma_swarm/fs_substrate/stage_contracts.py missing
-  - ✗ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: FAIL — no tests ran in 0.00s
+  - ✓ `stage_contract_reader_exists` (file_contains) — pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py
+  - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
+  - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 8 passed in 0.35s
 
 ## Findings
 
@@ -189,4 +189,4 @@ Active tracks: **9** (warn 5, max 10) — shippable 4
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
 - **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
-- **INFO** `track-in-progress:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] 2/5 completion criteria pass.
+- **INFO** `track-shippable:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] all 5 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
