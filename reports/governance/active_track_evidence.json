@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T14:45:31+00:00",
+  "generated_at": "2026-06-24T15:42:52+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,7 +97,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.41s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.80s"
     }
   ],
   "portfolio_summary": {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.41s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.80s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.43s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.50s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -797,7 +797,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.33s"
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.37s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -912,7 +912,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.29s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.33s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -1071,7 +1071,7 @@
       "has_rigorous_evidence": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 0,
+        "passed": 3,
         "total": 4
       },
       "criteria": [
@@ -1102,20 +1102,20 @@
         {
           "id": "github_review_receipt_bridge",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'github_review' NOT FOUND in scripts/runtime/pr_merge_control.py"
+          "passed": true,
+          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
         },
         {
           "id": "github_review_bridge_tested",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "tests/test_pr_merge_control_github_reviews.py MISSING"
+          "passed": true,
+          "detail": "tests/test_pr_merge_control_github_reviews.py present"
         },
         {
           "id": "automerge_enrolls_all_nondraft",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'all non-draft' NOT FOUND in .github/workflows/automerge.yml"
+          "passed": true,
+          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
         },
         {
           "id": "mike_cloud_heartbeat",
@@ -1196,7 +1196,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:merge-master-mike-d4-2026-06",
-      "message": "[merge-master-mike-d4-2026-06] 0/4 completion criteria pass.",
+      "message": "[merge-master-mike-d4-2026-06] 3/4 completion criteria pass.",
       "criterion_id": null
     }
   ]

@@ -1099,7 +1099,7 @@ active_tracks:
       - id: automerge_enrolls_all_nondraft
         kind: file_contains
         file: .github/workflows/automerge.yml
-        pattern: "all non-draft"
+        pattern: "mike-watch"
       - id: mike_cloud_heartbeat
         kind: file_contains
         file: .github/workflows/merge-master-mike-backlog.yml

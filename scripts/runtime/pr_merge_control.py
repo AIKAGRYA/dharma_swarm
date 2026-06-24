@@ -879,17 +879,18 @@ def agent_review_blockers(status: dict[str, Any], *, human_approved: bool) -> li
 # lane). This is strictly ADDITIVE: it can satisfy a missing receipt, never
 # waives any other gate check (CI, conflict, unresolved threads, CHANGES_REQUESTED).
 TRUSTED_REVIEW_LOGINS: dict[str, frozenset[str]] = {
-    "codex": frozenset({"chatgpt-codex-connector", "codex"}),
-    "copilot": frozenset({"copilot-pull-request-reviewer", "copilot", "github-copilot"}),
-    "github_copilot": frozenset({"copilot-pull-request-reviewer", "copilot", "github-copilot"}),
+    "codex": frozenset({"chatgpt-codex-connector[bot]"}),
+    "copilot": frozenset({"copilot-pull-request-reviewer[bot]"}),
+    "github_copilot": frozenset({"copilot-pull-request-reviewer[bot]"}),
 }
 
 
 def _normalize_login(login: str) -> str:
-    login = (login or "").strip().lower()
-    if login.endswith("[bot]"):
-        login = login[: -len("[bot]")]
-    return login
+    # EXACT match only — do NOT strip the "[bot]" suffix. The suffix is GitHub's
+    # App-identity marker that a human account cannot hold, so matching the full
+    # "<app>[bot]" login keeps the trust boundary at the installed reviewer App
+    # (a human "chatgpt-codex-connector" could never satisfy the bridge).
+    return (login or "").strip().lower()
 
 
 def fetch_pr_reviews(pr_number: int) -> list[dict[str, Any]]:
@@ -933,11 +934,12 @@ def github_review_status(agent: str, reviews: list[dict[str, Any]]) -> dict[str,
     matched.sort(key=lambda r: str(r.get("submittedAt") or ""))
     latest = matched[-1]
     state = str(latest.get("state") or "")
+    login = _normalize_login(str((latest.get("author") or {}).get("login") or ""))
     return {
         "agent": agent,
-        "output": "",
+        "output": f"<github-review by {login} state={state or 'NONE'}>",
         "output_present": True,
-        "receipt": "",
+        "receipt": f"<github-review:{login}>",
         "receipt_present": True,
         "receipt_valid": True,
         "receipt_error": "",
@@ -948,7 +950,7 @@ def github_review_status(agent: str, reviews: list[dict[str, Any]]) -> dict[str,
         "duration_s": None,
         "verdict": _github_review_verdict(state),
         "source": "github_review",
-        "github_login": _normalize_login(str((latest.get("author") or {}).get("login") or "")),
+        "github_login": login,
         "github_state": state,
     }
 
@@ -967,12 +969,16 @@ def resolve_agent_review_status(
     local.setdefault("source", "local")
     if not accept_github_reviews:
         return local
-    if not agent_review_blockers(local, human_approved=human_approved):
-        return local  # local receipt already satisfies the gate
+    # Bridge ONLY when the local artifacts are genuinely ABSENT. A present local
+    # receipt — even a negative one (REQUEST_CHANGES / timeout / invalid JSON) —
+    # is authoritative and must never be overridden by a GitHub review. The
+    # bridge is an additive SOURCE for a missing receipt, not a bypass.
+    if local.get("output_present") or local.get("receipt_present"):
+        return local
     gh = github_review_status(agent, pr_reviews)
     if gh is not None and not agent_review_blockers(gh, human_approved=human_approved):
         return gh
-    return local  # neither source clean; keep local so its blockers surface
+    return local  # no trusted GitHub review either; keep local so its blockers surface
 
 
 def run_agent_process(

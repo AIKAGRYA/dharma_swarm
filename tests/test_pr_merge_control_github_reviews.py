@@ -34,10 +34,17 @@ def test_codex_commented_review_counts_as_clean_receipt():
 
 
 def test_copilot_approved_review_counts_as_clean_receipt():
-    status = github_review_status("copilot", [_review("Copilot", "APPROVED")])
+    status = github_review_status("copilot", [_review("copilot-pull-request-reviewer[bot]", "APPROVED")])
     assert status is not None
     assert status["verdict"] == "APPROVE"
     assert agent_review_blockers(status, human_approved=False) == []
+
+
+def test_bare_login_without_bot_suffix_is_rejected():
+    # The trust boundary is the App identity ("[bot]"). A human/account with the
+    # bare base login must NOT satisfy the bridge (Copilot review #1).
+    assert github_review_status("codex", [_review("chatgpt-codex-connector", "APPROVED")]) is None
+    assert github_review_status("copilot", [_review("copilot-pull-request-reviewer", "APPROVED")]) is None
 
 
 def test_changes_requested_still_blocks():
@@ -101,3 +108,18 @@ def test_resolve_on_no_trusted_review_keeps_local_blocked(tmp_path: Path):
     )
     assert status["source"] == "local"
     assert agent_review_blockers(status, human_approved=False)
+
+
+def test_present_local_receipt_is_never_overridden_by_github_review(tmp_path: Path):
+    # Fix for Copilot review #4: a PRESENT local artifact (even a negative one)
+    # is authoritative — a clean GitHub review must not bridge over it.
+    (tmp_path / "codex_review.md").write_text(
+        "VERDICT: REQUEST_CHANGES\nThis change has a real problem that must be fixed first.\n"
+    )
+    status = resolve_agent_review_status(
+        tmp_path, "codex",
+        pr_reviews=[_review("chatgpt-codex-connector[bot]", "APPROVED")],
+        accept_github_reviews=True,
+    )
+    assert status["source"] == "local"  # local present -> never overridden
+    assert agent_review_blockers(status, human_approved=False)  # its REQUEST_CHANGES still blocks
