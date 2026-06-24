@@ -1020,6 +1020,123 @@ active_tracks:
         kind: code
         blocker: false
 
+  - id: filesystem-native-substrate-2026-06
+    name: Filesystem-Native Context Substrate — folder-as-contract + portable knowledge graph
+    status: ACTIVE
+    opened_at: "2026-06-24"
+    verified_at: "2026-06-24"
+    ttl_days: 21
+    owner: "@AmitabhainArunachala"
+    serves: substrate-nativeness
+    complements:
+      - truth-graph-platform-2026-06
+      - runtime-truth-spine-adoption-2026-06
+    owned_surfaces:
+      - docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+      - dharma_swarm/fs_substrate/**
+      - tests/test_stage_contracts.py
+      - tests/test_okf_projection.py
+    moves_vital_signs:
+      - context_efficiency
+      - tool_coverage
+      - memory_persistence
+
+    description: |
+      Operator directive 2026-06-24: consolidate four convergent "filesystem-as-
+      agent-substrate" sources into one substrate power and wire it into the swarm.
+      The four: LSFS (arXiv 2410.11843, semantic syscalls over a vector index),
+      LlamaFS (iyaja/llama-fs, self-organizing propose-then-apply), Van Clief's
+      ICM/MWP (arXiv 2603.16021, numbered folders as pipeline stages + CONTEXT.md
+      contracts + token-firewall folders), and Google's OKF v0.1 (2026-06-12,
+      portable markdown knowledge graph: required `type`, index.md/log.md, links).
+
+      This is a Tier-1 substrate/organizer power (NORTH_STAR.md §4), realizing
+      self-organs the genome already names (THE_ORGANISM.md ③: self-onboarding,
+      self-ontology-maintenance, self-memory-curation) and grounding the
+      categorical-systems-theory pillar (genome ①) physically: CONTEXT.md
+      Inputs/Outputs tables are morphism declarations; OKF `type`+links are
+      objects+morphisms — compositional interfaces the organism can read and
+      rewrite without losing coherence.
+
+      The track creates NO new truth store and NO authority surface. Every slice
+      projects from / converges on existing owners: the spine (invoke_agent /
+      EvidenceReceipt), the orchestrator + TaskBoard DAG, handoff.py, and the
+      MemoryKernel front door + surface registry.
+
+      Doctrine line that must hold (inherited from reconciliation + truth-graph):
+        Read models project truth from owners; they do not become authority.
+
+      Anti-pattern guard (THE_ORGANISM.md needle): this must not become "a paper
+      about our own architecture." The outward licence is OKF interchange — making
+      the swarm's knowledge portable to external humans and agent systems
+      (NORTH_STAR.md §6 noosphere propagation; §8 trust-gate auditability).
+
+    prerequisites:
+      - id: dossier_exists
+        kind: file_exists
+        file: docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+      - id: spine_invoke_owner_exists
+        kind: file_contains
+        file: dharma_swarm/spine/invoke.py
+        pattern: "async def invoke_agent"
+      - id: handoff_owner_exists
+        kind: file_exists
+        file: dharma_swarm/handoff.py
+
+    completion_criteria:
+      - id: dossier_consolidates_four_powers
+        kind: file_contains
+        file: docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+        pattern: "The four powers at a glance"
+      - id: dossier_carries_organism_tie
+        kind: file_contains
+        file: docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
+        pattern: "How this serves the organism"
+      # --- Slice A (ICM CONTEXT.md pipeline reader) is the shippable bar. These
+      # fail until built, keeping the track honestly ACTIVE, not SHIPPABLE. ---
+      - id: stage_contract_reader_exists
+        kind: file_contains
+        file: dharma_swarm/fs_substrate/stage_contracts.py
+        pattern: "class StageContract"
+      - id: stage_reader_routes_through_spine
+        kind: file_contains
+        file: dharma_swarm/fs_substrate/stage_contracts.py
+        pattern: "invoke_agent"
+      - id: stage_contract_test_passes
+        kind: test_passes
+        test: "tests/test_stage_contracts.py"
+
+    non_goals:
+      - Do not create a new daemon, database, vector store, event log, or truth store.
+      - Do not mint a second receipt type; project over spine.EvidenceReceipt.
+      - Do not mutate files without a dry-run proposal + operator approval (Slice D); writes go through MemoryWritePolicy.
+      - Do not broadly refactor orchestrator.py, agent_runner.py, or swarm.py; plug in at dispatch_next()/TaskBoard, honoring spine-adoption's owned surfaces.
+      - Do not touch operator_core/** or runtime_state.py.
+      - Do not duplicate the truth-graph-platform repo_context projection; this owns the portable on-disk interchange format, not the in-repo render.
+      - Do not commit provider API keys or any credentials.
+
+    next_items:
+      - id: 1
+        what: "SHIPPED: single-location research dossier consolidating LSFS, LlamaFS, ICM/MWP, OKF with the organism tie (docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md)."
+        kind: docs
+        blocker: false
+      - id: 2
+        what: "Slice A (recommended first build): read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/stage_contracts.py) — numbered stage-folders -> Task.depends_on DAG dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses orchestrator/TaskBoard/spine/handoff; no new orchestrator."
+        kind: code
+        blocker: true
+      - id: 3
+        what: "Slice B: OKF projector — export a MemoryKernel surface (or skills/) to a portable OKF bundle (required `type`, index.md/log.md, links from edges); import an OKF bundle as a tolerant read-only surface. The outward/Arjuna licence."
+        kind: code
+        blocker: false
+      - id: 4
+        what: "Slice C: bounded LSFS-style semantic-query facade over existing vector/graph surfaces via the MemoryKernel front door (no new vector DB)."
+        kind: code
+        blocker: false
+      - id: 5
+        what: "Slice D (last, most caution): LlamaFS-style batch, dry-run-first self-organizer that PROPOSES a docs/ reorg for operator approval; writes gated by MemoryWritePolicy. Watch-mode deferred."
+        kind: code
+        blocker: false
+
 closed_tracks:
   - id: orientation-graph-2026-06
     name: Orientation Graph — whole-system view served on token one

@@ -210,6 +210,63 @@ is simultaneously the program, the memory, and the knowledge graph.
 
 ---
 
+## How this serves the organism (the non-myopic tie — read before building)
+
+This dossier sits one inch from a named anti-pattern. `foundations/THE_ORGANISM.md`
+warns: *"Inward motion with no telos and no contact (recursion-for-its-own-sake,
+narration outrunning build, **papers about our own architecture**) is still the
+anti-pattern."* A "research dossier about a filesystem-context-substrate" **is** a
+paper about our own architecture unless it compounds into capability that reaches the
+world. So the tie below is not decoration — it is the licence for this work to exist.
+
+**1 — It is a Tier-1 substrate power, not a feature.** `NORTH_STAR.md` §4 names a
+three-tier metabolism; Tier 1 is *"Substrate guides… the most powerful, evolving
+toolset we can manage — fuels, organizes, and guides everything else. Top tier
+because it is the organizer, not the point."* Filesystem-as-substrate is exactly an
+**organizer**: the tree through which every organ reads and writes. It serves the
+`substrate-nativeness` spine objective directly, and only that.
+
+**2 — It realizes self-organs the vision already declares.** `THE_ORGANISM.md` genome
+③ lists, verbatim, the organs this work *is*:
+- **self-onboarding** ("fresh agent coherent on first token — the cure for 'every new
+  instance is confused'") → ICM's `CLAUDE.md → CONTEXT.md` layered load is
+  self-onboarding rendered as on-disk structure.
+- **self-ontology-maintenance** ("one shared world-model all organs read/write") →
+  OKF is that world-model made portable: a markdown graph any organ (or external
+  human/agent) can consume.
+- **self-memory-curation** (chetana decay/revive) → LlamaFS's propose-then-apply
+  organizer is curation with a gate.
+
+**3 — It is categorical systems theory made physical (the deepest tie).** Genome ①
+names *"categorical systems theory — objects+morphisms so parts compose with provable
+interfaces… self-rewire without losing coherence."* ICM's `CONTEXT.md` Inputs/Outputs
+tables **are morphism declarations** — typed interfaces between stages. OKF's required
+`type` field + links **are objects + morphisms**. A filesystem-native substrate gives
+the organism *compositional interfaces it can read, audit, and rewrite without losing
+coherence.* This is the abstract pillar grounded in something you can `ls`.
+
+**4 — It is the portable face of the truth graph (sibling track tie).** The
+`truth-graph-platform-2026-06` track is building *"a single truth graph that every
+agent reads."* OKF is the **portable serialization** of that graph — and an ingest
+path for external bundles. This track *complements* truth-graph-platform (it does not
+duplicate it): truth-graph owns the in-repo projection; this owns the on-disk
+interchange format and the per-stage contract reader.
+
+**5 — It feeds Arjuna, which is what licenses it.** The outward hook (the cure for the
+anti-pattern) is OKF interchange: a vendor-neutral, portable knowledge format makes
+the swarm's knowledge **leave the house** — readable by external humans and other
+agent systems. That is `NORTH_STAR.md` §6 (noosphere propagation, "an organized,
+lawful, global way") and §8 trust-gate item 1 (*"a pointed audit agent reports… deep
+understanding of how everything flows"* — a legible filesystem substrate makes that
+flow auditable by default, per ICM's "observable-by-default" property).
+
+**The doctrine line this track inherits** (from reconciliation + truth-graph):
+*Read models project truth from owners; they do not become authority.* Every slice
+below projects from / converges on existing owners (MemoryKernel, the spine, the
+orchestrator). None mints a new truth store.
+
+---
+
 ## Mapping onto dharma_swarm's existing substrate
 
 The strongest finding of this research: **dharma_swarm has already independently grown
