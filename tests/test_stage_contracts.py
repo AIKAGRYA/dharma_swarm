@@ -111,6 +111,54 @@ def test_cycle_is_rejected():
         to_tasks(StageWorkspace(root="/w", stages=[a, b]))
 
 
+def test_duplicate_stage_id_rejected():
+    from dharma_swarm.fs_substrate.stage_contracts import StageWorkspace
+
+    a = StageContract(stage_id="02-dup", order=2, path="/w/stages/02-a/CONTEXT.md",
+                      inputs=[], process=["x"], outputs=[])
+    b = StageContract(stage_id="02-dup", order=2, path="/w/stages/02-b/CONTEXT.md",
+                      inputs=[], process=["y"], outputs=[])
+    with pytest.raises(WorkspaceError):
+        to_tasks(StageWorkspace(root="/w", stages=[a, b]))
+
+
+def test_same_order_fanout_depends_on_prior_order():
+    """Two same-order stages with no explicit sibling input both depend on the
+    prior order — never on each other (preserves fan-out)."""
+    from dharma_swarm.fs_substrate.stage_contracts import StageWorkspace
+
+    one = StageContract(stage_id="01-scope", order=1, path="/w/stages/01-scope/CONTEXT.md",
+                        inputs=[], process=["x"], outputs=[])
+    a = StageContract(stage_id="02-a", order=2, path="/w/stages/02-a/CONTEXT.md",
+                      inputs=[], process=["x"], outputs=[])
+    b = StageContract(stage_id="02-b", order=2, path="/w/stages/02-b/CONTEXT.md",
+                      inputs=[], process=["x"], outputs=[])
+    tasks = to_tasks(StageWorkspace(root="/w", stages=[one, a, b]))
+    by_stage = {t.metadata["stage_id"]: t for t in tasks}
+    one_id = by_stage["01-scope"].id
+    assert by_stage["02-a"].depends_on == [one_id]
+    assert by_stage["02-b"].depends_on == [one_id]
+    assert by_stage["02-b"].id not in by_stage["02-a"].depends_on
+    assert by_stage["02-a"].id not in by_stage["02-b"].depends_on
+
+
+def test_assemble_input_context_rejects_escaping_input(tmp_path):
+    """The read-time path guard fails closed on the public dispatch path too."""
+    from dharma_swarm.fs_substrate.stage_contracts import StageInput
+
+    ws_root = tmp_path / "ws"
+    (ws_root / "stages" / "01-evil").mkdir(parents=True)
+    ctx = ws_root / "stages" / "01-evil" / "CONTEXT.md"
+    ctx.write_text("x")
+    evil = StageContract(
+        stage_id="01-evil", order=1, path=str(ctx),
+        inputs=[StageInput(source="x", location="../../../../../../etc/passwd")],
+        process=["x"], outputs=[],
+    )
+    with pytest.raises(WorkspaceError):
+        assemble_input_context(evil, workspace_root=str(ws_root))
+
+
 def test_input_path_traversal_rejected():
     from dharma_swarm.fs_substrate.stage_contracts import StageInput, StageWorkspace
 
@@ -153,3 +201,42 @@ async def test_dispatch_stage_calls_invoke_agent():
     assert receipt.routing_decision_id == call["routing"].decision_id
     assert receipt.attributes["stage_id"] == "01-scope"
     assert receipt.status == "ok"
+
+
+async def test_run_workspace_stops_on_failed_stage():
+    """A non-ok stage halts the run — downstream stages must not execute."""
+    from dharma_swarm.fs_substrate.stage_executor import run_workspace
+    from dharma_swarm.handoff import HandoffProtocol
+
+    class _FailingInvoker:
+        def __init__(self):
+            self.dispatched = []
+
+        async def __call__(self, task, agent_id, context_id, routing):
+            self.dispatched.append(routing.task_id)
+            status = "failed" if routing.task_id == "02-research" else "ok"
+            return EvidenceReceipt(
+                agent_id=agent_id, context_id=context_id, task_id=routing.task_id,
+                routing_decision_id=routing.decision_id, status=status,
+                attributes=dict(routing.attributes),
+            )
+
+    ws = load_workspace(WORKSPACE)
+    invoker = _FailingInvoker()
+    receipts = await run_workspace(ws, invoker=invoker, handoff=HandoffProtocol())
+
+    # 01-scope ok, 02-research failed -> stop. 03-synthesize never dispatched.
+    assert invoker.dispatched == ["01-scope", "02-research"]
+    assert [r.status for r in receipts] == ["ok", "failed"]
+
+
+async def test_run_workspace_dispatches_in_dependency_order():
+    """Execution follows the derived DAG, upstream before dependent."""
+    from dharma_swarm.fs_substrate.stage_executor import run_workspace
+
+    ws = load_workspace(WORKSPACE)
+    invoker = _FakeInvoker()
+    await run_workspace(ws, invoker=invoker)
+    dispatched = [c["routing"].task_id for c in invoker.calls]
+    assert dispatched.index("01-scope") < dispatched.index("02-research")
+    assert dispatched.index("02-research") < dispatched.index("03-synthesize")

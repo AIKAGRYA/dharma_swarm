@@ -72,6 +72,15 @@ def _render_body(concept: OKFConcept) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
+def _within(root: Path, candidate: Path) -> bool:
+    """True if *candidate* resolves inside *root* (bundle containment guard)."""
+    try:
+        candidate.resolve().relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
 def write_bundle(
     concepts: list[OKFConcept],
     root: str | Path,
@@ -87,10 +96,33 @@ def write_bundle(
     """
     root_path = Path(root)
     root_path.mkdir(parents=True, exist_ok=True)
+    resolved_root = root_path.resolve()
+
+    # Validate every concept path BEFORE writing: relative, non-reserved, and
+    # contained within the bundle — a caller-supplied rel_path of "../x" or an
+    # absolute path must never write outside the bundle root.
+    targets: set[Path] = set()
+    for concept in concepts:
+        if Path(concept.rel_path).is_absolute():
+            raise ValueError(f"OKF concept rel_path must be relative: {concept.rel_path}")
+        target = (root_path / concept.rel_path).resolve()
+        if Path(concept.rel_path).name in _RESERVED:
+            raise ValueError(f"concept rel_path collides with reserved name: {concept.rel_path}")
+        if not _within(resolved_root, target):
+            raise ValueError(f"OKF concept rel_path escapes the bundle: {concept.rel_path}")
+        targets.add(target)
+
+    # Remove stale concept files (non-reserved *.md no longer in the set) so a
+    # re-export after a rename/delete does not resurrect removed concepts via
+    # read_bundle(). Only touches files inside the bundle root.
+    for existing in root_path.rglob("*.md"):
+        if existing.name in _RESERVED:
+            continue
+        if existing.resolve() not in targets:
+            existing.unlink()
+
     for concept in concepts:
         target = root_path / concept.rel_path
-        if target.name in _RESERVED:
-            raise ValueError(f"concept rel_path collides with reserved name: {concept.rel_path}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_frontmatter(concept) + "\n" + _render_body(concept), encoding="utf-8")
 

@@ -16,7 +16,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dharma_swarm.fs_substrate.stage_contracts import StageContract, StageWorkspace
+from dharma_swarm.fs_substrate.stage_contracts import (
+    StageContract,
+    StageWorkspace,
+    WorkspaceError,
+    derive_dependencies,
+    topological_order,
+)
 from dharma_swarm.handoff import Artifact, ArtifactType, HandoffProtocol
 from dharma_swarm.spine.invoke import AgentInvoker, invoke_agent
 from dharma_swarm.spine.receipt import EvidenceReceipt
@@ -50,22 +56,43 @@ def _extract_section(text: str, scope: str) -> str:
     return "\n".join(out) if out else text
 
 
+def _workspace_root(contract: StageContract, workspace_root: str | None) -> Path:
+    """Resolve the workspace root for a stage (explicit, else <root>/stages/<NN>/CONTEXT.md)."""
+    if workspace_root:
+        return Path(workspace_root).resolve()
+    resolved = Path(contract.path).resolve()
+    return resolved.parents[2] if len(resolved.parents) > 2 else resolved.parent
+
+
 def assemble_input_context(
-    contract: StageContract, *, char_budget: int = _INPUT_CHAR_BUDGET
+    contract: StageContract,
+    *,
+    char_budget: int = _INPUT_CHAR_BUDGET,
+    workspace_root: str | None = None,
 ) -> str:
     """Build the bounded context for a stage from ONLY its Inputs table.
 
     Nothing outside the declared Inputs enters the window — this is the token
-    firewall the whole power is about. Missing input files are reported inline
-    rather than silently skipped.
+    firewall the whole power is about. Missing input files are reported inline.
+
+    Defense-in-depth path guard: an input that resolves outside the workspace is
+    rejected here too (fail closed), not only in to_tasks() — because the public
+    run_workspace path reads files through this function without calling to_tasks.
     """
     base = Path(contract.path).parent
+    root = _workspace_root(contract, workspace_root)
     parts: list[str] = []
     used = 0
     for inp in contract.inputs:
         if not inp.location:
             continue
         target = (base / inp.location).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            raise WorkspaceError(
+                f"stage '{contract.stage_id}' input escapes workspace: {inp.location}"
+            )
         files = (
             sorted(target.glob("*")) if target.is_dir() else [target]
         )
@@ -109,6 +136,7 @@ async def dispatch_stage(
     invoker: AgentInvoker,
     context_id: str = "",
     char_budget: int = _INPUT_CHAR_BUDGET,
+    workspace_root: str | None = None,
 ) -> EvidenceReceipt:
     """Dispatch one stage through the spine, returning its EvidenceReceipt.
 
@@ -118,7 +146,9 @@ async def dispatch_stage(
     mint a second receipt.
     """
     agent_id, provider, model, _sys = _resolve_agent(contract.agent_role)
-    context_text = assemble_input_context(contract, char_budget=char_budget)
+    context_text = assemble_input_context(
+        contract, char_budget=char_budget, workspace_root=workspace_root
+    )
 
     routing = RoutingDecision(
         agent_id=agent_id,
@@ -153,34 +183,50 @@ async def run_workspace(
     invoker: AgentInvoker,
     context_id: str = "",
     handoff: HandoffProtocol | None = None,
+    stop_on_failure: bool = True,
 ) -> list[EvidenceReceipt]:
-    """Run every stage in order, handing each stage's output to the next.
+    """Run the workspace in DEPENDENCY (DAG) order — not raw numeric order.
 
-    Slice A executes stages in declared order (the workspace is already sorted by
-    the derived DAG). Each transition emits a typed Handoff so the stage chain is
-    visible to the rest of the organism, not just to the filesystem.
+    Stages run in topological order of the derived dependency graph, so fan-out /
+    fan-in and explicit cross-order edges are honored. For each stage, the typed
+    Handoff from every completed upstream is created BEFORE the stage is dispatched
+    (so an invoker consulting get_pending() at startup sees the upstream artifact).
+    A stage whose receipt is not ``ok`` halts the run by default — downstream
+    stages must not execute against missing or stale upstream outputs.
     """
     handoff = handoff or HandoffProtocol()
+    deps = derive_dependencies(ws)
+    order = topological_order(ws, deps)
+    by_id = {c.stage_id: c for c in ws.stages}
     receipts: list[EvidenceReceipt] = []
-    prev: StageContract | None = None
-    for contract in ws.stages:
-        receipt = await dispatch_stage(
-            contract, invoker=invoker, context_id=context_id
-        )
-        receipts.append(receipt)
-        if prev is not None:
+    completed: dict[str, StageContract] = {}
+
+    for contract in order:
+        # Hand off each completed upstream BEFORE dispatching this stage.
+        for up_id in deps.get(contract.stage_id, ()):
+            up = completed.get(up_id) or by_id.get(up_id)
+            if up is None or up_id not in completed:
+                continue
             await handoff.create_handoff(
-                from_agent=prev.agent_role or prev.stage_id,
+                from_agent=up.agent_role or up.stage_id,
                 to_agent=contract.agent_role or contract.stage_id,
-                task_context=f"{prev.stage_id} -> {contract.stage_id}",
+                task_context=f"{up.stage_id} -> {contract.stage_id}",
                 artifacts=[
                     Artifact(
                         artifact_type=ArtifactType.CONTEXT,
-                        content=", ".join(o.location for o in prev.outputs),
-                        summary=f"outputs of stage {prev.stage_id}",
-                        metadata={"stage_id": prev.stage_id},
+                        content=", ".join(o.location for o in up.outputs),
+                        summary=f"outputs of stage {up.stage_id}",
+                        metadata={"stage_id": up.stage_id},
                     )
                 ],
             )
-        prev = contract
+
+        receipt = await dispatch_stage(
+            contract, invoker=invoker, context_id=context_id, workspace_root=ws.root
+        )
+        receipts.append(receipt)
+        if stop_on_failure and getattr(receipt, "status", "ok") != "ok":
+            break
+        completed[contract.stage_id] = contract
+
     return receipts

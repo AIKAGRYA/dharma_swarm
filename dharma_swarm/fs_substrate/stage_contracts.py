@@ -244,36 +244,45 @@ def _within(root: Path, candidate: Path) -> bool:
 
 
 def _upstream_stage_ids(contract: StageContract, by_id: dict[str, StageContract]) -> list[str]:
-    """Stage ids whose output/ dir is referenced by this stage's Inputs."""
+    """Stage ids whose output/ dir is referenced by this stage's Inputs (explicit edges)."""
     ups: list[str] = []
     for inp in contract.inputs:
+        loc = inp.location.replace("\\", "/")
         for other_id in by_id:
             if other_id == contract.stage_id:
                 continue
             # An input that points into "../<other>/..." is a real data edge.
-            if f"/{other_id}/" in inp.location.replace("\\", "/") or inp.location.replace(
-                "\\", "/"
-            ).startswith(f"../{other_id}"):
+            if f"/{other_id}/" in loc or loc.startswith(f"../{other_id}"):
                 if other_id not in ups:
                     ups.append(other_id)
     return ups
 
 
-def to_tasks(ws: StageWorkspace) -> list[Task]:
-    """Map a workspace to Task objects with depends_on edges.
+def derive_dependencies(ws: StageWorkspace) -> dict[str, list[str]]:
+    """The stage-id dependency graph: {stage_id: [upstream stage_ids]}.
 
-    Dependency rule (in order):
-      1. Explicit — a stage depends on any stage whose output/ it lists as input.
-      2. Fallback — otherwise it depends on the immediately-lower order stage
-         (ICM's numeric default).
+    Single source of the DAG, used by BOTH to_tasks() (Task.depends_on) and the
+    executor (run_workspace ordering). Rules, in order:
+      1. Explicit — depend on any stage whose output/ this stage lists as input.
+      2. Fallback — otherwise depend on ALL stages at the immediately-lower order
+         (ICM's numeric default). Preserves same-order fan-out: two order-2 stages
+         with no explicit sibling input both depend on order-1, never on each other.
 
-    The folder is the source of the DAG; TaskBoard is the executor of the DAG.
-    Raises WorkspaceError on a dependency cycle or a workspace-escaping input.
+    Fails closed (WorkspaceError) on: a duplicate stage_id, an input that escapes
+    the workspace, a self-dependency, or a dependency cycle.
     """
     root = Path(ws.root).resolve()
+
+    # Duplicate stage_id guard — two folders sharing a `stage:` would otherwise
+    # collapse onto one identifier, silently merging their deps and receipts.
+    seen: set[str] = set()
+    for c in ws.stages:
+        if c.stage_id in seen:
+            raise WorkspaceError(
+                f"duplicate stage_id '{c.stage_id}' — stage identifiers must be unique"
+            )
+        seen.add(c.stage_id)
     by_id = {c.stage_id: c for c in ws.stages}
-    id_to_task: dict[str, str] = {}
-    tasks: list[Task] = []
 
     # Path-traversal guard: every input must resolve inside the workspace.
     for c in ws.stages:
@@ -284,7 +293,38 @@ def to_tasks(ws: StageWorkspace) -> list[Task]:
                     f"stage '{c.stage_id}' input escapes workspace: {inp.location}"
                 )
 
-    # First pass: allocate Task ids so depends_on can reference them.
+    orders = sorted({c.order for c in ws.stages})
+
+    def _prev_order_ids(order: int) -> list[str]:
+        lower = [o for o in orders if o < order]
+        if not lower:
+            return []
+        target = max(lower)
+        return [c.stage_id for c in ws.stages if c.order == target]
+
+    deps: dict[str, list[str]] = {}
+    for c in ws.stages:
+        ups = _upstream_stage_ids(c, by_id)
+        if not ups:
+            ups = _prev_order_ids(c.order)  # same-order fan-out preserved
+        if c.stage_id in ups:
+            raise WorkspaceError(f"stage '{c.stage_id}' depends on itself")
+        deps[c.stage_id] = ups
+
+    _assert_acyclic(deps)
+    return deps
+
+
+def to_tasks(ws: StageWorkspace) -> list[Task]:
+    """Map a workspace to Task objects with depends_on edges.
+
+    The folder is the source of the DAG; TaskBoard is the executor of the DAG.
+    Raises WorkspaceError per derive_dependencies (dup id / escape / cycle).
+    """
+    deps = derive_dependencies(ws)
+    id_to_task: dict[str, str] = {}
+    tasks: list[Task] = []
+
     for c in ws.stages:
         t = Task(
             title=c.title or c.stage_id,
@@ -300,35 +340,49 @@ def to_tasks(ws: StageWorkspace) -> list[Task]:
         id_to_task[c.stage_id] = t.id
         tasks.append(t)
 
-    # Second pass: wire depends_on from the derived upstream set.
-    prev_id: str | None = None
     for c, t in zip(ws.stages, tasks):
-        ups = _upstream_stage_ids(c, by_id)
-        if not ups and prev_id is not None:
-            ups = [prev_id]  # numeric fallback
-        if c.stage_id in ups:
-            raise WorkspaceError(f"stage '{c.stage_id}' depends on itself")
-        t.depends_on = [id_to_task[u] for u in ups if u in id_to_task]
-        prev_id = c.stage_id
-
-    _assert_acyclic(tasks)
+        t.depends_on = [id_to_task[u] for u in deps[c.stage_id] if u in id_to_task]
     return tasks
 
 
-def _assert_acyclic(tasks: list[Task]) -> None:
-    """Raise WorkspaceError if the depends_on graph has a cycle."""
-    graph = {t.id: set(t.depends_on) for t in tasks}
+def topological_order(
+    ws: StageWorkspace, deps: dict[str, list[str]] | None = None
+) -> list[StageContract]:
+    """Stage contracts in dependency order (every upstream before its dependents)."""
+    deps = deps if deps is not None else derive_dependencies(ws)
+    by_id = {c.stage_id: c for c in ws.stages}
+    state: dict[str, int] = {}
+    order: list[str] = []
+
+    def visit(sid: str) -> None:
+        if state.get(sid) == 2:
+            return
+        if state.get(sid) == 1:
+            return  # a cycle would already have been rejected by derive_dependencies
+        state[sid] = 1
+        for up in deps.get(sid, ()):
+            visit(up)
+        state[sid] = 2
+        order.append(sid)
+
+    for c in ws.stages:
+        visit(c.stage_id)
+    return [by_id[sid] for sid in order if sid in by_id]
+
+
+def _assert_acyclic(deps: dict[str, list[str]]) -> None:
+    """Raise WorkspaceError if the stage-id dependency graph has a cycle."""
     state: dict[str, int] = {}  # 0=unseen,1=visiting,2=done
 
     def visit(node: str) -> None:
         if state.get(node) == 2:
             return
         if state.get(node) == 1:
-            raise WorkspaceError(f"dependency cycle through task {node}")
+            raise WorkspaceError(f"dependency cycle through stage {node}")
         state[node] = 1
-        for dep in graph.get(node, ()):
+        for dep in deps.get(node, ()):
             visit(dep)
         state[node] = 2
 
-    for t in tasks:
-        visit(t.id)
+    for node in deps:
+        visit(node)

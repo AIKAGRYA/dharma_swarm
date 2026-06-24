@@ -41,6 +41,28 @@ def test_write_bundle_emits_required_type_and_reserved_files(tmp_path):
     assert "## 2026-06-24" in (root / "log.md").read_text()
 
 
+def test_write_bundle_rejects_escaping_or_absolute_paths(tmp_path):
+    import pytest
+
+    with pytest.raises(ValueError):
+        write_bundle([OKFConcept(rel_path="../escape.md", type="x")], tmp_path / "b")
+    with pytest.raises(ValueError):
+        write_bundle([OKFConcept(rel_path="/etc/passwd", type="x")], tmp_path / "b2")
+
+
+def test_reexport_removes_stale_concepts(tmp_path):
+    root = tmp_path / "bundle"
+    write_bundle(_sample(), root, today="2026-06-24")  # Alpha + Beta
+    assert (root / "objects" / "Alpha.md").is_file()
+    # Re-export with Beta renamed away -> Alpha must not be resurrected.
+    write_bundle(
+        [OKFConcept(rel_path="objects/Beta.md", type="identifier", title="Beta")],
+        root, today="2026-06-25",
+    )
+    assert not (root / "objects" / "Alpha.md").exists()
+    assert {c.rel_path for c in read_bundle(root)} == {"objects/Beta.md"}
+
+
 def test_roundtrip_preserves_identity_and_type(tmp_path):
     root = write_bundle(_sample(), tmp_path / "bundle", today="2026-06-24")
     back = {c.rel_path: c for c in read_bundle(root)}
