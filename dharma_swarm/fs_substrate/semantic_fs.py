@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from dharma_swarm.memory_kernel.atoms import MemoryAtomType, MemoryQuery
 

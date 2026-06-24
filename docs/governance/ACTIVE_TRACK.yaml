@@ -1034,12 +1034,13 @@ active_tracks:
     owned_surfaces:
       - docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
       - docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md
-      - docs/ontology/ONTOLOGY_PROPOSAL_LOG.md
+      - docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md
       - dharma_swarm/fs_substrate/**
       - tests/test_stage_contracts.py
       - tests/test_okf_projection.py
       - tests/test_semantic_fs.py
       - tests/test_organizer.py
+      - tests/test_fs_substrate_e2e.py
     moves_vital_signs:
       - context_efficiency
       - tool_coverage
@@ -1136,6 +1137,11 @@ active_tracks:
       - id: organizer_test_passes
         kind: test_passes
         test: "tests/test_organizer.py"
+      # --- The "honestly flows" bar: all four slices against REAL owners, not fakes
+      # (real MemoryKernel, real EvidenceReceipt, real HandoffProtocol, real manifest). ---
+      - id: fs_substrate_e2e_passes
+        kind: test_passes
+        test: "tests/test_fs_substrate_e2e.py"
 
     non_goals:
       - Do not create a new daemon, database, vector store, event log, or truth store.

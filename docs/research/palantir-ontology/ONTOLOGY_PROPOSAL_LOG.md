@@ -1,7 +1,10 @@
 # Semantic Ontology — Proposal / Observation Log
 
 **Status:** running observation log (NOT authority) · **Opened:** 2026-06-24 · **Keeper:** rolling (any repo-aware agent appends)
-**Lives in:** `docs/ontology/` — beside the owners it feeds (moved here 2026-06-24 from docs/research/).
+**Lives in:** `docs/research/palantir-ontology/` — the ontology *proposal/grounding* zone,
+beside its ancestor `PROPOSED_VOCABULARY.md`. (Proposals live here; *ratified owners* live
+in `docs/ontology/`. The docops canonical guard enforces that split — this file projects,
+it does not rule, so it belongs with the proposals.)
 
 **The ontology landscape (so a newcomer can orient):**
 - `dharma_swarm/ontology.py` — the **typed-object registry** (Palantir-style: `ObjectType`=schema,

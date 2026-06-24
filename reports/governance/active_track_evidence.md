@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-24T09:04:03+00:00 (schema v2)
+Generated: 2026-06-24T09:28:44+00:00 (schema v2)
 Active tracks: **9** (warn 5, max 10) — shippable 5
 
 ## Spine coverage
@@ -29,7 +29,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
   - ✓ `correlation_spine_manifest_still_declared` (file_contains) — pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml
   - ✓ `evidence_receipt_still_defined` (file_contains) — pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py
   - ✓ `runtime_receipt_still_defined` (file_contains) — pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py
-  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.79s
+  - ✓ `operator_core_contracts_pass` (test_passes) — pytest tests/test_operator_core_contracts.py: PASS — 7 passed in 0.75s
 
 ## `runtime-truth-nats-2026-06` — 2/2
 
@@ -102,7 +102,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
   - ✓ `nats_e2e_shell_wrapper_exists` (file_exists) — scripts/governance/run_truth_graph_nats_e2e_demo.sh present
   - ✓ `a2a_gate_tests_exist` (file_contains) — pattern "receipt or it didn't happen" found in tests/test_a2a_gate.py
   - ✓ `registry_presence_tests_exist` (file_contains) — pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py
-  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.45s
+  - ✓ `repo_context_projection_passes` (test_passes) — pytest tests/test_truth_graph_repo_context.py: PASS — 1 passed in 0.42s
   - ✓ `truth_graph_projection_on_main` (commit_on_main) — 936d365db is an ancestor of origin/main
 
 ## `composer-holon-spine-longrun-2026-06` — SHIPPABLE
@@ -120,7 +120,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
   - ✓ `holon_bridge_verifier_exists` (file_exists) — tests/test_holon_bridge.py present
   - ✓ `holon_runtime_verifier_exists` (file_exists) — tests/test_holon_runtime.py present
   - ✓ `composer_wake_witness_pending` (file_exists) — reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present
-  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.32s
+  - ✓ `holon_bridge_verifier_passes` (test_passes) — pytest tests/test_holon_bridge.py: PASS — 15 passed, 1 skipped in 0.31s
   - ✓ `holon_substrate_on_main` (commit_on_main) — 9c76b210 is an ancestor of origin/main
 
 ## `provider-routing-consolidation-2026-06` — SHIPPABLE
@@ -164,7 +164,7 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
 ## `filesystem-native-substrate-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['truth-graph-platform-2026-06', 'runtime-truth-spine-adoption-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'docs/ontology/ONTOLOGY_PROPOSAL_LOG.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py', 'tests/test_semantic_fs.py', 'tests/test_organizer.py']
+- owned_surfaces: ['docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md', 'docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md', 'docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md', 'dharma_swarm/fs_substrate/**', 'tests/test_stage_contracts.py', 'tests/test_okf_projection.py', 'tests/test_semantic_fs.py', 'tests/test_organizer.py', 'tests/test_fs_substrate_e2e.py']
 - moves_vital_signs: ['context_efficiency', 'tool_coverage', 'memory_persistence']
 
   - ✓ `dossier_exists` (file_exists) — docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present
@@ -176,11 +176,12 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
   - ✓ `stage_reader_routes_through_spine` (file_contains) — pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py
   - ✓ `stage_contract_test_passes` (test_passes) — pytest tests/test_stage_contracts.py: PASS — 8 passed in 0.32s
   - ✓ `okf_projector_exists` (file_contains) — pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py
-  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 6 passed in 0.35s
+  - ✓ `okf_roundtrip_test_passes` (test_passes) — pytest tests/test_okf_projection.py: PASS — 6 passed in 0.37s
   - ✓ `semantic_fs_facade_exists` (file_contains) — pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py
-  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.34s
+  - ✓ `semantic_fs_test_passes` (test_passes) — pytest tests/test_semantic_fs.py: PASS — 5 passed in 0.33s
   - ✓ `organizer_dry_run_first_exists` (file_contains) — pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py
   - ✓ `organizer_test_passes` (test_passes) — pytest tests/test_organizer.py: PASS — 5 passed in 0.30s
+  - ✓ `fs_substrate_e2e_passes` (test_passes) — pytest tests/test_fs_substrate_e2e.py: PASS — 4 passed in 0.39s
 
 ## Findings
 
@@ -195,4 +196,4 @@ Active tracks: **9** (warn 5, max 10) — shippable 5
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
 - **INFO** `track-shippable:provider-routing-consolidation-2026-06`: [provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
 - **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
-- **INFO** `track-shippable:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] all 11 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.
+- **INFO** `track-shippable:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers — SHIPPABLE (rigorous bar). Close it.

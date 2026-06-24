@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T09:04:03+00:00",
+  "generated_at": "2026-06-24T09:28:44+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,7 +97,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.79s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
     }
   ],
   "portfolio_summary": {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.79s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.45s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.42s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -797,7 +797,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.32s"
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.31s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -1051,12 +1051,13 @@
       "owned_surfaces": [
         "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
         "docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md",
-        "docs/ontology/ONTOLOGY_PROPOSAL_LOG.md",
+        "docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md",
         "dharma_swarm/fs_substrate/**",
         "tests/test_stage_contracts.py",
         "tests/test_okf_projection.py",
         "tests/test_semantic_fs.py",
-        "tests/test_organizer.py"
+        "tests/test_organizer.py",
+        "tests/test_fs_substrate_e2e.py"
       ],
       "moves_vital_signs": [
         "context_efficiency",
@@ -1072,8 +1073,8 @@
       "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 11,
-        "total": 11
+        "passed": 12,
+        "total": 12
       },
       "criteria": [
         {
@@ -1134,7 +1135,7 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.35s"
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.37s"
         },
         {
           "id": "semantic_fs_facade_exists",
@@ -1146,7 +1147,7 @@
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.33s"
         },
         {
           "id": "organizer_dry_run_first_exists",
@@ -1159,6 +1160,12 @@
           "kind": "test_passes",
           "passed": true,
           "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
+        },
+        {
+          "id": "fs_substrate_e2e_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.39s"
         }
       ]
     }
@@ -1233,7 +1240,7 @@
     {
       "severity": "INFO",
       "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 11 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     }
   ]
