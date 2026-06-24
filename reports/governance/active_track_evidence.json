@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T08:56:08+00:00",
+  "generated_at": "2026-06-24T09:04:03+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,7 +97,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.79s"
     }
   ],
   "portfolio_summary": {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.79s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.43s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.45s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -797,7 +797,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.34s"
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.32s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -912,7 +912,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.32s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.34s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -1054,7 +1054,9 @@
         "docs/ontology/ONTOLOGY_PROPOSAL_LOG.md",
         "dharma_swarm/fs_substrate/**",
         "tests/test_stage_contracts.py",
-        "tests/test_okf_projection.py"
+        "tests/test_okf_projection.py",
+        "tests/test_semantic_fs.py",
+        "tests/test_organizer.py"
       ],
       "moves_vital_signs": [
         "context_efficiency",
@@ -1070,8 +1072,8 @@
       "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 7,
-        "total": 7
+        "passed": 11,
+        "total": 11
       },
       "criteria": [
         {
@@ -1120,7 +1122,7 @@
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.31s"
+          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.32s"
         },
         {
           "id": "okf_projector_exists",
@@ -1132,7 +1134,31 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.47s"
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.35s"
+        },
+        {
+          "id": "semantic_fs_facade_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py"
+        },
+        {
+          "id": "semantic_fs_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.34s"
+        },
+        {
+          "id": "organizer_dry_run_first_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py"
+        },
+        {
+          "id": "organizer_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
         }
       ]
     }
@@ -1207,7 +1233,7 @@
     {
       "severity": "INFO",
       "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 7 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "message": "[filesystem-native-substrate-2026-06] all 11 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     }
   ]

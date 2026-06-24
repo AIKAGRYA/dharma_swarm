@@ -121,6 +121,26 @@ the owner:** these should eventually share one type lattice; today a `runtime_ob
 (Semantic Commons) and an `ObjectType` (ontology.py) are cousins that don't know they're
 related. Reconciling them is probably the single highest-leverage ontology cleanup.
 
+## Candidates surfaced 2026-06-24 (filesystem-native-substrate, Slices C + D)
+
+| Concept | Proposed api_name | Lens | Reasoning & intuition | Conf. |
+|---|---|---|---|---|
+| Retrieval hit | `dharma.knowledge.RetrievalHit` | **value (projection)** | `ScoredAtom` — a ranked projection of a MemoryAtom (surface, score, snippet). **Intuition:** ephemeral query result, *not* durable truth — should stay a value object, not an ObjectType. Listed so the line between "atom" (object) and "hit" (transient view of it) stays crisp. | med |
+| LSFS syscalls | (Actions, not objects) | **ActionDef-like** | `keywords_retrieve / semantic_retrieve / group_semantic / integrated_retrieve` are *operations over* the knowledge graph, not nouns. **Intuition:** in the Palantir model these are Action/Function definitions, not ObjectTypes — a reminder that not everything typed is an object; some typed things are verbs. | med |
+| Reorg proposal | `dharma.execution.ReorgProposal` | **ObjectType candidate** | A dry-run plan with identity, a lifecycle (proposed → applied), and review surface. **Intuition (the sharp one):** this *re-instances the existing metabolic loop* — `ReorgProposal` is a `proposal`, the `confirm=True` gate is a `gateDecision`, and `ApplyResult` is an `outcome`. Slice D is the metabolic loop (`proposal → gateDecision → outcome`, per PROPOSED_VOCABULARY.md) specialized for filesystem reorg. That is strong evidence the metabolic-loop triple is the system's *most reusable* shape — worth ratifying as the canonical generic before specializing it. | med-high |
+| Reorg move | (property/link of ReorgProposal) | **value** | One src→dst edge with a reason. **Intuition:** a link/value inside the proposal, not its own object. | low-med |
+| Apply result | `dharma.execution.OutcomeRecord`? | **event object** | Record of what was applied/skipped — an `outcome`/`ActionExec`. **Intuition:** ratify *with* the generic metabolic `outcome`, not as a one-off. | med |
+
+**Cross-cutting (2026-06-24, end of Slices A–D).** Across four slices the same
+triad keeps reappearing: a *declaration* (StageContract, ReorgProposal), a *gated
+dispatch* (invoke_agent / confirm), and an *immutable record* (EvidenceReceipt,
+ApplyResult). This is the `proposal → gateDecision → outcome` metabolic loop the
+2026-06-02 census already named as bedrock. **My strongest single recommendation
+for the owner:** ratify that triple as the canonical generic in `ontology.py`
+first; nearly every substrate object I proposed is a specialization of it. The
+filesystem-native work didn't invent new shapes — it kept rediscovering the
+metabolic loop on disk.
+
 ## How to append (for the next agent)
 
 1. Add a row under a dated heading: concept · proposed api_name (ADR-008 grammar) ·
