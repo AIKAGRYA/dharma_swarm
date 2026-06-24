@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T08:39:17+00:00",
+  "generated_at": "2026-06-24T08:56:08+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,7 +97,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.76s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
     }
   ],
   "portfolio_summary": {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.76s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.44s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.43s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -912,7 +912,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.30s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.32s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -1051,7 +1051,7 @@
       "owned_surfaces": [
         "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
         "docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md",
-        "docs/research/SEMANTIC_ONTOLOGY_PROPOSAL_LOG.md",
+        "docs/ontology/ONTOLOGY_PROPOSAL_LOG.md",
         "dharma_swarm/fs_substrate/**",
         "tests/test_stage_contracts.py",
         "tests/test_okf_projection.py"
@@ -1070,8 +1070,8 @@
       "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 5,
-        "total": 5
+        "passed": 7,
+        "total": 7
       },
       "criteria": [
         {
@@ -1120,7 +1120,19 @@
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.35s"
+          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.31s"
+        },
+        {
+          "id": "okf_projector_exists",
+          "kind": "file_contains",
+          "passed": true,
+          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py"
+        },
+        {
+          "id": "okf_roundtrip_test_passes",
+          "kind": "test_passes",
+          "passed": true,
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.47s"
         }
       ]
     }
@@ -1195,7 +1207,7 @@
     {
       "severity": "INFO",
       "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 5 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "message": "[filesystem-native-substrate-2026-06] all 7 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     }
   ]

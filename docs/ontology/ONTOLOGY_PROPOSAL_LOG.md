@@ -1,9 +1,22 @@
 # Semantic Ontology — Proposal / Observation Log
 
 **Status:** running observation log (NOT authority) · **Opened:** 2026-06-24 · **Keeper:** rolling (any repo-aware agent appends)
-**Defers to:** `dharma_swarm/ontology.py` (the 22 `ObjectType` defs + `create_dharma_registry()`),
-`docs/architecture/ADRs/ADR-008-ontology-api-name-grammar.md` (the grammar), and the
-**Semantic Commons** naming SSOT (`CLAUDE.md` § Behavioral Rules).
+**Lives in:** `docs/ontology/` — beside the owners it feeds (moved here 2026-06-24 from docs/research/).
+
+**The ontology landscape (so a newcomer can orient):**
+- `dharma_swarm/ontology.py` — the **typed-object registry** (Palantir-style: `ObjectType`=schema,
+  `OntologyObj`=instance, `LinkDef`/`Link`=relations, `ActionDef`/`ActionExec`=audited mutations,
+  `OntologyRegistry`=catalog). ~22 domain types; api_names per ADR-008.
+- `docs/ontology/SEMANTIC_COMMONS.md` + `semantic_objects.yaml` + `semantic_aliases.yaml` —
+  the **naming/identity SSOT** (canonical name + owner + aliases per runtime object). The
+  machine-readable index of terms.
+- `docs/architecture/ADRs/ADR-008-ontology-api-name-grammar.md` — the **grammar**
+  (`dharma.<domain>.<TypeName>`, PascalCase, no version suffix).
+- `docs/research/palantir-ontology/vocabulary-census/PROPOSED_VOCABULARY.md` — the **ancestor**
+  of this log (2026-06-02 census: "what each object IS in the life of the system"; awaits the
+  operator's voice). This file is its lightweight, ongoing continuation.
+
+**Defers to all of the above. Mints nothing.** Promotion is operator-only.
 
 > **What this file is.** A place for agents who know the repo to *propose* terms for
 > the semantic ontology — typed objects that have naturally formed in the system —
@@ -90,6 +103,23 @@ Task→RoutingDecision→EvidenceReceipt triple), because the spine-adoption tra
 "one receipt per dispatch" claim would then be ontology-native, not just code-native.
 
 ---
+
+## Candidates surfaced 2026-06-24 (filesystem-native-substrate, Slice B — OKF)
+
+| Concept | Proposed api_name | Lens | Reasoning & intuition | Conf. |
+|---|---|---|---|---|
+| OKF concept | `dharma.knowledge.OKFConcept` | **ObjectType candidate** | One markdown file in a portable bundle; its path IS its identity; carries a required `type`. **Intuition:** this is the *interchange shadow* of an ontology object — the same noun, serialized for export/import. Worth ratifying because it's the boundary type between our ontology and the outside world (Google-OKF compat). It is to `MemoryAtom` what a shipping container is to a warehouse shelf. | med |
+
+**Observation from building the projector.** `project_semantic_objects()` reads
+`docs/ontology/semantic_objects.yaml` and emits one OKF concept per object, using each
+object's **`kind`** (`runtime_object`, `identifier`, `route_binding`,
+`governance_contract`, `key_store`, ...) as the OKF `type`. That means the manifest's
+`kind` field is *already* functioning as a lightweight ObjectType discriminator — the
+system has two parallel type-vocabularies (the `kind:` tags in semantic_objects.yaml and
+the `ObjectType`s in ontology.py) that have not been reconciled. **Intuition / flag for
+the owner:** these should eventually share one type lattice; today a `runtime_object`
+(Semantic Commons) and an `ObjectType` (ontology.py) are cousins that don't know they're
+related. Reconciling them is probably the single highest-leverage ontology cleanup.
 
 ## How to append (for the next agent)
 

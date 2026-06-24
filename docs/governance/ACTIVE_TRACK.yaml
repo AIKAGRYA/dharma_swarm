@@ -1034,7 +1034,7 @@ active_tracks:
     owned_surfaces:
       - docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md
       - docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md
-      - docs/research/SEMANTIC_ONTOLOGY_PROPOSAL_LOG.md
+      - docs/ontology/ONTOLOGY_PROPOSAL_LOG.md
       - dharma_swarm/fs_substrate/**
       - tests/test_stage_contracts.py
       - tests/test_okf_projection.py
@@ -1110,6 +1110,14 @@ active_tracks:
       - id: stage_contract_test_passes
         kind: test_passes
         test: "tests/test_stage_contracts.py"
+      # --- Slice B (OKF projector) — the outward/interchange face. ---
+      - id: okf_projector_exists
+        kind: file_contains
+        file: dharma_swarm/fs_substrate/okf.py
+        pattern: "def project_semantic_objects"
+      - id: okf_roundtrip_test_passes
+        kind: test_passes
+        test: "tests/test_okf_projection.py"
 
     non_goals:
       - Do not create a new daemon, database, vector store, event log, or truth store.
@@ -1130,7 +1138,7 @@ active_tracks:
         kind: code
         blocker: false
       - id: 3
-        what: "Slice B: OKF projector — export a MemoryKernel surface (or skills/) to a portable OKF bundle (required `type`, index.md/log.md, links from edges); import an OKF bundle as a tolerant read-only surface. The outward/Arjuna licence."
+        what: "SHIPPED (2026-06-24): Slice B — OKF projector (dharma_swarm/fs_substrate/okf.py). write_bundle/read_bundle (tolerant consumer) + project_semantic_objects() projects docs/ontology/semantic_objects.yaml to a portable OKF bundle (required `type` from each object's kind, index.md/log.md, cross-links). 13 ontology objects round-trip. tests/test_okf_projection.py: 6 passed. The outward/Arjuna licence: the knowledge graph is now portable."
         kind: code
         blocker: false
       - id: 4
