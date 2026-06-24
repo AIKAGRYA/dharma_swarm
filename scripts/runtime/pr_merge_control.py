@@ -894,13 +894,31 @@ def _normalize_login(login: str) -> str:
 
 
 def fetch_pr_reviews(pr_number: int) -> list[dict[str, Any]]:
-    """Native GitHub reviews on a PR (author login + state + submittedAt)."""
-    data = gh_json(["pr", "view", str(pr_number), "--json", "reviews"])
-    if isinstance(data, dict):
-        reviews = data.get("reviews")
-        if isinstance(reviews, list):
-            return reviews
-    return []
+    """Native GitHub reviews on a PR via the REST API.
+
+    Uses the REST endpoint (not `gh pr view --json reviews`) because it returns
+    ``commit_id`` — the exact SHA each review saw — which the bridge needs to
+    reject reviews of stale revisions.
+    """
+    repo = repo_name()
+    data = gh_json(["api", f"repos/{repo}/pulls/{pr_number}/reviews", "--paginate"])
+    return data if isinstance(data, list) else []
+
+
+def _review_login(review: dict[str, Any]) -> str:
+    user = review.get("user") or review.get("author") or {}
+    return _normalize_login(str(user.get("login") or "")) if isinstance(user, dict) else ""
+
+
+def _review_commit(review: dict[str, Any]) -> str:
+    commit = review.get("commit_id") or review.get("commit") or ""
+    if isinstance(commit, dict):
+        commit = commit.get("oid") or commit.get("sha") or ""
+    return str(commit)
+
+
+def _review_submitted(review: dict[str, Any]) -> str:
+    return str(review.get("submitted_at") or review.get("submittedAt") or "")
 
 
 def _github_review_verdict(state: str) -> str:
@@ -917,24 +935,31 @@ def _github_review_verdict(state: str) -> str:
     return "UNKNOWN"
 
 
-def github_review_status(agent: str, reviews: list[dict[str, Any]]) -> dict[str, Any] | None:
+def github_review_status(
+    agent: str, reviews: list[dict[str, Any]], head_sha: str = ""
+) -> dict[str, Any] | None:
     """Status dict synthesized from the latest trusted GitHub review for *agent*,
-    shaped like load_agent_review_status(). None if no trusted, non-dismissed review."""
+    shaped like load_agent_review_status(). None if no trusted, non-dismissed review.
+
+    When *head_sha* is given, only a review that actually saw THAT head counts —
+    a review of an earlier revision must not satisfy the gate after new commits
+    are pushed (the bridged reviewer has not seen the new changes)."""
     trusted = TRUSTED_REVIEW_LOGINS.get(agent)
     if not trusted:
         return None
     matched = [
         review
         for review in reviews
-        if _normalize_login(str((review.get("author") or {}).get("login") or "")) in trusted
+        if _review_login(review) in trusted
         and str(review.get("state") or "").upper() != "DISMISSED"
+        and (not head_sha or _review_commit(review) == head_sha)
     ]
     if not matched:
         return None
-    matched.sort(key=lambda r: str(r.get("submittedAt") or ""))
+    matched.sort(key=_review_submitted)
     latest = matched[-1]
     state = str(latest.get("state") or "")
-    login = _normalize_login(str((latest.get("author") or {}).get("login") or ""))
+    login = _review_login(latest)
     return {
         "agent": agent,
         "output": f"<github-review by {login} state={state or 'NONE'}>",
@@ -952,6 +977,7 @@ def github_review_status(agent: str, reviews: list[dict[str, Any]]) -> dict[str,
         "source": "github_review",
         "github_login": login,
         "github_state": state,
+        "github_commit": _review_commit(latest),
     }
 
 
@@ -962,9 +988,10 @@ def resolve_agent_review_status(
     pr_reviews: list[dict[str, Any]],
     accept_github_reviews: bool,
     human_approved: bool = False,
+    head_sha: str = "",
 ) -> dict[str, Any]:
-    """Local receipt first; if it is absent/blocked and accept_github_reviews is
-    on, fall back to a trusted native GitHub review as the receipt SOURCE."""
+    """Local receipt first; if it is absent and accept_github_reviews is on, fall
+    back to a trusted native GitHub review OF THE CURRENT HEAD as the receipt SOURCE."""
     local = load_agent_review_status(out_dir, agent)
     local.setdefault("source", "local")
     if not accept_github_reviews:
@@ -975,10 +1002,10 @@ def resolve_agent_review_status(
     # bridge is an additive SOURCE for a missing receipt, not a bypass.
     if local.get("output_present") or local.get("receipt_present"):
         return local
-    gh = github_review_status(agent, pr_reviews)
+    gh = github_review_status(agent, pr_reviews, head_sha=head_sha)
     if gh is not None and not agent_review_blockers(gh, human_approved=human_approved):
         return gh
-    return local  # no trusted GitHub review either; keep local so its blockers surface
+    return local  # no trusted GitHub review of this head; keep local so its blockers surface
 
 
 def run_agent_process(
@@ -1159,6 +1186,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
         )
         required_reviewers = []
     accept_github_reviews = getattr(args, "accept_github_reviews", False)
+    head_sha = current_pr.get("headRefOid") or ""
     pr_reviews = fetch_pr_reviews(args.pr) if accept_github_reviews and required_reviewers else []
     review_statuses = {
         agent: resolve_agent_review_status(
@@ -1167,6 +1195,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
             human_approved=args.human_approved,
+            head_sha=head_sha,
         )
         for agent in required_reviewers
     }
@@ -1177,6 +1206,7 @@ def build_gate(args: argparse.Namespace) -> dict[str, Any]:
             pr_reviews=pr_reviews,
             accept_github_reviews=accept_github_reviews,
             human_approved=args.human_approved,
+            head_sha=head_sha,
         )
         for agent in backup_reviewer_agents(args)
     }
@@ -2254,6 +2284,7 @@ def cmd_fanout(args: argparse.Namespace) -> int:
             backup_reviewers=args.backup_reviewers,
             backup_reviewer_reason=args.backup_reviewer_reason,
             required_reviewers=args.required_reviewers,
+            accept_github_reviews=getattr(args, "accept_github_reviews", False),
             ci_truth_contract=args.ci_truth_contract,
         )
         gate = build_gate(gate_args)

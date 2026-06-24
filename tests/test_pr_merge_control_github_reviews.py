@@ -20,8 +20,9 @@ from scripts.runtime.pr_merge_control import (
 )
 
 
-def _review(login: str, state: str, when: str = "2026-06-24T00:00:00Z") -> dict:
-    return {"author": {"login": login}, "state": state, "submittedAt": when}
+def _review(login: str, state: str, when: str = "2026-06-24T00:00:00Z", commit: str = "") -> dict:
+    # REST review shape: user.login / state / submitted_at / commit_id.
+    return {"user": {"login": login}, "state": state, "submitted_at": when, "commit_id": commit}
 
 
 def test_codex_commented_review_counts_as_clean_receipt():
@@ -65,6 +66,20 @@ def test_latest_review_wins():
 
 def test_dismissed_review_is_ignored():
     assert github_review_status("codex", [_review("chatgpt-codex-connector[bot]", "DISMISSED")]) is None
+
+
+def test_review_of_stale_head_is_rejected():
+    # A trusted review of an OLD commit must not satisfy the gate for a new head.
+    reviews = [_review("chatgpt-codex-connector[bot]", "APPROVED", commit="oldsha")]
+    assert github_review_status("codex", reviews, head_sha="newsha") is None
+
+
+def test_review_of_current_head_is_accepted():
+    reviews = [_review("chatgpt-codex-connector[bot]", "APPROVED", commit="headsha")]
+    status = github_review_status("codex", reviews, head_sha="headsha")
+    assert status is not None
+    assert status["github_commit"] == "headsha"
+    assert agent_review_blockers(status, human_approved=False) == []
 
 
 def test_untrusted_login_is_never_a_receipt():
