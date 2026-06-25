@@ -14,6 +14,7 @@ substrate-nativeness as a side effect instead of leaking it.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dharma_swarm.fs_substrate.stage_contracts import (
@@ -27,6 +28,8 @@ from dharma_swarm.handoff import Artifact, ArtifactType, HandoffProtocol
 from dharma_swarm.spine.invoke import AgentInvoker, invoke_agent
 from dharma_swarm.spine.receipt import EvidenceReceipt
 from dharma_swarm.spine.routing import RoutingDecision
+
+logger = logging.getLogger(__name__)
 
 # The 2k-8k token band where models perform best (ICM). Applied as a char cap
 # on the bounded-Inputs context. Memory-derived inputs (a later refinement)
@@ -125,8 +128,8 @@ def _resolve_agent(role: str | None) -> tuple[str, str, str, str]:
         skill = SkillRegistry().get(role)
         if skill is not None:
             return (skill.name, skill.provider, skill.model, getattr(skill, "description", ""))
-    except Exception:
-        pass
+    except Exception as exc:  # skills/ is an optional convergence dep — fall back, but record why
+        logger.debug("skill resolution for role %r failed; using bare role: %s", role, exc)
     return (role, "", "", "")
 
 
