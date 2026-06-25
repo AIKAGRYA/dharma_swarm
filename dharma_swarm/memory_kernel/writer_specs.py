@@ -514,7 +514,7 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             WriteMode.APPEND_ONLY,
             WriterClassification.REVIEW_REQUIRED,
             RiskLevel.MEDIUM,
-            "Pudgala Forge VerifiedMachineReceipt append path; hash-chained witness evidence, not canon.",
+            "Pudgala Autopoiesis Protostar VerifiedMachineReceipt append path; hash-chained witness evidence, not canon.",
         ),
         MemoryWriterSpec(
             "telos_gates.coupling_feedback",
