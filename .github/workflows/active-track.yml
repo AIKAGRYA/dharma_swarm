@@ -55,13 +55,16 @@ jobs:
           python3 -m pip install pyyaml
 
       - name: Evaluate ACTIVE_TRACK.yaml against tree
-        continue-on-error: ${{ github.event_name != 'schedule' }}
         run: |
           set -euo pipefail
           mkdir -p reports/governance
           # TTL staleness blocks only on the weekly freshness sweep (schedule),
           # never on per-PR runs — a stale unrelated track must not block every
-          # open PR. Structural/graph/regression findings still block on PRs.
+          # open PR (the checker emits TTL as WARN, exit 0, on the per-PR path).
+          # Structural / regression / false-shippable-claim findings are ERROR
+          # and now BLOCK on PRs too (this step is no longer continue-on-error):
+          # a track that declares status: shippable without rigorous evidence is
+          # a false-closure claim and must fail CI, not merely inform.
           if [ "${{ github.event_name }}" = "schedule" ]; then
             python3 scripts/governance/check_track_status.py --enforce-ttl
           else
