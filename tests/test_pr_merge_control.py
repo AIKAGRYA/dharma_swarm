@@ -10,6 +10,11 @@ from scripts.runtime import pr_merge_control as prc
 def _ci_required_success_rollup():
     return [
         {"name": "DocOps integrity gate", "status": "COMPLETED", "conclusion": "SUCCESS"},
+        {
+            "name": "Quality ratchet - repo-wide fitness function",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+        },
         {"name": "Coherence Delta PR body", "status": "COMPLETED", "conclusion": "SUCCESS"},
     ]
 

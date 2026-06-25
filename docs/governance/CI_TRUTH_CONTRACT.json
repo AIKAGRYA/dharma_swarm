@@ -1,6 +1,6 @@
 {
   "schema": "dharma.ci_truth_contract.v1",
-  "version": 1,
+  "version": 2,
   "description": "Machine-readable CI membrane consumed by local ACI tooling and Merge Master Mike. Required checks block merge when missing, pending, failed, cancelled, timed out, or action-required. Advisory checks are reported with local repro commands but do not block automated merge flow.",
   "required": [
     {
@@ -10,6 +10,17 @@
       "local_command": "make docops-integrity",
       "failure_category": "doc_drift",
       "autofix": "limited"
+    },
+    {
+      "id": "quality_ratchet",
+      "names": [
+        "Quality ratchet - repo-wide fitness function",
+        "Quality ratchet \u2014 whole-tree regression + baseline freshness"
+      ],
+      "owner": "governance",
+      "local_command": "make quality-ratchet-check",
+      "failure_category": "quality_ratchet",
+      "autofix": "forbidden"
     }
   ],
   "advisory": [
