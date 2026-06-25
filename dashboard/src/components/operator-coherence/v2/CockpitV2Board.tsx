@@ -450,12 +450,16 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
                 <th className="px-2 py-2">Track</th>
                 <th className="px-2 py-2">State</th>
                 <th className="px-2 py-2">Readiness</th>
+                <th className="px-2 py-2">Rigor</th>
                 <th className="px-2 py-2">Evidence</th>
                 <th className="px-2 py-2">Next items</th>
               </tr>
             </thead>
             <tbody>
-              {tracks.map((track, index) => (
+              {tracks.map((track, index) => {
+                const rigorous = Boolean(track.has_rigorous_evidence);
+                const capped = Boolean(track.readiness_capped);
+                return (
                 <tr
                   key={`${asText(track.id)}-${index}`}
                   onClick={() => onInspect({ type: "track", title: asText(track.name), subtitle: asText(track.id), status: asText(track.status), raw: track })}
@@ -463,11 +467,18 @@ function TracksMode({ report, onInspect }: { report: OperatorCoherenceReport; on
                 >
                   <td className="max-w-[360px] px-2 py-2 font-semibold text-sumi-200">{asText(track.name)}</td>
                   <td className="px-2 py-2 text-sumi-400">{asText(track.lifecycle)} · {track.stale ? "stale" : asText(track.status)}</td>
-                  <td className="px-2 py-2 font-mono text-sumi-300">{asText(track.readiness)}%</td>
+                  <td className="px-2 py-2 font-mono text-sumi-300">
+                    {asText(track.readiness)}%
+                    {capped ? <span className="ml-1 text-[10px] text-kinpaku">capped</span> : null}
+                  </td>
+                  <td className={`px-2 py-2 font-medium ${rigorous ? "text-emerald-400" : "text-kinpaku"}`}>
+                    {rigorous ? "rigorous" : asText(track.readiness_basis) || "existence-only"}
+                  </td>
                   <td className="px-2 py-2 text-sumi-400">{track.evidence_present ? "present" : "missing"}</td>
                   <td className="max-w-[420px] truncate px-2 py-2 text-sumi-500">{asText(track.next_items)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

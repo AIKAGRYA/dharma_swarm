@@ -63,6 +63,7 @@ def test_onboard_renders_required_sections():
         "DHARMA SWARM — AGENT ONBOARDING",
         "ACTIVE PORTFOLIO",
         "PARALLEL WORK LANES",
+        "SWARM BULLETINS",
         "LIVE OPS SNAPSHOT",
         "LIVE OPS COCKPIT",
         "SURFACE MANIFEST HEALTH",
@@ -167,6 +168,56 @@ def test_broken_register_parser_missing_file(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "BROKEN_REGISTER", tmp_path / "does_not_exist.md")
     info = mod._parse_broken_register()
     assert info == {"present": False}
+
+
+def test_swarm_bulletins_parse_cleanup_receipts(tmp_path, monkeypatch):
+    mod = _load_module()
+    receipt = tmp_path / "reports/governance/cleanup_packet/DELETION_READINESS_RECHECK.md"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(
+        """# Recheck
+
+## Deletion Execution Receipt - 2026-06-25T120918JST
+
+Only approved commands were run.
+
+```bash
+git -C /Users/dhyana/dharma_swarm worktree prune --verbose
+git -C /Users/dhyana/dharma_swarm worktree remove /tmp/a
+```
+
+### Removed Paths
+
+- `/tmp/stale` stale registration was pruned.
+- `/tmp/a` was removed.
+
+### Protected State Re-Verified
+
+Protected paths still present.
+
+Stashes remain untouched:
+
+### Refused Or Skipped Commands
+
+- Tier C `rm` commands were not run; exact-path approval is required first.
+
+## Next Section
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+
+    rows = mod._collect_swarm_bulletins()
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["kind"] == "cleanup_deletion_receipt"
+    assert row["observed_at"] == "2026-06-25T120918JST"
+    assert row["removed_path_count"] == 2
+    assert row["approved_worktree_command_count"] == 2
+    assert row["tier_c_pending_approval"] is True
+    assert row["protected_paths_reverified"] is True
+    assert row["stashes_untouched"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +346,14 @@ def test_json_mode_emits_valid_receipt(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["schema"] == "dharma_swarm.onboard_receipt.v1"
     assert payload["authority"] == "projection_only"
-    for key in ("repo", "work_lanes", "portfolio", "next_items", "broken_register"):
+    for key in (
+        "repo",
+        "work_lanes",
+        "portfolio",
+        "next_items",
+        "swarm_bulletins",
+        "broken_register",
+    ):
         assert key in payload, f"receipt missing key: {key}"
     # The same payload must land on disk for fleet consumers.
     receipt = tmp_path / "onboard_receipt.json"
