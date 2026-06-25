@@ -270,6 +270,11 @@ active_tracks:
       transport contact modules and the master spec; it does not touch the
       operator_core read models the reconciliation lane owns.
 
+      Closure for this track means offline substrate wiring is test-backed and
+      governance-visible. It is not a production live-readiness claim. Live ACL
+      proof, cross-host broker proof, and semantic liveness/domain-receipt proof
+      remain separate operator-runtime gates.
+
     prerequisites:
       - id: nats_master_spec_exists
         kind: file_exists
@@ -283,11 +288,20 @@ active_tracks:
         kind: file_contains
         file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
         pattern: "NATS"
+      # Rigorous evidence: NATS transport behavior must pass, not merely exist.
+      # This keeps runtime-truth-nats from closing on file/string presence alone.
+      - id: nats_transport_tests_pass
+        kind: test_passes
+        test: tests/test_nats_transport.py
+      - id: nats_substrate_contract_test_pass
+        kind: test_passes
+        test: tests/test_nats_substrate_contract.py
 
     non_goals:
       - Do not introduce Redis or gRPC as part of this track.
       - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
       - Do not add a parallel spine-check CI workflow.
+      - Do not claim production live readiness without live ACL, cross-host broker, and semantic liveness proof.
 
     next_items:
       - id: 1
