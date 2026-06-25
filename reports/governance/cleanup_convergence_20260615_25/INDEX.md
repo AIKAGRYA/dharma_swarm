@@ -3,7 +3,8 @@
 Generated: 2026-06-25 JST
 Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
 Branch: `cleanup/convergence-20260615-25`
-Baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
+Initial baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
+Deletion-recheck baseline: `origin/main` at `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`
 
 ## Purpose
 
@@ -17,10 +18,11 @@ operator surface, archive bucket, or explicit decision bucket.
 
 | Source | Current evidence |
 |---|---|
-| User task | `/Users/dhyana/.codex/attachments/809c3c2d-7eb1-4001-ac3d-ce7a7384917c/pasted-text-1.txt` |
-| Fresh baseline | `git fetch origin main` completed; `origin/main` is `a46522040cc6d4ec80cf9f1466a81c7dac33c616` |
+| User task | `/Users/dhyana/.codex/attachments/27a5c7a8-1524-486a-8c5a-e86a8bc6bbac/pasted-text-1.txt` |
+| Initial baseline | `git fetch origin main` completed; `origin/main` was `a46522040cc6d4ec80cf9f1466a81c7dac33c616` for the first packet pass |
+| Deletion-recheck baseline | `origin/main` was refreshed to `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3` before deletion readiness verdicts |
 | Onboarding | `make onboard` ran in `/Users/dhyana/dharma_swarm` and in this convergence worktree |
-| Worktree list | `git -C /Users/dhyana/dharma_swarm worktree list --porcelain` now shows 19 registered worktrees including this convergence worktree |
+| Worktree list | Initial packet inventory captured 19 registered worktrees; deletion recheck and current pass show 20 registered worktrees including `/Users/dhyana/dharma_swarm_wt/render-on-demand` |
 | Preservation root | `/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST` exists |
 | Backup root | `/Users/dhyana/dharma_recover_backups` exists |
 | Backup receipt | `receipts/BACKUP_RECEIPT.md` says bundles verified, 686 stable files checksum-verified, and archive copied to `agni` |
@@ -30,6 +32,7 @@ operator surface, archive bucket, or explicit decision bucket.
 | Sprawl memory | `/Users/dhyana/.claude/projects/-Users-dhyana/memory/local-tree-sprawl-backup-2026-06-24.md` records corrected keeper/junk verdicts |
 | PR truth checked | GitHub connector checked PR #648, #674, and #685 |
 | Deletion readiness recheck | `DELETION_READINESS_RECHECK.md` refreshed current deletion candidates through three read-only passes; no deletion was performed |
+| Publication status | Draft PR #688 is open and mergeable; PR checks passed after push; no cleanup deletion was performed |
 
 ## Deliverables
 
@@ -57,8 +60,8 @@ lanes and a lot of preserved-but-not-promoted output:
   June 24 files are generated run output and should not be promoted.
 - The old independent clone is archive-only unless the operator explicitly
   revives the March autonomy line.
-- Anti-slop promotion membrane is a compact governance packet already open as
-  draft PR #685.
+- Anti-slop promotion membrane has landed through PR #685 and is present on
+  current `origin/main`.
 - The clean cockpit extraction and PR #674 repair branches are already on main
   or superseded by merged PRs.
 

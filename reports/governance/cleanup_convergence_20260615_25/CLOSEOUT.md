@@ -3,7 +3,8 @@
 Generated: 2026-06-25 JST
 Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
 Branch: `cleanup/convergence-20260615-25`
-Baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
+Initial baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
+Deletion-recheck baseline: `origin/main` at `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`
 
 ## Status
 
@@ -41,8 +42,8 @@ Files added in this convergence worktree:
 
 ## Verification Performed
 
-- `git -C /Users/dhyana/dharma_swarm fetch origin main` completed; clean
-  baseline is `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`.
+- `git -C /Users/dhyana/dharma_swarm fetch origin main` completed; the first
+  packet pass used `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`.
 - `make -C /Users/dhyana/dharma_swarm onboard` ran for the dirty primary
   checkout.
 - `make -C /Users/dhyana/ds_cleanup_convergence_20260625 onboard` ran for this
@@ -94,10 +95,30 @@ Additional verification for the recheck:
 - `LC_ALL=C grep -n '[^ -~]' DELETION_READINESS_RECHECK.md` produced no output.
 - `file DELETION_READINESS_RECHECK.md` reports ASCII text.
 
-## Final Dirty Status After Local Commit
+## Publication And Current State
+
+- Draft PR #688 is open: `https://github.com/AmitabhainArunachala/dharma_swarm/pull/688`.
+- PR #688 targets `main` from `cleanup/convergence-20260615-25`.
+- PR #688 is mergeable and all GitHub checks passed after publication,
+  including `pytest (3.11)`, `pytest (3.12)`, CodeQL, Semgrep, gitleaks,
+  manifest, docops, hygiene, and governance gates.
+- Current `origin/main` is `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`.
+- The current worktree registry shows 20 registered worktrees. The
+  `/Users/dhyana/dharma_swarm_wt/render-on-demand` worktree is clean,
+  equals current `origin/main`, and is explicitly `DO_NOT_REMOVE`.
+- PR #685 has merged; anti-slop promotion membrane is no longer an open draft
+  cleanup lane and should not be duplicated in this packet.
+- The cleanup branch is clean against its pushed upstream before this metadata
+  refresh commit.
+- A normal commit attempt for this metadata refresh reran the local hooks and
+  hit the same local environment failures already recorded above:
+  `dharma_swarm` import/dataclass incompatibility and missing PyYAML. Content,
+  doc, gitleaks, whitespace, EOF, merge-conflict, and large-file checks passed.
+
+## Final Branch Status Before Metadata Refresh
 
 ```text
-## cleanup/convergence-20260615-25...origin/main [ahead 1]
+## cleanup/convergence-20260615-25...origin/cleanup/convergence-20260615-25
 ```
 
 ## Blockers And Risks
@@ -114,6 +135,9 @@ Additional verification for the recheck:
   docs-only content checks passed. This packet was committed after recording
   that hook failure.
 - No deletion should be performed from this packet alone.
+- The local GitHub status connector reports legacy commit statuses only for
+  PR #688; GitHub Actions check-suite truth was verified through the PR check
+  rollup after publication.
 
 ## Deletion Candidates Requiring Explicit Approval
 
@@ -135,7 +159,8 @@ Additional verification for the recheck:
    terminal branch under large-diff exception.
 4. `forge-v1/tokenbroker-scoreboard`: create/admit a Forge evaluation track and
    rebase the clean branch.
-5. `governance/anti-slop-promotion-membrane-20260625`: continue draft PR #685.
+5. `governance/anti-slop-promotion-membrane-20260625`: landed through PR #685;
+   do not duplicate it here.
 6. `scheduler-federation-adr`: operator-ratify and port ADR-010 as a governance
    proposal.
 7. `loop-closure/supplychain-thin-loop`: inspect local commit `11de04fb7` and

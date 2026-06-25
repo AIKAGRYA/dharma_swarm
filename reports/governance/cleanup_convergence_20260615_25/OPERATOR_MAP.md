@@ -12,7 +12,7 @@
 - Helm terminal work is real operator-surface work with a dated closeout receipt.
 - Forge v1/tokenbroker is real and test-backed according to the DGM report, but
   it is a separate local branch and needs a proposed track or explicit PR lane.
-- Anti-slop promotion membrane is real and already has draft PR #685.
+- Anti-slop promotion membrane is real and has landed through PR #685.
 - The cockpit extract branch and PR #674 repair branch are already represented
   on current `origin/main`.
 
@@ -47,7 +47,7 @@
 5. Scheduler federation ADR: port ADR-010 only after operator ratification.
 6. Supply-chain thin-loop: inspect commit `11de04fb7` separately from merged
    PR #648 and from the dirty governance overlay.
-7. Anti-slop membrane: continue draft PR #685 rather than duplicating it here.
+7. Anti-slop membrane: PR #685 is merged; do not duplicate it here.
 
 ## What Should Be Archived?
 
