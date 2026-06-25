@@ -59,14 +59,42 @@ RUBRIC: dict[int, str] = {
 }
 
 
-KIND_STRENGTH: dict[str, int] = {
+EVIDENCE_GRADES_PATH = Path(__file__).resolve().parents[2] / "docs/governance/evidence_grades.yaml"
+
+# Fail-safe copy used only if the single config is missing or malformed. The
+# authoritative source is docs/governance/evidence_grades.yaml::kind_maturity;
+# the invariant test pins this projection equal to that source.
+_FALLBACK_KIND_STRENGTH: dict[str, int] = {
     "file_exists": 0,
     "file_contains": 1,
     "pr_merged": 2,
     "commit_on_main": 2,
     "test_passes": 3,
     "receipt_valid": 5,
+    "mutation_score_gte": 4,
 }
+
+
+def _load_kind_strength() -> dict[str, int]:
+    """Read claim-maturity strengths from the single governance config."""
+    try:
+        raw = load_active_track(EVIDENCE_GRADES_PATH)
+        kind_maturity = raw.get("kind_maturity") if isinstance(raw, dict) else None
+        if isinstance(kind_maturity, dict) and kind_maturity:
+            strengths: dict[str, int] = {}
+            for key, value in kind_maturity.items():
+                try:
+                    strengths[str(key)] = int(value)
+                except (TypeError, ValueError):
+                    continue
+            if strengths:
+                return strengths
+    except (OSError, ValueError):
+        pass
+    return dict(_FALLBACK_KIND_STRENGTH)
+
+
+KIND_STRENGTH: dict[str, int] = _load_kind_strength()
 
 
 ADVERSARIAL_CUE = re.compile(

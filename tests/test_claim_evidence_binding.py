@@ -87,6 +87,28 @@ def test_resolve_enforcement_precedence() -> None:
     assert binding_stage() == "advisory"
 
 
+def test_single_owner_no_second_strength_ladder() -> None:
+    """The acceptance membrane must read kind strengths from the single config."""
+    from check_track_status import load_active_track  # type: ignore  # noqa: E402
+    import track_acceptance_strength_report as tas  # type: ignore  # noqa: E402
+
+    raw = load_active_track(REPO_ROOT / "docs/governance/evidence_grades.yaml")
+    kind_maturity = raw.get("kind_maturity")
+    assert isinstance(kind_maturity, dict) and kind_maturity
+    for kind, strength in tas.KIND_STRENGTH.items():
+        assert int(kind_maturity.get(kind, -999)) == strength, (
+            f"track_acceptance strength for {kind}={strength} drifted from "
+            f"evidence_grades.yaml kind_maturity={kind_maturity.get(kind)}"
+        )
+    assert "mutation_score_gte" in tas.KIND_STRENGTH
+
+    cli_src = (REPO_ROOT / "scripts/governance/check_claim_evidence_binding.py").read_text(
+        encoding="utf-8"
+    )
+    assert "from check_track_status import" in cli_src and "evaluate_track" in cli_src
+    assert "def evaluate_track" not in cli_src, "the thin CLI must not re-implement the evaluator"
+
+
 # --------------------------------------------------------------------------- #
 # Grade ladder + graded conjunct                                              #
 # --------------------------------------------------------------------------- #
