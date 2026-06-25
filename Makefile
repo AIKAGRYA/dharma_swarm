@@ -405,6 +405,9 @@ orient:
 status:
 	$(PYTHON) scripts/governance/repo_status.py
 
+track-strength:
+	$(VENV_PYTHON) scripts/governance/track_acceptance_strength_report.py
+
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
 # ============================================================================
