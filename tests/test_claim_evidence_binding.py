@@ -67,6 +67,25 @@ def test_canonical_digest_byte_identical_across_three_owners() -> None:
         ), f"stable_digest drift across owners for {payload!r}"
 
 
+def test_resolve_enforcement_precedence() -> None:
+    """Stage-driven ratchet: --warn-only forces advisory; --enforce forces
+    blocking; otherwise the AI-M1 hygiene stage drives it (block iff 'enforced').
+    This is what lets `promote.py AI-M1 --stage enforced` flip the gate's teeth on
+    without a code change, and keeps it advisory (safe in governance-all) today."""
+    from check_claim_evidence_binding import (  # type: ignore  # noqa: E402
+        binding_stage,
+        resolve_enforcement,
+    )
+
+    assert resolve_enforcement(enforce_flag=False, warn_only_flag=False, stage="advisory") is False
+    assert resolve_enforcement(enforce_flag=False, warn_only_flag=False, stage="enforced") is True
+    assert resolve_enforcement(enforce_flag=True, warn_only_flag=False, stage="advisory") is True
+    # --warn-only wins over everything (stays advisory even at the enforced stage):
+    assert resolve_enforcement(enforce_flag=True, warn_only_flag=True, stage="enforced") is False
+    # the shipped AI-M1 pattern is advisory today, so the bare gate stays advisory:
+    assert binding_stage() == "advisory"
+
+
 # --------------------------------------------------------------------------- #
 # Grade ladder + graded conjunct                                              #
 # --------------------------------------------------------------------------- #

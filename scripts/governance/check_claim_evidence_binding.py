@@ -9,13 +9,18 @@ Pudgala Forge anti-slop bar:
 
     A claim ships only when its strongest evidence meets the required grade.
 
-Advisory by default (--warn-only) so it can be wired into governance-all without
-gating merges while the ladder is socialised. Promotion to a hard gate is an
-operator decision (raise the floor / flip --warn-only off), never automatic.
+Enforcement is STAGE-DRIVEN: by default the gate blocks iff the AI-M1 hygiene
+pattern is at stage `enforced` (so an operator promotes advisory->enforced via
+scripts/governance/hygiene/promote.py, never the gate auto-escalating). The
+flags override the stage: `--warn-only` forces advisory (exit 0), `--enforce`
+forces blocking. While AI-M1 is `advisory` the bare gate is advisory, which is
+why it is safe to wire into governance-all today.
 """
 from __future__ import annotations
 
 import argparse
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,6 +34,54 @@ from check_track_status import (  # noqa: E402
     normalize_portfolio,
 )
 
+# The hygiene pattern whose lifecycle stage drives enforcement (observed ->
+# measured -> advisory -> enforced -> resolved). Read fail-safe (see binding_stage).
+BINDING_PATTERN_PATH = (
+    Path(__file__).resolve().parents[2] / "docs/governance/hygiene/patterns/AI-M1.yaml"
+)
+
+
+def binding_stage(path: Path | None = None) -> str:
+    """Read the AI-M1 hygiene pattern's lifecycle stage. FAIL-SAFE: any problem
+    (missing/malformed file) returns 'advisory' so the gate never accidentally
+    blocks on bad config — escalation must be a deliberate, readable promotion."""
+    target = path or BINDING_PATTERN_PATH
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+        return (str(data.get("stage", "advisory")).strip().lower() or "advisory")
+    except (OSError, ValueError):
+        return "advisory"
+
+
+def resolve_enforcement(*, enforce_flag: bool, warn_only_flag: bool, stage: str) -> bool:
+    """Return True iff the gate should BLOCK (exit non-zero on any UNDERGRADED
+    track). Precedence: explicit --warn-only wins (advisory), then explicit
+    --enforce (block), else the hygiene stage drives it (block iff 'enforced')."""
+    if warn_only_flag:
+        return False
+    if enforce_flag:
+        return True
+    return stage == "enforced"
+
+
+def _git_context(repo_root: Path) -> tuple[str, bool]:
+    """Best-effort HEAD sha + dirty flag for the machine receipt (INV-1). Never
+    raises — a receipt with empty git context is still valid, just weaker."""
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo_root,
+            capture_output=True, text=True, timeout=10,
+        )
+        status = subprocess.run(
+            ["git", "status", "--porcelain"], cwd=repo_root,
+            capture_output=True, text=True, timeout=10,
+        )
+        git_sha = sha.stdout.strip() if sha.returncode == 0 else ""
+        git_dirty = bool(status.stdout.strip()) if status.returncode == 0 else False
+        return git_sha, git_dirty
+    except (OSError, subprocess.SubprocessError):
+        return "", False
+
 
 def _verdict(r: dict) -> str:
     if r["shippable"]:
@@ -40,24 +93,31 @@ def _verdict(r: dict) -> str:
 
 def run(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--warn-only", action="store_true", default=True,
-                    help="advisory mode (default): always exit 0")
-    ap.add_argument("--enforce", dest="warn_only", action="store_false",
-                    help="exit non-zero if any active track is UNDERGRADED")
+    ap.add_argument("--warn-only", action="store_true",
+                    help="force advisory (exit 0) regardless of hygiene stage")
+    ap.add_argument("--enforce", action="store_true",
+                    help="force blocking (exit non-zero if any track UNDERGRADED)")
     ap.add_argument("--emit-receipt", action="store_true",
                     help="append a VerifiedMachineReceipt of this binding run "
                          "to ~/.dharma/witness/claim_evidence_receipts.jsonl")
     args = ap.parse_args(argv)
 
+    stage = binding_stage()
+    blocking = resolve_enforcement(
+        enforce_flag=args.enforce, warn_only_flag=args.warn_only, stage=stage,
+    )
+
     if not ACTIVE_TRACK_PATH.exists():
         print(f"ERROR: {ACTIVE_TRACK_PATH} not found", file=sys.stderr)
-        return 0 if args.warn_only else 2
+        return 2 if blocking else 0
 
     portfolio = normalize_portfolio(load_active_track(ACTIVE_TRACK_PATH))
     tracks = portfolio["active_tracks"]
     undergraded = 0
 
+    mode = "ENFORCED (blocking)" if blocking else "advisory"
     print("Claim/Evidence binding (graded anti-slop bar)\n" + "=" * 46)
+    print(f"  AI-M1 stage={stage}  mode={mode}")
     for t in tracks:
         if str(t.get("status", "")).upper() not in {"ACTIVE", "SHIPPABLE"}:
             continue
@@ -77,36 +137,44 @@ def run(argv: list[str] | None = None) -> int:
     print(f"{len(tracks)} active track(s); {undergraded} undergraded "
           f"(below required evidence grade).")
 
-    exit_code = 0 if args.warn_only else (1 if undergraded else 0)
+    exit_code = (1 if undergraded else 0) if blocking else 0
 
     if args.emit_receipt:
-        _emit_receipt(undergraded=undergraded, exit_code=exit_code)
+        _emit_receipt(undergraded=undergraded, exit_code=exit_code, stage=stage, blocking=blocking)
 
     return exit_code
 
 
-def _emit_receipt(*, undergraded: int, exit_code: int) -> None:
+def _emit_receipt(*, undergraded: int, exit_code: int, stage: str, blocking: bool) -> None:
     """Append a hash-chained VerifiedMachineReceipt of this binding run. The
-    receipt IS the proof the gate ran — verifiable by check_receipt_valid."""
+    receipt IS the proof the gate ran — verifiable by check_receipt_valid. It
+    carries the machine context (command, cwd, git sha/dirty, exit code, INV-1)."""
     try:
         from dharma_swarm.spine.receipt import (
             VerifiedMachineReceipt,
             append_machine_receipt,
         )
+        from dharma_swarm.memory_kernel.write_receipts import utc_now
     except ImportError as exc:  # advisory: never crash the gate on a missing dep
         print(f"(receipt skipped: {exc})", file=sys.stderr)
         return
+    repo_root = ACTIVE_TRACK_PATH.parent.parent.parent
+    git_sha, git_dirty = _git_context(repo_root)
     receipt = VerifiedMachineReceipt(
         claim_id="claim-evidence-binding",
         command="python3 scripts/governance/check_claim_evidence_binding.py",
-        cwd=str(ACTIVE_TRACK_PATH.parent.parent.parent),
+        cwd=str(repo_root),
+        git_sha=git_sha,
+        git_dirty=git_dirty,
         actor="make claim-evidence",
         exit_code=exit_code,
+        finished_at=utc_now(),
         generated_by="check_claim_evidence_binding.py",
-        attributes={"undergraded_tracks": undergraded},
+        attributes={"undergraded_tracks": undergraded, "stage": stage, "blocking": blocking},
     )
     chained = append_machine_receipt(receipt)
-    print(f"receipt appended (digest {chained.digest[:12]}…, verify={chained.verify()})")
+    print(f"receipt appended (digest {chained.digest[:12]}…, verify={chained.verify()}, "
+          f"git_sha={git_sha[:8] or 'n/a'})")
 
 
 if __name__ == "__main__":
