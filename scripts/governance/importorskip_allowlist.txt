@@ -1,0 +1,12 @@
+# importorskip allowlist — first-party (dharma_swarm.*) modules that the
+# test suite currently guards with pytest.importorskip. A NEW first-party
+# guard not listed here fails check_importorskip_allowlist.py, and an
+# allowlisted module whose source file disappears also fails (a deleted
+# internal module must break collection, not silently skip). Regenerate
+# the frozen baseline with:
+#   python3 scripts/governance/check_importorskip_allowlist.py --update-baseline
+dharma_swarm.contracts.intelligence_agents
+dharma_swarm.dharma_kernel
+dharma_swarm.memory_kernel.context_parity
+dharma_swarm.operator_core.a2a_task_lifecycle
+dharma_swarm.telos_gates
