@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T09:28:44+00:00",
+  "generated_at": "2026-06-25T01:20:30+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,14 +97,14 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed, 2 warnings in 0.61s"
     }
   ],
   "portfolio_summary": {
     "active": 9,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 5
+    "shippable": 3
   },
   "spine_objectives": [
     {
@@ -265,7 +265,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.75s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed, 2 warnings in 0.61s"
         }
       ]
     },
@@ -691,7 +691,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.42s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed, 2 warnings in 0.49s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -729,13 +729,13 @@
       "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
+      "shippable": false,
+      "criteria_pass": false,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 8,
+        "passed": 7,
         "total": 8
       },
       "criteria": [
@@ -796,8 +796,8 @@
         {
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.31s"
+          "passed": false,
+          "detail": "pytest tests/test_holon_bridge.py: FAIL \u2014 3 failed, 12 passed, 1 skipped, 2 warnings in 0.37s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -912,7 +912,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.34s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed, 2 warnings in 0.35s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -1067,13 +1067,13 @@
       "verified_at": "2026-06-24",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
+      "shippable": false,
+      "criteria_pass": false,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 12,
+        "passed": 10,
         "total": 12
       },
       "criteria": [
@@ -1122,8 +1122,8 @@
         {
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 8 passed in 0.32s"
+          "passed": false,
+          "detail": "pytest tests/test_stage_contracts.py: FAIL \u2014 3 failed, 10 passed, 2 warnings in 0.39s"
         },
         {
           "id": "okf_projector_exists",
@@ -1135,7 +1135,7 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 6 passed in 0.37s"
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed, 2 warnings in 0.39s"
         },
         {
           "id": "semantic_fs_facade_exists",
@@ -1147,7 +1147,7 @@
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.33s"
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed, 2 warnings in 0.40s"
         },
         {
           "id": "organizer_dry_run_first_exists",
@@ -1159,13 +1159,13 @@
           "id": "organizer_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.30s"
+          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed, 2 warnings in 0.36s"
         },
         {
           "id": "fs_substrate_e2e_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.39s"
+          "passed": false,
+          "detail": "pytest tests/test_fs_substrate_e2e.py: FAIL \u2014 1 failed, 3 passed, 2 warnings in 0.45s"
         }
       ]
     }
@@ -1221,8 +1221,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] 7/8 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1239,8 +1239,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "track-in-progress:filesystem-native-substrate-2026-06",
+      "message": "[filesystem-native-substrate-2026-06] 10/12 completion criteria pass.",
       "criterion_id": null
     }
   ]

@@ -18,7 +18,7 @@
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 8 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 9 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -342,6 +342,61 @@ trained weights — training is earned only after the arena produces labels.
 - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
 - Do not couple admission to the full world-ingestion (#662) seam.
 
+### Filesystem-Native Context Substrate — folder-as-contract + portable knowledge graph
+
+**Track id:** `filesystem-native-substrate-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-24 (TTL 21 days)
+**Relations:** complements: truth-graph-platform-2026-06, runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md, docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md, docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md, dharma_swarm/fs_substrate/**, tests/test_stage_contracts.py, tests/test_okf_projection.py, tests/test_semantic_fs.py, tests/test_organizer.py, tests/test_fs_substrate_e2e.py
+**Moves vital signs:** context_efficiency, tool_coverage, memory_persistence
+
+Operator directive 2026-06-24: consolidate four convergent "filesystem-as-
+agent-substrate" sources into one substrate power and wire it into the swarm.
+The four: LSFS (arXiv 2410.11843, semantic syscalls over a vector index),
+LlamaFS (iyaja/llama-fs, self-organizing propose-then-apply), Van Clief's
+ICM/MWP (arXiv 2603.16021, numbered folders as pipeline stages + CONTEXT.md
+contracts + token-firewall folders), and Google's OKF v0.1 (2026-06-12,
+portable markdown knowledge graph: required `type`, index.md/log.md, links).
+
+This is a Tier-1 substrate/organizer power (NORTH_STAR.md §4), realizing
+self-organs the genome already names (THE_ORGANISM.md ③: self-onboarding,
+self-ontology-maintenance, self-memory-curation) and grounding the
+categorical-systems-theory pillar (genome ①) physically: CONTEXT.md
+Inputs/Outputs tables are morphism declarations; OKF `type`+links are
+objects+morphisms — compositional interfaces the organism can read and
+rewrite without losing coherence.
+
+The track creates NO new truth store and NO authority surface. Every slice
+projects from / converges on existing owners: the spine (invoke_agent /
+EvidenceReceipt), the orchestrator + TaskBoard DAG, handoff.py, and the
+MemoryKernel front door + surface registry.
+
+Doctrine line that must hold (inherited from reconciliation + truth-graph):
+  Read models project truth from owners; they do not become authority.
+
+Anti-pattern guard (THE_ORGANISM.md needle): this must not become "a paper
+about our own architecture." The outward licence is OKF interchange — making
+the swarm's knowledge portable to external humans and agent systems
+(NORTH_STAR.md §6 noosphere propagation; §8 trust-gate auditability).
+
+**Next items:**
+
+- [docs] SHIPPED: single-location research dossier consolidating LSFS, LlamaFS, ICM/MWP, OKF with the organism tie (docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md).
+- [code] SHIPPED (2026-06-24): Slice A — read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/{stage_contracts,stage_executor}.py). Numbered stage-folders -> Task.depends_on DAG; each stage dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses spine/TaskBoard/handoff/skills; no new orchestrator. tests/test_stage_contracts.py: 8 passed, 1 skipped.
+- [code] SHIPPED (2026-06-24): Slice B — OKF projector (dharma_swarm/fs_substrate/okf.py). write_bundle/read_bundle (tolerant consumer) + project_semantic_objects() projects docs/ontology/semantic_objects.yaml to a portable OKF bundle (required `type` from each object's kind, index.md/log.md, cross-links). 13 ontology objects round-trip. tests/test_okf_projection.py: 6 passed. The outward/Arjuna licence: the knowledge graph is now portable.
+- [code] SHIPPED (2026-06-24): Slice C — LSFS-style semantic-query facade (dharma_swarm/fs_substrate/semantic_fs.py): keywords_retrieve/semantic_retrieve/group_semantic/integrated_retrieve + a parse_query LSFS-Parser analog, all delegating to the MemoryKernel front door (iter_memory_atoms). No new vector DB; lexical proxy with an embedding seam noted. tests/test_semantic_fs.py: 5 passed.
+- [code] SHIPPED (2026-06-24): Slice D — propose-then-apply organizer (dharma_swarm/fs_substrate/organizer.py): propose_organization (pure dry-run, by-family classification) + apply_proposal (GATED: refuses without confirm=True; write_ok predicate is the MemoryWritePolicy seam; never overwrites/escapes root). Watch-mode + LLM-summary deferred. tests/test_organizer.py: 5 passed.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mint a second receipt type; project over spine.EvidenceReceipt.
+- Do not mutate files without a dry-run proposal + operator approval (Slice D); writes go through MemoryWritePolicy.
+- Do not broadly refactor orchestrator.py, agent_runner.py, or swarm.py; plug in at dispatch_next()/TaskBoard, honoring spine-adoption's owned surfaces.
+- Do not touch operator_core/** or runtime_state.py.
+- Do not duplicate the truth-graph-platform repo_context projection; this owns the portable on-disk interchange format, not the in-repo render.
+- Do not commit provider API keys or any credentials.
+
 **Recently closed tracks:**
 
 - `orientation-graph-2026-06` — Orientation Graph — whole-system view served on token one (SHIPPED, closed 2026-06-12)
@@ -398,110 +453,24 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-19 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-24 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **413 (54.5%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **314,922** | wc -l across dharma_swarm Python modules |
-| Test files | **750** | find tests -name "*.py" -type f |
-| Test functions | **11,881 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **778** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **413 (53.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **319,298** | wc -l across dharma_swarm Python modules |
+| Test files | **753** | find tests -name "*.py" -type f |
+| Test functions | **11,902 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,822** | wc -l across all .md |
-| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **751** | find tests -name "*.py" -type f |
-| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,838** | wc -l across all .md |
-| Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
-| Test files | **750** | find tests -name "*.py" -type f |
-| Test functions | **11,881 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,822** | wc -l across all .md |
-| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **751** | find tests -name "*.py" -type f |
-| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,838** | wc -l across all .md |
-| Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **413 (54.3%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **312,264** | wc -l across dharma_swarm Python modules |
-| Test files | **750** | find tests -name "*.py" -type f |
-| Test functions | **11,881 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,822** | wc -l across all .md |
-| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **751** | find tests -name "*.py" -type f |
-| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,838** | wc -l across all .md |
-| Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
-| Test files | **750** | find tests -name "*.py" -type f |
-| Test functions | **11,881 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,822** | wc -l across all .md |
-| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **751** | find tests -name "*.py" -type f |
-| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,838** | wc -l across all .md |
-| Total Python modules | **771** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **413 (54.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **305,925** | wc -l across dharma_swarm Python modules |
-| Test files | **750** | find tests -name "*.py" -type f |
-| Test functions | **11,881 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,822** | wc -l across all .md |
-| Test functions | **11,880 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **751** | find tests -name "*.py" -type f |
-| Test functions | **11,892 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
-| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1050** | find . -name "*.md" -type f |
-| Markdown total lines | **246,838** | wc -l across all .md |
-| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" |
-| Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" |
-| Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" |
-| Router files | **16** (4,976 LOC total) | find dharma_swarm -type f \| rg -i "rout" |
-| Memory modules | **11** (5,848 LOC) | find dharma_swarm -name "*memory*" |
-| Context modules | **8** (5,828 LOC) | find dharma_swarm -name "*context*" |
-| Provider types (enum) | **18** | models.py ProviderType enum |
-| Provider classes | **19** (including LLMProvider base) | grep "class.*Provider" providers.py |
-| Kernel axioms | **25** (10 original + 15 foundations) | dharma_kernel.py MetaPrinciple enum |
-| Telos gates | **11** (2 Tier A, 1 Tier B, 8 Tier C) | telos_gates.py core gates |
-| SQLite-using modules | **49** | grep aiosqlite/sqlite3 |
-| JSONL-writing modules | **126** | grep .jsonl |
-| ~/.dharma/ subdirectories | **74** | ls ~/.dharma/ |
-| Circular dependency chains | **9 confirmed** | import tracing |
-| Files >500 lines | **148** | wc -l + awk |
-| Files >3000 lines | **7** | wc -l + awk |
-
----
+| Markdown files | **1072** | find . -name "*.md" -type f |
+| Markdown total lines | **248,854** | wc -l across all .md |
+| Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
+| Adapter files | **25** | find dharma_swarm -type f | rg -i "adapter" |
+| Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
 
 ## SYSTEM TOPOGRAPHY
 

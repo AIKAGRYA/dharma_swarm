@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 8 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 9 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -371,6 +371,61 @@ trained weights — training is earned only after the arena produces labels.
 - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
 - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
 - Do not couple admission to the full world-ingestion (#662) seam.
+
+### Filesystem-Native Context Substrate — folder-as-contract + portable knowledge graph
+
+**Track id:** `filesystem-native-substrate-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-24 (TTL 21 days)
+**Relations:** complements: truth-graph-platform-2026-06, runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md, docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md, docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md, dharma_swarm/fs_substrate/**, tests/test_stage_contracts.py, tests/test_okf_projection.py, tests/test_semantic_fs.py, tests/test_organizer.py, tests/test_fs_substrate_e2e.py
+**Moves vital signs:** context_efficiency, tool_coverage, memory_persistence
+
+Operator directive 2026-06-24: consolidate four convergent "filesystem-as-
+agent-substrate" sources into one substrate power and wire it into the swarm.
+The four: LSFS (arXiv 2410.11843, semantic syscalls over a vector index),
+LlamaFS (iyaja/llama-fs, self-organizing propose-then-apply), Van Clief's
+ICM/MWP (arXiv 2603.16021, numbered folders as pipeline stages + CONTEXT.md
+contracts + token-firewall folders), and Google's OKF v0.1 (2026-06-12,
+portable markdown knowledge graph: required `type`, index.md/log.md, links).
+
+This is a Tier-1 substrate/organizer power (NORTH_STAR.md §4), realizing
+self-organs the genome already names (THE_ORGANISM.md ③: self-onboarding,
+self-ontology-maintenance, self-memory-curation) and grounding the
+categorical-systems-theory pillar (genome ①) physically: CONTEXT.md
+Inputs/Outputs tables are morphism declarations; OKF `type`+links are
+objects+morphisms — compositional interfaces the organism can read and
+rewrite without losing coherence.
+
+The track creates NO new truth store and NO authority surface. Every slice
+projects from / converges on existing owners: the spine (invoke_agent /
+EvidenceReceipt), the orchestrator + TaskBoard DAG, handoff.py, and the
+MemoryKernel front door + surface registry.
+
+Doctrine line that must hold (inherited from reconciliation + truth-graph):
+  Read models project truth from owners; they do not become authority.
+
+Anti-pattern guard (THE_ORGANISM.md needle): this must not become "a paper
+about our own architecture." The outward licence is OKF interchange — making
+the swarm's knowledge portable to external humans and agent systems
+(NORTH_STAR.md §6 noosphere propagation; §8 trust-gate auditability).
+
+**Next items:**
+
+- [docs] SHIPPED: single-location research dossier consolidating LSFS, LlamaFS, ICM/MWP, OKF with the organism tie (docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md).
+- [code] SHIPPED (2026-06-24): Slice A — read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/{stage_contracts,stage_executor}.py). Numbered stage-folders -> Task.depends_on DAG; each stage dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses spine/TaskBoard/handoff/skills; no new orchestrator. tests/test_stage_contracts.py: 8 passed, 1 skipped.
+- [code] SHIPPED (2026-06-24): Slice B — OKF projector (dharma_swarm/fs_substrate/okf.py). write_bundle/read_bundle (tolerant consumer) + project_semantic_objects() projects docs/ontology/semantic_objects.yaml to a portable OKF bundle (required `type` from each object's kind, index.md/log.md, cross-links). 13 ontology objects round-trip. tests/test_okf_projection.py: 6 passed. The outward/Arjuna licence: the knowledge graph is now portable.
+- [code] SHIPPED (2026-06-24): Slice C — LSFS-style semantic-query facade (dharma_swarm/fs_substrate/semantic_fs.py): keywords_retrieve/semantic_retrieve/group_semantic/integrated_retrieve + a parse_query LSFS-Parser analog, all delegating to the MemoryKernel front door (iter_memory_atoms). No new vector DB; lexical proxy with an embedding seam noted. tests/test_semantic_fs.py: 5 passed.
+- [code] SHIPPED (2026-06-24): Slice D — propose-then-apply organizer (dharma_swarm/fs_substrate/organizer.py): propose_organization (pure dry-run, by-family classification) + apply_proposal (GATED: refuses without confirm=True; write_ok predicate is the MemoryWritePolicy seam; never overwrites/escapes root). Watch-mode + LLM-summary deferred. tests/test_organizer.py: 5 passed.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mint a second receipt type; project over spine.EvidenceReceipt.
+- Do not mutate files without a dry-run proposal + operator approval (Slice D); writes go through MemoryWritePolicy.
+- Do not broadly refactor orchestrator.py, agent_runner.py, or swarm.py; plug in at dispatch_next()/TaskBoard, honoring spine-adoption's owned surfaces.
+- Do not touch operator_core/** or runtime_state.py.
+- Do not duplicate the truth-graph-platform repo_context projection; this owns the portable on-disk interchange format, not the in-repo render.
+- Do not commit provider API keys or any credentials.
 
 **Recently closed tracks:**
 

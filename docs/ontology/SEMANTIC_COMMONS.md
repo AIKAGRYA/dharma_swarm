@@ -4,6 +4,10 @@ Semantic Commons is the naming and identity source of truth for Dharma Swarm
 runtime objects. Code and cards must resolve existing names here before adding
 new terms.
 
+Claim-maturity vocabulary for promotion language lives in
+[`CLAIM_MATURITY_VOCABULARY.md`](CLAIM_MATURITY_VOCABULARY.md). It keeps
+workflow status separate from evidence-backed claims.
+
 ## Canonical A2A Contact Vocabulary
 
 | Object | Meaning | Runtime projection |
