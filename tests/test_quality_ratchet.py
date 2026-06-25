@@ -129,6 +129,49 @@ def test_up_counter_falling_is_a_regression(fake_repo, capsys):
     assert "asset_things" in capsys.readouterr().err
 
 
+# -- invariant: baseline freshness gate ---------------------------------------
+
+
+def test_fresh_baseline_passes_the_freshness_gate(fake_repo):
+    # tightened_on 2026-06-12, today 2026-06-13 => 1 day old, within 30.
+    _write_baselines(fake_repo, {"debt_things": 5, "asset_things": 3})
+    assert _run(fake_repo, "--max-baseline-age-days", "30") == ratchet.EXIT_GREEN
+
+
+def test_stale_baseline_is_broken_even_when_counters_match(fake_repo, capsys):
+    # 1 day old vs a 0-day window => stale => fail closed, independent of
+    # any regression (every counter here equals its baseline).
+    _write_baselines(fake_repo, {"debt_things": 5, "asset_things": 3})
+    assert _run(fake_repo, "--max-baseline-age-days", "0") == ratchet.EXIT_BROKEN
+    assert "freshness" in capsys.readouterr().err
+
+
+def test_baseline_without_tightened_on_is_broken(fake_repo, capsys):
+    # A baseline the freshness gate cannot date is untrustworthy.
+    path = fake_repo / ratchet.BASELINE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": ratchet.BASELINE_SCHEMA_VERSION,
+                "counters": {"debt_things": 5, "asset_things": 3},
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert _run(fake_repo, "--max-baseline-age-days", "30") == ratchet.EXIT_BROKEN
+    assert "tightened_on" in capsys.readouterr().err
+
+
+def test_freshness_check_is_opt_in(fake_repo):
+    # Without the flag the gate is backwards-compatible: regression-only,
+    # no freshness failure regardless of baseline age.
+    _write_baselines(fake_repo, {"debt_things": 5, "asset_things": 3})
+    assert _run(fake_repo) == ratchet.EXIT_GREEN
+
+
 # -- invariants 3-5: tighten semantics ----------------------------------------
 
 

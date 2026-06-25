@@ -262,7 +262,7 @@ quality-ratchet:
 	$(PYTHON) scripts/governance/hygiene/ratchet.py --tighten
 
 quality-ratchet-check:
-	$(PYTHON) scripts/governance/hygiene/ratchet.py
+	$(PYTHON) scripts/governance/hygiene/ratchet.py --max-baseline-age-days 45
 
 # Assurance boundary V0: contracts (not counts) on spine, memory_kernel,
 # a2a, runtime_state, runtime_provider. Exit 1 lists hold-at-zero

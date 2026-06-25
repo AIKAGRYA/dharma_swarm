@@ -1,0 +1,47 @@
+name: quality-ratchet
+
+# Makes the GLOBAL one-way quality ratchet load-bearing. The detector and
+# baselines already shipped (scripts/governance/hygiene/ratchet.py +
+# docs/governance/hygiene/ratchet_baselines.json) and `make quality-ratchet`
+# ran only by hand — so whole-tree drift (god-object growth, silent-swallow
+# creep, boundary regressions) went ungated while the touched-file
+# delta-ratchet grandfathered everything pre-existing. This workflow runs the
+# global ratchet on every PR and weekly, and enforces a baseline-freshness
+# gate so a stale baseline can no longer silently mask drift.
+
+on:
+  pull_request:
+    branches: [main, "promote/**", "governance/**"]
+  schedule:
+    # Weekly sweep — catches drift on main even when no PR touched it.
+    - cron: "31 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: quality-ratchet-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality-ratchet:
+    name: Quality ratchet — whole-tree regression + baseline freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Run global quality ratchet (+ freshness gate)
+        # Exit 1 = a counter regressed vs baseline; exit 2 = a counter could
+        # not be measured OR the baseline is older than the freshness window
+        # (a stale baseline is an open gate). Either way the run fails — the
+        # global anti-slop counters can no longer drift unobserved.
+        run: |
+          python3 scripts/governance/hygiene/ratchet.py --max-baseline-age-days 45
