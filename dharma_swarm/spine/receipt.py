@@ -10,8 +10,11 @@ See docs/reports/CONVERGED_SEAM_AUDIT_RUNTIME_TRUTH_SPINE.md §7 Fix 1.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal, Optional
 from uuid import UUID, uuid4
 
@@ -133,3 +136,125 @@ class EvidenceReceipt:
         if self.routing_decision_id:
             d["routing_decision_id"] = str(self.routing_decision_id)
         return d
+
+
+# --- Verified machine receipt (Pudgala Autopoiesis Protostar Phase 1) ---------
+# EvidenceReceipt proves a dispatch happened. It carries NO machine-execution
+# fields (the command run, the tree state, the exit code), so it cannot bind a
+# *claim* to *what actually ran*. VerifiedMachineReceipt is the sibling that
+# does: a hash-chained record of one verified command execution. It is NOT a new
+# receipt system — it is a typed projection persisted via the existing
+# append-only + conflicting-digest pattern (memory_kernel.promotion_gate) and
+# digested with the same canonical formula as memory_kernel.write_receipts. The
+# governance gate (scripts/governance/check_track_status.py::check_receipt_valid)
+# recomputes this digest to verify the receipt was not tampered.
+#
+# DEFAULT SINK is under ~/.dharma/ (runtime receipts never enter git — see
+# CLAUDE.md "Runtime receipts never enter git").
+DEFAULT_MACHINE_RECEIPT_PATH = (
+    Path.home() / ".dharma" / "witness" / "claim_evidence_receipts.jsonl"
+)
+MACHINE_RECEIPT_SCHEMA_VERSION = "verified_machine_receipt.v1"
+
+
+def _utc_now() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _canonical_json(payload: object) -> str:
+    # Byte-for-byte identical to memory_kernel.write_receipts.canonical_json and
+    # to the verifier in check_track_status.py — the digest must match across all
+    # three. Do not change one without the others.
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _stable_digest(payload: object) -> str:
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedMachineReceipt:
+    """A hash-chained record of one verified command execution that backs a claim.
+
+    PROV-O alignment is expressed in ``attributes`` (wasGeneratedBy /
+    wasAttributedTo / wasDerivedFrom). The digest covers every field EXCEPT
+    ``digest`` itself; ``prev_digest`` IS covered, so altering any prior receipt
+    breaks every later link — the anti-slop tamper-evidence property.
+    """
+
+    claim_id: str = ""
+    command: str = ""
+    cwd: str = ""
+    git_sha: str = ""
+    git_dirty: bool = False
+    actor: str = ""
+    model: str = ""
+    exit_code: Optional[int] = None
+    stdout_stderr_hash: str = ""
+    started_at: str = field(default_factory=_utc_now)
+    finished_at: str = ""
+    produced_at: str = field(default_factory=_utc_now)
+    generated_by: str = ""
+    verified_by: str = ""
+    tool_versions: dict[str, str] = field(default_factory=dict)
+    artifact_hashes: dict[str, str] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    schema_version: str = MACHINE_RECEIPT_SCHEMA_VERSION
+    prev_digest: str = ""
+    digest: str = ""
+
+    def _payload(self) -> dict[str, Any]:
+        """Every field except ``digest`` — the bytes the digest is taken over."""
+        return {k: v for k, v in asdict(self).items() if k != "digest"}
+
+    def with_chain(self, prev_digest: str = "") -> "VerifiedMachineReceipt":
+        """Return a copy linked to ``prev_digest`` with a freshly-computed digest.
+        Pass the previous receipt's ``digest`` to chain; "" begins a chain."""
+        linked = replace(self, prev_digest=prev_digest or "", digest="")
+        return replace(linked, digest=_stable_digest(linked._payload()))
+
+    def verify(self) -> bool:
+        """True iff the stored digest recomputes — i.e. the receipt is intact."""
+        return bool(self.digest) and self.digest == _stable_digest(self._payload())
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def append_machine_receipt(
+    receipt: "VerifiedMachineReceipt",
+    *,
+    path: Path | None = None,
+) -> "VerifiedMachineReceipt":
+    """Append a chained VerifiedMachineReceipt to the JSONL log, linking it to
+    the tail of the existing chain. Returns the chained-and-persisted receipt.
+
+    Append-only with a tamper guard: if the file's tail digest does not verify,
+    we refuse to extend a broken chain. Mirrors the immutable-append discipline
+    of memory_kernel.promotion_gate without minting a second receipt *system*."""
+    target = (path or DEFAULT_MACHINE_RECEIPT_PATH).expanduser()
+    prev_digest = ""
+    if target.exists():
+        tail: dict[str, Any] | None = None
+        for line in target.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                try:
+                    tail = json.loads(line)
+                except json.JSONDecodeError:
+                    raise ValueError(f"machine receipt log {target} has a non-JSON line")
+        if tail is not None:
+            stored = str(tail.get("digest", ""))
+            recomputed = _stable_digest({k: v for k, v in tail.items() if k != "digest"})
+            if not stored or stored != recomputed:
+                raise ValueError(f"machine receipt log {target} tail digest is broken; refusing to extend")
+            prev_digest = stored
+    chained = receipt.with_chain(prev_digest)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as handle:
+        handle.write(_canonical_json(chained.to_dict()) + "\n")
+    return chained
