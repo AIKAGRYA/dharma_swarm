@@ -283,7 +283,7 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
 # open blocker next-items. Pattern borrowed from
 # cybernetics_codex._evaluate_loop_closure_replay (compute closure from
 # structural evidence; never trust a bare boolean) and REALITY_DEBT_LEDGER.md.
-RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged"})
+RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged", "mutation_score_gte"})
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
 
 
@@ -320,12 +320,13 @@ def _load_grade_ladder() -> dict[str, Any]:
         "commit_on_main": 2,
         "receipt_valid": 2,
         "test_passes": 3,
+        "mutation_score_gte": 6,  # S6 active (Pudgala Forge P3-09): primary anti-gaming oracle
     }
     ladder = {
         "kind_to_grade": dict(builtin_active),
         "default_min_grade": _DEFAULT_MIN_GRADE,
         "oracle_downgrade_to": _DEFAULT_ORACLE_DOWNGRADE,
-        "grade_names": {0: "S0", 1: "S1", 2: "S2", 3: "S3"},
+        "grade_names": {0: "S0", 1: "S1", 2: "S2", 3: "S3", 6: "S6"},
     }
     if EVIDENCE_GRADES_PATH.exists():
         try:
@@ -563,6 +564,47 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
                            detail=f"receipt {file_path} valid ({', '.join(bits)})")
 
 
+def check_mutation_score_gte(file_path: str, threshold: float, *,
+                             fresh_ttl_days: int | None = None) -> CriterionResult:
+    """A mutation-score report must EXIST, be FRESH, and show a score >= threshold
+    — proof the test suite actually KILLS injected faults (S6, the primary
+    anti-gaming oracle: it resists the seven deadly AI test patterns — a trivially
+    -asserting/mock-everything/tautological test survives mutants). The report is
+    produced by `make mutation-test` (runs mutmut on the changed surfaces); this
+    gate READS it and never runs mutmut inline, so the governance gate stays fast.
+    Conservative: a missing / stale / below-threshold report does NOT pass."""
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} MISSING — run `make mutation-test`")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} unreadable: {type(exc).__name__}")
+    if not isinstance(data, dict):
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} is not a JSON object")
+    try:
+        score = float(data.get("score"))
+    except (TypeError, ValueError):
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} has no numeric 'score'")
+    if fresh_ttl_days is not None:
+        ts = _receipt_timestamp(data)
+        age = days_since(ts[:10]) if ts else None
+        if age is None:
+            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                                   detail=f"mutation report {file_path} has no usable timestamp for freshness")
+        if age > fresh_ttl_days:
+            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                                   detail=f"mutation report {file_path} is stale ({age}d > {fresh_ttl_days}d ttl)")
+    passed = score >= threshold
+    return CriterionResult(id="", kind="mutation_score_gte", passed=passed,
+                           detail=f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
+                                  f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)")
+
+
 def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
     """Evaluate one predicate. A malformed criterion becomes a failing result,
     never an exception — a governance gate must convert bad config into a
@@ -611,6 +653,17 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                     expect_digest=bool(crit.get("expect_digest")),
                     expect_chain=bool(crit.get("expect_chain")),
                 )
+        elif kind == "mutation_score_gte":
+            report = crit.get("file") or "reports/governance/mutation_score.json"
+            try:
+                threshold = float(crit.get("threshold", 0.6))
+            except (TypeError, ValueError):
+                threshold = 0.6
+            ttl = crit.get("fresh_ttl_days")
+            res = check_mutation_score_gte(
+                report, threshold,
+                fresh_ttl_days=int(ttl) if ttl is not None else None,
+            )
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")

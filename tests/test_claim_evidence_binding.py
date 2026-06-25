@@ -86,6 +86,40 @@ def test_resolve_enforcement_precedence() -> None:
     assert binding_stage() == "advisory"
 
 
+def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
+    """S6 (P3-09) is ACTIVE: a passing mutation_score_gte grades S6, and the gate
+    READS a mutation-score report — above threshold passes; below / missing /
+    stale fail (fail-closed). The slow mutmut run that produces the report is a
+    separate `make mutation-test` step (the gate never runs mutmut inline)."""
+    from check_track_status import check_mutation_score_gte  # type: ignore  # noqa: E402
+
+    assert grade_of_criterion({"kind": "mutation_score_gte"}, _passing("mutation_score_gte"), {}) == 6
+    assert grade_name(6).startswith("S6")
+
+    rpt = tmp_path / "mutation_score.json"
+    rpt.write_text(json.dumps({"score": 0.72, "killed": 36, "total": 50,
+                               "produced_at": "2026-06-25T00:00:00Z"}), encoding="utf-8")
+    assert check_mutation_score_gte(str(rpt), 0.6).passed              # 0.72 >= 0.60
+    assert not check_mutation_score_gte(str(rpt), 0.8).passed          # 0.72 <  0.80
+    assert not check_mutation_score_gte(str(tmp_path / "nope.json"), 0.6).passed  # missing -> fail-closed
+    old = tmp_path / "old.json"
+    old.write_text(json.dumps({"score": 0.99, "produced_at": "2020-01-01T00:00:00Z"}), encoding="utf-8")
+    assert not check_mutation_score_gte(str(old), 0.6, fresh_ttl_days=1).passed   # stale -> fail
+
+
+def test_parse_mutmut_summary_score() -> None:
+    """The version-tolerant mutmut parser computes killed / (killed + survived +
+    timeout + suspicious), excluding skipped — so the S6 score cannot drift
+    silently across mutmut versions."""
+    from mutation_score_report import parse_mutmut_summary  # type: ignore  # noqa: E402
+
+    c = parse_mutmut_summary("⠋ 50/50  🎉 36  ⏰ 1  🤔 1  🙁 12  🔇 4")
+    assert c["killed"] == 36 and c["survived"] == 12 and c["skipped"] == 4
+    assert c["total"] == 50  # 36 + 12 + 1 + 1; skipped excluded
+    assert c["score"] == 0.72
+    assert parse_mutmut_summary("no mutants here")["score"] == 0.0
+
+
 # --------------------------------------------------------------------------- #
 # Grade ladder + graded conjunct                                              #
 # --------------------------------------------------------------------------- #
