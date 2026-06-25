@@ -128,7 +128,10 @@ def _resolve_agent(role: str | None) -> tuple[str, str, str, str]:
         skill = SkillRegistry().get(role)
         if skill is not None:
             return (skill.name, skill.provider, skill.model, getattr(skill, "description", ""))
-    except Exception as exc:  # skills/ is an optional convergence dep — fall back, but record why
+    except (ImportError, AttributeError, KeyError, TypeError) as exc:
+        # skills/ is an optional convergence dep — fall back to the bare role on the
+        # realistic resolution failures (module absent / missing attr / not found /
+        # bad call), but record why rather than swallowing it silently.
         logger.debug("skill resolution for role %r failed; using bare role: %s", role, exc)
     return (role, "", "", "")
 
