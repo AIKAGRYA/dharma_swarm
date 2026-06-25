@@ -731,6 +731,23 @@ def run(args: argparse.Namespace) -> int:
 
         r = evaluate_track(t)
 
+        # ENFORCING rigor gate (operator directive 2026-06-25): a track may not
+        # DECLARE itself shippable without earning it under the rigorous bar.
+        # Previously the rigor verdict was advisory (INFO only); a YAML that set
+        # `status: shippable` on existence-only criteria would still pass green.
+        # This is the "AI slop" trap the operator named: a green flag with no
+        # real check behind it. Now a declared-shippable track that fails the
+        # rigorous bar is a hard ERROR (non-zero exit), so the false-closure
+        # claim blocks instead of merely informing.
+        declared_status = str(t.get("status") or "").lower()
+        if declared_status == "shippable" and not r["shippable"]:
+            blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
+            findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
+                f"[{tid}] declares status: shippable but FAILS the rigorous bar: {blocks}. "
+                "A track cannot be marked shippable without >=1 rigorous criterion "
+                "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
+                "open blockers. Either add real evidence or change status back to ACTIVE."))
+
         # Prerequisite failures => track mis-declared.
         for c in r["prereqs"]:
             if not c.passed and c.kind in {"file_exists", "file_contains"}:

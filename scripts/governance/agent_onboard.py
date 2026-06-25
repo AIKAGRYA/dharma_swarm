@@ -531,6 +531,63 @@ def _evidence_age_minutes(evidence: dict[str, Any] | None) -> float | None:
     return max(0.0, (datetime.now(tz=timezone.utc) - when).total_seconds() / 60.0)
 
 
+def render_trust_check(evidence: dict[str, Any] | None) -> None:
+    """TRUST CHECK — leads the onboarding with rigor discrepancies so a fresh
+    agent is told, UNPROMPTED and before any green checkmark, where an
+    existence-only "complete" reading is NOT backed by rigorous evidence.
+
+    This automates the hand-holding the operator previously had to do by hand:
+    a track can show N/N completion criteria passing and still have zero real
+    checks (test_passes / commit_on_main / receipt_valid / pr_merged) behind it.
+    Authority for the verdict is scripts/governance/check_track_status.py; this
+    section only foregrounds its verdict so it cannot be missed."""
+    section("TRUST CHECK — read this BEFORE any green checkmark below")
+    if not evidence:
+        print("  ⚠ no active_track_evidence.json — track readiness CANNOT be verified.")
+        print("    Run: python3 scripts/governance/check_track_status.py")
+        return
+    active_tracks = evidence.get("active_tracks") or []
+    if not active_tracks:
+        print("  (no active tracks to verify)")
+        return
+
+    false_closures: list[tuple[Any, list[Any]]] = []  # status: shippable, rigor FAILS
+    soft_done: list[tuple[Any, int, int]] = []         # all criteria pass, no rigor evidence
+    rigorous: list[Any] = []                           # earned shippable under rigorous bar
+    for t in active_tracks:
+        tid = t.get("id")
+        cp = t.get("completion_progress") or {"passed": 0, "total": 0}
+        passed, total = int(cp.get("passed") or 0), int(cp.get("total") or 0)
+        has_rig = bool(t.get("has_rigorous_evidence"))
+        declared = str(t.get("status") or "").lower()
+        if t.get("shippable"):
+            rigorous.append(tid)
+        elif declared == "shippable":
+            false_closures.append((tid, t.get("ship_blocks") or []))
+        elif total > 0 and passed == total and not has_rig:
+            soft_done.append((tid, passed, total))
+
+    if false_closures:
+        print("  ✗ FALSE-CLOSURE CLAIM — declares status: shippable but FAILS the rigorous bar.")
+        print("    Do NOT trust these as done (and CI now blocks them):")
+        for tid, blocks in false_closures:
+            print(f"      • {tid}: {'; '.join(str(b) for b in blocks) or 'no rigorous evidence'}")
+    if soft_done:
+        print("  ⚠ READS COMPLETE ON EXISTENCE CHECKS ONLY (file_exists/file_contains) —")
+        print("    zero rigorous evidence; do NOT treat as shipping-ready. The per-track")
+        print("    readiness % is capped until a real check (test/commit/receipt) lands:")
+        for tid, passed, total in soft_done:
+            print(f"      • {tid}: {passed}/{total} criteria pass, 0 rigorous — existence-only")
+    if rigorous:
+        print(f"  ✓ rigor-backed SHIPPABLE ({len(rigorous)}): {', '.join(str(x) for x in rigorous)}")
+    if not false_closures and not soft_done:
+        print("  ✓ no rigor discrepancies: every active track's reading is evidence-backed.")
+    print()
+    print("  Rule: the number you see = the number a real check produced. A track is")
+    print("  shippable ONLY with >=1 rigorous criterion (test_passes / commit_on_main /")
+    print("  receipt_valid / pr_merged) and zero open blockers. Existence checks are not closure.")
+
+
 def render_active_track(evidence: dict[str, Any] | None,
                         track: dict[str, Any]) -> None:
     section("ACTIVE PORTFOLIO (owner: docs/governance/ACTIVE_TRACK.yaml)")
@@ -564,7 +621,11 @@ def render_active_track(evidence: dict[str, Any] | None,
                   + (f"  ·  GAPS (no active track): {', '.join(gaps)}" if gaps else ""))
         for t in active_tracks:
             cp = t.get("completion_progress", {"passed": 0, "total": 0})
-            flag = "SHIPPABLE" if t.get("shippable") else f"{cp['passed']}/{cp['total']}"
+            if t.get("shippable"):
+                flag = "SHIPPABLE ✓rigorous"
+            else:
+                basis = "rigorous" if t.get("has_rigorous_evidence") else "existence-only"
+                flag = f"{cp['passed']}/{cp['total']} · {basis}"
             print()
             print(f"  • {t.get('id')}  [{t.get('status')}]  serves={t.get('serves')}  ({flag})")
             edges = [f"{k}={t.get(k)}" for k in ("complements", "depends_on", "conflicts_with") if t.get(k)]
@@ -1659,6 +1720,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     repo_state = render_repo_state(fast=args.fast)
+    render_trust_check(evidence)
     render_identity()
     render_active_track(evidence, track)
     lanes = render_parallel_work_lanes()
