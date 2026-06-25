@@ -89,8 +89,10 @@ def _load_kind_strength() -> dict[str, int]:
                     continue
             if strengths:
                 return strengths
-    except (OSError, ValueError):
-        pass
+    except OSError:
+        return dict(_FALLBACK_KIND_STRENGTH)
+    except ValueError:
+        return dict(_FALLBACK_KIND_STRENGTH)
     return dict(_FALLBACK_KIND_STRENGTH)
 
 
