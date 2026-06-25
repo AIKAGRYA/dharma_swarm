@@ -353,12 +353,12 @@ def _load_grade_ladder() -> dict[str, Any]:
             try:
                 ladder["default_min_grade"] = int(raw.get("default_min_grade", _DEFAULT_MIN_GRADE))
             except (TypeError, ValueError):
-                pass
+                ladder["default_min_grade"] = _DEFAULT_MIN_GRADE
             try:
                 ladder["oracle_downgrade_to"] = int(
                     raw.get("oracle_dependent_downgrade_to", _DEFAULT_ORACLE_DOWNGRADE))
             except (TypeError, ValueError):
-                pass
+                ladder["oracle_downgrade_to"] = _DEFAULT_ORACLE_DOWNGRADE
     _GRADE_LADDER_CACHE = ladder
     return ladder
 

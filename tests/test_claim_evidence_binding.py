@@ -87,22 +87,27 @@ def test_track_on_file_contains_only_is_not_shippable() -> None:
     assert any("strongest evidence" in b for b in r["ship_blocks"])
 
 
-def test_track_on_commit_on_main_meets_floor() -> None:
-    # commit_on_main against a bogus sha fails verification, so use a passing
-    # stub by monkey-free construction: a real commit check would need git.
-    # Instead assert the grade math: a passing commit_on_main is S2 == floor.
+def test_track_meets_floor_on_receipt_valid_s2(tmp_path: Path) -> None:
+    # Deterministic S2 evidence without depending on git ancestry: a valid
+    # chained machine receipt (receipt_valid -> S2, a RIGOROUS kind). Proves the
+    # graded conjunct is satisfied when strongest_grade meets the floor.
+    log = tmp_path / "receipt.jsonl"
+    append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
     track = {
         "id": "t-landed",
         "status": "ACTIVE",
         "owner": "@alice",
         "min_evidence_grade": 2,
-        "completion_criteria": [{"id": "c1", "kind": "commit_on_main", "commit": "HEAD"}],
+        "completion_criteria": [
+            {"id": "c1", "kind": "receipt_valid", "file": str(log),
+             "requires_keys": ["claim_id"], "expect_chain": True},
+        ],
     }
     r = evaluate_track(track)
-    # HEAD is an ancestor of HEAD, so the criterion passes -> S2 -> meets floor
-    # (no open blockers, rigorous evidence present).
     assert r["strongest_grade"] >= 2
     assert not any("strongest evidence" in b for b in r["ship_blocks"])
+    assert r["shippable"]
 
 
 def test_grade_name_is_human_readable() -> None:
