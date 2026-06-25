@@ -507,6 +507,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "Telos witness logs are intent/provenance evidence.",
         ),
         MemoryWriterSpec(
+            "spine_receipt.append_machine_receipt",
+            "dharma_swarm.spine.receipt",
+            "append_machine_receipt",
+            ("home.witness",),
+            WriteMode.APPEND_ONLY,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.MEDIUM,
+            "Pudgala Forge VerifiedMachineReceipt append path; hash-chained witness evidence, not canon.",
+        ),
+        MemoryWriterSpec(
             "telos_gates.coupling_feedback",
             "dharma_swarm.telos_gates",
             "check_action",

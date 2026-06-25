@@ -29,7 +29,42 @@ from check_track_status import (  # type: ignore  # noqa: E402
 from dharma_swarm.spine.receipt import (  # noqa: E402
     VerifiedMachineReceipt,
     append_machine_receipt,
+    _canonical_json as _spine_canonical_json,
+    _stable_digest as _spine_stable_digest,
 )
+from dharma_swarm.memory_kernel.write_receipts import (  # noqa: E402
+    canonical_json as _wr_canonical_json,
+    stable_digest as _wr_stable_digest,
+)
+from check_track_status import (  # type: ignore  # noqa: E402
+    _canonical_json as _gate_canonical_json,
+    _stable_digest as _gate_stable_digest,
+)
+
+
+def test_canonical_digest_byte_identical_across_three_owners() -> None:
+    """The receipt digest is computed/verified in three places — the producer
+    (spine/receipt.py), the gate (check_track_status.py), and canon
+    (memory_kernel/write_receipts.py). They MUST canonicalise byte-for-byte or a
+    produced VerifiedMachineReceipt silently fails verification. This pins the
+    triplication so it cannot drift unnoticed (closes the duplication fragility)."""
+    samples = [
+        {"b": 1, "a": 2, "nested": {"y": [3, 2, 1], "x": "z"}},
+        {"claim_id": "c", "command": "pytest -k x", "exit_code": 0, "prev_digest": ""},
+        {"unicode": "réçu—✓", "bool": True, "none": None, "float": 1.5},
+        {},
+    ]
+    for payload in samples:
+        assert (
+            _spine_canonical_json(payload)
+            == _gate_canonical_json(payload)
+            == _wr_canonical_json(payload)
+        ), f"canonical_json drift across owners for {payload!r}"
+        assert (
+            _spine_stable_digest(payload)
+            == _gate_stable_digest(payload)
+            == _wr_stable_digest(payload)
+        ), f"stable_digest drift across owners for {payload!r}"
 
 
 # --------------------------------------------------------------------------- #
