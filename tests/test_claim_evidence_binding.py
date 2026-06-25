@@ -107,17 +107,20 @@ def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
     assert not check_mutation_score_gte(str(old), 0.6, fresh_ttl_days=1).passed   # stale -> fail
 
 
-def test_parse_mutmut_summary_score() -> None:
-    """The version-tolerant mutmut parser computes killed / (killed + survived +
-    timeout + suspicious), excluding skipped — so the S6 score cannot drift
-    silently across mutmut versions."""
-    from mutation_score_report import parse_mutmut_summary  # type: ignore  # noqa: E402
+def test_run_mutation_score_build_report() -> None:
+    """The mutmut-3.5 runner (run_mutation_score.py, grafted from #696) projects
+    `mutmut export-cicd-stats` into the report the S6 gate reads:
+    score = (killed + caught_by_type_check) / (total - skipped), with `passed` vs
+    threshold and a produced_at for the freshness check. Pure function — no run."""
+    from run_mutation_score import build_report  # type: ignore  # noqa: E402
 
-    c = parse_mutmut_summary("⠋ 50/50  🎉 36  ⏰ 1  🤔 1  🙁 12  🔇 4")
-    assert c["killed"] == 36 and c["survived"] == 12 and c["skipped"] == 4
-    assert c["total"] == 50  # 36 + 12 + 1 + 1; skipped excluded
-    assert c["score"] == 0.72
-    assert parse_mutmut_summary("no mutants here")["score"] == 0.0
+    stats = {"killed": 36, "caught_by_type_check": 0, "survived": 12,
+             "timeout": 1, "suspicious": 1, "skipped": 4, "total": 54}
+    r = build_report(stats, threshold=0.6, command="mutmut run")
+    assert r["killed"] == 36 and r["total"] == 50            # 54 raw - 4 skipped
+    assert r["score"] == 0.72 and r["passed"] is True
+    assert "produced_at" in r                                # the S6 freshness field
+    assert build_report({"total": 0}, threshold=0.6, command="x")["score"] == 0.0
 
 
 def test_single_owner_no_second_strength_ladder() -> None:

@@ -392,7 +392,7 @@ claim-evidence:
 # report the `mutation_score_gte` criterion reads. SLOW — a separate step, NOT in
 # governance-all. Needs `pip install mutmut`.
 mutation-test:
-	$(REPO_PYTHON) scripts/governance/mutation_score_report.py
+	$(REPO_PYTHON) scripts/governance/run_mutation_score.py
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
