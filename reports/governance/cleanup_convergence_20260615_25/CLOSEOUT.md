@@ -5,12 +5,14 @@ Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
 Branch: `cleanup/convergence-20260615-25`
 Initial baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
 Deletion-recheck baseline: `origin/main` at `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`
+Post-deletion baseline: `origin/main` at `240a92c6b12b390e429298dfb36661ed8af365a8`
 
 ## Status
 
-This closeout covers the convergence map packet only. It does not claim the
-source-bearing dirty worktrees are landed, merged, closed, shippable, or safe to
-delete.
+This closeout covers the convergence map packet plus the first
+operator-approved worktree deletion receipt. It does not claim the
+source-bearing dirty worktrees are landed, merged, closed, shippable, or safe
+to delete.
 
 ## Files Ported
 
@@ -38,7 +40,8 @@ Files added in this convergence worktree:
 - Forge v1/tokenbroker source: clean local branch, but belongs in its own track.
 - Reconciliation raw command dumps: archive-only forensic evidence.
 - Old clone March autonomy work: archive-only unless operator revives it.
-- Prunable tmp worktrees: deletion candidates only after explicit approval.
+- Prunable tmp worktrees: the first explicitly approved batch has now been
+  executed and receipted; remaining cleanup still requires exact-path approval.
 
 ## Verification Performed
 
@@ -76,17 +79,21 @@ Follow-up read-only cleanup work added
 That report:
 
 - refreshes `origin/main` to `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`;
-- records three read-only passes over Tier A, Tier B, and Tier C cleanup
+- records four read-only passes over Tier A, Tier B, and Tier C cleanup
   candidates;
 - narrows the first approval-ready deletion batch to exact worktree commands;
+- records execution of the first operator-approved worktree deletion batch;
 - marks source-bearing or ambiguous worktrees as `DO_NOT_REMOVE_YET`;
 - records the newly observed clean `/Users/dhyana/dharma_swarm_wt/render-on-demand`
   worktree as `DO_NOT_REMOVE`;
 - lists exact generated-output candidates without wildcard deletion; and
-- provides a post-approval deletion receipt template.
+- prepares the next Tier C exact-path approval command groups without running
+  them.
 
-No deletion, prune, worktree removal, branch deletion, reset, stash operation,
-or cleanup command was run while producing the recheck.
+No branch deletion, reset, stash operation, preservation removal, backup
+removal, clone removal, or Tier C cleanup command was run. The only deletion
+operations recorded here are the five exact `git worktree` commands approved by
+the operator.
 
 Additional verification for the recheck:
 
@@ -95,21 +102,38 @@ Additional verification for the recheck:
 - `LC_ALL=C grep -n '[^ -~]' DELETION_READINESS_RECHECK.md` produced no output.
 - `file DELETION_READINESS_RECHECK.md` reports ASCII text.
 
+Additional verification for the post-deletion receipt follow-up:
+
+- `git diff --cached --check` passed.
+- `awk -F '\t' 'NR==1{n=NF; next} NF!=n{print NR ":" NF ":" $0}' worktree_inventory.tsv`
+  produced no output, proving consistent TSV columns.
+- `rg -n "[[:blank:]]+$" reports/governance/cleanup_convergence_20260615_25`
+  produced no output.
+- `LC_ALL=C grep -n '[^ -~]' INDEX.md CLOSEOUT.md DELETION_READINESS_RECHECK.md`
+  produced no output.
+- A normal `git commit` attempt reran the local hooks. Content-adjacent checks
+  passed (`dharma test hygiene`, `dharma contract tests`, docops integrity,
+  hygiene integrity, gitleaks, trailing whitespace, EOF, merge-conflict, and
+  large-file checks). The commit remained blocked by the same local environment
+  failures: `dharma-uplift-guards` could not import `dharma_swarm` and hit a
+  Python `dataclass(slots=...)` incompatibility; `dharma-manifest-check` could
+  not import PyYAML.
+
 ## Publication And Current State
 
-- Draft PR #688 is open: `https://github.com/AmitabhainArunachala/dharma_swarm/pull/688`.
-- PR #688 targets `main` from `cleanup/convergence-20260615-25`.
-- PR #688 is mergeable and all GitHub checks passed after publication,
-  including `pytest (3.11)`, `pytest (3.12)`, CodeQL, Semgrep, gitleaks,
-  manifest, docops, hygiene, and governance gates.
-- Current `origin/main` is `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`.
-- The current worktree registry shows 20 registered worktrees. The
-  `/Users/dhyana/dharma_swarm_wt/render-on-demand` worktree is clean,
-  equals current `origin/main`, and is explicitly `DO_NOT_REMOVE`.
+- PR #688 merged into `main` as
+  `73113dbd0770c251ba5128ae16f496141c932fee`.
+- Current `origin/main` is `240a92c6b12b390e429298dfb36661ed8af365a8`.
+- The current worktree registry shows 15 registered worktrees after the first
+  approved deletion batch.
+- `/Users/dhyana/dharma_swarm_wt/render-on-demand` remains registered and is
+  explicitly `DO_NOT_REMOVE`.
+- `/Users/dhyana/worktrees/ds_pr674_rebase_20260624`,
+  `/Users/dhyana/ds_governance_fitness_ci_20260620`, and
+  `/private/tmp/ds_provider_review` remain present and protected.
 - PR #685 has merged; anti-slop promotion membrane is no longer an open draft
   cleanup lane and should not be duplicated in this packet.
-- The cleanup branch is clean against its pushed upstream before this metadata
-  refresh commit.
+- The cleanup branch has local docs-only receipt updates pending publication.
 - A normal commit attempt for this metadata refresh reran the local hooks and
   hit the same local environment failures already recorded above:
   `dharma_swarm` import/dataclass incompatibility and missing PyYAML. Content,
@@ -134,25 +158,27 @@ Additional verification for the recheck:
   uplift guards and manifest check failed for import/dependency reasons while
   docs-only content checks passed. This packet was committed after recording
   that hook failure.
-- No deletion should be performed from this packet alone.
+- No additional deletion should be performed from this packet alone.
 - The local GitHub status connector reports legacy commit statuses only for
   PR #688; GitHub Actions check-suite truth was verified through the PR check
   rollup after publication.
 
-## Deletion Candidates Requiring Explicit Approval
+## Remaining Deletion Candidates Requiring Explicit Approval
 
-- `/private/tmp/dharma_nim_main_check`
-- `/private/tmp/ds_pr674_merge_check`
-- Clean/superseded local worktrees after confirming preservation:
-  `/Users/dhyana/worktrees/ds_cockpit_extract_20260623`,
-  `/Users/dhyana/worktrees/ds_pr674_rebase_20260624`,
-  `/Users/dhyana/worktrees/ds_arena_admit_20260623`
+- Tier C generated output candidates listed exactly in
+  `DELETION_READINESS_RECHECK.md`; do not use wildcards.
+- `/Users/dhyana/worktrees/ds_pr674_rebase_20260624` remains protected until
+  the dirty `uv.lock` MarkItDown/ingest decision is made.
+- `/Users/dhyana/ds_governance_fitness_ci_20260620` remains protected because
+  it has unique source-bearing commits.
+- `/private/tmp/ds_provider_review` remains protected because it has a
+  source-bearing archive-fitness overlay.
 - Old clone `/Users/dhyana/migration_delta/dharma_swarm_old`, after archive
   decision.
 
 ## Exact Next PR Lanes
 
-1. `cleanup/convergence-20260615-25`: land this report packet.
+1. `cleanup/convergence-20260615-25`: publish this deletion receipt follow-up.
 2. `runtime-truth/nats-rebuild-preflight`: rebase A2A/NATS code, locked spec,
    scripts, and tests; exclude bulk generated receipts.
 3. `helm/worldclass-terminal`: run live-use gate, then PR Helm closeout and

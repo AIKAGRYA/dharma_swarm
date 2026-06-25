@@ -5,14 +5,16 @@ Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
 Branch: `cleanup/convergence-20260615-25`
 Initial baseline: `origin/main` at `a46522040cc6d4ec80cf9f1466a81c7dac33c616`
 Deletion-recheck baseline: `origin/main` at `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`
+Post-deletion baseline: `origin/main` at `240a92c6b12b390e429298dfb36661ed8af365a8`
 
 ## Purpose
 
 This packet turns the June 15-25 local Dharma Swarm sprawl into one clinical
-cleanup map. It does not merge dirty worktrees, delete anything, prune branches,
-or claim source packets are production-ready. Its job is to preserve the map,
-classify the work, and point each keeper toward an active track, proposed track,
-operator surface, archive bucket, or explicit decision bucket.
+cleanup map. It does not merge dirty worktrees, prune branches, or claim source
+packets are production-ready. Its job is to preserve the map, classify the work,
+record the first operator-approved worktree deletion batch, and point each
+keeper toward an active track, proposed track, operator surface, archive bucket,
+or explicit decision bucket.
 
 ## Evidence Read
 
@@ -22,7 +24,7 @@ operator surface, archive bucket, or explicit decision bucket.
 | Initial baseline | `git fetch origin main` completed; `origin/main` was `a46522040cc6d4ec80cf9f1466a81c7dac33c616` for the first packet pass |
 | Deletion-recheck baseline | `origin/main` was refreshed to `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3` before deletion readiness verdicts |
 | Onboarding | `make onboard` ran in `/Users/dhyana/dharma_swarm` and in this convergence worktree |
-| Worktree list | Initial packet inventory captured 19 registered worktrees; deletion recheck and current pass show 20 registered worktrees including `/Users/dhyana/dharma_swarm_wt/render-on-demand` |
+| Worktree list | Initial packet inventory captured 19 registered worktrees; deletion recheck showed 20 registered worktrees including `/Users/dhyana/dharma_swarm_wt/render-on-demand`; post-deletion verification shows 15 registered worktrees |
 | Preservation root | `/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST` exists |
 | Backup root | `/Users/dhyana/dharma_recover_backups` exists |
 | Backup receipt | `receipts/BACKUP_RECEIPT.md` says bundles verified, 686 stable files checksum-verified, and archive copied to `agni` |
@@ -31,8 +33,8 @@ operator surface, archive bucket, or explicit decision bucket.
 | Read-only audit | `/private/tmp/dharma_swarm_readonly_audit_20260624_84785/CONSOLIDATED_REPORT.md` covers 19 trees and 1,098 unique at-risk file instances |
 | Sprawl memory | `/Users/dhyana/.claude/projects/-Users-dhyana/memory/local-tree-sprawl-backup-2026-06-24.md` records corrected keeper/junk verdicts |
 | PR truth checked | GitHub connector checked PR #648, #674, and #685 |
-| Deletion readiness recheck | `DELETION_READINESS_RECHECK.md` refreshed current deletion candidates through three read-only passes; no deletion was performed |
-| Publication status | Draft PR #688 is open and mergeable; PR checks passed after push; no cleanup deletion was performed |
+| Deletion readiness recheck | `DELETION_READINESS_RECHECK.md` refreshed current deletion candidates through four read-only passes, records the first approved worktree deletion batch, and prepares exact Tier C approval commands without running them |
+| Publication status | PR #688 merged into `main` as `73113dbd0770c251ba5128ae16f496141c932fee`; this packet has a follow-up local receipt pending publication |
 
 ## Deliverables
 
@@ -41,7 +43,7 @@ operator surface, archive bucket, or explicit decision bucket.
 - `decision_log.md` - decisions made while building this convergence packet.
 - `OPERATOR_MAP.md` - short operator-facing answer map.
 - `PALANTIR_SEMANTIC_ONTOLOGY_META_SCRATCHPAD.md` - proposed-only ontology notes and typed object candidates.
-- `DELETION_READINESS_RECHECK.md` - exact-path deletion readiness report, second/third-pass addenda, approval checklist, and receipt template.
+- `DELETION_READINESS_RECHECK.md` - exact-path deletion readiness report, read-only addenda, executed first-batch deletion receipt, and next Tier C exact-path approval list.
 - `CLOSEOUT.md` - final receipt for this convergence packet.
 
 ## Current High-Level Verdict
@@ -82,7 +84,8 @@ Every worktree or packet in this convergence map is assigned exactly one class:
 
 ## Boundaries
 
-- No destructive operations were performed.
+- Only the five operator-approved `git worktree` cleanup commands were run.
+- No Tier C `rm` command was run.
 - No dirty worktree was merged wholesale.
 - No source packet from another dirty worktree was copied into this convergence
   branch.
