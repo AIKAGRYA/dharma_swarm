@@ -293,7 +293,7 @@ RIGOROUS_KINDS = frozenset({
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
 
 
-# --- Graded evidence ladder (Pudgala Forge Phase 1) ---------------------------
+# --- Graded evidence ladder (Pudgala Autopoiesis Protostar Phase 1) -----------
 # The RIGOROUS bar above is binary: ONE rigorous criterion of any strength
 # suffices. That still lets a track ship on a single self-authored green test.
 # The ladder turns "rigorous yes/no" into a GRADED floor (min_evidence_grade):
@@ -484,8 +484,8 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
                         expect_digest: bool = False,
                         expect_chain: bool = False) -> CriterionResult:
     """A receipt artifact must EXIST and carry the required structural keys —
-    behavioral evidence, not just file presence. Optionally (Pudgala Forge
-    Phase 1) it must also be FRESH (within fresh_ttl_days), DIGEST-INTACT
+    behavioral evidence, not just file presence. Optionally (Pudgala Autopoiesis
+    Protostar Phase 1) it must also be FRESH (within fresh_ttl_days), DIGEST-INTACT
     (stored digest recomputes), and CHAIN-INTACT (JSONL where each row's
     prev_digest links to the previous row's digest). Any failed check ->
     NOT passed (a stale or tampered receipt is not evidence)."""
@@ -949,7 +949,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     open_blockers = [ni for ni in next_items if ni.get("blocker") is True]
     has_rigorous_evidence = any(c.passed and c.kind in RIGOROUS_KINDS for c in comps)
 
-    # --- GRADED bar (Pudgala Forge Phase 1) ------------------------------------
+    # --- GRADED bar (Pudgala Autopoiesis Protostar Phase 1) --------------------
     # Pair each completion criterion with its declared criterion dict so we can
     # read per-criterion ladder hints (oracle_source). zip is safe: comps is
     # built 1:1 from completion_criteria in order.

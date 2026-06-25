@@ -1,4 +1,4 @@
-# Anti-Slop Pudgala Forge track block — DRAFT for operator promotion.
+# Anti-Slop Pudgala Autopoiesis Protostar track block — DRAFT for operator promotion.
 #
 # Status: DRAFT — ACTIVE_TRACK.yaml is NOT hand-edited. Drop this entry under
 # `active_tracks:` only when the operator promotes it (and bump WIP if needed;
@@ -9,8 +9,8 @@
 # test_passes, and a chained+fresh receipt_valid criterion. Existence checks
 # alone would leave it UNDERGRADED — exactly the slop the track exists to stop.
 
-- id: anti-slop-pudgala-forge-2026-06
-  name: Anti-Slop Pudgala Forge — graded claim/evidence binding
+- id: anti-slop-pudgala-autopoiesis-protostar-2026-06
+  name: Anti-Slop Pudgala Autopoiesis Protostar — graded claim/evidence binding
   status: ACTIVE
   opened_at: "2026-06-25"
   verified_at: "2026-06-25"
@@ -84,7 +84,7 @@
   non_goals:
     - Do not create a new truth store, daemon, receipt system, or authority surface.
     - Do not change the EvidenceReceipt schema; add the machine sibling alongside it.
-    - Do not build property oracle, SBOM, forge adapters, dashboard, verifier
+    - Do not build property oracle, SBOM, Dharma Forge adapters, dashboard, verifier
       signatures, or formal proof here; those grade slots remain reserved.
     - Do not flip any new gate to enforced; all land advisory until the operator promotes.
 

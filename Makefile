@@ -377,11 +377,13 @@ operator-prod-smoke:
 # `make spine-check` target stays as an operator-convenience alias only.
 governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity claim-evidence-check
 
-# Pudgala Forge (graded claim/evidence binding). claim-evidence-check is
-# ADVISORY here (always exits 0) — it reports per-track strongest evidence grade
-# vs the required min_evidence_grade so existence-only "shipped" claims surface.
-# claim-evidence additionally appends a hash-chained VerifiedMachineReceipt of
-# the run under ~/.dharma/witness/ (runtime receipts never enter git).
+# Pudgala Autopoiesis Protostar (graded claim/evidence binding). This is the
+# anti-slop quality membrane, not Dharma Forge / Forge Swarm Evolution Arena.
+# claim-evidence-check is ADVISORY here (always exits 0) — it reports per-track
+# strongest evidence grade vs the required min_evidence_grade so existence-only
+# "shipped" claims surface. claim-evidence additionally appends a hash-chained
+# VerifiedMachineReceipt of the run under ~/.dharma/witness/ (runtime receipts
+# never enter git).
 claim-evidence-check:
 	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py --warn-only
 

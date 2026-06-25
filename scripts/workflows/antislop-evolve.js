@@ -1,4 +1,6 @@
-// antislop-evolve — the reusable Pudgala Forge evolution engine.
+// antislop-evolve — the reusable Pudgala Autopoiesis Protostar quality engine.
+// This is not Dharma Forge / Forge Swarm Evolution Arena; it is the anti-slop
+// claim/evidence mechanism that hardens governance claims.
 //
 // WHY THIS LIVES HERE (not .claude/workflows/): `.gitignore` ignores `.claude/`,
 // so a workflow placed there is never committed (that is exactly how the first

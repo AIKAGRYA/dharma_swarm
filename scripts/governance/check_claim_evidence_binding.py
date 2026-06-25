@@ -5,7 +5,7 @@ A THIN CLI over the graded evaluator in check_track_status.py. It does NOT
 re-implement evaluate_track; it renders, per active track, the strongest passing
 evidence grade vs the required min_evidence_grade and a binding verdict
 (BOUND / UNDERGRADED / NOT-SHIPPABLE). This is the operator-facing read of the
-Pudgala Forge anti-slop bar:
+Pudgala Autopoiesis Protostar anti-slop bar:
 
     A claim ships only when its strongest evidence meets the required grade.
 

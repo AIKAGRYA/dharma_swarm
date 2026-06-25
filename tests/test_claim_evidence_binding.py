@@ -1,4 +1,4 @@
-"""Tests for the Pudgala Forge graded claim/evidence binding (Phase 1).
+"""Tests for the Pudgala Autopoiesis Protostar graded claim/evidence binding (Phase 1).
 
 These guard the anti-slop bar itself: existence-only evidence is not closure,
 self-owned tests are not independent oracles, and a machine receipt that is
@@ -6,8 +6,8 @@ tampered or stale is not evidence. They are small and fast — structural
 invariants over the extended governance gate, not the live portfolio contents.
 
 This module is the *independent oracle* (oracle_source: ci) for the proposed
-anti-slop-pudgala-forge track: it is authored to verify the kernel, not by the
-code's owner asserting its own correctness.
+anti-slop-pudgala-autopoiesis-protostar track: it is authored to verify the
+kernel, not by the code's owner asserting its own correctness.
 """
 from __future__ import annotations
 
