@@ -283,11 +283,17 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
 # open blocker next-items. Pattern borrowed from
 # cybernetics_codex._evaluate_loop_closure_replay (compute closure from
 # structural evidence; never trust a bare boolean) and REALITY_DEBT_LEDGER.md.
-RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged", "mutation_score_gte"})
+RIGOROUS_KINDS = frozenset({
+    "test_passes",
+    "commit_on_main",
+    "receipt_valid",
+    "pr_merged",
+    "mutation_score_gte",
+})
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
 
 
-# --- Graded evidence ladder (Pudgala Forge Phase 1) ---------------------------
+# --- Graded evidence ladder (Pudgala Autopoiesis Protostar Phase 1) -----------
 # The RIGOROUS bar above is binary: ONE rigorous criterion of any strength
 # suffices. That still lets a track ship on a single self-authored green test.
 # The ladder turns "rigorous yes/no" into a GRADED floor (min_evidence_grade):
@@ -320,7 +326,7 @@ def _load_grade_ladder() -> dict[str, Any]:
         "commit_on_main": 2,
         "receipt_valid": 2,
         "test_passes": 3,
-        "mutation_score_gte": 6,  # S6 active (Pudgala Forge P3-09): primary anti-gaming oracle
+        "mutation_score_gte": 6,
     }
     ladder = {
         "kind_to_grade": dict(builtin_active),
@@ -334,9 +340,9 @@ def _load_grade_ladder() -> dict[str, Any]:
         except (OSError, ValueError):
             raw = None
         if isinstance(raw, dict):
-            kind_to_grade: dict[str, int] = dict(builtin_active)
-            parsed_active_kinds = False
+            kind_to_grade: dict[str, int] = {}
             names: dict[int, str] = {}
+            parsed_active_grade = False
             for row in raw.get("grades") or []:
                 if not isinstance(row, dict):
                     continue
@@ -349,14 +355,14 @@ def _load_grade_ladder() -> dict[str, Any]:
                 # remain unmapped and therefore score S0 until they land.
                 if str(row.get("status", "active")) != "active":
                     continue
+                parsed_active_grade = True
                 for kind in row.get("kinds") or []:
                     kind_to_grade[str(kind)] = g
-                    parsed_active_kinds = True
             # receipt_valid is a checker-native rigorous kind not listed as its
             # own ladder row; pin it to S2 (landed-equivalent) if unmapped.
-            kind_to_grade.setdefault("receipt_valid", 2)
-            if parsed_active_kinds:
-                ladder["kind_to_grade"] = kind_to_grade
+            if parsed_active_grade:
+                kind_to_grade.setdefault("receipt_valid", 2)
+                ladder["kind_to_grade"] = {**builtin_active, **kind_to_grade}
                 ladder["grade_names"] = names or ladder["grade_names"]
             try:
                 ladder["default_min_grade"] = int(raw.get("default_min_grade", _DEFAULT_MIN_GRADE))
@@ -478,8 +484,8 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
                         expect_digest: bool = False,
                         expect_chain: bool = False) -> CriterionResult:
     """A receipt artifact must EXIST and carry the required structural keys —
-    behavioral evidence, not just file presence. Optionally (Pudgala Forge
-    Phase 1) it must also be FRESH (within fresh_ttl_days), DIGEST-INTACT
+    behavioral evidence, not just file presence. Optionally (Pudgala Autopoiesis
+    Protostar Phase 1) it must also be FRESH (within fresh_ttl_days), DIGEST-INTACT
     (stored digest recomputes), and CHAIN-INTACT (JSONL where each row's
     prev_digest links to the previous row's digest). Any failed check ->
     NOT passed (a stale or tampered receipt is not evidence)."""
@@ -575,43 +581,72 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
 
 def check_mutation_score_gte(file_path: str, threshold: float, *,
                              fresh_ttl_days: int | None = None) -> CriterionResult:
-    """A mutation-score report must EXIST, be FRESH, and show a score >= threshold
-    — proof the test suite actually KILLS injected faults (S6, the primary
-    anti-gaming oracle: it resists the seven deadly AI test patterns — a trivially
-    -asserting/mock-everything/tautological test survives mutants). The report is
-    produced by `make mutation-test` (runs mutmut on the changed surfaces); this
-    gate READS it and never runs mutmut inline, so the governance gate stays fast.
-    Conservative: a missing / stale / below-threshold report does NOT pass."""
+    """A mutation-score report must EXIST, be FRESH, and show a score >= threshold.
+
+    This is S6, the primary anti-gaming oracle: the test suite must kill injected
+    faults. The expensive mutmut run happens in `make mutation-test`; this gate
+    only reads the report so normal track evaluation stays fast.
+    """
     path = repo_path(file_path)
     if not path.exists():
-        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                               detail=f"mutation report {file_path} MISSING — run `make mutation-test`")
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation report {file_path} MISSING — run `make mutation-test`",
+        )
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                               detail=f"mutation report {file_path} unreadable: {type(exc).__name__}")
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation report {file_path} unreadable: {type(exc).__name__}",
+        )
     if not isinstance(data, dict):
-        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                               detail=f"mutation report {file_path} is not a JSON object")
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation report {file_path} is not a JSON object",
+        )
     try:
         score = float(data.get("score"))
     except (TypeError, ValueError):
-        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                               detail=f"mutation report {file_path} has no numeric 'score'")
+        return CriterionResult(
+            id="",
+            kind="mutation_score_gte",
+            passed=False,
+            detail=f"mutation report {file_path} has no numeric 'score'",
+        )
     if fresh_ttl_days is not None:
         ts = _receipt_timestamp(data)
         age = days_since(ts[:10]) if ts else None
         if age is None:
-            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                                   detail=f"mutation report {file_path} has no usable timestamp for freshness")
+            return CriterionResult(
+                id="",
+                kind="mutation_score_gte",
+                passed=False,
+                detail=f"mutation report {file_path} has no usable timestamp for freshness",
+            )
         if age > fresh_ttl_days:
-            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
-                                   detail=f"mutation report {file_path} is stale ({age}d > {fresh_ttl_days}d ttl)")
+            return CriterionResult(
+                id="",
+                kind="mutation_score_gte",
+                passed=False,
+                detail=f"mutation report {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}",
+            )
     passed = score >= threshold
-    return CriterionResult(id="", kind="mutation_score_gte", passed=passed,
-                           detail=f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
-                                  f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)")
+    return CriterionResult(
+        id="",
+        kind="mutation_score_gte",
+        passed=passed,
+        detail=(
+            f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
+            f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)"
+        ),
+    )
 
 
 def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
@@ -664,15 +699,20 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 )
         elif kind == "mutation_score_gte":
             report = crit.get("file") or "reports/governance/mutation_score.json"
-            try:
-                threshold = float(crit.get("threshold", 0.6))
-            except (TypeError, ValueError):
-                threshold = 0.6
-            ttl = crit.get("fresh_ttl_days")
-            res = check_mutation_score_gte(
-                report, threshold,
-                fresh_ttl_days=int(ttl) if ttl is not None else None,
-            )
+            if not isinstance(report, str) or not report:
+                res = CriterionResult(id="", kind=kind, passed=False,
+                                      detail="malformed criterion: 'file' must be a non-empty string")
+            else:
+                try:
+                    threshold = float(crit.get("threshold", 0.6))
+                except (TypeError, ValueError):
+                    threshold = 0.6
+                ttl = crit.get("fresh_ttl_days")
+                res = check_mutation_score_gte(
+                    report,
+                    threshold,
+                    fresh_ttl_days=int(ttl) if ttl is not None else None,
+                )
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")
@@ -919,7 +959,7 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     open_blockers = [ni for ni in next_items if ni.get("blocker") is True]
     has_rigorous_evidence = any(c.passed and c.kind in RIGOROUS_KINDS for c in comps)
 
-    # --- GRADED bar (Pudgala Forge Phase 1) ------------------------------------
+    # --- GRADED bar (Pudgala Autopoiesis Protostar Phase 1) --------------------
     # Pair each completion criterion with its declared criterion dict so we can
     # read per-criterion ladder hints (oracle_source). zip is safe: comps is
     # built 1:1 from completion_criteria in order.

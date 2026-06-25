@@ -31,7 +31,7 @@ dependencies = [
 [project.optional-dependencies]
 mcp = ["mcp>=1.0"]
 ingest = ["markitdown>=0.1.6"]
-dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0", "pytest-timeout>=2.3", "ruff==0.15.16", "hypothesis>=6.100"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0", "pytest-timeout>=2.3", "ruff==0.15.16", "hypothesis>=6.100", "mutmut>=3.5"]
 router = ["fasttext-wheel>=0.9.2", "redis>=5.0.0"]
 infra = [
     "langgraph>=0.2.0",
@@ -64,7 +64,7 @@ filterwarnings = [
 ]
 
 [tool.mutmut]
-# S6 mutation gate (Pudgala Forge P3-09). Scoped to the kernel's load-bearing
+# S6 mutation gate (Pudgala Autopoiesis Protostar P3-09). Scoped to the kernel's load-bearing
 # surface so one run is tractable; widen paths_to_mutate as the gate is adopted.
 # The runner is the kernel's own fast test file, so mutants are scored against
 # meaningful assertions (a trivially-true test lets mutants survive -> low score
