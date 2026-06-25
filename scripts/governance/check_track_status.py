@@ -60,6 +60,11 @@ class CriterionResult:
     kind: str
     passed: bool
     detail: str = ""
+    # False when the check could not be RUN in this environment (e.g. the
+    # governance gate's minimal-deps job has no pytest). An unverified check
+    # is neither a pass nor a regression — it is "could not observe", and
+    # must be reported as such instead of being scored as a hard failure.
+    executed: bool = True
 
 
 def load_active_track(path: Path) -> dict[str, Any]:
@@ -317,10 +322,17 @@ def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
             capture_output=True, text=True, timeout=timeout, cwd=REPO_ROOT,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        return CriterionResult(id="", kind="test_passes", passed=False,
+        return CriterionResult(id="", kind="test_passes", passed=False, executed=False,
                                detail=f"pytest {test_target}: {type(exc).__name__} (could not execute)")
+    out = (res.stdout or "") + (res.stderr or "")
+    # pytest itself absent (minimal-deps environment): the check could not be
+    # RUN. Report it as unverified rather than a hard fail — a missing test
+    # runner is not evidence the code regressed.
+    if res.returncode != 0 and "No module named pytest" in out:
+        return CriterionResult(id="", kind="test_passes", passed=False, executed=False,
+                               detail=f"pytest {test_target}: pytest not installed (could not execute)")
     passed = res.returncode == 0
-    lines = [ln for ln in (res.stdout or res.stderr or "").splitlines() if ln.strip()]
+    lines = [ln for ln in out.splitlines() if ln.strip()]
     tail = lines[-1] if lines else ""
     return CriterionResult(id="", kind="test_passes", passed=passed,
                            detail=f"pytest {test_target}: {'PASS' if passed else 'FAIL'} — {tail}")
@@ -731,6 +743,37 @@ def run(args: argparse.Namespace) -> int:
 
         r = evaluate_track(t)
 
+        # ENFORCING rigor gate (operator directive 2026-06-25): a track may not
+        # DECLARE itself shippable without earning it under the rigorous bar.
+        # Previously the rigor verdict was advisory (INFO only); a YAML that set
+        # `status: shippable` on existence-only criteria would still pass green.
+        # This is the "AI slop" trap the operator named: a green flag with no
+        # real check behind it. Now a declared-shippable track that fails the
+        # rigorous bar is a hard ERROR (non-zero exit), so the false-closure
+        # claim blocks instead of merely informing.
+        declared_status = str(t.get("status") or "").lower()
+        if declared_status == "shippable" and not r["shippable"]:
+            # Only block for a REAL false-closure reason. A rigorous criterion
+            # that could not be RUN in this environment (e.g. the minimal-deps
+            # gate has no pytest) is unverified, not a false claim — blocking on
+            # it would manufacture exactly the kind of untrustworthy signal we
+            # are trying to remove. Fire when: an open blocker exists, OR the
+            # track declares NO rigorous criterion at all (existence-only
+            # theater — the core trap), OR a criterion actually ran and failed.
+            declares_rigorous = any(c.kind in RIGOROUS_KINDS for c in r["completion"])
+            executed_failure = any(
+                (not c.passed) and getattr(c, "executed", True)
+                for c in (r["completion"] + r["prereqs"]))
+            real_false_claim = (
+                r["open_blocker_count"] > 0 or not declares_rigorous or executed_failure)
+            if real_false_claim:
+                blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
+                findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
+                    f"[{tid}] declares status: shippable but FAILS the rigorous bar: {blocks}. "
+                    "A track cannot be marked shippable without >=1 rigorous criterion "
+                    "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
+                    "open blockers. Either add real evidence or change status back to ACTIVE."))
+
         # Prerequisite failures => track mis-declared.
         for c in r["prereqs"]:
             if not c.passed and c.kind in {"file_exists", "file_contains"}:
@@ -739,9 +782,18 @@ def run(args: argparse.Namespace) -> int:
                     "does not exist.", criterion_id=c.id))
 
         # Regression drift => previously-passing completion criterion now fails.
+        # A criterion that could not be RUN in this environment (e.g. the
+        # minimal-deps governance gate has no pytest) is NOT a regression — the
+        # code did not change, the runner is absent. Surface it as INFO so the
+        # gap is visible without producing a false-positive block.
         prev = prior_passed.get(tid, set())
         for c in r["completion"]:
             if c.id in prev and not c.passed:
+                if not getattr(c, "executed", True):
+                    findings.append(Finding("INFO", f"unverified:{tid}:{c.id}",
+                        f"[{tid}] UNVERIFIED — '{c.id}' could not run here (not a regression): {c.detail}",
+                        criterion_id=c.id))
+                    continue
                 findings.append(Finding("ERROR", f"regression:{tid}:{c.id}",
                     f"[{tid}] REGRESSION — '{c.id}' passed before and now fails: {c.detail}",
                     criterion_id=c.id))

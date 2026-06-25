@@ -21,6 +21,16 @@ from .base import (
     _utc_now,
 )
 
+# Trust rule (operator directive 2026-06-25): an ACTIVE track must not display as
+# verified-complete on existence checks alone. Without >=1 rigorous criterion
+# (test_passes / commit_on_main / receipt_valid / pr_merged) the surfaced
+# readiness is capped so the number can never exceed what a real check supports.
+# This kills the "9/9 criteria pass -> 100%" theater where every criterion is a
+# file_exists/file_contains grep. The rigorous bar itself lives in
+# scripts/governance/check_track_status.py (has_rigorous_evidence).
+UNVERIFIED_READINESS_CEILING = 50.0
+
+
 def _parse_porcelain_worktrees(stdout: str) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     current: dict[str, Any] = {}
@@ -129,7 +139,20 @@ def _probe_governance(ctx: ProbeContext) -> dict[str, Any]:
             progress = evidence.get("completion_progress") or {}
             total = int(progress.get("total") or 0)
             passed = int(progress.get("passed") or 0)
-            readiness = round((passed / total) * 100, 1) if total else (100.0 if lifecycle != "active" else 0.0)
+            has_rigorous_evidence = bool(evidence.get("has_rigorous_evidence"))
+            criteria_pass_rate = round((passed / total) * 100, 1) if total else (100.0 if lifecycle != "active" else 0.0)
+            # An ACTIVE track with no rigorous evidence cannot read above the
+            # ceiling no matter how many existence checks pass. The displayed
+            # number is then provably bounded by what a real check supports.
+            readiness_capped = (
+                lifecycle == "active" and total > 0 and not has_rigorous_evidence
+                and criteria_pass_rate > UNVERIFIED_READINESS_CEILING
+            )
+            readiness = UNVERIFIED_READINESS_CEILING if readiness_capped else criteria_pass_rate
+            readiness_basis = (
+                "rigorous" if has_rigorous_evidence
+                else ("existence-only" if total > 0 else "no-evidence")
+            )
             status = str(track.get("status") or lifecycle).lower()
             shippable = bool(evidence.get("shippable")) or status == "shippable"
             lane = "Archived" if lifecycle != "active" else ("Verified" if shippable and not stale else "Needs Repair" if stale else "Active Branch")
@@ -157,6 +180,10 @@ def _probe_governance(ctx: ProbeContext) -> dict[str, Any]:
                 "ttl_days": ttl_days,
                 "stale": stale,
                 "readiness": readiness,
+                "criteria_pass_rate": criteria_pass_rate,
+                "has_rigorous_evidence": has_rigorous_evidence,
+                "readiness_basis": readiness_basis,
+                "readiness_capped": readiness_capped,
                 "shippable": shippable,
                 "completion_progress": {"passed": passed, "total": total},
                 "evidence_present": bool(evidence),
