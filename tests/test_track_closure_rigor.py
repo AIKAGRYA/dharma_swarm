@@ -51,6 +51,68 @@ def test_test_passes_runs_and_distinguishes_pass_from_fail(tmp_path):
     assert check_test_passes(f"{bad}::test_no").passed is False
 
 
+def test_test_passes_marks_unverified_when_pytest_absent(monkeypatch):
+    """When the test RUNNER itself is missing (minimal-deps governance gate),
+    a test_passes check is unverified — executed=False, passed=False — not a
+    hard failure. A missing runner is not evidence the code regressed."""
+    import subprocess as _sp
+
+    import check_track_status as cts  # type: ignore
+
+    class _FakeProc:
+        returncode = 1
+        stdout = ""
+        stderr = "/usr/bin/python3: No module named pytest\n"
+
+    monkeypatch.setattr(cts.subprocess, "run", lambda *a, **k: _FakeProc())
+    r = cts.check_test_passes("tests/test_whatever.py")
+    assert r.passed is False
+    assert r.executed is False
+    assert "could not execute" in r.detail
+    del _sp  # silence unused-import lint in some configs
+
+
+def test_test_passes_executed_true_on_real_run(tmp_path):
+    good = tmp_path / "test_good.py"
+    good.write_text("def test_ok():\n    assert True\n")
+    r = check_test_passes(f"{good}::test_ok")
+    assert r.passed is True and r.executed is True
+
+
+def test_unverified_test_runs_do_not_block_the_gate(monkeypatch):
+    """End-to-end against the REAL portfolio: when every test_passes criterion
+    can only report 'could not execute' (the minimal-deps governance gate has
+    no pytest), the checker must still exit 0 — a missing runner is not a
+    regression and must not manufacture a false CI failure. Authority for this
+    is the unverified-vs-regression split in run()."""
+    import argparse
+
+    import check_track_status as cts  # type: ignore
+
+    # Mark every rigorous test_passes criterion as previously-passing so the
+    # regression path is exercised, then force it unverified now.
+    raw = cts.load_active_track(cts.ACTIVE_TRACK_PATH)
+    portfolio = cts.normalize_portfolio(raw)
+    prior: dict[str, set[str]] = {}
+    for t in portfolio["active_tracks"]:
+        ids = {c.get("id") for c in (t.get("completion_criteria") or [])
+               if c.get("kind") == "test_passes"}
+        if ids:
+            prior[t["id"]] = ids
+    assert prior, "expected at least one test_passes criterion in the portfolio"
+
+    def _unverified(_target, timeout=180):
+        return cts.CriterionResult(id="", kind="test_passes", passed=False,
+                                   executed=False,
+                                   detail="pytest not installed (could not execute)")
+
+    monkeypatch.setattr(cts, "check_test_passes", _unverified)
+    monkeypatch.setattr(cts, "_load_prior_passed", lambda: prior)
+    monkeypatch.setattr(cts, "emit_reports", lambda *_a, **_k: None)
+    args = argparse.Namespace(enforce_ttl=False)
+    assert cts.run(args) == 0  # unverified must not block
+
+
 def test_receipt_valid_requires_keys(tmp_path):
     receipt = tmp_path / "r.json"
     receipt.write_text('{"closeout_state": "positive_lift_candidate", "score": 1.0}')
