@@ -120,6 +120,30 @@ def test_parse_mutmut_summary_score() -> None:
     assert parse_mutmut_summary("no mutants here")["score"] == 0.0
 
 
+def test_single_owner_no_second_strength_ladder() -> None:
+    """Anti-drift guard from the #685/#693/#695 convergence weave: exactly ONE
+    source of kind->strength. track_acceptance_strength_report reads its strengths
+    from evidence_grades.yaml (the single config), NOT a hard-coded second ladder
+    that can silently diverge (the reviewed defect). And the thin CLI consumes
+    evaluate_track — it never re-implements the verdict (the only real drift risk
+    is a future second evaluator; this test fails if one appears)."""
+    from check_track_status import load_active_track  # type: ignore  # noqa: E402
+    import track_acceptance_strength_report as tas  # type: ignore  # noqa: E402
+
+    raw = load_active_track(REPO_ROOT / "docs/governance/evidence_grades.yaml")
+    km = raw.get("kind_maturity")
+    assert isinstance(km, dict) and km, "evidence_grades.yaml must carry kind_maturity (the single source)"
+    for kind, strength in tas.KIND_STRENGTH.items():
+        assert int(km.get(kind, -999)) == strength, (
+            f"track_acceptance strength for {kind}={strength} drifted from "
+            f"evidence_grades.yaml kind_maturity={km.get(kind)}")
+    assert "mutation_score_gte" in tas.KIND_STRENGTH  # the gap the review caught is now closed
+
+    cli_src = (REPO_ROOT / "scripts/governance/check_claim_evidence_binding.py").read_text(encoding="utf-8")
+    assert "from check_track_status import" in cli_src and "evaluate_track" in cli_src
+    assert "def evaluate_track" not in cli_src, "the thin CLI must not re-implement the evaluator"
+
+
 # --------------------------------------------------------------------------- #
 # Grade ladder + graded conjunct                                              #
 # --------------------------------------------------------------------------- #

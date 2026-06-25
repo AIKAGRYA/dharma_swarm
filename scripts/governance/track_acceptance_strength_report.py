@@ -59,14 +59,46 @@ RUBRIC: dict[int, str] = {
 }
 
 
-KIND_STRENGTH: dict[str, int] = {
+EVIDENCE_GRADES_PATH = Path(__file__).resolve().parents[2] / "docs/governance/evidence_grades.yaml"
+
+# Fail-safe copy used ONLY if the single config is missing/malformed (a
+# governance gate must not crash on bad config). The authoritative source is
+# docs/governance/evidence_grades.yaml::kind_maturity — do not hand-edit these
+# to diverge from it; the single-owner invariant test pins them equal.
+_FALLBACK_KIND_STRENGTH: dict[str, int] = {
     "file_exists": 0,
     "file_contains": 1,
     "pr_merged": 2,
     "commit_on_main": 2,
     "test_passes": 3,
     "receipt_valid": 5,
+    "mutation_score_gte": 4,
 }
+
+
+def _load_kind_strength() -> dict[str, int]:
+    """Read the claim-maturity strengths from the SINGLE config
+    (evidence_grades.yaml::kind_maturity) so this membrane and the evidence-grade
+    gate read ONE source — no second hard-coded ladder that can silently drift
+    (the convergence-review defect). Fail-safe to a built-in copy."""
+    try:
+        raw = load_active_track(EVIDENCE_GRADES_PATH)
+        km = raw.get("kind_maturity") if isinstance(raw, dict) else None
+        if isinstance(km, dict) and km:
+            out: dict[str, int] = {}
+            for key, val in km.items():
+                try:
+                    out[str(key)] = int(val)
+                except (TypeError, ValueError):
+                    continue
+            if out:
+                return out
+    except (OSError, ValueError):
+        pass
+    return dict(_FALLBACK_KIND_STRENGTH)
+
+
+KIND_STRENGTH: dict[str, int] = _load_kind_strength()
 
 
 ADVERSARIAL_CUE = re.compile(

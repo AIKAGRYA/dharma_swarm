@@ -39,6 +39,42 @@ default_min_grade: 2          # S2 — landed on origin/main
 # `oracle_source:` to an independent verifier (signer != committer) to keep S3.
 oracle_dependent_downgrade_to: 2   # S3 -> S2 when oracle == track owner
 
+# ENFORCEMENT MODEL — ONE evaluator (check_track_status.py::evaluate_track),
+# TWO ratcheted enforcement rungs, read by multiple projection surfaces. Do NOT
+# collapse the two rungs into one strictness (that would break the advisory->
+# enforced ratchet and the light-governance/diversity constraint):
+#   Rung 1 (HARD, always-on, NARROW): the false-shippable-claim ERROR in run()
+#     fires only when a track DECLARES status:shippable yet lacks any rigorous
+#     criterion OR has an open blocker OR an *executed* failure. An UNVERIFIED
+#     (could-not-run-here) criterion NEVER blocks. This is #695's deliberate,
+#     fail-safe ratchet exception — it ships enforcing on merge by design.
+#   Rung 2 (STAGE-DRIVEN, fail-safe-advisory): the graded undergrade case
+#     (strongest passing grade < min_evidence_grade) blocks only when the AI-M1
+#     hygiene pattern is at stage 'enforced' (operator-promoted via promote.py).
+# A future editor must NOT "fix" the binary-vs-graded seam by making the graded
+# case hard-block unconditionally — that collapse is the PRIMARY documented risk.
+
+# Claim-MATURITY scale (0-7) — a DELIBERATELY DISTINCT scale from the evidence
+# `grade` below, CO-LOCATED here so the two cannot silently drift. (Prior split-
+# brain, caught by the convergence review: track_acceptance_strength_report.py
+# hard-coded its own ladder that disagreed with this file on receipt_valid /
+# pr_merged / mutation_score_gte.) The evidence GRADE answers "how strong is the
+# evidence?"; claim-MATURITY answers "does the evidence match the CLAIM's NAME?"
+# (a 'runtime'/'closure' claim implies an observed path). Same ordering, not every
+# value (a receipt is S2-landed evidence yet runtime-MATURITY 5) — intentional.
+# track_acceptance reads its strengths from HERE; it no longer hard-codes them.
+# RUBRIC: 0 file-present · 1 declaration-complete · 2 command-receipted ·
+# 3 behavior-verified · 4 adversarial-verified · 5 runtime-verified ·
+# 6 independently-reproduced · 7 promoted.
+kind_maturity:
+  file_exists: 0
+  file_contains: 1
+  pr_merged: 2
+  commit_on_main: 2
+  test_passes: 3
+  receipt_valid: 5
+  mutation_score_gte: 4    # adversarial-verified — tests kill injected faults (was absent -> 0)
+
 grades:
   - grade: 0
     name: S0_EXISTS
