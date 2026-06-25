@@ -847,3 +847,613 @@ Then append a deletion receipt to this packet naming:
 - worktrees still registered
 - remaining dirty paths
 - any refused command or unexpected status
+
+## Fourth-Pass Current-State Recheck (Pass 4)
+
+Generated: 2026-06-25T11:58 JST
+Worktree: `/Users/dhyana/ds_cleanup_convergence_20260625`
+Branch: `cleanup/convergence-20260615-25`
+
+This pass was triggered because `origin/main` advanced since Pass 3
+(`21ee18b36` -> `240a92c6b`). Every verdict and the three prior hold findings
+were re-verified against current main. This is a read-only recheck: no
+deletion, prune, worktree removal, branch deletion, reset, stash operation,
+or file deletion was run.
+
+Pass 4 supersedes the verdict tables in Passes 1-3 where they disagree. In
+practice the advanced main resolved none of the hold findings, so the
+approval-ready batch and the hold list are unchanged from the Pass 2
+addendum, now re-confirmed against `240a92c6b`.
+
+### New Baseline
+
+```bash
+git -C /Users/dhyana/dharma_swarm fetch origin main
+git -C /Users/dhyana/dharma_swarm rev-parse origin/main
+git -C /Users/dhyana/dharma_swarm worktree list --porcelain
+```
+
+Result:
+
+```text
+73113dbd0..240a92c6b  main -> origin/main
+origin/main = 240a92c6b12b390e429298dfb36661ed8af365a8
+registered worktrees = 20 (unchanged set since Pass 3)
+```
+
+### Preservation Re-Verified Present
+
+```bash
+ls /Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST
+ls /Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST.tar.gz
+ls /Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST.tar.gz.sha256
+ls /Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST/receipts/BACKUP_RECEIPT.md
+ls /Users/dhyana/dharma_recover_backups
+ls /Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST/trees/
+git -C /Users/dhyana/dharma_swarm stash list | wc -l
+```
+
+Result:
+
+- preservation root, portable archive (211562612 bytes), sha256 sidecar, and
+  backup root all present
+- `BACKUP_RECEIPT.md`: shared and old-clone bundle verify OK; off-machine
+  archive copied to `agni` and verified OK; all 686 stable files
+  checksum-verified OK; no destructive op performed during preservation
+- preservation `trees/` directory contains an overlay for every candidate
+  named below, including `tracked_unstaged.diff` for the dirty ones
+- 70 stashes exist in `dharma_swarm`. They are not deletion candidates. Do not
+  drop, pop, or clear them.
+
+### Commands Run This Pass
+
+Candidate inspection loop (read-only), run for all Tier A, Tier B, and the
+do-not-clear paths:
+
+```bash
+# per candidate path p:
+git -C "$p" rev-parse HEAD
+git -C "$p" rev-parse --abbrev-ref HEAD
+git -C "$p" rev-parse --abbrev-ref --symbolic-full-name '@{u}'
+git -C "$p" status -sb | head -3
+git -C "$p" status --short | wc -l
+git -C "$p" status --short | grep -c '^??'
+git -C "$p" merge-base --is-ancestor HEAD origin/main && echo ANCESTOR=yes || echo ANCESTOR=no
+test -d "$p" && echo EXISTS=yes || echo EXISTS=no
+```
+
+Hold-finding re-verification against current `origin/main` (240a92c6b):
+
+```bash
+git -C /Users/dhyana/dharma_swarm show origin/main:pyproject.toml | rg -n 'markitdown|ingest'
+git -C /Users/dhyana/worktrees/ds_pr674_rebase_20260624 diff origin/main -- uv.lock --stat
+git -C /Users/dhyana/dharma_swarm grep -n 'ArchiveFitnessAuthorityError|fitness_authority_granted|_one_wire_quorum_eligible' origin/main -- dharma_swarm/archive.py tests/test_archive.py
+git -C /private/tmp/ds_provider_review diff origin/main -- dharma_swarm/archive.py tests/test_archive.py --stat
+git -C /Users/dhyana/ds_governance_fitness_ci_20260620 cherry -v origin/main HEAD
+git -C /Users/dhyana/ds_governance_fitness_ci_20260620 rev-list --left-right --count origin/main...HEAD
+shasum -a 256 /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25/reports/governance/prod_readiness/PROD_GRADE_REVIEW_RESULTS_2026-06-22.md
+git -C /Users/dhyana/dharma_swarm show origin/main:reports/governance/prod_readiness/PROD_GRADE_REVIEW_RESULTS_2026-06-22.md | shasum -a 256
+git -C /Users/dhyana/dharma_swarm ls-tree -r --name-only origin/main reports/governance/prod_readiness
+```
+
+### Exact Current Status Per Candidate (origin/main = 240a92c6b)
+
+```text
+TIER A
+/private/tmp/dharma_nim_main_check
+  EXISTS=no (MISSING); worktree list marks prunable
+  HEAD=4394d81b201e4a42d3cc30e78dc3f428bf85c506
+  branch=model-routing/nim-live-catalog-fix-20260620
+  ANCESTOR=n/a (path missing); preserve ref + preservation overlay exist
+  Verdict: SAFE_TO_REMOVE (prune stale registration)
+
+/private/tmp/ds_pr674_merge_check
+  EXISTS=yes; detached (HEAD no branch); clean (0 dirty)
+  HEAD=98a22169883116a8536407dc7700dbbced9ab831
+  ANCESTOR=no (throwaway merge-check commit; PR #674 is merged)
+  preserve ref + refs/tmp/pr674-merge-20260624 exist
+  Verdict: SAFE_TO_REMOVE (worktree remove; keep refs unless separately approved)
+
+/Users/dhyana/worktrees/ds_cockpit_extract_20260623
+  EXISTS=yes; clean (0 dirty); 0 untracked
+  branch=governance/operator-coherence-cockpit-20260623 (origin gone)
+  HEAD=f0d52830ebb47f675e5af4b0dd0beea07fb5cef8
+  ANCESTOR=yes; PR #677 merged 2026-06-23T15:39:26Z
+  Verdict: SAFE_TO_REMOVE
+
+/Users/dhyana/worktrees/ds_pr674_rebase_20260624
+  EXISTS=yes; 4 dirty (0 untracked)
+  branch=repair/pr674-track-closure-gate-20260624 (upstream origin/chore/reconcile-records-2026-06-22 gone)
+  HEAD=ebccfb1e2d242f035ac7d9c7a10c3a1ed7d05edc
+  ANCESTOR=yes; PR #674 merged 2026-06-23T22:32:24Z
+  dirty: reports/governance/active_track_evidence.json, .md, track_portfolio.json (generated churn), uv.lock (markitdown lockfile resolution NOT on main)
+  Verdict: INSPECT_FIRST / DO_NOT_REMOVE_YET
+
+/Users/dhyana/worktrees/ds_arena_admit_20260623
+  EXISTS=yes; clean (0 dirty); 0 untracked
+  branch=governance/arena-v1-admission-20260623 (origin gone)
+  HEAD=55e121b13b048dd750579bf88a566cd86638f462
+  ANCESTOR=yes; PR #678 merged 2026-06-23T15:01:31Z
+  Verdict: SAFE_TO_REMOVE
+
+TIER B
+/private/tmp/dharma_swarm_prod_readiness_20260623_839fd25
+  EXISTS=yes; detached; 6 dirty + 1 untracked (reports/governance/prod_readiness/)
+  HEAD=839fd25f43c76375f49e45012fe8f20a324aa74c
+  ANCESTOR=yes
+  keeper files byte-identical to current main: md=7993e034..., json=5830c537... (origin/main contains the full prod_readiness dir)
+  Verdict: SAFE_TO_REMOVE (--force; only generated churn + keeper content already on main)
+
+/Users/dhyana/ds_governance_fitness_ci_20260620
+  EXISTS=yes; clean (0 dirty); 0 untracked
+  branch=codex/governance-fitness-ci-20260620 (origin gone)
+  HEAD=c69f1cf05bec9b38fa0468135d21a25e7709971d
+  ANCESTOR=no; git cherry marks all 5 commits unique (+); behind 185 / ahead 5
+  Verdict: DO_NOT_REMOVE_YET (source-bearing; port or archive)
+
+/private/tmp/ds_provider_review
+  EXISTS=yes; 2 dirty source files (0 untracked)
+  branch=fix/provider-discoverability (origin gone)
+  HEAD=f4814580a47608ccd896481352fe2fd76b054cfc
+  ANCESTOR=yes; PR #675 merged 2026-06-23T15:01:35Z
+  dirty: dharma_swarm/archive.py, tests/test_archive.py (389-line ArchiveFitnessAuthorityError / One Wire quorum overlay NOT on main)
+  preservation overlay tracked_unstaged.diff=389 lines captures it
+  Verdict: DO_NOT_REMOVE_YET (source-bearing keeper candidate; port or archive)
+
+TIER C (generated output; exact paths only, unchanged from prior passes)
+/Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution
+  33 top-level dirs, 1260 files, 546 tracked; 17 untracked timestamp dirs are the only rm candidates
+  Verdict: INSPECT_FIRST (exact untracked dirs only; never evolution/* wildcard)
+
+/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a
+  548 files, 3 tracked; 18 untracked generated entries are the only rm candidates
+  parent worktree is ACTIVE_RUNTIME_SUBSTRATE (82 dirty, behind 185) -> DO_NOT_CLEAR
+  Verdict: INSPECT_FIRST (exact untracked entries only; lane-owner approval; never reports/a2a/* wildcard)
+
+/Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22
+  38 files, 0 tracked (whole dir untracked); mixes raw dumps with keeper reports
+  Verdict: INSPECT_FIRST (numbered raw dumps 00_*..18_* only; keep 19_*..25_* and DGM_READY/NEXT_GOAL/README)
+
+DO NOT CLEAR (confirmed present, source-bearing or active; not deletion candidates)
+/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618  82 dirty, behind 185, ACTIVE_RUNTIME_SUBSTRATE
+/Users/dhyana/dharma_helm_build                     9 dirty, ahead 57, DASHBOARD_OPERATOR_SURFACE
+/Users/dhyana/ds_forge_v1_scoreboard                0 dirty, ahead 9/behind 185, PORT_TO_TRACK
+/Users/dhyana/ds_supplychain_slice                 14 dirty, upstream gone, unmerged local commit 11de04fb7, PORT_TO_TRACK
+/Users/dhyana/ds_anti_slop_membrane_20260625        0 dirty, PR #685 merged, GOVERNANCE_MEMBRANE
+/Users/dhyana/dharma_swarm                         221 dirty, primary checkout on recover/dharma-capital-2026-06-24
+/Users/dhyana/dharma_swarm_live                     1 dirty (staged), organ/03-seat
+/Users/dhyana/migration_delta/dharma_swarm_old     53 dirty, ahead 16, ARCHIVE_ONLY (old clone)
+/Users/dhyana/dharma_swarm_wt/render-on-demand      clean, HEAD=origin/main, DO_NOT_REMOVE (not in cleanup scope)
+```
+
+### Hold Findings Re-Verified Against Current Main
+
+1. `ds_pr674_rebase_20260624` uv.lock: STILL DIVERGENT.
+   `origin/main:pyproject.toml` declares `ingest = ["markitdown>=0.1.6"]`, but
+   the worktree's dirty `uv.lock` resolves dependencies (coloredlogs,
+   humanfriendly, ...) that are absent from `origin/main:uv.lock`.
+   `git diff origin/main -- uv.lock` is non-empty. The dirty lockfile is an
+   unmerged markitdown/ingest resolution, not cleanup debris.
+   Verdict: DO_NOT_REMOVE_YET. Note: this candidate was listed in the
+   operator's Tier A, but current-state confirmation shows it is NOT yet safe
+   to remove; it should be held out of the first deletion batch.
+
+2. `ds_provider_review` archive-fitness overlay: STILL SOURCE-BEARING, NOT ON
+   MAIN. `git diff origin/main -- dharma_swarm/archive.py tests/test_archive.py`
+   is 389 lines adding `ArchiveFitnessAuthorityError`,
+   `fitness_authority_granted`, and One Wire quorum enforcement plus tests.
+   `origin/main` lacks these symbols. The preservation overlay captures the
+   diff, but the work is a real keeper candidate.
+   Verdict: DO_NOT_REMOVE_YET (port or archive; do not delete as temp cleanup).
+
+3. `ds_governance_fitness_ci_20260620`: 5 commits STILL UNIQUE.
+   `git cherry -v origin/main HEAD` marks all five `+`; `rev-list --count
+   origin/main...HEAD` = behind 185 / ahead 5. Clean does not mean redundant.
+   Verdict: DO_NOT_REMOVE_YET (port or archive).
+
+4. `prod_readiness` keeper files: STILL BYTE-IDENTICAL to current main.
+   `PROD_GRADE_REVIEW_RESULTS_2026-06-22.md` sha = `7993e034...` and `.json`
+   sha = `5830c537...` match `origin/main`; `origin/main` contains the full
+   `reports/governance/prod_readiness/` directory. Remaining dirty files are
+   generated governance/orientation projections.
+   Verdict: SAFE_TO_REMOVE with `--force`.
+
+### Refreshed Verdict Summary (current main 240a92c6b)
+
+| Candidate | Current evidence | Verdict |
+|---|---|---|
+| `/private/tmp/dharma_nim_main_check` | missing; prunable; preserved | SAFE_TO_REMOVE (prune) |
+| `/private/tmp/ds_pr674_merge_check` | detached; clean; throwaway merge-check; preserved | SAFE_TO_REMOVE (worktree remove) |
+| `/Users/dhyana/worktrees/ds_cockpit_extract_20260623` | clean; ancestor of main; PR #677 merged | SAFE_TO_REMOVE |
+| `/Users/dhyana/worktrees/ds_pr674_rebase_20260624` | ancestor of main; PR #674 merged; dirty uv.lock is unmerged markitdown lockfile resolution | DO_NOT_REMOVE_YET |
+| `/Users/dhyana/worktrees/ds_arena_admit_20260623` | clean; ancestor of main; PR #678 merged | SAFE_TO_REMOVE |
+| `/private/tmp/dharma_swarm_prod_readiness_20260623_839fd25` | detached; ancestor of main; keeper files byte-identical on main; only generated churn dirty | SAFE_TO_REMOVE (--force) |
+| `/Users/dhyana/ds_governance_fitness_ci_20260620` | clean; 5 commits unique vs main; source-bearing | DO_NOT_REMOVE_YET |
+| `/private/tmp/ds_provider_review` | ancestor of main; PR #675 merged; 389-line source overlay not on main | DO_NOT_REMOVE_YET |
+| Cashclaw `reports/revenue_wedge/evolution` | 17 untracked timestamp dirs; 546 tracked files | INSPECT_FIRST (exact untracked dirs only) |
+| A2A `reports/a2a` | 18 untracked entries; 3 tracked; active substrate parent | INSPECT_FIRST (exact untracked entries only) |
+| Reconciliation raw dumps | 38 untracked files; mixes dumps with keeper reports | INSPECT_FIRST (numbered dumps only) |
+
+### Final Approval-Ready Deletion Batch
+
+These are the only commands ready for operator approval as the first batch.
+They are unchanged from the Pass 2 addendum and re-confirmed against current
+main. Do not run them until the operator approves exact paths.
+
+```bash
+git -C /Users/dhyana/dharma_swarm worktree prune --verbose
+git -C /Users/dhyana/dharma_swarm worktree remove /private/tmp/ds_pr674_merge_check
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_cockpit_extract_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_arena_admit_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove --force /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25
+```
+
+Optional branch cleanup, approve separately and only after the worktree is
+removed (use `-d`, not `-D`, so git refuses if the branch is not merged):
+
+```bash
+git -C /Users/dhyana/dharma_swarm branch -d governance/operator-coherence-cockpit-20260623
+git -C /Users/dhyana/dharma_swarm branch -d governance/arena-v1-admission-20260623
+```
+
+### Do Not Include In The First Batch
+
+- `/Users/dhyana/worktrees/ds_pr674_rebase_20260624` (dirty uv.lock markitdown
+  resolution; hold for the ingest lockfile decision)
+- `/Users/dhyana/ds_governance_fitness_ci_20260620` (5 unique source-bearing
+  commits; port or archive)
+- `/private/tmp/ds_provider_review` (389-line source-bearing archive-fitness
+  overlay; port or archive)
+- any preservation refs (`refs/preserve/*`), bundles, tarballs, sha256
+  sidecars, `dharma_recover_backups`, the old clone, or any of the 70 stashes
+- `/Users/dhyana/dharma_swarm_wt/render-on-demand` (clean, on main, not in
+  cleanup scope)
+- every do-not-clear worktree listed above
+
+### Final Consolidated Approval Checklist
+
+Approve exact paths and command groups. Do not approve by tier name alone.
+
+- [ ] Approve `worktree prune --verbose` for the missing `/private/tmp/dharma_nim_main_check` registration.
+- [ ] Approve `worktree remove /private/tmp/ds_pr674_merge_check`.
+- [ ] Approve `worktree remove /Users/dhyana/worktrees/ds_cockpit_extract_20260623`.
+- [ ] Approve `worktree remove /Users/dhyana/worktrees/ds_arena_admit_20260623`.
+- [ ] Approve `worktree remove --force /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25` (keeper files are byte-identical on current main; only generated churn is dirty).
+- [ ] Do NOT remove `/Users/dhyana/worktrees/ds_pr674_rebase_20260624` until the dirty `uv.lock` markitdown/ingest resolution is captured or explicitly discarded.
+- [ ] Port or archive `/Users/dhyana/ds_governance_fitness_ci_20260620`; do not delete as cleanup debris.
+- [ ] Port or archive `/private/tmp/ds_provider_review`; do not delete as cleanup debris.
+- [ ] Approve or reject branch deletion for `governance/operator-coherence-cockpit-20260623` (separate from worktree removal).
+- [ ] Approve or reject branch deletion for `governance/arena-v1-admission-20260623` (separate from worktree removal).
+- [ ] Do not delete `repair/pr674-track-closure-gate-20260624` until the dirty worktree decision is made.
+- [ ] Approve the 17 exact Cashclaw untracked timestamp directories listed in the Cashclaw section above; never `evolution/*`.
+- [ ] Approve the 18 exact A2A untracked generated entries listed above; never `reports/a2a/*`; lane-owner approval required.
+- [ ] Approve the exact reconciliation raw dump files `00_*` through `18_*` only; keep `19_*` through `25_*` and `DGM_READY_RECONCILIATION_REPORT.md`, `NEXT_GOAL_PROMPT.md`, `README.md`.
+- [ ] Confirm no preservation ref, bundle, tarball, backup root, old clone, or stash is touched.
+
+### Post-Approval Verification
+
+After any approved deletion batch, rerun and append a receipt:
+
+```bash
+git -C /Users/dhyana/dharma_swarm worktree list --porcelain
+git -C /Users/dhyana/dharma_swarm status -sb
+git -C /Users/dhyana/ds_cleanup_convergence_20260625 status -sb
+```
+
+Then complete the Deletion Execution Receipt template in the Third-Pass
+addendum above, naming exact commands run, exact paths removed, worktrees
+still registered, remaining dirty paths, and any refused command.
+
+## Deletion Execution Receipt - 2026-06-25T120918JST
+
+This receipt records the first approved worktree deletion batch. Only the exact
+commands approved by the operator were run. No branch deletion, stash operation,
+preservation ref update, backup removal, clone removal, or Tier C file removal
+was performed.
+
+### Operator-Approved Command Group
+
+```bash
+git -C /Users/dhyana/dharma_swarm worktree prune --verbose
+git -C /Users/dhyana/dharma_swarm worktree remove /private/tmp/ds_pr674_merge_check
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_cockpit_extract_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_arena_admit_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove --force /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25
+```
+
+### Commands Actually Run
+
+```bash
+git -C /Users/dhyana/dharma_swarm fetch origin main
+git -C /Users/dhyana/dharma_swarm worktree prune --verbose
+git -C /Users/dhyana/dharma_swarm worktree remove /private/tmp/ds_pr674_merge_check
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_cockpit_extract_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove /Users/dhyana/worktrees/ds_arena_admit_20260623
+git -C /Users/dhyana/dharma_swarm worktree remove --force /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25
+```
+
+`fetch origin main` was the read-only freshness check required by the cleanup
+protocol before deletion. It left `origin/main` at:
+
+```text
+240a92c6b12b390e429298dfb36661ed8af365a8
+```
+
+### Command Output
+
+`worktree prune --verbose` output:
+
+```text
+Removing worktrees/dharma_nim_main_check: gitdir file points to non-existent location
+```
+
+The four `worktree remove` commands completed without stdout or stderr.
+
+### Removed Paths
+
+- `/private/tmp/dharma_nim_main_check` stale registration was pruned.
+- `/private/tmp/ds_pr674_merge_check` was removed.
+- `/Users/dhyana/worktrees/ds_cockpit_extract_20260623` was removed.
+- `/Users/dhyana/worktrees/ds_arena_admit_20260623` was removed.
+- `/private/tmp/dharma_swarm_prod_readiness_20260623_839fd25` was removed with `--force`.
+
+Filesystem verification:
+
+```text
+ls: /Users/dhyana/worktrees/ds_arena_admit_20260623: No such file or directory
+ls: /Users/dhyana/worktrees/ds_cockpit_extract_20260623: No such file or directory
+ls: /private/tmp/dharma_swarm_prod_readiness_20260623_839fd25: No such file or directory
+ls: /private/tmp/ds_pr674_merge_check: No such file or directory
+```
+
+### Post-Run Worktree Registry
+
+`git -C /Users/dhyana/dharma_swarm worktree list --porcelain` now reports 15
+registered worktrees:
+
+```text
+worktree /Users/dhyana/dharma_swarm
+HEAD 69506fc803c2b56912a71e0c169a5b37b9ea345d
+branch refs/heads/recover/dharma-capital-2026-06-24
+
+worktree /private/tmp/ds_provider_review
+HEAD f4814580a47608ccd896481352fe2fd76b054cfc
+branch refs/heads/fix/provider-discoverability
+
+worktree /Users/dhyana/dharma_helm_build
+HEAD 680b013c027194eb50416840d63055f025ca4bb7
+branch refs/heads/helm/worldclass-20260612
+
+worktree /Users/dhyana/dharma_swarm_cashclaw
+HEAD c487d2725663bc83d1846bf349763c25930ab2ec
+branch refs/heads/cashclaw/revenue-hydra-v1
+
+worktree /Users/dhyana/dharma_swarm_live
+HEAD e67b91829cb0b375069a19e4e60125b6d89ba374
+branch refs/heads/organ/03-seat
+
+worktree /Users/dhyana/dharma_swarm_main
+HEAD 86418541a99c265c09040b9bfc064625c6d59994
+detached
+
+worktree /Users/dhyana/dharma_swarm_wt/render-on-demand
+HEAD 21ee18b365a7a0f4b22bb9b087a987973c6fdaa3
+branch refs/heads/chore/render-on-demand-stop-churn-20260625
+
+worktree /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618
+HEAD 86418541a99c265c09040b9bfc064625c6d59994
+branch refs/heads/runtime-truth/nats-rebuild-preflight-20260618
+
+worktree /Users/dhyana/ds_cleanup_convergence_20260625
+HEAD cffd79ead84eead0d8e8ef2cf06e77e829b97808
+branch refs/heads/cleanup/convergence-20260615-25
+
+worktree /Users/dhyana/ds_forge_v1_scoreboard
+HEAD d8bca7aab20af7871cff4ef46d08227cdb0923fa
+branch refs/heads/forge-v1/tokenbroker-scoreboard-20260620
+
+worktree /Users/dhyana/ds_governance_fitness_ci_20260620
+HEAD c69f1cf05bec9b38fa0468135d21a25e7709971d
+branch refs/heads/codex/governance-fitness-ci-20260620
+
+worktree /Users/dhyana/ds_supplychain_slice
+HEAD 11de04fb743ff9b02a293b248d579bf02fe8fd38
+branch refs/heads/loop-closure/supplychain-bronze-20260620
+
+worktree /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622
+HEAD 726bc9d4d4add60c46f102d1ceee3a065c474892
+detached
+
+worktree /Users/dhyana/worktrees/ds_mandala_cockpit_throwaway_20260624
+HEAD 63c4937b33dcef673be53e59368c8eee9293591d
+branch refs/heads/scratch/mandala-cockpit-v1-20260624
+
+worktree /Users/dhyana/worktrees/ds_pr674_rebase_20260624
+HEAD ebccfb1e2d242f035ac7d9c7a10c3a1ed7d05edc
+branch refs/heads/repair/pr674-track-closure-gate-20260624
+```
+
+### Protected State Re-Verified
+
+Protected paths still present:
+
+```text
+/Users/dhyana/worktrees/ds_pr674_rebase_20260624
+/Users/dhyana/ds_governance_fitness_ci_20260620
+/private/tmp/ds_provider_review
+/Users/dhyana/dharma_swarm_wt/render-on-demand
+```
+
+Preservation state still present:
+
+```text
+/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST
+/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST.tar.gz
+/Users/dhyana/.dharma/preservation/dharma_swarm_current_20260624T223009JST.tar.gz.sha256
+/Users/dhyana/dharma_recover_backups
+```
+
+Stashes remain untouched:
+
+```text
+git -C /Users/dhyana/dharma_swarm stash list | wc -l
+70
+```
+
+### Post-Run Status Summary
+
+```text
+git -C /Users/dhyana/dharma_swarm status -sb
+## recover/dharma-capital-2026-06-24...origin/recover/dharma-capital-2026-06-24
+status --short count: 221
+
+git -C /Users/dhyana/ds_cleanup_convergence_20260625 status -sb
+## cleanup/convergence-20260615-25...origin/cleanup/convergence-20260615-25
+ M reports/governance/cleanup_convergence_20260615_25/DELETION_READINESS_RECHECK.md
+```
+
+### Refused Or Skipped Commands
+
+- Branch deletion was not run; branch cleanup requires separate approval.
+- Tier C `rm` commands were not run; exact-path approval is required first.
+- No preservation refs, backup tarballs, stashes, old clone bundles, or dirty
+  source-bearing worktrees were touched.
+
+## Next Tier C Exact-Path Approval List - Prepared Only, Not Run
+
+The next cleanup decision should approve or reject exact paths only. Do not
+approve wildcards such as `evolution/*` or `reports/a2a/*`.
+
+### Cashclaw Generated Evolution Directories
+
+Current evidence:
+
+```bash
+git -C /Users/dhyana/dharma_swarm_cashclaw status --short --untracked-files=normal reports/revenue_wedge/evolution
+```
+
+Result: 17 untracked timestamp directories. Proposed command group for later
+approval only:
+
+```bash
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260610T193223Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260611T073905Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260611T154212Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260611T194323Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260611T234419Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260612T034600Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260612T074726Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260612T155034Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260612T195220Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260613T035510Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260613T075727Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260613T115830Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260613T201327Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260614T001505Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260614T041649Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260614T081808Z
+rm -rf /Users/dhyana/dharma_swarm_cashclaw/reports/revenue_wedge/evolution/20260614T122148Z
+```
+
+Do not remove the 13 tracked evolution directories dated `20260607` through
+`20260610T112428Z`.
+
+### A2A Generated Report Entries
+
+Current evidence:
+
+```bash
+git -C /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618 status --short --untracked-files=normal reports/a2a
+git -C /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618 ls-files reports/a2a
+```
+
+Result: 18 untracked entries. `reports/a2a/domain_reply_artifacts` contains a
+tracked keeper file, so only the two untracked files inside it are proposed;
+the directory itself must not be removed.
+
+Proposed command group for later approval only:
+
+```bash
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/domain_reply_artifact_preflight
+rm -f /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/domain_reply_artifacts/20260619T084913Z-codex_composer-a2a-semantic-signoff-codex_composer-e4778df2dfe6.json
+rm -f /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/domain_reply_artifacts/20260619T085732Z-hermes-m5-a2a-semantic-signoff-hermes-m5-e4778df2dfe6.json
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/domain_reply_requests
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/full_spec_readiness
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/identity_reconcile
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/live_acl
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/live_topology
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/model_reply_captures
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/presence_preflight
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/presence_projection
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/rebuild_preflight
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/semantic_task_packets
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/semantic_tasks
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/standing_agent_preflight
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/standing_wake_loop
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/topology
+rm -rf /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618/reports/a2a/wake_loop_preflight
+```
+
+Do not remove these tracked A2A files:
+
+```text
+reports/a2a/domain_reply_artifacts/20260611T091552Z-hermes-m5-3a0e3081da8a.json
+reports/a2a/live_listen_20260611T1030Z.jsonl
+reports/a2a/mike_inbox_drain_20260612T0158Z.txt
+```
+
+### Reconciliation Raw Dump Files
+
+Current evidence:
+
+```bash
+find /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22 -maxdepth 1 -type f \( -name '0[0-9]_*' -o -name '1[0-8]_*' \) -print | sort
+```
+
+Result: 25 raw dump files. Proposed command group for later approval only:
+
+```bash
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/00_environment_receipt.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/01_worktree_inventory.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/01_worktree_status_inventory.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/02_dirty_checkout_classification.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/02_dirty_checkout_status.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/03_stash_inventory.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/04_branch_inventory.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/04_local_branch_ahead_behind.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/05_remote_heads.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/05_remote_open_pr_inventory.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/05_remote_relevant_heads.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/05_remote_specific_prs.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/06_offrepo_dharma_artifacts_inventory.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/07_surface_reconciliation_seed.json
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/08_clean_make_onboard.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/09_clean_make_orient.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/10_clean_make_status.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/11_clean_check_track_status.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/12_clean_spine_bypass_report.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/13_pr_662_seeing_organ_diff.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/14_pr_663_markitdown_diff.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/15_local_forge_v1_tokenbroker_diff.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/16_routing_remote_truth.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/17_bronze_throat_grep.txt
+rm -f /Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/reconciliation_2026-06-22/18_local_forge_v1_tests.txt
+```
+
+Do not remove the keeper files in that directory:
+
+```text
+19_subagent_local_preservation_audit.md
+20_subagent_remote_reconciliation_audit.md
+21_preservation_receipt.json
+21_preservation_receipt.md
+22_phase3_red_team_checklist.md
+23_reconciliation_worktree_preservation.md
+24_phase3_red_team_verdict.json
+24_phase3_red_team_verdict.md
+25_phase3_red_team_verdict_after_followup.json
+25_phase3_red_team_verdict_after_followup.md
+DGM_READY_RECONCILIATION_REPORT.md
+NEXT_GOAL_PROMPT.md
+README.md
+```
