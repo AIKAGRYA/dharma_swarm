@@ -131,8 +131,10 @@ def _resolve_agent(role: str | None) -> tuple[str, str, str, str]:
     except (ImportError, AttributeError, KeyError, TypeError) as exc:
         # skills/ is an optional convergence dep — fall back to the bare role on the
         # realistic resolution failures (module absent / missing attr / not found /
-        # bad call), but record why rather than swallowing it silently.
+        # bad call), recording why rather than swallowing it silently, then return
+        # the fallback explicitly (an unexpected error still propagates).
         logger.debug("skill resolution for role %r failed; using bare role: %s", role, exc)
+        return (role, "", "", "")
     return (role, "", "", "")
 
 
