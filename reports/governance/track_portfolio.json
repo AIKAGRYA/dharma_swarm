@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T07:59:31+00:00",
+  "generated_at": "2026-06-25T22:43:59+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -111,7 +111,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.85s",
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
       "executed": true
     }
   ],
@@ -298,7 +298,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.85s",
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.38s",
           "executed": true
         }
       ]
@@ -788,7 +788,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.73s",
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
           "executed": true
         },
         {
@@ -909,7 +909,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.55s",
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.17s",
           "executed": true
         },
         {
@@ -1040,7 +1040,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.51s",
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.25s",
           "executed": true
         },
         {
@@ -1382,7 +1382,7 @@
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.55s",
+          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
           "executed": true
         },
         {
@@ -1396,7 +1396,7 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.58s",
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.17s",
           "executed": true
         },
         {
@@ -1410,7 +1410,7 @@
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.57s",
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.16s",
           "executed": true
         },
         {
@@ -1424,14 +1424,14 @@
           "id": "organizer_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.52s",
+          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
           "executed": true
         },
         {
           "id": "fs_substrate_e2e_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 0.69s",
+          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 3.51s",
           "executed": true
         }
       ]

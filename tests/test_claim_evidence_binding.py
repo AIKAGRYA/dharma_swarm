@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
+    check_mutation_score_gte,
     check_receipt_valid,
     evaluate_track,
     grade_of_criterion,
@@ -124,6 +125,11 @@ def test_independent_oracle_keeps_s3() -> None:
     assert grade_of_criterion(crit, _passing("test_passes"), track) == 3
 
 
+def test_mutation_score_gte_is_s6() -> None:
+    assert grade_of_criterion({"kind": "mutation_score_gte"}, _passing("mutation_score_gte"), {}) == 6
+    assert grade_name(6).startswith("S6")
+
+
 def test_track_on_file_contains_only_is_not_shippable() -> None:
     track = {
         "id": "t-existence",
@@ -164,6 +170,31 @@ def test_track_meets_floor_on_receipt_valid_s2(tmp_path: Path) -> None:
     assert r["shippable"]
 
 
+def test_track_meets_s6_floor_on_mutation_score(tmp_path: Path) -> None:
+    report = tmp_path / "mutation_score.json"
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report.write_text(json.dumps({
+        "score": 0.75,
+        "killed": 3,
+        "total": 4,
+        "produced_at": _utc_now(),
+    }))
+    track = {
+        "id": "t-mutated",
+        "status": "ACTIVE",
+        "owner": "@alice",
+        "min_evidence_grade": 6,
+        "completion_criteria": [
+            {"id": "c1", "kind": "mutation_score_gte", "file": str(report),
+             "threshold": 0.6, "fresh_ttl_days": 7},
+        ],
+    }
+    r = evaluate_track(track)
+    assert r["strongest_grade"] == 6
+    assert r["shippable"], r["ship_blocks"]
+
+
 def test_grade_name_is_human_readable() -> None:
     assert grade_name(0).startswith("S0")
     assert grade_name(2).startswith("S2")
@@ -196,7 +227,7 @@ def test_checker_rejects_tampered_digest(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(
         VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
-    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
     rows[0]["command"] = "rm -rf /"            # tamper, keep stale digest
     log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
     res = check_receipt_valid(str(log), [], expect_chain=True)
@@ -208,7 +239,7 @@ def test_checker_rejects_broken_chain_link(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
-    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    rows = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
     # Re-digest row 1 with a wrong prev_digest so its own digest stays valid but
     # the link is broken.
     from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
@@ -241,3 +272,73 @@ def test_checker_accepts_fresh_single_receipt(tmp_path: Path) -> None:
     log.write_text(json.dumps(row))
     res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
     assert res.passed, res.detail
+
+
+# --------------------------------------------------------------------------- #
+# Mutation score report                                                       #
+# --------------------------------------------------------------------------- #
+
+def test_checker_accepts_passing_mutation_score(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report = tmp_path / "mutation_score.json"
+    report.write_text(json.dumps({
+        "score": 0.75,
+        "killed": 3,
+        "total": 4,
+        "produced_at": _utc_now(),
+    }))
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert res.passed, res.detail
+    assert "0.75 >= 0.60" in res.detail
+
+
+def test_checker_rejects_low_mutation_score(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _utc_now  # type: ignore
+
+    report = tmp_path / "mutation_score.json"
+    report.write_text(json.dumps({
+        "score": 0.5,
+        "killed": 1,
+        "total": 2,
+        "produced_at": _utc_now(),
+    }))
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert "0.50 < 0.60" in res.detail
+
+
+def test_checker_rejects_stale_mutation_score(tmp_path: Path) -> None:
+    report = tmp_path / "mutation_score.json"
+    report.write_text(json.dumps({
+        "score": 1.0,
+        "killed": 2,
+        "total": 2,
+        "produced_at": "2000-01-01T00:00:00Z",
+    }))
+    res = check_mutation_score_gte(str(report), 0.6, fresh_ttl_days=7)
+    assert not res.passed
+    assert "stale" in res.detail
+
+
+def test_mutation_score_report_builder_counts_bad_mutants_against_score() -> None:
+    from run_mutation_score import build_report  # type: ignore
+
+    report = build_report(
+        {
+            "killed": 3,
+            "caught_by_type_check": 1,
+            "survived": 1,
+            "no_tests": 1,
+            "timeout": 0,
+            "suspicious": 0,
+            "skipped": 2,
+            "total": 8,
+        },
+        threshold=0.6,
+        command="normalize-mutmut-stats",
+    )
+    assert report["killed"] == 4
+    assert report["total"] == 6
+    assert report["score"] == 0.666667
+    assert report["passed"] is True

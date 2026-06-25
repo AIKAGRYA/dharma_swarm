@@ -25,6 +25,7 @@
   owned_surfaces:
     - docs/governance/evidence_grades.yaml
     - scripts/governance/check_claim_evidence_binding.py
+    - scripts/governance/run_mutation_score.py
     - docs/governance/hygiene/patterns/AI-M1.yaml
     - .claude/workflows/antislop-evolve.js
     - tests/test_claim_evidence_binding.py
@@ -38,8 +39,10 @@
     this track turns that binary bar into a graded floor (min_evidence_grade)
     with oracle independence, gives EvidenceReceipt a hash-chained machine
     sibling (VerifiedMachineReceipt), and exposes a scoped proof verdict on the
-    runtime truth packet. It creates NO new truth store, daemon, or authority
-    surface — it extends existing owners and projects from them.
+    runtime truth packet. P3-09 activates the S6 mutation-score criterion as a
+    read-only report gate produced by `make mutation-test`. It creates NO new
+    truth store, daemon, or authority surface — it extends existing owners and
+    projects from them.
 
     Doctrine line that must hold:
       A claim ships only when its strongest evidence meets the required grade,
@@ -72,12 +75,17 @@
       kind: test_passes
       test: "tests/test_claim_evidence_binding.py"
       oracle_source: "ci"   # independent of track owner -> keeps S3 (not downgraded)
+    # S6 — optional high-assurance local oracle produced by explicit operator run.
+    - id: mutation_oracle_available
+      kind: file_contains
+      file: scripts/governance/check_track_status.py
+      pattern: "mutation_score_gte"
 
   non_goals:
     - Do not create a new truth store, daemon, receipt system, or authority surface.
     - Do not change the EvidenceReceipt schema; add the machine sibling alongside it.
-    - Do not build Phases 3-9 (mutation/property oracle, SBOM, forge adapters,
-      dashboard) here; their grade slots are reserved-but-inactive.
+    - Do not build property oracle, SBOM, forge adapters, dashboard, verifier
+      signatures, or formal proof here; those grade slots remain reserved.
     - Do not flip any new gate to enforced; all land advisory until the operator promotes.
 
   next_items:
@@ -90,6 +98,10 @@
       kind: code
       blocker: false
     - id: 3
+      what: "SHIPPED: S6 mutation_score_gte checker + explicit make mutation-test producer."
+      kind: code
+      blocker: false
+    - id: 4
       what: "Operator: promote AI-M1 from advisory to enforced once the ladder is socialised."
       kind: governance
       blocker: false

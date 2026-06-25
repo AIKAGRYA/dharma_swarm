@@ -17,11 +17,12 @@
 # grade_of_criterion(); an unmapped/unknown kind scores S0.
 #
 # ACTIVE vs RESERVED:
-#   - S0..S3 are ACTIVE — they map to criterion kinds the checker implements
-#     today (file_exists, file_contains/pr_merged, commit_on_main, test_passes).
-#   - S4..S8 are RESERVED — declared-but-inactive slots so the ladder is
+#   - S0..S3 and S6 are ACTIVE — they map to criterion kinds the checker
+#     implements today (file_exists, file_contains/pr_merged, commit_on_main,
+#     test_passes, mutation_score_gte).
+#   - S4, S5, S7, S8 are RESERVED — declared-but-inactive slots so the ladder is
 #     forward-stable. They map to kinds the checker does NOT yet implement
-#     (Phases 3-9). A track that cites a reserved kind scores S0 until the
+#     (Phases 4-9). A track that cites a reserved kind scores S0 until the
 #     kind lands, so reserving a slot can never silently inflate a grade.
 #
 # default_min_grade is the floor a track is held to when it does not declare
@@ -83,11 +84,13 @@ grades:
 
   - grade: 6
     name: S6_MUTATION
-    status: reserved
+    status: active
     phase: 4
     kinds: [mutation_score_gte]
     meaning: "Mutation score over a threshold — the primary anti-gaming oracle:
-              the tests actually kill injected faults."
+              the tests actually kill injected faults. Reads a fresh
+              reports/governance/mutation_score.json produced by
+              `make mutation-test`."
 
   - grade: 7
     name: S7_VERIFIED
