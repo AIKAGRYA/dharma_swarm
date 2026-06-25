@@ -23,6 +23,7 @@ Files added in this convergence worktree:
 - `reports/governance/cleanup_convergence_20260615_25/decision_log.md`
 - `reports/governance/cleanup_convergence_20260615_25/OPERATOR_MAP.md`
 - `reports/governance/cleanup_convergence_20260615_25/PALANTIR_SEMANTIC_ONTOLOGY_META_SCRATCHPAD.md`
+- `reports/governance/cleanup_convergence_20260615_25/DELETION_READINESS_RECHECK.md`
 - `reports/governance/cleanup_convergence_20260615_25/CLOSEOUT.md`
 
 ## Files Intentionally Not Ported
@@ -65,6 +66,33 @@ Files added in this convergence worktree:
   failures: `dharma-uplift-guards` could not import `dharma_swarm` and hit a
   Python `dataclass(slots=...)` incompatibility; `dharma-manifest-check` could
   not import PyYAML.
+
+## Deletion Readiness Recheck
+
+Follow-up read-only cleanup work added
+`reports/governance/cleanup_convergence_20260615_25/DELETION_READINESS_RECHECK.md`.
+
+That report:
+
+- refreshes `origin/main` to `21ee18b365a7a0f4b22bb9b087a987973c6fdaa3`;
+- records three read-only passes over Tier A, Tier B, and Tier C cleanup
+  candidates;
+- narrows the first approval-ready deletion batch to exact worktree commands;
+- marks source-bearing or ambiguous worktrees as `DO_NOT_REMOVE_YET`;
+- records the newly observed clean `/Users/dhyana/dharma_swarm_wt/render-on-demand`
+  worktree as `DO_NOT_REMOVE`;
+- lists exact generated-output candidates without wildcard deletion; and
+- provides a post-approval deletion receipt template.
+
+No deletion, prune, worktree removal, branch deletion, reset, stash operation,
+or cleanup command was run while producing the recheck.
+
+Additional verification for the recheck:
+
+- `git diff --check` passed.
+- `rg -n "[[:blank:]]+$" DELETION_READINESS_RECHECK.md` produced no output.
+- `LC_ALL=C grep -n '[^ -~]' DELETION_READINESS_RECHECK.md` produced no output.
+- `file DELETION_READINESS_RECHECK.md` reports ASCII text.
 
 ## Final Dirty Status After Local Commit
 

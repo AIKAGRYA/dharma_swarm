@@ -29,6 +29,7 @@ operator surface, archive bucket, or explicit decision bucket.
 | Read-only audit | `/private/tmp/dharma_swarm_readonly_audit_20260624_84785/CONSOLIDATED_REPORT.md` covers 19 trees and 1,098 unique at-risk file instances |
 | Sprawl memory | `/Users/dhyana/.claude/projects/-Users-dhyana/memory/local-tree-sprawl-backup-2026-06-24.md` records corrected keeper/junk verdicts |
 | PR truth checked | GitHub connector checked PR #648, #674, and #685 |
+| Deletion readiness recheck | `DELETION_READINESS_RECHECK.md` refreshed current deletion candidates through three read-only passes; no deletion was performed |
 
 ## Deliverables
 
@@ -37,6 +38,7 @@ operator surface, archive bucket, or explicit decision bucket.
 - `decision_log.md` - decisions made while building this convergence packet.
 - `OPERATOR_MAP.md` - short operator-facing answer map.
 - `PALANTIR_SEMANTIC_ONTOLOGY_META_SCRATCHPAD.md` - proposed-only ontology notes and typed object candidates.
+- `DELETION_READINESS_RECHECK.md` - exact-path deletion readiness report, second/third-pass addenda, approval checklist, and receipt template.
 - `CLOSEOUT.md` - final receipt for this convergence packet.
 
 ## Current High-Level Verdict
