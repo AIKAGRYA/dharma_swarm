@@ -377,12 +377,16 @@ operator-prod-smoke:
 governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity claim-evidence-check
 
 # Pudgala Forge (graded claim/evidence binding). claim-evidence-check is
-# ADVISORY here (always exits 0) — it reports per-track strongest evidence grade
-# vs the required min_evidence_grade so existence-only "shipped" claims surface.
-# claim-evidence additionally appends a hash-chained VerifiedMachineReceipt of
-# the run under ~/.dharma/witness/ (runtime receipts never enter git).
+# STAGE-DRIVEN: it blocks iff the AI-M1 hygiene pattern is at stage 'enforced'
+# (operator-promoted via scripts/governance/hygiene/promote.py). AI-M1 is advisory
+# today and binding_stage() fail-safes to advisory, so this exits 0 in
+# governance-all NOW and starts blocking the moment AI-M1 is promoted — ONE switch
+# (the stage), no separate --warn-only flag to also remember to drop. It reports
+# per-track strongest evidence grade vs required min_evidence_grade so existence-
+# only "shipped" claims surface. (Force advisory anywhere with --warn-only; force
+# blocking with --enforce.) claim-evidence (below) appends the receipt.
 claim-evidence-check:
-	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py --warn-only
+	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py
 
 claim-evidence:
 	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt
