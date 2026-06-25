@@ -135,3 +135,22 @@ closed_tracks: []
     markdown = render_markdown_report(payload)
     assert "Operator Coherence Cockpit" in markdown
     assert "Prod readiness estimate" in markdown
+
+
+def test_operator_coherence_api_envelope_contract() -> None:
+    """The /api/operator-coherence/report envelope wraps the cockpit projection.
+
+    The cockpit dashboard surface depends on this contract: the HTTP envelope
+    carries operator_coherence_api.v0.1 while the inner data payload carries
+    operator_coherence_cockpit.v0.1 (the version the dashboard v2 model expects).
+    """
+    from api.routers.operator_coherence import operator_coherence_report
+
+    result = operator_coherence_report(github=False, live_probes=False)
+
+    assert result["schema_version"] == "operator_coherence_api.v0.1"
+    assert result["status"] in ("ok", "partial")
+    assert result["request_id"]
+    assert result["generated_at"]
+    assert result["data"] is not None
+    assert result["data"]["schema_version"] == "operator_coherence_cockpit.v0.1"

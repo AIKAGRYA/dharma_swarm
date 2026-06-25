@@ -171,6 +171,9 @@ health_check_registry:
   api_router_registered:
     description: "Verify the API router prefix is registered in api/main.py"
     type: api_probe
+  api_endpoint_registered:
+    description: "Verify each declared api_dependency resolves to a real registered route path (not just the prefix)"
+    type: api_probe
   dashboard_route_exists:
     description: "Verify the dashboard page directory exists under dashboard/src/app/dashboard/"
     type: file_exists
@@ -200,12 +203,14 @@ health_check_registry:
 # Every dashboard page: desired state, observed-state checks, gap info.
 
 dashboard_surfaces:
+  # Cockpit is a read-only projection of the operator-coherence read model.
+  # It projects truth from owners; it is NOT an authority or a command surface.
   - id: cockpit
     label: "Cockpit"
     route: /dashboard/cockpit
-    api_dependencies: [/api/control-surface/summary, /api/control-surface/rows]
+    api_dependencies: [/api/operator-coherence/report]
     status: live
-    health_check_ids: [dashboard_route_exists, api_router_registered]
+    health_check_ids: [dashboard_route_exists, api_router_registered, api_endpoint_registered]
     priority: p0
     next_action: null
 

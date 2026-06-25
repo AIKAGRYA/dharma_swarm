@@ -75,6 +75,71 @@ def _check_api_router_registered(
     return True, f"all {len(deps)} API dep(s) have registered routers"
 
 
+def _route_matches(dep: str, route_path: str) -> bool:
+    """Match a declared endpoint against a real route path.
+
+    Segment counts must agree; a route segment wrapped in ``{...}`` (a path
+    parameter) matches any single dep segment.
+    """
+    dep_parts = dep.strip("/").split("/")
+    route_parts = route_path.strip("/").split("/")
+    if len(dep_parts) != len(route_parts):
+        return False
+    for d, r in zip(dep_parts, route_parts):
+        if r.startswith("{") and r.endswith("}"):
+            continue
+        if d != r:
+            return False
+    return True
+
+
+def _check_api_endpoint_registered(
+    entity: dict[str, Any],
+    manifest: dict[str, Any],
+) -> tuple[bool, str]:
+    """Endpoint-level validation: each api_dependency must resolve to a real
+    registered route path, not merely a registered router prefix.
+
+    This catches typo'd or stale endpoints under an otherwise-valid prefix
+    (the gap left by :func:`_check_api_router_registered`).
+    """
+    deps = entity.get("api_dependencies", [])
+    if not deps:
+        return True, "no API dependencies declared"
+    routers = manifest.get("api_routers", [])
+    # Longest prefix first so /api/control-surface wins over /api.
+    routers_sorted = sorted(
+        routers, key=lambda r: len(r.get("prefix", "")), reverse=True
+    )
+    missing: list[str] = []
+    for dep in deps:
+        owner = next(
+            (
+                r
+                for r in routers_sorted
+                if dep == r.get("prefix")
+                or dep.startswith(r.get("prefix", "") + "/")
+            ),
+            None,
+        )
+        if owner is None:
+            missing.append(f"{dep} (no registered router prefix)")
+            continue
+        try:
+            module = importlib.import_module(owner["module"])
+            route_paths = [
+                getattr(rt, "path", "") for rt in getattr(module.router, "routes", [])
+            ]
+        except Exception as exc:
+            missing.append(f"{dep} (router import failed: {exc})")
+            continue
+        if not any(_route_matches(dep, rp) for rp in route_paths if rp):
+            missing.append(f"{dep} (no matching route in {owner['module']})")
+    if missing:
+        return False, f"unregistered API endpoints: {missing}"
+    return True, f"all {len(deps)} API endpoint(s) resolve to registered routes"
+
+
 def _check_module_file_exists(
     entity: dict[str, Any],
     _manifest: dict[str, Any],
@@ -144,6 +209,7 @@ _HEALTH_CHECK_REGISTRY: dict[
 ] = {
     "dashboard_route_exists": _check_dashboard_route_exists,
     "api_router_registered": _check_api_router_registered,
+    "api_endpoint_registered": _check_api_endpoint_registered,
     "module_file_exists": _check_module_file_exists,
     "test_file_exists": _check_test_file_exists,
     "runtime_db_present": _check_runtime_db_present,
