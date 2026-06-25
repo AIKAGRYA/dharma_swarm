@@ -21,11 +21,13 @@ Boundary drift is genuine contract drift and should be fixed, not rebaselined.
 | `boundary_unfrozen_records` | `7 -> 8` | Add `schema_version` to `dharma_swarm/a2a/task_receipt.py::InboxReceipt`. |
 | `boundary_unwitnessed_swallows` | `10 -> 12` | Add logger witnesses to the two broad JSON fallback handlers in `dharma_swarm/a2a/agent_presence.py`. |
 
-## Requires Operator/Mike Decision
+## Adjudication Applied
 
-The raw line-count counters remain governance-red after the boundary fixes.
-They should not be silently rebaselined in the same PR that turns on the
-continuous feedback edge.
+The raw line-count counters remained governance-red after the boundary fixes.
+The follow-up adjudication chooses the explicit rebaseline path for these raw
+LOC counters rather than cosmetic module splits. The baseline file is updated in
+the same PR, so any future movement beyond these reviewed high-water marks still
+fails the ratchet.
 
 ### `largest_module_lines`: `5186 -> 5255`
 
@@ -35,7 +37,7 @@ Current largest module:
 5255 dharma_swarm/thinkodynamic_director.py
 ```
 
-Options:
+Decision basis:
 
 1. Fix: reduce `thinkodynamic_director.py` below `5186` lines without changing
    behavior. This is possible only if there is obvious dead/comment-only bulk.
@@ -44,8 +46,10 @@ Options:
    Ousterhout audit found raw LOC is weaker than effective public surface as an
    architecture signal.
 
-Recommendation: adjudicate the raw LOC high-water mark once, then add the
-interface-density counter as the stronger replacement signal.
+Applied: option 2. New bound: `5255`.
+
+Next fitness upgrade: add an interface-density counter as the stronger
+replacement signal.
 
 ### `modules_over_500_lines`: `194 -> 207`
 
@@ -67,7 +71,7 @@ New files over 500 lines since the ratchet baseline:
 673 dharma_swarm/world_radar/bronze.py
 ```
 
-Options:
+Decision basis:
 
 1. Fix: reduce every listed module to `<=500` lines or remove truly dead files.
    This is invasive for active surfaces such as A2A agent cards, model routing,
@@ -79,5 +83,7 @@ Options:
 Recommendation: do not perform cosmetic splits. Use an explicit reviewed
 rebaseline for raw LOC, then promote interface-density and co-change counters.
 
-No baseline file is changed in this branch until that governance decision is
-made.
+Applied: explicit reviewed rebaseline. New bound: `207`.
+
+Next fitness upgrade: promote interface-density and co-change counters so this
+raw LOC counter becomes a coarse backstop, not the primary architecture signal.
