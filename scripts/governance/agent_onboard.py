@@ -60,6 +60,7 @@ SURFACE_MANIFEST = REPO_ROOT / "ACTIVE_SURFACE_MANIFEST.yaml"
 TRUST_GATE_JSON = REPO_ROOT / "reports/governance/trust_gate_status.json"
 SWARM_GENOME = REPO_ROOT / "docs/governance/SWARM_GENOME.md"
 REALITY_DEBT_LEDGER = REPO_ROOT / "docs/governance/REALITY_DEBT_LEDGER.md"
+CLEANUP_RECEIPT_GLOB = "reports/governance/**/DELETION_READINESS_RECHECK.md"
 
 # Soft-warning thresholds. Beyond these, surface a note. Never a gate.
 LIVE_OPS_STALE_DAYS = 7
@@ -404,6 +405,107 @@ def render_parallel_work_lanes() -> dict[str, Any]:
         ],
         "lane_families": dict(families),
     }
+
+
+def _section_until_next_h2(text: str, start: int) -> str:
+    lines = text[start:].splitlines(keepends=True)
+    section_lines: list[str] = []
+    in_fence = False
+    for index, line in enumerate(lines):
+        if index > 0 and not in_fence and re.match(r"^##\s+", line):
+            break
+        section_lines.append(line)
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+    return "".join(section_lines)
+
+
+def _collect_swarm_bulletins(limit: int = 8) -> list[dict[str, Any]]:
+    """Project recent swarm-visible operational receipts.
+
+    This owns no facts. It scans existing receipt owners and emits compact
+    rows that onboarding/fleet receipts can carry forward.
+    """
+    bulletins: list[dict[str, Any]] = []
+    for path in sorted(REPO_ROOT.glob(CLEANUP_RECEIPT_GLOB)):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for match in re.finditer(r"(?m)^## Deletion Execution Receipt - ([^\n]+)", text):
+            observed_at = match.group(1).strip()
+            if observed_at.startswith("YYYY-"):
+                continue
+            body = _section_until_next_h2(text, match.start())
+            removed_paths = re.findall(
+                r"(?m)^- `([^`]+)` (?:was removed|stale registration was pruned|was removed with)",
+                body,
+            )
+            worktree_commands = {
+                command.strip()
+                for command in re.findall(
+                    r"(?m)^git -C /Users/dhyana/dharma_swarm worktree (?:prune|remove)[^\n]*$",
+                    body,
+                )
+            }
+            lowered_body = body.lower()
+            tier_c_pending = (
+                "tier c" in lowered_body
+                and (
+                    "not run" in lowered_body
+                    or "not performed" in lowered_body
+                    or "approval" in lowered_body
+                )
+            )
+            protected_reverified = "Protected State Re-Verified" in body
+            stash_untouched = "Stashes remain untouched" in body
+            pr_numbers = sorted({int(n) for n in re.findall(r"\bPR #(\d+)\b", body)})
+            summary_bits = [f"{len(removed_paths)} path(s) removed/pruned"]
+            if tier_c_pending:
+                summary_bits.append("Tier C prepared only, not run")
+            if protected_reverified:
+                summary_bits.append("protected paths re-verified")
+            bulletins.append({
+                "kind": "cleanup_deletion_receipt",
+                "observed_at": observed_at,
+                "title": "Approved cleanup deletion batch executed",
+                "summary": "; ".join(summary_bits),
+                "source_ref": f"{rel} :: Deletion Execution Receipt - {observed_at}",
+                "removed_path_count": len(removed_paths),
+                "removed_paths": removed_paths[:12],
+                "approved_worktree_command_count": len(worktree_commands),
+                "tier_c_pending_approval": tier_c_pending,
+                "protected_paths_reverified": protected_reverified,
+                "stashes_untouched": stash_untouched,
+                "pr_numbers": pr_numbers,
+                "authority": "projection_only",
+            })
+    bulletins.sort(key=lambda row: str(row.get("observed_at") or ""), reverse=True)
+    return bulletins[:limit]
+
+
+def render_swarm_bulletins() -> list[dict[str, Any]]:
+    section("SWARM BULLETINS - latest local receipts")
+    bulletins = _collect_swarm_bulletins()
+    if not bulletins:
+        print("  No cleanup or operational bulletins found in tracked receipt owners.")
+        return []
+    print("  Doctrine: read-only projection over receipt owners; this section owns no facts.")
+    for item in bulletins[:5]:
+        print(
+            f"  - [{item.get('kind')}] "
+            f"{item.get('observed_at')} - {item.get('summary')}"
+        )
+        print(f"    source: {item.get('source_ref')}")
+        watches = []
+        if item.get("tier_c_pending_approval"):
+            watches.append("Tier C still needs explicit exact-path approval")
+        if item.get("stashes_untouched"):
+            watches.append("stashes untouched")
+        if watches:
+            print(f"    watch: {', '.join(watches)}")
+    return bulletins
 
 
 def _evidence_age_minutes(evidence: dict[str, Any] | None) -> float | None:
@@ -1548,6 +1650,7 @@ def main(argv: list[str] | None = None) -> int:
         with contextlib.redirect_stdout(sink):
             repo_state = render_repo_state(fast=args.fast)
             lanes = render_parallel_work_lanes()
+            render_swarm_bulletins()
             rows = render_runtime_truth(evidence, track)
             prs = render_pr_hygiene(net=net)
         payload = _receipt_payload(repo_state, lanes, rows, prs, evidence, track)
@@ -1559,6 +1662,7 @@ def main(argv: list[str] | None = None) -> int:
     render_identity()
     render_active_track(evidence, track)
     lanes = render_parallel_work_lanes()
+    render_swarm_bulletins()
     render_live_ops()
     render_live_ops_cockpit()
     if args.fast:
@@ -1658,6 +1762,7 @@ def _receipt_payload(
             ],
         },
         "next_items": _collect_next_items(evidence, track)[:10],
+        "swarm_bulletins": _collect_swarm_bulletins()[:10],
         "broken_register": {
             k: broken.get(k) for k in ("total", "open_count", "closed_count")
         },
