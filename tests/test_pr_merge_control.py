@@ -267,6 +267,144 @@ def test_select_fanout_items_prefers_allowed_statuses_in_order():
     assert [item["number"] for item in selected] == [12, 13, 11]
 
 
+def _write_current_fanout_packet(state_root, *, pr_number=12, head_sha="abc123", updated_at="2026-06-01T02:00:00Z"):
+    packet_dir = state_root / f"pr-{pr_number}" / "20260601T020000Z"
+    packet_dir.mkdir(parents=True)
+    prc.write_json(
+        packet_dir / "FACTS.json",
+        {
+            "pr": {
+                "number": pr_number,
+                "headRefOid": head_sha,
+                "updatedAt": updated_at,
+            },
+            "classification": {
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "reviewDecision": "NONE",
+            },
+        },
+    )
+    prc.write_json(packet_dir / "MERGE_GATE.json", {"decision": "BLOCKED"})
+    return packet_dir
+
+
+def test_select_fanout_plan_skips_current_packet_gate(tmp_path):
+    packet_dir = _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "already packeted",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            },
+            {
+                "number": 13,
+                "title": "new work",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "updatedAt": "2026-06-01T03:00:00Z",
+                "reviewDecision": "NONE",
+            },
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [13]
+    assert plan["skipped_current"][0]["number"] == 12
+    assert plan["skipped_current"][0]["packet_dir"] == str(packet_dir)
+
+
+def test_select_fanout_plan_skips_when_only_pr_updated_timestamp_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, updated_at="2026-06-01T02:00:00Z")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "comment changed only",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert plan["selected"] == []
+    assert plan["skipped_current"][0]["number"] == 12
+
+
+def test_select_fanout_plan_reprocesses_when_head_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, head_sha="abc123")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new head",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "force",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
 def test_build_queue_summary_counts_statuses():
     prs = [
         {
