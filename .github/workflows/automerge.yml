@@ -91,6 +91,28 @@ jobs:
             gh pr edit "$pr" --repo "$GH_REPO" --add-label bot-pr || true
           done < /tmp/enroll.txt
 
+          # D4 (track merge-master-mike-d4): engage Mike on EVERY open non-draft
+          # PR that has no lane label yet, via `mike-watch`. Unlike `bot-pr`,
+          # mike-watch does NOT waive the reviewer quorum — it only makes Mike
+          # run the deterministic gate and post status (arm-don't-merge). This is
+          # the proactive-coverage half of always-on Mike; remove the label to
+          # opt a PR out.
+          gh label create mike-watch --repo "$GH_REPO" \
+            --color BFD4F2 \
+            --description "Mike evaluates + gates this PR (no auto-merge, no reviewer waiver)" \
+            >/dev/null 2>&1 || true
+          gh pr list --repo "$GH_REPO" --state open --limit 200 \
+            --json number,isDraft,labels \
+            --jq '.[]
+              | select(.isDraft | not)
+              | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch") | not)
+              | .number' > /tmp/watch.txt || true
+          while IFS= read -r pr; do
+            [ -z "$pr" ] && continue
+            echo "Auto-enrolling #${pr} with mike-watch label"
+            gh pr edit "$pr" --repo "$GH_REPO" --add-label mike-watch || true
+          done < /tmp/watch.txt
+
       - name: Build candidate PR list
         id: candidates
         run: |
@@ -105,10 +127,11 @@ jobs:
               --jq ".[] | select(.headRefOid == \"${CHECK_SUITE_SHA}\") | .number" \
               > /tmp/candidates.txt
           else
-            # Scheduled sweep: every open PR carrying an opt-in label.
+            # Scheduled sweep: every open PR carrying a lane label
+            # (automerge / bot-pr = unattended; mike-watch = gate+status only).
             gh pr list --repo "$GH_REPO" --state open --limit 200 \
               --json number,labels \
-              --jq '.[] | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr")) | .number' \
+              --jq '.[] | select(.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch")) | .number' \
               > /tmp/candidates.txt
           fi
           echo "Candidates:"
@@ -126,11 +149,14 @@ jobs:
             view="$(gh pr view "$pr" --repo "$GH_REPO" \
               --json number,isDraft,labels,reviewDecision,headRefOid,mergeable,statusCheckRollup,comments,latestReviews)"
 
-            # 1. Opt-in label required
-            labeled="$(echo "$view" | jq -r '.labels | map(.name) | any(. == "automerge" or . == "bot-pr")')"
+            # 1. Lane label required. automerge/bot-pr => unattended auto-merge;
+            #    mike-watch => Mike gates and posts status but never auto-merges
+            #    (the operator arms it by adding `automerge` or commenting @mike).
+            labeled="$(echo "$view" | jq -r '.labels | map(.name) | any(. == "automerge" or . == "bot-pr" or . == "mike-watch")')"
             if [ "$labeled" != "true" ]; then
               skipped=$((skipped + 1)); continue
             fi
+            merge_when_clean="$(echo "$view" | jq -r 'if (.labels | map(.name) | any(. == "automerge" or . == "bot-pr")) then "true" else "false" end')"
 
             # 2. Never drafts, never CHANGES_REQUESTED
             is_draft="$(echo "$view" | jq -r '.isDraft')"
@@ -172,6 +198,9 @@ jobs:
                 ([.comments[]?] | length | tostring),
                 ([.latestReviews[]?] | length | tostring)
               ] | join(":")')"
+            # Include the merge intent so flipping mike-watch -> automerge (or
+            # back) re-dispatches instead of being deduped on an unchanged SHA.
+            ready_key="${ready_key}:mwc=${merge_when_clean}"
             marker="<!-- automerge-dispatch:${ready_key} -->"
             already="$(echo "$view" | jq -r --arg m "$marker" \
               '[.comments[]? | select(.body | startswith($m))] | length')"
@@ -180,24 +209,28 @@ jobs:
               skipped=$((skipped + 1)); continue
             fi
 
-            # 5. Hand off to Merge Master Mike (full deterministic gate +
-            #    auto-merge arming happen there).
+            # 5. Hand off to Merge Master Mike (full deterministic gate runs
+            #    there; auto-merge is armed only when merge_when_clean=true).
             gh workflow run codex-mention-router.yml --repo "$GH_REPO" \
-              -f pr="$pr" -f merge_when_clean=true
+              -f pr="$pr" -f merge_when_clean="${merge_when_clean}"
+            if [ "${merge_when_clean}" = "true" ]; then
+              mode_line="dispatched **Merge Master Mike** with \`merge_when_clean: true\` (will auto-merge once the gate is clean)"
+            else
+              mode_line="dispatched **Merge Master Mike** in \`mike-watch\` mode (\`merge_when_clean: false\`): Mike runs the full gate and posts status but will NOT auto-merge — add the \`automerge\` label or comment \`@mike merge\` to arm it"
+            fi
             gh pr comment "$pr" --repo "$GH_REPO" --body "${marker}
           ## 🟢 Automerge lane engaged
 
           All status checks are green and no review requests changes, so the
-          automerge lane dispatched **Merge Master Mike** with
-          \`merge_when_clean: true\` for head \`${sha}\`.
+          automerge lane ${mode_line} for head \`${sha}\`.
 
           Mike still runs the full deterministic gate (fourfold-warrant,
           reviewer receipts, unresolved threads, and required CI before any
           merge is armed. Coherence Delta / ACTIVE_TRACK remain advisory. This dispatch marker is keyed to readiness state
           \`${ready_key}\`; later review/comment/check changes can dispatch
-          again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`
+          again for the same head SHA. Remove the \`automerge\`/\`bot-pr\`/\`mike-watch\`
           label to leave this lane." || true
-            summary+="- #${pr}: **dispatched** Mike (merge_when_clean) for readiness key ${ready_key}\n"
+            summary+="- #${pr}: **dispatched** Mike (merge_when_clean=${merge_when_clean}) for readiness key ${ready_key}\n"
             dispatched=$((dispatched + 1))
           done < /tmp/candidates.txt
 
