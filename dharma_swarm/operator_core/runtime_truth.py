@@ -541,6 +541,7 @@ def _store_packet(
         probe_ok=ok,
         probe_error=probe_error,
         missing_machine_fields=missing,
+        proof_grade=ProofGrade.MISSING.value,
         metadata={
             "runtime_db": str(path),
             "tables": sorted(table_set),
@@ -649,6 +650,7 @@ def _packet_from_latest_runtime_receipt(
         last_receipt_at=str(receipt["created_at"] or "") or None,
         retry_intent_key=idempotency_key or None,
         missing_machine_fields=missing,
+        proof_grade=ProofGrade.MISSING.value,
         metadata={
             "runtime_db": str(path),
             "runtime_table_counts": counts,

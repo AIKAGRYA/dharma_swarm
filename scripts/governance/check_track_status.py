@@ -334,7 +334,8 @@ def _load_grade_ladder() -> dict[str, Any]:
         except (OSError, ValueError):
             raw = None
         if isinstance(raw, dict):
-            kind_to_grade: dict[str, int] = {}
+            kind_to_grade: dict[str, int] = dict(builtin_active)
+            parsed_active_kinds = False
             names: dict[int, str] = {}
             for row in raw.get("grades") or []:
                 if not isinstance(row, dict):
@@ -350,10 +351,11 @@ def _load_grade_ladder() -> dict[str, Any]:
                     continue
                 for kind in row.get("kinds") or []:
                     kind_to_grade[str(kind)] = g
+                    parsed_active_kinds = True
             # receipt_valid is a checker-native rigorous kind not listed as its
             # own ladder row; pin it to S2 (landed-equivalent) if unmapped.
             kind_to_grade.setdefault("receipt_valid", 2)
-            if kind_to_grade:
+            if parsed_active_kinds:
                 ladder["kind_to_grade"] = kind_to_grade
                 ladder["grade_names"] = names or ladder["grade_names"]
             try:
@@ -498,10 +500,14 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
             if not ln.strip():
                 continue
             try:
-                rows.append(json.loads(ln))
+                row = json.loads(ln)
             except json.JSONDecodeError:
                 return CriterionResult(id="", kind="receipt_valid", passed=False,
                                        detail=f"receipt chain {file_path} has a non-JSON line")
+            if not isinstance(row, dict):
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                       detail=f"receipt chain {file_path} row {len(rows)} is not a JSON object")
+            rows.append(row)
         if not rows:
             return CriterionResult(id="", kind="receipt_valid", passed=False,
                                    detail=f"receipt chain {file_path} is empty")
@@ -512,6 +518,9 @@ def check_receipt_valid(file_path: str, requires_keys: list[str], *,
                 return CriterionResult(id="", kind="receipt_valid", passed=False,
                     detail=f"receipt chain {file_path} row {i} digest mismatch (tampered)")
             link = str(row.get("prev_digest", ""))
+            if i == 0 and link:
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                    detail=f"receipt chain {file_path} row 0 has non-empty prev_digest (missing genesis anchor)")
             if i > 0 and link != prev:
                 return CriterionResult(id="", kind="receipt_valid", passed=False,
                     detail=f"receipt chain {file_path} broken at row {i}: prev_digest != prior digest")

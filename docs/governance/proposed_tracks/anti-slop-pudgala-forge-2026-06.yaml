@@ -26,7 +26,7 @@
     - docs/governance/evidence_grades.yaml
     - scripts/governance/check_claim_evidence_binding.py
     - docs/governance/hygiene/patterns/AI-M1.yaml
-    - .claude/workflows/antislop-evolve.js
+    - scripts/workflows/antislop-evolve.js
     - tests/test_claim_evidence_binding.py
   moves_vital_signs:
     - quality_gates

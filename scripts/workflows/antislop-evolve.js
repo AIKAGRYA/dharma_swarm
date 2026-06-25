@@ -11,7 +11,8 @@
 //
 // It is a CLIENT of the kernel, not an authority: its own output must pass
 // scripts/governance/check_claim_evidence_binding.py (S(x)=x — the judge of slop
-// must not be slop). It NEVER pushes. Receipts sink to ~/.dharma/logs/.
+// must not be slop). It NEVER pushes. Machine receipts sink to
+// ~/.dharma/witness/claim_evidence_receipts.jsonl.
 
 export const meta = {
   name: "antislop-evolve",

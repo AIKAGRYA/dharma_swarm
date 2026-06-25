@@ -177,6 +177,43 @@ def _stable_digest(payload: object) -> str:
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
+def _read_verified_machine_receipt_chain(path: Path) -> list[dict[str, Any]]:
+    """Read and verify every row of a machine-receipt JSONL chain."""
+    rows: list[dict[str, Any]] = []
+    prev_digest = ""
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"machine receipt log {path} line {line_number} is non-JSON"
+            ) from exc
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"machine receipt log {path} line {line_number} is not a JSON object"
+            )
+        stored = str(row.get("digest", ""))
+        recomputed = _stable_digest({k: v for k, v in row.items() if k != "digest"})
+        if not stored or stored != recomputed:
+            raise ValueError(
+                f"machine receipt log {path} row {len(rows)} digest is broken; refusing to extend"
+            )
+        link = str(row.get("prev_digest", ""))
+        if not rows and link:
+            raise ValueError(
+                f"machine receipt log {path} row 0 has non-empty prev_digest; refusing to extend"
+            )
+        if rows and link != prev_digest:
+            raise ValueError(
+                f"machine receipt log {path} row {len(rows)} prev_digest is broken; refusing to extend"
+            )
+        rows.append(row)
+        prev_digest = stored
+    return rows
+
+
 @dataclass(frozen=True, slots=True)
 class VerifiedMachineReceipt:
     """A hash-chained record of one verified command execution that backs a claim.
@@ -234,25 +271,16 @@ def append_machine_receipt(
     """Append a chained VerifiedMachineReceipt to the JSONL log, linking it to
     the tail of the existing chain. Returns the chained-and-persisted receipt.
 
-    Append-only with a tamper guard: if the file's tail digest does not verify,
-    we refuse to extend a broken chain. Mirrors the immutable-append discipline
-    of memory_kernel.promotion_gate without minting a second receipt *system*."""
+    Append-only with a tamper guard: if any existing row digest or chain link does
+    not verify, we refuse to extend a broken chain. Mirrors the immutable-append
+    discipline of memory_kernel.promotion_gate without minting a second receipt
+    *system*."""
     target = (path or DEFAULT_MACHINE_RECEIPT_PATH).expanduser()
     prev_digest = ""
     if target.exists():
-        tail: dict[str, Any] | None = None
-        for line in target.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                try:
-                    tail = json.loads(line)
-                except json.JSONDecodeError:
-                    raise ValueError(f"machine receipt log {target} has a non-JSON line")
-        if tail is not None:
-            stored = str(tail.get("digest", ""))
-            recomputed = _stable_digest({k: v for k, v in tail.items() if k != "digest"})
-            if not stored or stored != recomputed:
-                raise ValueError(f"machine receipt log {target} tail digest is broken; refusing to extend")
-            prev_digest = stored
+        rows = _read_verified_machine_receipt_chain(target)
+        if rows:
+            prev_digest = str(rows[-1].get("digest", ""))
     chained = receipt.with_chain(prev_digest)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a", encoding="utf-8") as handle:

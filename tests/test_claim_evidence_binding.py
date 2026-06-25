@@ -15,6 +15,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
@@ -67,7 +69,7 @@ def test_canonical_digest_byte_identical_across_three_owners() -> None:
         ), f"stable_digest drift across owners for {payload!r}"
 
 
-def test_resolve_enforcement_precedence() -> None:
+def test_resolve_enforcement_precedence(tmp_path: Path) -> None:
     """Stage-driven ratchet: --warn-only forces advisory; --enforce forces
     blocking; otherwise the AI-M1 hygiene stage drives it (block iff 'enforced').
     This is what lets `promote.py AI-M1 --stage enforced` flip the gate's teeth on
@@ -82,8 +84,19 @@ def test_resolve_enforcement_precedence() -> None:
     assert resolve_enforcement(enforce_flag=True, warn_only_flag=False, stage="advisory") is True
     # --warn-only wins over everything (stays advisory even at the enforced stage):
     assert resolve_enforcement(enforce_flag=True, warn_only_flag=True, stage="enforced") is False
-    # the shipped AI-M1 pattern is advisory today, so the bare gate stays advisory:
-    assert binding_stage() == "advisory"
+    pattern = tmp_path / "AI-M1.yaml"
+    pattern.write_text(json.dumps({"stage": "enforced"}), encoding="utf-8")
+    assert binding_stage(pattern) == "enforced"
+    assert binding_stage(tmp_path / "missing.json") == "advisory"
+
+
+def test_receipt_command_line_records_actual_flags() -> None:
+    from check_claim_evidence_binding import receipt_command_line  # type: ignore  # noqa: E402
+
+    assert receipt_command_line(
+        ["scripts/governance/check_claim_evidence_binding.py", "--warn-only", "--emit-receipt"],
+        executable="python3",
+    ) == "python3 scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt"
 
 
 def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
@@ -162,6 +175,31 @@ def test_grade_of_unknown_kind_is_s0() -> None:
 def test_grade_of_failing_criterion_is_zero() -> None:
     failing = CriterionResult(id="x", kind="commit_on_main", passed=False)
     assert grade_of_criterion({"kind": "commit_on_main"}, failing, {}) == 0
+
+
+def test_empty_grade_config_preserves_builtin_ladder(tmp_path: Path) -> None:
+    import check_track_status as cts  # type: ignore  # noqa: E402
+
+    old_path = cts.EVIDENCE_GRADES_PATH
+    old_cache = cts._GRADE_LADDER_CACHE
+    try:
+        grade_file = tmp_path / "evidence_grades.yaml"
+        grade_file.write_text("schema_version: 1\ngrades: []\n", encoding="utf-8")
+        cts.EVIDENCE_GRADES_PATH = grade_file
+        cts._GRADE_LADDER_CACHE = None
+        assert grade_of_criterion(
+            {"kind": "test_passes", "oracle_source": "ci"},
+            _passing("test_passes"),
+            {},
+        ) == 3
+        assert grade_of_criterion(
+            {"kind": "commit_on_main"},
+            _passing("commit_on_main"),
+            {},
+        ) == 2
+    finally:
+        cts.EVIDENCE_GRADES_PATH = old_path
+        cts._GRADE_LADDER_CACHE = old_cache
 
 
 def test_existence_kinds_grade_below_landed() -> None:
@@ -265,6 +303,25 @@ def test_checker_rejects_tampered_digest(tmp_path: Path) -> None:
     assert "digest mismatch" in res.detail
 
 
+def test_checker_rejects_non_object_chain_row(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    log.write_text("[]\n", encoding="utf-8")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "not a JSON object" in res.detail
+
+
+def test_checker_rejects_missing_genesis_anchor(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+    row = {"claim_id": "C1", "command": "x", "prev_digest": "external"}
+    row["digest"] = _stable_digest(row)
+    log.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "genesis anchor" in res.detail
+
+
 def test_checker_rejects_broken_chain_link(tmp_path: Path) -> None:
     log = tmp_path / "receipts.jsonl"
     append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
@@ -280,6 +337,18 @@ def test_checker_rejects_broken_chain_link(tmp_path: Path) -> None:
     res = check_receipt_valid(str(log), [], expect_chain=True)
     assert not res.passed
     assert "broken" in res.detail
+
+
+def test_append_machine_receipt_refuses_to_extend_tampered_earlier_row(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
+    rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows[0]["command"] = "tampered earlier row"
+    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="row 0 digest is broken"):
+        append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="z"), path=log)
 
 
 def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:

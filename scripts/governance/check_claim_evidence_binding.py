@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -89,6 +90,16 @@ def _verdict(r: dict) -> str:
     if r.get("strongest_grade", 0) < r.get("min_evidence_grade", 2):
         return "UNDERGRADED"
     return "NOT-SHIPPABLE"
+
+
+def receipt_command_line(
+    argv: list[str] | None = None,
+    *,
+    executable: str | None = None,
+) -> str:
+    """Return the actual Python command line that produced the receipt."""
+    parts = [executable or sys.executable, *(argv if argv is not None else sys.argv)]
+    return " ".join(shlex.quote(part) for part in parts)
 
 
 def run(argv: list[str] | None = None) -> int:
@@ -162,7 +173,7 @@ def _emit_receipt(*, undergraded: int, exit_code: int, stage: str, blocking: boo
     git_sha, git_dirty = _git_context(repo_root)
     receipt = VerifiedMachineReceipt(
         claim_id="claim-evidence-binding",
-        command="python3 scripts/governance/check_claim_evidence_binding.py",
+        command=receipt_command_line(),
         cwd=str(repo_root),
         git_sha=git_sha,
         git_dirty=git_dirty,
