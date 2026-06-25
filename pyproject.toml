@@ -57,7 +57,14 @@ exclude = ["hooks*", "scripts*", "tests*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 timeout = 300
+addopts = "--strict-markers --strict-config"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "docker: marks tests that require a running Docker daemon",
+    "network: marks tests that require network access",
+]
 filterwarnings = [
+    "error::pytest.PytestUnknownMarkWarning",
     "ignore:'asyncio.get_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:`torch.jit.script` is not supported in Python 3.14\\+ and may break\\. Please switch to `torch.compile` or `torch.export`\\.:DeprecationWarning",
