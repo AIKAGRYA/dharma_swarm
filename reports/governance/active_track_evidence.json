@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-24T15:42:52+00:00",
+  "generated_at": "2026-06-25T02:33:14+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -97,11 +97,11 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.80s"
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.84s"
     }
   ],
   "portfolio_summary": {
-    "active": 9,
+    "active": 8,
     "max_active": 10,
     "warn_active": 5,
     "shippable": 4
@@ -171,6 +171,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 12,
@@ -265,7 +269,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.80s"
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.84s"
         }
       ]
     },
@@ -293,9 +297,14 @@
       "shippable": false,
       "criteria_pass": true,
       "ship_blocks": [
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 2,
@@ -351,9 +360,14 @@
       "criteria_pass": false,
       "ship_blocks": [
         "4 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 7,
@@ -447,9 +461,14 @@
       "criteria_pass": false,
       "ship_blocks": [
         "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 10,
@@ -573,6 +592,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 17,
@@ -691,7 +714,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.50s"
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 0.67s"
         },
         {
           "id": "truth_graph_projection_on_main",
@@ -733,6 +756,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 8,
@@ -797,7 +824,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.37s"
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 15 passed, 1 skipped in 0.52s"
         },
         {
           "id": "holon_substrate_on_main",
@@ -842,6 +869,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 9,
@@ -912,7 +943,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.33s"
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.35s"
         },
         {
           "id": "stage4_precedence_locked_on_main",
@@ -954,9 +985,14 @@
       "criteria_pass": true,
       "ship_blocks": [
         "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 9,
@@ -1036,101 +1072,13 @@
           "detail": "tests/test_coordination_closure_checks.py present"
         }
       ]
-    },
-    {
-      "id": "merge-master-mike-d4-2026-06",
-      "name": "Merge Master Mike \u2014 D4 persistent always-on merge agent",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-reconciliation-2026-06"
-      ],
-      "depends_on": [],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "scripts/runtime/pr_merge_control.py",
-        "scripts/runtime/merge_master_mike_daemon.py",
-        ".github/workflows/automerge.yml",
-        ".github/workflows/codex-mention-router.yml",
-        ".github/workflows/merge-master-mike-backlog.yml",
-        "tests/test_pr_merge_control_github_reviews.py"
-      ],
-      "moves_vital_signs": [
-        "quality_gates",
-        "tool_coverage"
-      ],
-      "verified_at": "2026-06-24",
-      "ttl_days": 21,
-      "owner": "@AmitabhainArunachala",
-      "shippable": false,
-      "criteria_pass": false,
-      "ship_blocks": [
-        "2 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
-      ],
-      "has_rigorous_evidence": false,
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 3,
-        "total": 4
-      },
-      "criteria": [
-        {
-          "id": "pr_merge_control_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/runtime/pr_merge_control.py present"
-        },
-        {
-          "id": "mike_daemon_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/runtime/merge_master_mike_daemon.py present"
-        },
-        {
-          "id": "automerge_workflow_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": ".github/workflows/automerge.yml present"
-        },
-        {
-          "id": "router_workflow_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": ".github/workflows/codex-mention-router.yml present"
-        },
-        {
-          "id": "github_review_receipt_bridge",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'github_review' found in scripts/runtime/pr_merge_control.py"
-        },
-        {
-          "id": "github_review_bridge_tested",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "tests/test_pr_merge_control_github_reviews.py present"
-        },
-        {
-          "id": "automerge_enrolls_all_nondraft",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'mike-watch' found in .github/workflows/automerge.yml"
-        },
-        {
-          "id": "mike_cloud_heartbeat",
-          "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'schedule:' NOT FOUND in .github/workflows/merge-master-mike-backlog.yml"
-        }
-      ]
     }
   ],
   "findings": [
     {
       "severity": "WARN",
       "check": "wip-high",
-      "message": "9 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
+      "message": "8 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
       "criterion_id": null
     },
     {
@@ -1154,7 +1102,7 @@
     {
       "severity": "INFO",
       "check": "track-provisional:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] 2/2 criteria pass but NOT shippable under the rigorous bar: no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
+      "message": "[runtime-truth-nats-2026-06] 2/2 criteria pass but NOT shippable under the rigorous bar: no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {
@@ -1190,13 +1138,7 @@
     {
       "severity": "INFO",
       "check": "track-provisional:orchestration-arena-v1-2026-06",
-      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-in-progress:merge-master-mike-d4-2026-06",
-      "message": "[merge-master-mike-d4-2026-06] 3/4 completion criteria pass.",
+      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     }
   ]
