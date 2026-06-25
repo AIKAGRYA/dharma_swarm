@@ -13,6 +13,8 @@ The contract is lifecycle first, not prose first:
 - `CATALOGUE.md` and `AUDIT_PROMPT.md` are generated from those pattern files.
 - `baselines/` stores dated non-blocking scan outputs.
 - `archive/` keeps retired pattern ids available for old citations.
+- `FITNESS_FUNCTIONS.md` registers executable architecture invariants that run
+  continuously in CI and local pytest.
 
 Run:
 
