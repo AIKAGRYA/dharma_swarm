@@ -13,6 +13,10 @@ Slop."** Soul-name: **Pramāṇa Probe.**
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
 
+> **Status: v0.0.1 COMPLETE — 49 prompts across 25 themes + the flagship.** Every
+> prompt ran on this repo's real ground truth. Backlog/angles in `ROADMAP.md`;
+> landscape in `SOURCES.md`; lineage canon in `FOUNDATIONS.md`.
+
 1. **Inward** — level up *this* repo from the level of invariants and first
    principles, not surface lint.
 2. **Outward** — a packaged, sellable offering (or a free entry tier) for

@@ -39,6 +39,30 @@ new angles added below.
 
 _(backlog markers below are historical; all are now ✅.)_
 
+## v0.1.0 — proposed angles (operator greenlight before building)
+
+Genuine future angles, each with a real invariant + lineage + a runnable demo on
+this repo. **Not built** — listed here so growth stays vetted, never padded.
+
+- ◻ **accessibility-audit** (frontend) — WCAG: every interactive element keyboard-
+  reachable + labeled; the dashboard is real UI · *WCAG; POUR principles*
+- ◻ **unbounded-growth-scan** — data structures that grow without a bound (lists/dicts/
+  queues that only append) — a slow OOM distinct from resource leaks · *bounded resources*
+- ◻ **missing-index-inference** — queries whose WHERE/JOIN columns lack an index; route to
+  EXPLAIN, never guess · *Codd; query planner as ground truth*
+- ◻ **type-coverage / any-creep** — untyped escape hatches (`Any`, `# type: ignore`,
+  untyped defs) that defeat the type checker · *Milner (types); gradual typing*
+- ◻ **feature-flag-debt** — stale flags long past rollout (the removal breadcrumb from
+  `feature-flag-wrap`, now overdue) · *Lehman; flag lifecycle*
+- ◻ **build-reproducibility** — same source → same artifact; unpinned deps / timestamps /
+  ordering defeat it · *reproducible-builds.org; supply-chain integrity*
+- ◻ **slo-error-budget** — are the critical paths' SLOs defined and measured? · *Google SRE*
+- ◻ **logging-level-hygiene** — DEBUG/INFO/ERROR used correctly; log spam vs silence · *Gray*
+- ◻ **i18n-readiness** — hardcoded user-facing strings, locale-unsafe formatting · *Unicode/CLDR*
+
+(The armed cron is instructed to no-op when the v0.0.1 backlog is empty — it will not
+build these until they're moved above the line by operator greenlight.)
+
 ## Backlog — by theme (invariant · lineage)
 
 ### Concurrency & correctness
