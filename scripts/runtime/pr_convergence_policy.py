@@ -129,10 +129,10 @@ def compute_convergence_order(open_prs, pr_files, owned_surfaces=(), grades=None
 
 def _fetch_live(limit: int) -> dict:
     """ADVISORY live run: reuse the existing owners for reads; never mutate."""
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
-    from pr_merge_control import fetch_open_prs, fetch_pr_files  # type: ignore  # noqa: E402
-    from check_track_status import (  # type: ignore  # noqa: E402
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))  # repo-root only — never shadow bare names
+    from scripts.runtime.pr_merge_control import fetch_open_prs, fetch_pr_files  # noqa: E402
+    from scripts.governance.check_track_status import (  # noqa: E402
         ACTIVE_TRACK_PATH, load_active_track, normalize_portfolio,
     )
     repo = "AmitabhainArunachala/dharma_swarm"

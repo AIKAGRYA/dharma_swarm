@@ -72,8 +72,9 @@ def main(argv=None) -> int:
     ap.add_argument("--limit", type=int, default=30)
     args = ap.parse_args(argv)
 
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from pr_merge_control import fetch_open_prs  # type: ignore  # noqa: E402
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))  # repo-root only — never shadow bare names
+    from scripts.runtime.pr_merge_control import fetch_open_prs  # noqa: E402
     prs = fetch_open_prs(args.limit)
     plan = plan_quorum_repair(prs)
     print(json.dumps({"mode": "execute" if args.execute else "dry-run", "plan": plan}, indent=2))

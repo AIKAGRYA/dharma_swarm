@@ -5,13 +5,7 @@ the same discipline the rigor gate applies to evidence, applied to PR ordering.
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "scripts/runtime"))
-
-from pr_convergence_policy import (  # type: ignore  # noqa: E402
+from scripts.runtime.pr_convergence_policy import (
     compute_convergence_order,
     is_decision_pr,
     overlapping_surface,

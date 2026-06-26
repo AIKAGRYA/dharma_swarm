@@ -7,13 +7,7 @@ side-effecting wrapper; this is the verifiable core.
 """
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "scripts/runtime"))
-
-from reviewer_quorum_repair import (  # type: ignore  # noqa: E402
+from scripts.runtime.reviewer_quorum_repair import (
     plan_quorum_repair,
     should_request_copilot,
 )

@@ -488,8 +488,9 @@ def _convergence_advisory(limit: int = 30) -> dict[str, Any]:
     cycle. Quorum-repair (reviewer_quorum_repair.py) is intentionally NOT fired
     here — it is a deliberate request-only CLI organ, not cycle automation."""
     try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import pr_convergence_policy  # type: ignore  # noqa: PLC0415
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))  # repo-root only — never shadow bare names
+        from scripts.runtime import pr_convergence_policy  # noqa: PLC0415
 
         return pr_convergence_policy._fetch_live(limit)
     except Exception as exc:  # advisory must never break the cycle
