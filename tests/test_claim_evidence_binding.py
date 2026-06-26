@@ -1,0 +1,373 @@
+"""Tests for the Pudgala Forge graded claim/evidence binding (Phase 1).
+
+These guard the anti-slop bar itself: existence-only evidence is not closure,
+self-owned tests are not independent oracles, and a machine receipt that is
+tampered or stale is not evidence. They are small and fast — structural
+invariants over the extended governance gate, not the live portfolio contents.
+
+This module is the *independent oracle* (oracle_source: ci) for the proposed
+anti-slop-pudgala-forge track: it is authored to verify the kernel, not by the
+code's owner asserting its own correctness.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
+
+from check_track_status import (  # type: ignore  # noqa: E402
+    check_receipt_valid,
+    evaluate_track,
+    grade_of_criterion,
+    grade_name,
+    CriterionResult,
+)
+
+from dharma_swarm.spine.receipt import (  # noqa: E402
+    VerifiedMachineReceipt,
+    append_machine_receipt,
+    _canonical_json as _spine_canonical_json,
+    _stable_digest as _spine_stable_digest,
+)
+from dharma_swarm.memory_kernel.write_receipts import (  # noqa: E402
+    canonical_json as _wr_canonical_json,
+    stable_digest as _wr_stable_digest,
+)
+from check_track_status import (  # type: ignore  # noqa: E402
+    _canonical_json as _gate_canonical_json,
+    _stable_digest as _gate_stable_digest,
+)
+
+
+def test_canonical_digest_byte_identical_across_three_owners() -> None:
+    """The receipt digest is computed/verified in three places — the producer
+    (spine/receipt.py), the gate (check_track_status.py), and canon
+    (memory_kernel/write_receipts.py). They MUST canonicalise byte-for-byte or a
+    produced VerifiedMachineReceipt silently fails verification. This pins the
+    triplication so it cannot drift unnoticed (closes the duplication fragility)."""
+    samples = [
+        {"b": 1, "a": 2, "nested": {"y": [3, 2, 1], "x": "z"}},
+        {"claim_id": "c", "command": "pytest -k x", "exit_code": 0, "prev_digest": ""},
+        {"unicode": "réçu—✓", "bool": True, "none": None, "float": 1.5},
+        {},
+    ]
+    for payload in samples:
+        assert (
+            _spine_canonical_json(payload)
+            == _gate_canonical_json(payload)
+            == _wr_canonical_json(payload)
+        ), f"canonical_json drift across owners for {payload!r}"
+        assert (
+            _spine_stable_digest(payload)
+            == _gate_stable_digest(payload)
+            == _wr_stable_digest(payload)
+        ), f"stable_digest drift across owners for {payload!r}"
+
+
+def test_resolve_enforcement_precedence(tmp_path: Path) -> None:
+    """Stage-driven ratchet: --warn-only forces advisory; --enforce forces
+    blocking; otherwise the AI-M1 hygiene stage drives it (block iff 'enforced').
+    This is what lets `promote.py AI-M1 --stage enforced` flip the gate's teeth on
+    without a code change, and keeps it advisory (safe in governance-all) today."""
+    from check_claim_evidence_binding import (  # type: ignore  # noqa: E402
+        binding_stage,
+        resolve_enforcement,
+    )
+
+    assert resolve_enforcement(enforce_flag=False, warn_only_flag=False, stage="advisory") is False
+    assert resolve_enforcement(enforce_flag=False, warn_only_flag=False, stage="enforced") is True
+    assert resolve_enforcement(enforce_flag=True, warn_only_flag=False, stage="advisory") is True
+    # --warn-only wins over everything (stays advisory even at the enforced stage):
+    assert resolve_enforcement(enforce_flag=True, warn_only_flag=True, stage="enforced") is False
+    pattern = tmp_path / "AI-M1.yaml"
+    pattern.write_text(json.dumps({"stage": "enforced"}), encoding="utf-8")
+    assert binding_stage(pattern) == "enforced"
+    assert binding_stage(tmp_path / "missing.json") == "advisory"
+
+
+def test_receipt_command_line_records_actual_flags() -> None:
+    from check_claim_evidence_binding import receipt_command_line  # type: ignore  # noqa: E402
+
+    assert receipt_command_line(
+        ["scripts/governance/check_claim_evidence_binding.py", "--warn-only", "--emit-receipt"],
+        executable="python3",
+    ) == "python3 scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt"
+
+
+def test_mutation_score_gte_grades_s6_and_reads_report(tmp_path: Path) -> None:
+    """S6 (P3-09) is ACTIVE: a passing mutation_score_gte grades S6, and the gate
+    READS a mutation-score report — above threshold passes; below / missing /
+    stale fail (fail-closed). The slow mutmut run that produces the report is a
+    separate `make mutation-test` step (the gate never runs mutmut inline)."""
+    from check_track_status import check_mutation_score_gte  # type: ignore  # noqa: E402
+
+    assert grade_of_criterion({"kind": "mutation_score_gte"}, _passing("mutation_score_gte"), {}) == 6
+    assert grade_name(6).startswith("S6")
+
+    rpt = tmp_path / "mutation_score.json"
+    rpt.write_text(json.dumps({"score": 0.72, "killed": 36, "total": 50,
+                               "produced_at": "2026-06-25T00:00:00Z"}), encoding="utf-8")
+    assert check_mutation_score_gte(str(rpt), 0.6).passed              # 0.72 >= 0.60
+    assert not check_mutation_score_gte(str(rpt), 0.8).passed          # 0.72 <  0.80
+    assert not check_mutation_score_gte(str(tmp_path / "nope.json"), 0.6).passed  # missing -> fail-closed
+    old = tmp_path / "old.json"
+    old.write_text(json.dumps({"score": 0.99, "produced_at": "2020-01-01T00:00:00Z"}), encoding="utf-8")
+    assert not check_mutation_score_gte(str(old), 0.6, fresh_ttl_days=1).passed   # stale -> fail
+
+
+def test_run_mutation_score_build_report() -> None:
+    """The mutmut-3.5 runner (run_mutation_score.py, grafted from #696) projects
+    `mutmut export-cicd-stats` into the report the S6 gate reads:
+    score = (killed + caught_by_type_check) / (total - skipped), with `passed` vs
+    threshold and a produced_at for the freshness check. Pure function — no run."""
+    from run_mutation_score import build_report  # type: ignore  # noqa: E402
+
+    stats = {"killed": 36, "caught_by_type_check": 0, "survived": 12,
+             "timeout": 1, "suspicious": 1, "skipped": 4, "total": 54}
+    r = build_report(stats, threshold=0.6, command="mutmut run")
+    assert r["killed"] == 36 and r["total"] == 50            # 54 raw - 4 skipped
+    assert r["score"] == 0.72 and r["passed"] is True
+    assert "produced_at" in r                                # the S6 freshness field
+    assert build_report({"total": 0}, threshold=0.6, command="x")["score"] == 0.0
+
+
+def test_single_owner_no_second_strength_ladder() -> None:
+    """Anti-drift guard from the #685/#693/#695 convergence weave: exactly ONE
+    source of kind->strength. track_acceptance_strength_report reads its strengths
+    from evidence_grades.yaml (the single config), NOT a hard-coded second ladder
+    that can silently diverge (the reviewed defect). And the thin CLI consumes
+    evaluate_track — it never re-implements the verdict (the only real drift risk
+    is a future second evaluator; this test fails if one appears)."""
+    from check_track_status import load_active_track  # type: ignore  # noqa: E402
+    import track_acceptance_strength_report as tas  # type: ignore  # noqa: E402
+
+    raw = load_active_track(REPO_ROOT / "docs/governance/evidence_grades.yaml")
+    km = raw.get("kind_maturity")
+    assert isinstance(km, dict) and km, "evidence_grades.yaml must carry kind_maturity (the single source)"
+    for kind, strength in tas.KIND_STRENGTH.items():
+        assert int(km.get(kind, -999)) == strength, (
+            f"track_acceptance strength for {kind}={strength} drifted from "
+            f"evidence_grades.yaml kind_maturity={km.get(kind)}")
+    assert "mutation_score_gte" in tas.KIND_STRENGTH  # the gap the review caught is now closed
+
+    cli_src = (REPO_ROOT / "scripts/governance/check_claim_evidence_binding.py").read_text(encoding="utf-8")
+    assert "from check_track_status import" in cli_src and "evaluate_track" in cli_src
+    assert "def evaluate_track" not in cli_src, "the thin CLI must not re-implement the evaluator"
+
+
+# --------------------------------------------------------------------------- #
+# Grade ladder + graded conjunct                                              #
+# --------------------------------------------------------------------------- #
+
+def _passing(kind: str) -> CriterionResult:
+    return CriterionResult(id="x", kind=kind, passed=True, detail="")
+
+
+def test_grade_of_unknown_kind_is_s0() -> None:
+    assert grade_of_criterion({"kind": "wat"}, _passing("wat"), {}) == 0
+
+
+def test_grade_of_failing_criterion_is_zero() -> None:
+    failing = CriterionResult(id="x", kind="commit_on_main", passed=False)
+    assert grade_of_criterion({"kind": "commit_on_main"}, failing, {}) == 0
+
+
+def test_empty_grade_config_preserves_builtin_ladder(tmp_path: Path) -> None:
+    import check_track_status as cts  # type: ignore  # noqa: E402
+
+    old_path = cts.EVIDENCE_GRADES_PATH
+    old_cache = cts._GRADE_LADDER_CACHE
+    try:
+        grade_file = tmp_path / "evidence_grades.yaml"
+        grade_file.write_text("schema_version: 1\ngrades: []\n", encoding="utf-8")
+        cts.EVIDENCE_GRADES_PATH = grade_file
+        cts._GRADE_LADDER_CACHE = None
+        assert grade_of_criterion(
+            {"kind": "test_passes", "oracle_source": "ci"},
+            _passing("test_passes"),
+            {},
+        ) == 3
+        assert grade_of_criterion(
+            {"kind": "commit_on_main"},
+            _passing("commit_on_main"),
+            {},
+        ) == 2
+    finally:
+        cts.EVIDENCE_GRADES_PATH = old_path
+        cts._GRADE_LADDER_CACHE = old_cache
+
+
+def test_existence_kinds_grade_below_landed() -> None:
+    assert grade_of_criterion({"kind": "file_exists"}, _passing("file_exists"), {}) == 0
+    assert grade_of_criterion({"kind": "file_contains"}, _passing("file_contains"), {}) == 1
+    assert grade_of_criterion({"kind": "commit_on_main"}, _passing("commit_on_main"), {}) == 2
+
+
+def test_self_owned_test_is_downgraded_from_s3_to_s2() -> None:
+    track = {"owner": "@alice"}
+    # No oracle_source declared -> not independent -> downgraded.
+    assert grade_of_criterion({"kind": "test_passes"}, _passing("test_passes"), track) == 2
+    # oracle_source == owner -> still not independent -> downgraded.
+    crit = {"kind": "test_passes", "oracle_source": "@alice"}
+    assert grade_of_criterion(crit, _passing("test_passes"), track) == 2
+
+
+def test_independent_oracle_keeps_s3() -> None:
+    track = {"owner": "@alice"}
+    crit = {"kind": "test_passes", "oracle_source": "ci"}
+    assert grade_of_criterion(crit, _passing("test_passes"), track) == 3
+
+
+def test_track_on_file_contains_only_is_not_shippable() -> None:
+    track = {
+        "id": "t-existence",
+        "status": "ACTIVE",
+        "owner": "@alice",
+        "completion_criteria": [
+            {"id": "c1", "kind": "file_contains",
+             "file": "docs/governance/evidence_grades.yaml", "pattern": "grades"},
+        ],
+    }
+    r = evaluate_track(track)
+    assert r["strongest_grade"] == 1
+    assert r["min_evidence_grade"] == 2  # default floor S2
+    assert not r["shippable"]
+    assert any("strongest evidence" in b for b in r["ship_blocks"])
+
+
+def test_track_meets_floor_on_receipt_valid_s2(tmp_path: Path) -> None:
+    # Deterministic S2 evidence without depending on git ancestry: a valid
+    # chained machine receipt (receipt_valid -> S2, a RIGOROUS kind). Proves the
+    # graded conjunct is satisfied when strongest_grade meets the floor.
+    log = tmp_path / "receipt.jsonl"
+    append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
+    track = {
+        "id": "t-landed",
+        "status": "ACTIVE",
+        "owner": "@alice",
+        "min_evidence_grade": 2,
+        "completion_criteria": [
+            {"id": "c1", "kind": "receipt_valid", "file": str(log),
+             "requires_keys": ["claim_id"], "expect_chain": True},
+        ],
+    }
+    r = evaluate_track(track)
+    assert r["strongest_grade"] >= 2
+    assert not any("strongest evidence" in b for b in r["ship_blocks"])
+    assert r["shippable"]
+
+
+def test_grade_name_is_human_readable() -> None:
+    assert grade_name(0).startswith("S0")
+    assert grade_name(2).startswith("S2")
+
+
+# --------------------------------------------------------------------------- #
+# VerifiedMachineReceipt: chain, digest, freshness                            #
+# --------------------------------------------------------------------------- #
+
+def test_machine_receipt_roundtrips_and_chains(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    c1 = append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="pytest a", exit_code=0), path=log)
+    c2 = append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="pytest b", exit_code=0), path=log)
+    assert c1.verify() and c2.verify()
+    assert c2.prev_digest == c1.digest          # linked
+    assert c1.prev_digest == ""                  # genesis
+
+
+def test_checker_accepts_intact_chain(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
+    res = check_receipt_valid(str(log), ["claim_id", "command"], expect_chain=True)
+    assert res.passed, res.detail
+
+
+def test_checker_rejects_tampered_digest(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    append_machine_receipt(
+        VerifiedMachineReceipt(claim_id="C1", command="x", exit_code=0), path=log)
+    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    rows[0]["command"] = "rm -rf /"            # tamper, keep stale digest
+    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "digest mismatch" in res.detail
+
+
+def test_checker_rejects_non_object_chain_row(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    log.write_text("[]\n", encoding="utf-8")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "not a JSON object" in res.detail
+
+
+def test_checker_rejects_missing_genesis_anchor(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+    row = {"claim_id": "C1", "command": "x", "prev_digest": "external"}
+    row["digest"] = _stable_digest(row)
+    log.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "genesis anchor" in res.detail
+
+
+def test_checker_rejects_broken_chain_link(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
+    rows = [json.loads(l) for l in log.read_text().splitlines() if l.strip()]
+    # Re-digest row 1 with a wrong prev_digest so its own digest stays valid but
+    # the link is broken.
+    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+    rows[1]["prev_digest"] = "deadbeef"
+    payload = {k: v for k, v in rows[1].items() if k != "digest"}
+    rows[1]["digest"] = _stable_digest(payload)
+    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    res = check_receipt_valid(str(log), [], expect_chain=True)
+    assert not res.passed
+    assert "broken" in res.detail
+
+
+def test_append_machine_receipt_refuses_to_extend_tampered_earlier_row(tmp_path: Path) -> None:
+    log = tmp_path / "receipts.jsonl"
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="x"), path=log)
+    append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="y"), path=log)
+    rows = [json.loads(l) for l in log.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows[0]["command"] = "tampered earlier row"
+    log.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="row 0 digest is broken"):
+        append_machine_receipt(VerifiedMachineReceipt(claim_id="C1", command="z"), path=log)
+
+
+def test_checker_rejects_stale_receipt(tmp_path: Path) -> None:
+    log = tmp_path / "receipt.json"
+    # Single-object receipt with an old produced_at and a matching digest.
+    from dharma_swarm.spine.receipt import _stable_digest  # type: ignore
+    row = {"claim_id": "C1", "produced_at": "2000-01-01T00:00:00Z"}
+    row["digest"] = _stable_digest({k: v for k, v in row.items() if k != "digest"})
+    log.write_text(json.dumps(row))
+    res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
+    assert not res.passed
+    assert "stale" in res.detail
+
+
+def test_checker_accepts_fresh_single_receipt(tmp_path: Path) -> None:
+    from dharma_swarm.spine.receipt import _stable_digest, _utc_now  # type: ignore
+    log = tmp_path / "receipt.json"
+    row = {"claim_id": "C1", "produced_at": _utc_now()}
+    row["digest"] = _stable_digest({k: v for k, v in row.items() if k != "digest"})
+    log.write_text(json.dumps(row))
+    res = check_receipt_valid(str(log), ["claim_id"], expect_digest=True, fresh_ttl_days=7)
+    assert res.passed, res.detail
