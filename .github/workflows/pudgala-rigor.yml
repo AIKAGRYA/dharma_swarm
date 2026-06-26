@@ -1,0 +1,38 @@
+# Pudgala rigor — graded claim/evidence binding (authentic verified-precondition).
+#
+# This is the AUTHENTIC version of "rigor = merge trust": the gate runs HERE, in
+# GitHub's trusted environment, so a PR author cannot forge a green check-run.
+# (The local ~/.dharma witness receipt proves integrity, not authenticity — it
+# can be produced by the author — so it must NOT be a merge signal on its own.)
+# Merge Master Mike's existing CI-green gate consumes this check; no change to
+# pr_merge_control is needed for it to count.
+#
+# TRUST RATCHET (config, not code):
+#   Stage 0 (now): ADVISORY — runs `--warn-only`, always exits 0, reports each
+#     active track's strongest evidence grade vs its required floor. Informational
+#     check-run; never blocks (the portfolio still has pre-existing undergraded
+#     tracks). Surfaces the rigor signal without breaking every PR.
+#   Stage 1+: flip the step to `--enforce` (and/or mark this a required status
+#     check in branch protection) once tracks are graded up. Then a PR that drops
+#     a track below its floor fails this check, and Mike's CI-green gate blocks it.
+name: Pudgala rigor — claim/evidence binding
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rigor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install minimal deps (gate is stdlib + PyYAML)
+        run: pip install pyyaml
+      - name: Graded claim/evidence binding (ADVISORY — Stage 0 of the trust ratchet)
+        run: python scripts/governance/check_claim_evidence_binding.py --warn-only
