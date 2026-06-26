@@ -68,6 +68,18 @@ _(batch 5 added the last 6; backlog markers below may lag — the cron updates t
 - ◻ **coupling-hotspot-map** — fan-in/fan-out hotspots; the modules a change ripples through · *Parnas; Martin (instability metric)*
 - ◻ **god-object-decomposition-plan** — a single-responsibility decomposition for an oversized module (e.g. this repo's 5,255-line file) · *Parnas; SRP*
 
+### From the landscape survey (see SOURCES.md) — new angles
+- ◻⭐ **ai-slop-index** (**FLAGSHIP**) — score AI-generated slop via *measurable* signals: duplication ratio, complexity inflation, test-mirrors-implementation, architectural coherence, dead code, wildcard imports. The brand keystone — composes several existing prompts into one index. · *Larridin AI Slop Index; arXiv 2508.14727 (Wildcard #1, dead code 34–42%)*
+- ◻ **ai-agent-security-audit** — prompt-injection / tool-permission / agent attack surface (run on dharma_swarm's own agent layer) · *doneyli 5-phase; OWASP LLM Top 10*
+- ◻ **interface-replaceability-audit** — can an implementation be swapped without ripple? seams over entanglement · *Eskil Steenberg; Parnas*
+- ◻ **wildcard-import-audit** — `import *` / re-export sprawl; the #1 measured AI smell · *arXiv 2508.14727*
+- ◻ **test-mirrors-implementation** — tests that assert structure not behavior (the "asserts presence" caveat, sharpened) · *Goodenough; Weyuker*
+- ◻ **duplication-ratio-scan** — copy-paste clusters; a core slop signal · *Fowler (duplication = #1 smell)*
+- ◻ **complexity-inflation-scan** — cyclomatic/cognitive complexity vs necessity · *McCabe '76; Cognitive Complexity (Campbell)*
+- ◻ **legacy-modernization-plan** — risk areas + cleanup priorities + AI-ready context pack · *Feathers (Working Effectively with Legacy Code)*
+- ◻ **compliance-pii-readiness** — PII handling, retention, audit-log presence (code-level, not legal advice) · *GDPR/data-minimization; Saltzer–Schroeder*
+- ◻ **llm-call-hygiene** — for codebases that *call* LLMs: token budgets, prompt-injection at the call site, retry/idempotency, cost caps · *OWASP LLM Top 10; Nygard*
+
 ## Cron contract (proposed)
 One tick = pick the top ▶/◻ item → derive the prompt (invariant + lineage) →
 **run it on `dharma_swarm/` for a real demo** → save under its theme → commit to
