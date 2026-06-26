@@ -268,7 +268,7 @@ jobs:
             fi
           else
             existing="$(gh pr view "${PR_NUMBER}" --json comments \
-              --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .id' \
+              --jq '.comments[] | select(.body | startswith("'"${marker}"'")) | .url | split("issuecomment-")[-1]' \
               | head -1)"
             if [ -n "${existing}" ]; then
               gh api --method PATCH \
