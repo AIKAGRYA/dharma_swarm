@@ -405,6 +405,57 @@ def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
     assert plan["skipped_current"] == []
 
 
+def test_select_fanout_plan_zero_max_selects_none(tmp_path):
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "would otherwise select",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
+def test_select_fanout_plan_zero_max_does_not_scan_current_packets(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "current but disabled",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
 def test_build_queue_summary_counts_statuses():
     prs = [
         {

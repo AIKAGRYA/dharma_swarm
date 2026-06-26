@@ -2214,6 +2214,9 @@ def select_fanout_plan(
     state_root: Path,
     skip_current: bool,
 ) -> dict[str, list[dict[str, Any]]]:
+    if max_prs <= 0:
+        return {"selected": [], "skipped_current": []}
+
     status_rank = {status: index for index, status in enumerate(statuses)}
     candidates = [
         item
