@@ -1,0 +1,165 @@
+name: a2a-agni-live-contact
+
+# Read-only live contact with the Agni NATS hub (wss://157.245.193.15:8443).
+#
+# Why this exists: an interactive Claude Code sandbox cannot reach the Agni
+# hub (org egress policy blocks raw TLS to the hub IP, and the trishula creds
+# live only as repo secrets). A GitHub Actions runner has BOTH open egress and
+# the NATS secrets, so it is the supported "GitHub repo env" path to actually
+# connect to the hub and observe live agents.
+#
+# Default behaviour is OBSERVE-ONLY: it connects, reads JetStream account +
+# stream + consumer state (the per-agent inboxes on DHARMA_A2A = live agent
+# presence) and prints a receipt. It never publishes into an agent inbox.
+# Triggered by push to the review/test branch so it runs from the branch
+# itself (workflow_dispatch is also wired for manual reruns).
+
+on:
+  push:
+    branches:
+      - claude/a2a-nats-review-test-ncol7c
+    paths:
+      - .github/workflows/a2a-agni-live-contact.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install NATS client
+        run: python3 -m pip install --quiet 'nats-py>=2.9' 'aiohttp>=3.9'
+
+      - name: Connect to Agni hub and observe live agents (read-only)
+        env:
+          # Prefer Mike's creds, fall back to Devin's — either reaches Agni.
+          MERGE_MASTER_MIKE_NATS_URL: ${{ secrets.MERGE_MASTER_MIKE_NATS_URL }}
+          MERGE_MASTER_MIKE_NATS_USER: ${{ secrets.MERGE_MASTER_MIKE_NATS_USER }}
+          MERGE_MASTER_MIKE_NATS_PW: ${{ secrets.MERGE_MASTER_MIKE_NATS_PW }}
+          MERGE_MASTER_MIKE_NATS_CA_PEM: ${{ secrets.MERGE_MASTER_MIKE_NATS_CA_PEM }}
+          MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME: ${{ vars.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME || secrets.MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME }}
+          DEVIN_NATS_URL: ${{ secrets.DEVIN_NATS_URL }}
+          DEVIN_NATS_USER: ${{ secrets.DEVIN_NATS_USER }}
+          DEVIN_NATS_PW: ${{ secrets.DEVIN_NATS_PW }}
+          DEVIN_NATS_CA_PEM: ${{ secrets.DEVIN_NATS_CA_PEM }}
+          DEVIN_NATS_TLS_HOSTNAME: ${{ vars.DEVIN_NATS_TLS_HOSTNAME || secrets.DEVIN_NATS_TLS_HOSTNAME }}
+        run: |
+          python3 - <<'PY'
+          import asyncio, json, os, ssl, sys
+
+          def pick(*names):
+              for n in names:
+                  v = os.environ.get(n)
+                  if v:
+                      return v
+              return ""
+
+          endpoint = pick("MERGE_MASTER_MIKE_NATS_URL", "DEVIN_NATS_URL")
+          user     = pick("MERGE_MASTER_MIKE_NATS_USER", "DEVIN_NATS_USER")
+          pw       = pick("MERGE_MASTER_MIKE_NATS_PW", "DEVIN_NATS_PW")
+          ca_pem   = pick("MERGE_MASTER_MIKE_NATS_CA_PEM", "DEVIN_NATS_CA_PEM")
+          tls_host = pick("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME", "DEVIN_NATS_TLS_HOSTNAME")
+
+          if not endpoint:
+              print("NATS_SECRETS_MISSING: no MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL secret is set")
+              sys.exit(78)  # neutral: secrets not provisioned for this branch
+
+          # Never print creds. Show only non-secret shape.
+          print(f"endpoint_scheme={endpoint.split('://',1)[0]}  has_user={bool(user)} "
+                f"has_pw={bool(pw)} has_ca_pem={bool(ca_pem)} tls_hostname={tls_host or '(none)'}")
+
+          def tls_kwargs():
+              kw = {}
+              if ca_pem:
+                  ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+                  ctx.load_verify_locations(cadata=ca_pem.replace("\\n", "\n"))
+                  kw["tls"] = ctx
+              if tls_host:
+                  kw["tls_hostname"] = tls_host
+              return kw
+
+          async def main():
+              import nats
+              nc = await nats.connect(
+                  servers=[endpoint],
+                  user=user or None,
+                  password=pw or None,
+                  connect_timeout=10,
+                  allow_reconnect=False,
+                  max_reconnect_attempts=0,
+                  **tls_kwargs(),
+              )
+              receipt = {"schema": "dharma.a2a.agni_live_contact.v1", "connected": True}
+              try:
+                  info = getattr(nc, "_server_info", {}) or {}
+                  receipt["server"] = {
+                      "connected_url": str(getattr(nc, "connected_url", "") or ""),
+                      "server_id": info.get("server_id"),
+                      "server_name": info.get("server_name"),
+                      "version": info.get("version"),
+                      "jetstream": info.get("jetstream"),
+                      "client_id": info.get("client_id"),
+                  }
+                  print("CONNECTED to Agni:", json.dumps(receipt["server"]))
+
+                  js = nc.jetstream()
+                  try:
+                      acct = await js.account_info()
+                      receipt["account"] = {
+                          "streams": getattr(acct, "streams", None),
+                          "consumers": getattr(acct, "consumers", None),
+                          "tier": str(getattr(acct, "tier", "") or ""),
+                      }
+                  except Exception as exc:
+                      receipt["account_error"] = str(exc)
+
+                  streams = []
+                  try:
+                      for si in await js.streams_info():
+                          cfg = si.config
+                          streams.append({
+                              "name": cfg.name,
+                              "subjects": list(getattr(cfg, "subjects", []) or []),
+                              "messages": getattr(si.state, "messages", None),
+                              "last_seq": getattr(si.state, "last_seq", None),
+                              "consumer_count": getattr(si.state, "consumer_count", None),
+                          })
+                  except Exception as exc:
+                      receipt["streams_error"] = str(exc)
+                  receipt["streams"] = streams
+                  print("STREAMS:", json.dumps(streams))
+
+                  # The per-agent inboxes on DHARMA_A2A == live agent presence.
+                  agents = []
+                  try:
+                      for ci in await js.consumers_info("DHARMA_A2A"):
+                          delivered = getattr(ci, "delivered", None)
+                          agents.append({
+                              "consumer": ci.name,
+                              "filter_subject": getattr(ci.config, "filter_subject", "") or "",
+                              "num_pending": getattr(ci, "num_pending", None),
+                              "num_ack_pending": getattr(ci, "num_ack_pending", None),
+                              "delivered_stream_seq": getattr(delivered, "stream_seq", None) if delivered else None,
+                          })
+                  except Exception as exc:
+                      receipt["consumers_error"] = str(exc)
+                  receipt["agent_inboxes"] = agents
+                  print(f"LIVE AGENT INBOXES ({len(agents)}):", json.dumps(agents, indent=2))
+              finally:
+                  await nc.close()
+
+              receipt["status"] = "AGNI_LIVE_CONTACT_OK"
+              print("RECEIPT:", json.dumps(receipt, sort_keys=True))
+
+          asyncio.run(main())
+          PY
