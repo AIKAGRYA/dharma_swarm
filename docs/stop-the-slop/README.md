@@ -102,7 +102,7 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | # | Theme | Defends the invariant | Lineage | Prompts |
 |---|---|---|---|---|
 | 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
-| 02 | **Module topology & acyclicity** | "The import graph must be a DAG; a load-time cycle is a latent boot failure. Rank by load-time danger, not cycle length." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62 | `circular-dependency-triage` (v0.0.1) |
+| 02 | **Module topology & structure** | "The import graph must be a DAG; change cost = coupling; a module has one reason to change. Measure fan-in/out and cut along cohesion." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62; Martin (SRP) | `circular-dependency-triage` · `coupling-hotspot-map` · `god-object-decomposition-plan` (v0.0.1) |
 | 03 | **Performance & cost** | "Optimize only what a profiler proves dominates; a bottleneck is a measured share, not a guess. Amdahl bounds the payoff; name the floor." | Knuth '74; Amdahl '67; Gregg (USE/flame); Jain | `performance-bottleneck-triage` (v0.0.1) |
 | 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
 | 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
@@ -113,10 +113,14 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 10 | **Production hardening** | "Hardening is triage, not rewrite: rank by P(incident)×blast-radius; every finding names the line, the mechanism, and the consequence." | Nygard '07; Gray '85; Saltzer–Schroeder '75 | `hardening-checklist` (v0.0.1) |
 | 11 | **Onboarding & comprehension** | "A brief transfers the system's theory; be faithful to real paths or say you can't — fidelity over fluency." | Naur '85; Parnas (module guide); Brooks | `onboarding-brief` (v0.0.1) |
 | 12 | **Knowledge capture** _(adjacent)_ | "An SOP is faithful to observed actions; flag the unclear, never invent a step." | Gilbreth (motion study); Gawande; Polanyi | `recording-to-sop` (v0.0.1, drafted) |
-| 13 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
-| 14 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
+| 13 | **Data & queries** | "A new query per row is O(n) trips where a join is 1 — but a single query iterated is fine. Distinguish, then prove via query logs." | Codd '70; Fowler (lazy-load); EXPLAIN | `n-plus-one-query-scan` (v0.0.1) |
+| 14 | **State & lifecycle** | "Every acquired resource releases on all paths incl. exceptions — proven by a scope, not by 'we close it later'." | Dijkstra; RAII (Stroustrup); Gray '85 | `resource-leak-scan` (v0.0.1) |
+| 15 | **Security** | "A seen secret is burned: route to a real scanner over full history, then rotate-then-purge. Rank by reachable privilege." | Kerckhoffs; Saltzer–Schroeder '75 | `secret-leakage-scan` (v0.0.1) |
+| 16 | **Observability** | "At 3am you have only what you logged; a swallow with no log is a guaranteed blind spot. Measure blind spots, require queryable context." | Gray '85; Gregg (USE); structured logging | `logging-context-audit` (v0.0.1) |
 
-The map grows as prompts are added; themes are not fixed in advance.
+The map grows as prompts are added (backlog in `ROADMAP.md`); themes are not fixed
+in advance. Reserved next: invariant/contract discovery (Hoare, Meyer), drift &
+entropy control (Shannon, Lehman).
 
 ## Productization note (read before extracting)
 

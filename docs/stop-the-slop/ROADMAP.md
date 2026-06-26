@@ -9,12 +9,16 @@ no human paste step.
 
 Status: ✅ shipped · ▶ next · ◻ backlog
 
-## Shipped (13)
-01 dependency-risk-triage ✅ · 02 circular-dependency-triage ✅ ·
-03 performance-bottleneck-triage ✅ · 04 retry-audit ✅ · 05 seed-data-generator ✅ ·
-06 error-handling-rules ✅ · 07 minimal-repro-builder ✅ + bug-trace-before-fix ✅ ·
-08 feature-flag-wrap ✅ · 09 dead-code-scan ✅ · 10 hardening-checklist ✅ ·
-11 onboarding-brief ✅ · 12 recording-to-sop ✅(drafted)
+## Shipped (19)
+dependency-risk-triage ✅ · circular-dependency-triage ✅ · coupling-hotspot-map ✅ ·
+god-object-decomposition-plan ✅ · performance-bottleneck-triage ✅ · retry-audit ✅ ·
+seed-data-generator ✅ · error-handling-rules ✅ · minimal-repro-builder ✅ ·
+bug-trace-before-fix ✅ · feature-flag-wrap ✅ · dead-code-scan ✅ ·
+hardening-checklist ✅ · onboarding-brief ✅ · recording-to-sop ✅(drafted) ·
+n-plus-one-query-scan ✅ · resource-leak-scan ✅ · secret-leakage-scan ✅ ·
+logging-context-audit ✅
+
+_(batch 5 added the last 6; backlog markers below may lag — the cron updates them.)_
 
 ## Backlog — by theme (invariant · lineage)
 
