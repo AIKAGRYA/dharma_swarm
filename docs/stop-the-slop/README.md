@@ -87,10 +87,11 @@ Versions evolve **in place** (git is the version store); the frontmatter
 |---|---|---|---|---|
 | 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
 | 02 | **Module topology & acyclicity** | "The import graph must be a DAG; a load-time cycle is a latent boot failure. Rank by load-time danger, not cycle length." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62 | `circular-dependency-triage` (v0.0.1) |
-| 03 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
-| 04 | _Failure-mode & resilience_ | _(reserved)_ | Lamport; Gray | — |
-| 05 | _Test integrity & verification_ | _(reserved)_ | Dijkstra ("testing shows presence…"); Weyuker | — |
-| 06 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
+| 03 | **Performance & cost** | "Optimize only what a profiler proves dominates; a bottleneck is a measured share, not a guess. Amdahl bounds the payoff; name the floor." | Knuth '74; Amdahl '67; Gregg (USE/flame); Jain | `performance-bottleneck-triage` (v0.0.1) |
+| 04 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
+| 05 | _Failure-mode & resilience_ | _(reserved)_ | Lamport; Gray | — |
+| 06 | _Test integrity & verification_ | _(reserved)_ | Dijkstra ("testing shows presence…"); Weyuker | — |
+| 07 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
 
 The map grows as prompts are added; themes are not fixed in advance.
 
@@ -108,6 +109,11 @@ history. Treat the path here as a staging area, not the final home.
   - `01/dependency-risk-triage` v0.0.1 — rewrite of a kit's lockfile prompt;
     found 8 real advisories this repo's heuristic missed.
   - `02/circular-dependency-triage` v0.0.1 — rewrite of a kit's cycle-detection
-    prompt; found 12 real import cycles in `dharma_swarm/` via AST + Tarjan SCC,
-    ranked by load-time boot risk, and correctly left the already-deferred
-    (lazy) cycle alone.
+    prompt; AST + Tarjan SCC over `dharma_swarm/`. Full graph: 12 SCCs; rigorous
+    load-time pass (`TYPE_CHECKING` excluded): **exactly 1** genuine boot-risk
+    cycle (provider/router) — now fixed (load-time graph → DAG). Demo also keeps
+    the author's own first-draft over-count as the cautionary case.
+  - `03/performance-bottleneck-triage` v0.0.1 — rewrite of Vaylo Studios' "perf
+    from logs" prompt; routes to a profiler instead of guessing. `-X importtime`
+    on `dharma_swarm` found `models` = 21% of boot (29 eager Pydantic builds),
+    Amdahl-bounded, and named pydantic/ssl/stdlib as irreducible floor.

@@ -85,53 +85,44 @@ Kahn. The analysis is correct because the theory is.
 
 **Target:** `dharma_swarm/` (784 internal modules, 565 with internal imports),
 2026-06-25. Tool: stdlib AST import-graph + Tarjan SCC (same algorithm as
-`grimp`/`pydeps`; none were installed). **12 cyclic SCCs found.** (A heuristic
-"read the imports" prompt finds the 2-module ones and misses the 7–8 module
-chains entirely — and can't tell the boot-fragile ones from the harmless ones.)
+`grimp`/`pydeps`; none were installed).
 
-### #1 — LOAD-TIME (boot risk) · provider/router · SCC size 7
+### The honest two-pass result (and a self-correction worth keeping)
 
-Members: `dharma_swarm` (package `__init__`), `providers`, `provider_policy`,
-`router_v1`, `runtime_provider`, `smart_router`, `swarm_router`. **9 load-time
-edges.** The knot closes through the package root:
+**Pass 1 — full import graph (load + lazy edges): 12 cyclic SCCs.** This is the
+number a naive run reports, and the first draft of this demo ranked those 12 by
+*size* (an 8-module SCC, three 7-module SCCs, …) and implied several were
+boot-risks. **That was this prompt's own trap, committed by its author** — size
+is not danger. A cycle only threatens boot if it closes through *load-time*
+edges, and `TYPE_CHECKING` imports never execute at runtime and must be excluded.
+
+**Pass 2 — load-time-only graph, `TYPE_CHECKING` excluded: exactly 1 genuine
+load-time cycle.** All the apparent danger collapsed to a single 3-node core:
+
+`dharma_swarm` (package `__init__`) ↔ `providers` ↔ `router_v1`
 
 - `dharma_swarm/__init__.py:6` — `from dharma_swarm.providers import …` **[load-time]**
-- `dharma_swarm/providers.py:62` — `from dharma_swarm.provider_policy import …` **[load-time]**
-- `dharma_swarm/provider_policy.py:31` — `from dharma_swarm.smart_router import …` **[load-time]**
-- `dharma_swarm/smart_router.py:28` — `from dharma_swarm.router_v1 import …` **[load-time]**
-- `dharma_swarm/router_v1.py:16` — `from dharma_swarm import …` **[load-time]** ← closes the loop through `__init__`
+- `dharma_swarm/providers.py:62` → … → `router_v1.py:28` (provider chain) **[load-time]**
+- `dharma_swarm/router_v1.py:16` — `from dharma_swarm import model_pool` **[load-time]** ← re-enters the package while `__init__` is still on line 6 (half-initialized-module trap)
 
-**Minimum break:** `router_v1.py:16` (`from dharma_swarm import …`). It imports the
-package root *while the root's `__init__` is still executing line 6* — the textbook
-half-initialized-module trap. Defer it inside the function that uses it (or import
-the specific submodule, not the package). One-line cut; breaks the back-edge with
-the least churn. Secondary option: make `__init__.py:6` lazy.
+The other **11 SCCs close only via lazy/deferred imports** (e.g. `build_engine ↔
+custodians ↔ foreman` — 0 load-time edges) — **already mitigated; do not
+refactor.** A heuristic prompt nags about all 12; the disciplined one says *one*
+is real.
 
-### #2 — LOAD-TIME · ontology/organism · SCC size 8
-
-Members include `ontology`, `ontology_hub`, `ontology_runtime`, `telic_seam`,
-`lineage`, `organism`, `telos_gates`, `dharma_attractor`. 6 load-time edges;
-e.g. `telic_seam.py:41 → ontology_runtime` and `ontology_runtime.py:17 →
-ontology_hub` both `[load-time]`. **Minimum break:** defer `telic_seam.py:40–41`
-(it eagerly pulls three ontology modules; it's a consumer, not a definer — the
-natural place to cut).
-
-### #3–#7 — MIXED / smaller load-time cycles
-`memory_kernel` context cluster (size 7, 7 load edges), evolution/jikoku cluster
-(size 7), `consistency_guard↔guardian_crew↔watchdog↔room_health` (size 4),
-`evolution_roster↔model_pool↔ollama_config` (size 3), `surface_specs` cluster
-(size 3). Each has a named one-line break.
-
-### ALREADY MITIGATED (do not refactor)
-`build_engine ↔ custodians ↔ foreman` (SCC size 3) — **0 load-time edges, all 3
-lazy.** The authors already deferred these imports; the cycle never fires at boot.
-A heuristic prompt would tell you to "fix" it. The correct call is: **leave it.**
+### Minimum break (and it landed)
+Make the package's provider re-exports lazy (PEP 562 `__getattr__` in
+`__init__.py`), so importing the package no longer drags the provider/router
+graph into init time. One file, public API unchanged. **Shipped** on
+`claude/fix-provider-router-import-cycle`; re-running pass 2 after the fix:
+**0 load-time cycles — the load-time import graph is now a DAG.**
 
 ### Verdict
-The import graph is **not** a DAG (12 SCCs). The actionable set is the load-time
-cycles led by the provider/router knot through `__init__.py` — a genuine
-boot-fragility with a one-line break. One of the 12 is already correctly mitigated
-and should be left alone.
+Full graph: not a DAG (12 SCCs). Genuine boot risk: **1** (provider/router core),
+now fixed and verified to 0. The other 11 are lazy-mitigated and were correctly
+left alone. The lesson the prompt enforces — *rank by when the cycle resolves,
+not by how big it looks* — is the exact thing its own first draft got wrong, and
+the rigorous load-time pass caught it.
 
 ## Changelog
 
@@ -140,5 +131,8 @@ and should be left alone.
   load-time-vs-lazy classification as the primary ranking axis; mandated
   minimum-feedback-edge break points at `file:line`; required leaving fully-lazy
   (already-mitigated) cycles alone; added return-clean. Tested against
-  `dharma_swarm/` (12 cycles; correctly ranked the `__init__`-mediated provider
-  cycle top and the lazy `build_engine` cycle as mitigated).
+  `dharma_swarm/`: full graph has 12 SCCs but a rigorous load-time-only pass
+  (`TYPE_CHECKING` excluded) found **exactly 1** genuine load-time cycle
+  (provider/router core) — the other 11 close via lazy imports. The fix shipped
+  and re-running the pass confirms 0 load-time cycles. (The demo also records the
+  author's own first-draft slip — ranking SCCs by size — as the cautionary case.)
