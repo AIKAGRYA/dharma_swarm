@@ -86,6 +86,16 @@ class TestHealthChecks:
         assert prefix_passed is True  # prefix-level is fooled
         assert endpoint_passed is False, evidence  # endpoint-level is not
 
+    def test_api_endpoint_checks_mounted_app_routes(self) -> None:
+        # The module-local router can define the endpoint, but health must prove
+        # the route is mounted on api.main.app.
+        manifest = load_manifest()
+        entity = {"api_dependencies": ["/api/operator-coherence/report"]}
+        with patch("dharma_swarm.manifest_health._mounted_api_route_paths", return_value=[]):
+            passed, evidence = _check_api_endpoint_registered(entity, manifest)
+        assert passed is False
+        assert "mounted app route" in evidence
+
 
 class TestCockpitSurfaceContract:
     def test_cockpit_surface_depends_on_operator_coherence(self) -> None:

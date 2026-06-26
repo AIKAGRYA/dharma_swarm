@@ -93,6 +93,16 @@ def _route_matches(dep: str, route_path: str) -> bool:
     return True
 
 
+def _mounted_api_route_paths() -> list[str]:
+    """Return route paths mounted on the actual FastAPI app."""
+    api_main = importlib.import_module("api.main")
+    return [
+        str(getattr(route, "path", ""))
+        for route in getattr(api_main.app, "routes", [])
+        if getattr(route, "path", "")
+    ]
+
+
 def _check_api_endpoint_registered(
     entity: dict[str, Any],
     manifest: dict[str, Any],
@@ -106,38 +116,24 @@ def _check_api_endpoint_registered(
     deps = entity.get("api_dependencies", [])
     if not deps:
         return True, "no API dependencies declared"
-    routers = manifest.get("api_routers", [])
-    # Longest prefix first so /api/control-surface wins over /api.
-    routers_sorted = sorted(
-        routers, key=lambda r: len(r.get("prefix", "")), reverse=True
-    )
+    registered_prefixes = {
+        r["prefix"] for r in manifest.get("api_routers", [])
+    }
+    try:
+        route_paths = _mounted_api_route_paths()
+    except Exception as exc:
+        return False, f"mounted API route inspection failed: {exc}"
     missing: list[str] = []
     for dep in deps:
-        owner = next(
-            (
-                r
-                for r in routers_sorted
-                if dep == r.get("prefix")
-                or dep.startswith(r.get("prefix", "") + "/")
-            ),
-            None,
-        )
-        if owner is None:
+        prefix = "/" + "/".join(dep.strip("/").split("/")[:2])
+        if prefix not in registered_prefixes:
             missing.append(f"{dep} (no registered router prefix)")
             continue
-        try:
-            module = importlib.import_module(owner["module"])
-            route_paths = [
-                getattr(rt, "path", "") for rt in getattr(module.router, "routes", [])
-            ]
-        except Exception as exc:
-            missing.append(f"{dep} (router import failed: {exc})")
-            continue
         if not any(_route_matches(dep, rp) for rp in route_paths if rp):
-            missing.append(f"{dep} (no matching route in {owner['module']})")
+            missing.append(f"{dep} (no matching mounted app route)")
     if missing:
         return False, f"unregistered API endpoints: {missing}"
-    return True, f"all {len(deps)} API endpoint(s) resolve to registered routes"
+    return True, f"all {len(deps)} API endpoint(s) resolve to mounted app routes"
 
 
 def _check_module_file_exists(
