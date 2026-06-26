@@ -364,6 +364,11 @@ def _process_finding(
 
         # 8. Run anti-gaming checklist on the fix diff.
         diff_text = get_worktree_diff(wt_path)
+        # Save the fix diff so Stage 4 (reaudit) can run the anti-gaming
+        # checklist independently on the same diff.
+        diff_path = run.fixes_dir / f"fix_diff_{finding_id}.patch"
+        diff_path.parent.mkdir(parents=True, exist_ok=True)
+        diff_path.write_text(diff_text)
         ag_result = run_anti_gaming_check(diff_text, finding=finding)
         if not ag_result.passed:
             failed_names = [f.name for f in ag_result.failures()]
