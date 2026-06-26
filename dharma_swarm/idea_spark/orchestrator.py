@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.operator_core.live_ops_census_contract import default_state_root
 from dharma_swarm.semantic_commons import SemanticCommons
 
 from .action_routing import ActionRoute, route_action
@@ -181,11 +182,21 @@ def run_operator_idea_spark(
     )
 
     # 6. Proposal / task / BetCard (authority-gated).
+    #    Default the queues to DHARMA_STATE_DIR-resolved paths so a bare call
+    #    honors test isolation. In production (no state_root, no DHARMA_STATE_DIR)
+    #    this resolves to the real ~/.dharma queues the Darwin engine reads.
+    queue_base = Path(state_root) if state_root is not None else default_state_root()
+    resolved_proposals = proposals_path or (
+        queue_base / "evolution" / "pending_proposals.jsonl"
+    )
+    resolved_frontier = frontier_path or (
+        queue_base / "meta" / "frontier_tasks_pending.jsonl"
+    )
     action = route_action(
         routed_candidate,
         state_root=state_root,
-        proposals_path=proposals_path,
-        frontier_path=frontier_path,
+        proposals_path=resolved_proposals,
+        frontier_path=resolved_frontier,
         grant_authority=grant_authority,
     )
 

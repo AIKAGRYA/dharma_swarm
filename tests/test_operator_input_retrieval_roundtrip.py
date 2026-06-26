@@ -120,3 +120,28 @@ def test_unknown_correlation_id_fails_safely(tmp_path) -> None:
     probe = probe_by_correlation_id("corr_does_not_exist", tmp_path)
     assert probe.found is False
     assert "lifecycle_receipt_not_found" in probe.blockers
+
+
+def test_retrieval_tolerates_corrupt_files(tmp_path) -> None:
+    # A garbage candidates line and a corrupt lifecycle receipt must NOT crash
+    # retrieval — the good chain still reconstructs (degrade, don't explode).
+    from dharma_swarm.idea_spark.paths import candidates_path, lifecycle_receipts_dir
+
+    _receipt, candidate, _mem, _prop = _full_chain(tmp_path)
+    good_cid = candidate.correlation_id
+
+    # Corrupt the append-only candidate log with a non-JSON line.
+    with candidates_path(tmp_path).open("a", encoding="utf-8") as handle:
+        handle.write("{ this is not valid json at all\n")
+    # Corrupt a *different* lifecycle receipt file outright.
+    bad = lifecycle_receipts_dir(tmp_path, ensure=True) / "corr_corrupt.json"
+    bad.write_text("{ broken", encoding="utf-8")
+
+    # The good chain is still fully retrievable.
+    probe = probe_by_correlation_id(good_cid, tmp_path)
+    assert probe.found is True
+    assert probe.candidate is not None
+    # The corrupt receipt degrades to not-found instead of raising.
+    assert probe_by_correlation_id("corr_corrupt", tmp_path).found is False
+    # Multi-handle retrieval still works over the corruption.
+    assert any(p.correlation_id == good_cid for p in probe_by_text("memory kernel", tmp_path))

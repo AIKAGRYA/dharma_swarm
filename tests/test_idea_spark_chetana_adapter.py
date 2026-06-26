@@ -132,3 +132,20 @@ def test_promotion_goes_through_the_gate(chetana_tmp) -> None:
         schema, _ = parse_frontmatter(result.trusted_path.read_text(encoding="utf-8"))
         # Trusted atoms carry provenance (the gate ran).
         assert schema is not None and schema.provenance is not None
+
+
+def test_promotion_fails_closed_without_valid_kernel(chetana_tmp, monkeypatch) -> None:
+    # Pin the fail-closed invariant: with no valid signed kernel the real gate
+    # must BLOCK (never silently mint a trusted atom).
+    from dharma_swarm import dharma_kernel as kernel_mod
+
+    candidate = _candidate()
+    staged = stage_candidate(candidate)
+    monkeypatch.setattr(
+        kernel_mod, "_DEFAULT_KERNEL_PATH", chetana_tmp / "no_such_kernel.json", raising=True
+    )
+    result = promote_candidate_atom(staged.path, auto_promote=True)
+    assert result.decision == "BLOCK"
+    assert result.trusted_path is None
+    # Nothing reached the trusted tier.
+    assert list((chetana_tmp / "wiki" / "concepts").glob("*.md")) == []

@@ -92,3 +92,23 @@ def test_link_only_summary_drops_claim_text() -> None:
     summary = candidate_summary(candidate, redaction_policy="link_only")
     assert "Confidential operator transcript body" not in summary
     assert "link_only" in summary
+
+
+def test_governed_log_never_embeds_claim_body_even_with_secrets(tmp_path) -> None:
+    # The governed receipt references the candidate by id; it must not carry the
+    # operator claim body, so it cannot leak even token classes the MemoryKernel
+    # redactor misses (e.g. an AWS access key id).
+    aws_key = "AKIAIOSFODNN7EXAMPLE"
+    candidate = _candidate(
+        claim=f"Provision infra with AWS key {aws_key} and /Users/dhyana/.ssh/id_rsa password=hunter2."
+    )
+    result = emit_memory_kernel_receipt(candidate, state_root=tmp_path, created_at=FIXED_NOW)
+    blob = (
+        result.write_receipt_path.read_text()
+        + result.decision_path.read_text()
+        + result.canonical_receipt_path.read_text()
+    )
+    for secret in (aws_key, "hunter2", "id_rsa", "AWS key"):
+        assert secret not in blob, secret
+    # The reference (candidate_id) is present so the chain still joins.
+    assert candidate.candidate_id in blob

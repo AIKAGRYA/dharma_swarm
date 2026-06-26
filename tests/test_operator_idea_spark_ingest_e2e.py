@@ -203,3 +203,25 @@ def test_run_is_idempotent_by_correlation_id(e2e_env) -> None:
     assert first.correlation_id == second.correlation_id
     assert first.candidate.candidate_id == second.candidate.candidate_id
     assert first.memory.canonical_receipt_id == second.memory.canonical_receipt_id
+
+
+def test_bare_run_routes_queues_under_state_root_not_real_dharma(e2e_env) -> None:
+    # No proposals_path / frontier_path passed: the orchestrator must resolve the
+    # Darwin/frontier queues under the supplied state_root (DHARMA_STATE_DIR),
+    # never the operator's real ~/.dharma queues.
+    state_root, commons = e2e_env
+    result = run_operator_idea_spark(
+        source_kind="note",
+        source_ref="operator://note/bare-run",
+        content="Bounded governed agent runtime tooling task for the frontier queue.",
+        source_rights="operator_supplied",
+        domain="semantic commons",
+        authority_level="task_candidate",
+        commons=commons,
+        state_root=state_root,
+        created_at=FIXED_NOW,
+    )
+    assert result.action.lane == "task"
+    frontier = state_root / "meta" / "frontier_tasks_pending.jsonl"
+    assert frontier.exists()
+    assert result.action.task_id in frontier.read_text()

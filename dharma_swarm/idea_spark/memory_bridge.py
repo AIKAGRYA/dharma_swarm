@@ -116,16 +116,24 @@ def emit_memory_kernel_receipt(
     (not promotion-ready) — ``human_approved`` is NOT minted without a human.
     A real reviewer action (``approve=True``, with a ``reviewer``) is required to
     emit a REVIEWED canonical receipt. Either way no protected memory is mutated.
+
+    The governed receipt REFERENCES the candidate by id + content-derived
+    ``candidate_id`` (the fingerprint) and never embeds the operator claim body,
+    so the governance log cannot leak secrets even where the MemoryKernel
+    redactor misses a token class. The human-readable summary stays in the
+    operator-owned ``candidates.jsonl`` (``redaction_policy`` reserved for it).
     """
-    summary = candidate_summary(candidate, redaction_policy=redaction_policy)
     source_atom_ids = _source_atom_ids(candidate)
     reviewer_state = "human_approved" if approve else "pending_review"
+    reference = (
+        f"candidate={candidate.candidate_id} correlation={candidate.correlation_id}"
+    )
 
     write_request = MemoryKernelWriteReceiptInput(
         source_atom_ids=source_atom_ids,
         proposed_operation="append_proposal",
         target_surface=WRITE_TARGET_SURFACE,
-        reason=f"Operator Idea Spark candidate summary :: {summary}",
+        reason=f"Operator Idea Spark memory promotion request :: {reference}",
         reviewer_state=reviewer_state,
     )
     write_receipt = governed_write_receipt(write_request, created_at=created_at)
@@ -140,7 +148,7 @@ def emit_memory_kernel_receipt(
     decision = build_promotion_decision(
         write_receipt_id=write_receipt.receipt_id,
         reviewer=reviewer,
-        rationale=f"Idea Spark promotion review :: {summary}",
+        rationale=f"Idea Spark memory promotion review :: {reference}",
         approved_gates=REQUIRED_PROMOTION_GATES if approve else (),
         decision=(
             MemoryKernelPromotionDecisionKind.APPROVE

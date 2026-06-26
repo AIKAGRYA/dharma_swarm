@@ -202,9 +202,14 @@ def load_lifecycle_receipt(
     path = lifecycle_receipt_path(correlation_id, state_root)
     if not path.exists():
         return None
-    return OperatorInputLifecycleReceipt.model_validate_json(
-        path.read_text(encoding="utf-8")
-    )
+    try:
+        return OperatorInputLifecycleReceipt.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        # Tolerate a corrupt/partial receipt: degrade to "not found" so a single
+        # bad file never crashes retrieval (matches load_candidates/load_input_receipts).
+        return None
 
 
 def write_lifecycle_receipt(
