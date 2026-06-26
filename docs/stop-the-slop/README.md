@@ -101,8 +101,9 @@ Versions evolve **in place** (git is the version store); the frontmatter
 
 | # | Theme | Defends the invariant | Lineage | Prompts |
 |---|---|---|---|---|
+| ⭐ | **FLAGSHIP — AI-Slop Index** | "Slop is measurable: compose orthogonal, instrument-backed signals into one decomposable, trend-aware score. Never a vibe-grade." | Larridin (Slop Index); arXiv 2508.14727; Lehman | `ai-slop-index` (v0.0.1) |
 | 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
-| 02 | **Module topology & structure** | "The import graph must be a DAG; change cost = coupling; a module has one reason to change. Measure fan-in/out and cut along cohesion." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62; Martin (SRP) | `circular-dependency-triage` · `coupling-hotspot-map` · `god-object-decomposition-plan` (v0.0.1) |
+| 02 | **Module topology & structure** | "The import graph must be a DAG; change cost = coupling; a module has one reason to change; the implementation should be replaceable behind its interface." | Dijkstra '68; Parnas '72; Tarjan '72; Kahn '62; Martin (SRP/DIP); Steenberg | `circular-dependency-triage` · `coupling-hotspot-map` · `god-object-decomposition-plan` · `interface-replaceability-audit` (v0.0.1) |
 | 03 | **Performance & cost** | "Optimize only what a profiler proves dominates; a bottleneck is a measured share, not a guess. Amdahl bounds the payoff; name the floor." | Knuth '74; Amdahl '67; Gregg (USE/flame); Jain | `performance-bottleneck-triage` (v0.0.1) |
 | 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
 | 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
@@ -115,8 +116,10 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 12 | **Knowledge capture** _(adjacent)_ | "An SOP is faithful to observed actions; flag the unclear, never invent a step." | Gilbreth (motion study); Gawande; Polanyi | `recording-to-sop` (v0.0.1, drafted) |
 | 13 | **Data & queries** | "A new query per row is O(n) trips where a join is 1 — but a single query iterated is fine. Distinguish, then prove via query logs." | Codd '70; Fowler (lazy-load); EXPLAIN | `n-plus-one-query-scan` (v0.0.1) |
 | 14 | **State & lifecycle** | "Every acquired resource releases on all paths incl. exceptions — proven by a scope, not by 'we close it later'." | Dijkstra; RAII (Stroustrup); Gray '85 | `resource-leak-scan` (v0.0.1) |
-| 15 | **Security** | "A seen secret is burned: route to a real scanner over full history, then rotate-then-purge. Rank by reachable privilege." | Kerckhoffs; Saltzer–Schroeder '75 | `secret-leakage-scan` (v0.0.1) |
+| 15 | **Security** | "A seen secret is burned; route to a real scanner over full history. An agent's attack surface is its inputs × tools — least privilege + complete mediation." | Kerckhoffs; Saltzer–Schroeder '75; OWASP LLM Top 10 | `secret-leakage-scan` · `ai-agent-security-audit` (v0.0.1) |
 | 16 | **Observability** | "At 3am you have only what you logged; a swallow with no log is a guaranteed blind spot. Measure blind spots, require queryable context." | Gray '85; Gregg (USE); structured logging | `logging-context-audit` (v0.0.1) |
+| 17 | **Code-health metrics** | "Complexity, duplication, and wildcard sprawl are measurable slop signals — run the instrument, extract only on shared reason-to-change, return clean honestly." | McCabe '76; Fowler (DRY); Parnas; arXiv 2508.14727 | `complexity-inflation-scan` · `duplication-ratio-scan` · `wildcard-import-audit` (v0.0.1) |
+| 18 | **Test integrity** | "A test asserts behavior, not the implementation; a mock-only/no-assert test is theater. Mutation testing is the ground truth." | Goodenough '75; Beck (TDD); mutation testing | `test-mirrors-implementation` (v0.0.1) |
 
 The map grows as prompts are added (backlog in `ROADMAP.md`); themes are not fixed
 in advance. Reserved next: invariant/contract discovery (Hoare, Meyer), drift &

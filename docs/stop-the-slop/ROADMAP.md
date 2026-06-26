@@ -18,7 +18,11 @@ hardening-checklist ✅ · onboarding-brief ✅ · recording-to-sop ✅(drafted)
 n-plus-one-query-scan ✅ · resource-leak-scan ✅ · secret-leakage-scan ✅ ·
 logging-context-audit ✅
 
-_(batch 5 added the last 6; backlog markers below may lag — the cron updates them.)_
+**+batch 6 (7):** ⭐ ai-slop-index (FLAGSHIP) · complexity-inflation-scan ·
+duplication-ratio-scan · wildcard-import-audit · test-mirrors-implementation ·
+ai-agent-security-audit · interface-replaceability-audit — **26 shipped total.**
+
+_(backlog markers below may lag — the cron updates them.)_
 
 ## Backlog — by theme (invariant · lineage)
 
