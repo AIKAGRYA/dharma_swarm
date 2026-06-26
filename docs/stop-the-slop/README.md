@@ -1,4 +1,11 @@
-# Prompt Library — guru-grade code prompts for builders
+# STOP THE SLOP — _codename TBD_
+
+> guru-grade code prompts for builders, rooted in the history of computer &
+> cognitive science and verified against ground truth.
+
+**Codename (emerging — we let it settle over time):** `GROUND TRUTH` · `QUINE` ·
+`BEDROCK` · `FIRST LIGHT` · `THE RECKONER` · `PROVENANCE`. The brand is
+**"Stop the Slop"**; the second word is the addictive niche name.
 
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
@@ -30,6 +37,12 @@ Every prompt in this library obeys the inverse discipline:
   not a fix.
 - **State the invariant first.** Each prompt names the first-principles property
   it defends, so the model reasons from the property, not from the template.
+- **Stand on the shoulders.** Each prompt names its **lineage** — the
+  computer-/cognitive-science result it descends from (see `FOUNDATIONS.md`).
+  Old-school first principles (Dijkstra, Parnas, Tarjan, Thompson, Shannon,
+  Hoare) are not decoration; they are *why* the analysis is correct. Bleeding-
+  edge tooling is just those ideas mechanized. A finding rooted in a theorem
+  outranks a finding rooted in a vibe.
 
 > This discipline is the lesson of the host repo, learned the hard way: a system
 > can have the best anti-slop *vocabulary* and almost no anti-slop *enforcement*
@@ -47,6 +60,7 @@ version: <semver>          # version lives here + in git history, not in filenam
 theme: <thematic-map key>
 status: draft | tested | published
 invariant: <the first-principles property this prompt defends>
+lineage: [<the CS/cog-sci results it descends from — see FOUNDATIONS.md>]
 ground_truth_tools: [<the real tools it must run>]
 returns_clean: true        # asserts the prompt can and will say "nothing to fix"
 ---
@@ -69,14 +83,14 @@ Versions evolve **in place** (git is the version store); the frontmatter
 
 ## Thematic map
 
-| # | Theme | Defends the invariant | Prompts |
-|---|---|---|---|
-| 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | `dependency-risk-triage` (v0.0.1) |
-| 02 | _Invariant & contract discovery_ | _(reserved)_ | — |
-| 03 | _Architecture & boundary analysis_ | _(reserved)_ | — |
-| 04 | _Failure-mode & resilience_ | _(reserved)_ | — |
-| 05 | _Test integrity & verification_ | _(reserved)_ | — |
-| 06 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | — |
+| # | Theme | Defends the invariant | Lineage | Prompts |
+|---|---|---|---|---|
+| 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
+| 02 | **Module topology & acyclicity** | "The import graph must be a DAG; a load-time cycle is a latent boot failure. Rank by load-time danger, not cycle length." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62 | `circular-dependency-triage` (v0.0.1) |
+| 03 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
+| 04 | _Failure-mode & resilience_ | _(reserved)_ | Lamport; Gray | — |
+| 05 | _Test integrity & verification_ | _(reserved)_ | Dijkstra ("testing shows presence…"); Weyuker | — |
+| 06 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
 
 The map grows as prompts are added; themes are not fixed in advance.
 
@@ -89,6 +103,11 @@ history. Treat the path here as a staging area, not the final home.
 
 ## Changelog
 
-- **2026-06-25** — library seeded; format + thematic map defined; first prompt
-  `01/dependency-risk-triage` saved at v0.0.1 (rewrite of a third-party kit's
-  lockfile-analysis prompt, tested against this repo).
+- **2026-06-25** — library seeded as **Stop the Slop**; format + thematic map +
+  `FOUNDATIONS.md` lineage canon defined.
+  - `01/dependency-risk-triage` v0.0.1 — rewrite of a kit's lockfile prompt;
+    found 8 real advisories this repo's heuristic missed.
+  - `02/circular-dependency-triage` v0.0.1 — rewrite of a kit's cycle-detection
+    prompt; found 12 real import cycles in `dharma_swarm/` via AST + Tarjan SCC,
+    ranked by load-time boot risk, and correctly left the already-deferred
+    (lazy) cycle alone.

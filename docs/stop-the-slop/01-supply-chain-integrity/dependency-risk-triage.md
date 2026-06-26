@@ -9,6 +9,9 @@ invariant: >
   (blast radius) × (abandonment). "Versions behind latest" is a weak proxy and
   is often anti-correlated with risk — the most dangerous package is frequently
   the newest one with a fresh CVE.
+lineage:
+  - "Thompson 1984 — Reflections on Trusting Trust (you can't trust code you didn't create)"
+  - "Saltzer & Schroeder 1975 — least privilege; rank by reachable privilege"
 ground_truth_tools: [npm audit, npm outdated, pip-audit, osv-scanner]
 returns_clean: true
 ---
