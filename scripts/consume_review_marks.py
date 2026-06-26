@@ -74,6 +74,14 @@ TRUSTED_REVIEWERS = {
     "operator",
 }
 
+# Sentinel tag written by the Operator Idea Spark ingest lifecycle
+# (dharma_swarm/idea_spark/chetana_adapter.py). Atoms bearing this tag are
+# lifecycle-governed and must graduate to trusted ONLY through the gated
+# chetana.promote path (telos gate-check + axiom signature + provenance), never
+# this bulk content-hash mover. The literal is duplicated here on purpose: this
+# cron script stays import-light and does not depend on dharma_swarm.
+IDEA_SPARK_LIFECYCLE_TAG = "idea_spark_lifecycle"
+
 
 # ---------------------------------------------------------------------------
 # Frontmatter parser
@@ -195,6 +203,16 @@ def has_external_review_mark(src: Path) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def is_lifecycle_governed(meta: AtomMeta) -> bool:
+    """True when an atom is tracked by the Operator Idea Spark lifecycle.
+
+    Such atoms must graduate only through the gated chetana.promote path, never
+    this bulk mover. Detected from the raw frontmatter so it is robust to the
+    lightweight (non-YAML) parser.
+    """
+    return IDEA_SPARK_LIFECYCLE_TAG in (meta.raw_frontmatter or "")
+
+
 def should_promote(
     meta: AtomMeta,
     min_confidence: float,
@@ -205,6 +223,11 @@ def should_promote(
 
     Returns (should_promote, reason).
     """
+    if is_lifecycle_governed(meta):
+        return (
+            False,
+            "idea_spark lifecycle atom: requires gated chetana.promote (no bulk promotion)",
+        )
     if meta.atom_type not in ALLOWED_TYPES:
         return False, f"type={meta.atom_type} not in {ALLOWED_TYPES}"
     if meta.confidence < min_confidence:
