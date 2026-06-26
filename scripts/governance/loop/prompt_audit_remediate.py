@@ -1,0 +1,531 @@
+#!/usr/bin/env python3
+"""Stage 3 — prompt-audit-remediate (Implementer) for the Cybernetic Ratchet Loop.
+
+For each IMPLEMENT finding in ``accepted_findings.jsonl``:
+
+1. Determine ``proof_mode`` (natural|synthetic|none). ``proof_mode=none`` routes
+   the finding to DEFER — no fix is attempted (spec §6.2 proof ladder).
+2. Create an isolated git worktree off ``base_ref``
+   (``git worktree add <path> -b fix/<id> base_ref``). The worktree is a /tmp
+   path, NOT the user's working tree.
+3. Set up the proof scenario (gate script) in the worktree.
+4. Capture ``red_before`` (gate must exit non-zero on the unfixed state).
+   No red-before → the fix is not accepted.
+5. Apply the fix in the worktree.
+6. Capture ``green_after`` (gate must exit zero on the fixed state).
+   No green-after → the fix is not accepted.
+7. Enforce write-set: every changed file must be within the warrant's
+   ``write_set``. Violation → reject (non-zero exit).
+8. Run the §8 anti-gaming checklist on the fix diff. Violation → REJECT the
+   fix (non-zero exit, archived with evidence) — not merely flagged.
+9. Write ``fix_proposal_<finding_id>.yaml`` (§6.2 schema).
+10. Clean up the fix worktree.
+
+Worktree creation failure aborts gracefully (non-zero exit, no fix_proposal).
+The user's working tree is NEVER touched.
+
+Usage:
+    python3 scripts/governance/loop/prompt_audit_remediate.py \\
+        --warrant <warrant.yaml> --run-id <run_id> \\
+        [--repo-root <path>] [--worktree-root <path>]
+
+Exit codes:
+    0   all IMPLEMENT findings processed (accepted or deferred)
+    1   at least one fix was rejected (write-set, anti-gaming, no red/green)
+    2   warrant invalid/expired, no accepted_findings, or hard error
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from fnmatch import fnmatch
+from pathlib import Path
+
+from scripts.governance.loop.anti_gaming import run_anti_gaming_check
+from scripts.governance.loop.oracle import CIOracle
+from scripts.governance.loop.runs import Run, RunManager
+from scripts.governance.loop.warrant import Warrant, WarrantError
+
+DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+DEFAULT_WORKTREE_ROOT = "/tmp"
+
+CHECKLIST_ITEMS = (
+    "no_new_skips",
+    "no_new_xfails",
+    "no_weakened_assertions",
+    "no_deleted_tests",
+    "no_widened_budgets",
+    "fix_addresses_root_cause",
+)
+
+
+def _emit_error(message: str) -> int:
+    sys.stderr.write(message + "\n")
+    return 2
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# ---------------------------------------------------------------------------
+# Implementer backend interface
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ImplementerPlan:
+    """The Implementer's plan for a finding (determined before any worktree work)."""
+
+    proof_mode: str  # natural | synthetic | none
+    gate_command: str  # command to run for red-before / green-after
+
+
+class ImplementerBackend(ABC):
+    """Abstract base for the Implementer agent role.
+
+    In Phase 1 only the ``StubImplementer`` is available. It emits a canned
+    synthetic proof scenario (a gate script + a fix marker) that demonstrates
+    red-before/green-after deterministically.
+    """
+
+    @abstractmethod
+    def plan(self, finding: dict, write_set: list[str]) -> ImplementerPlan:
+        """Determine proof_mode and the gate command for the finding.
+
+        If ``proof_mode`` is ``none``, the finding routes to DEFER and no
+        worktree is created.
+        """
+
+    @abstractmethod
+    def setup_proof(self, worktree_path: Path, finding: dict) -> None:
+        """Set up the proof scenario in the worktree (e.g. write a gate script).
+
+        Called BEFORE red-before is run. For synthetic proof, this writes the
+        constructed failing case. For natural proof, this is a no-op (the
+        existing suite is the gate).
+        """
+
+    @abstractmethod
+    def apply_fix(self, worktree_path: Path, finding: dict) -> list[str]:
+        """Apply the fix in the worktree.
+
+        Called AFTER red-before, BEFORE green-after. Returns a list of changed
+        file paths (relative to the worktree root).
+        """
+
+
+class StubImplementer(ImplementerBackend):
+    """M1 stub: emits a canned synthetic proof scenario.
+
+    The stub writes a gate script that checks for the existence of a marker
+    file. Before the fix (red-before), the marker doesn't exist → exit 1.
+    After the fix (green-after), the marker exists → exit 0.
+
+    Both the gate script and the marker file are written under
+    ``scripts/governance/loop/`` (within the typical write-set).
+    """
+
+    def plan(self, finding: dict, write_set: list[str]) -> ImplementerPlan:
+        fid = finding.get("finding_id", "unknown")
+        gate_script = f"scripts/governance/loop/fix_gate_{fid}.py"
+        gate_command = f'"{DEFAULT_PYTHON}" {gate_script}'
+        return ImplementerPlan(proof_mode="synthetic", gate_command=gate_command)
+
+    def setup_proof(self, worktree_path: Path, finding: dict) -> None:
+        fid = finding.get("finding_id", "unknown")
+        gate_dir = worktree_path / "scripts" / "governance" / "loop"
+        gate_dir.mkdir(parents=True, exist_ok=True)
+        gate_script = gate_dir / f"fix_gate_{fid}.py"
+        gate_script.write_text(
+            "import sys\n"
+            "from pathlib import Path\n"
+            f'marker = Path(__file__).parent / "fix_marker_{fid}.txt"\n'
+            "if marker.exists():\n"
+            '    print("OK: fix marker found")\n'
+            "    sys.exit(0)\n"
+            'print("FAIL: fix marker not found")\n'
+            "sys.exit(1)\n"
+        )
+
+    def apply_fix(self, worktree_path: Path, finding: dict) -> list[str]:
+        fid = finding.get("finding_id", "unknown")
+        gate_dir = worktree_path / "scripts" / "governance" / "loop"
+        gate_dir.mkdir(parents=True, exist_ok=True)
+        marker = gate_dir / f"fix_marker_{fid}.txt"
+        marker.write_text(f"fix applied for {fid}\n")
+        return [
+            f"scripts/governance/loop/fix_gate_{fid}.py",
+            f"scripts/governance/loop/fix_marker_{fid}.txt",
+        ]
+
+
+def get_implementer(name: str | None = None) -> ImplementerBackend:
+    """Return the implementer selected by ``name`` or ``LOOP_AGENT_BACKEND`` env var.
+
+    Default is ``stub``. Unknown backends raise a clear error.
+    """
+    impl_name = name or os.environ.get("LOOP_AGENT_BACKEND", "stub")
+    if impl_name == "stub":
+        return StubImplementer()
+    raise NotImplementedError(
+        f"implementer backend {impl_name!r} is not implemented in Phase 1 "
+        f"(stub|droid|api; droid/api arrive in M2). Set LOOP_AGENT_BACKEND=stub for deterministic testing."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Write-set checking (glob-aware)
+# ---------------------------------------------------------------------------
+
+
+def is_in_write_set(path: str, write_set: list[str]) -> bool:
+    """Check if ``path`` matches any pattern in ``write_set`` (fnmatch glob)."""
+    for pattern in write_set:
+        if fnmatch(path, pattern):
+            return True
+        if path == pattern:
+            return True
+        if path.startswith(pattern.rstrip("*/") + "/"):
+            return True
+    return False
+
+
+def check_write_set(changed_files: list[str], write_set: list[str]) -> list[str]:
+    """Return the list of files that are OUTSIDE the write_set (violations)."""
+    return [f for f in changed_files if not is_in_write_set(f, write_set)]
+
+
+# ---------------------------------------------------------------------------
+# Worktree management
+# ---------------------------------------------------------------------------
+
+
+def _worktree_path(worktree_root: Path, finding_id: str) -> Path:
+    return worktree_root / f"ds_loop_fix_{finding_id}"
+
+
+def create_worktree(
+    repo_root: Path,
+    worktree_path: Path,
+    branch_name: str,
+    base_ref: str,
+) -> bool:
+    """Create an isolated git worktree off ``base_ref``.
+
+    Returns True on success, False on failure (caller handles graceful abort).
+    """
+    proc = subprocess.run(
+        ["git", "-C", str(repo_root), "worktree", "add", str(worktree_path),
+         "-b", branch_name, base_ref],
+        capture_output=True,
+        text=True,
+    )
+    return proc.returncode == 0
+
+
+def cleanup_worktree(repo_root: Path, worktree_path: Path, branch_name: str) -> None:
+    """Remove a fix worktree and its branch (best-effort, no raise)."""
+    subprocess.run(
+        ["git", "-C", str(repo_root), "worktree", "remove", "--force", str(worktree_path)],
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo_root), "branch", "-D", branch_name],
+        capture_output=True,
+        text=True,
+    )
+
+
+def get_worktree_diff(worktree_path: Path) -> str:
+    """Get the unified diff of all changes (including new files) in the worktree."""
+    # Stage all changes so new files appear in the diff with proper a/ b/ prefixes.
+    subprocess.run(
+        ["git", "-C", str(worktree_path), "add", "-A"],
+        capture_output=True,
+        text=True,
+    )
+    proc = subprocess.run(
+        ["git", "-C", str(worktree_path), "diff", "--cached", "--no-color"],
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# Stage core
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FixProposal:
+    """The §6.2 fix_proposal artifact."""
+
+    run_id: str
+    finding_id: str
+    write_set_used: list[str] = field(default_factory=list)
+    patch_ref: str = ""
+    red_before: dict = field(default_factory=dict)
+    green_after: dict = field(default_factory=dict)
+    proof_mode: str = "none"
+    anti_gaming_checklist: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "fix_proposal": {
+                "run_id": self.run_id,
+                "finding_id": self.finding_id,
+                "write_set_used": self.write_set_used,
+                "patch_ref": self.patch_ref,
+                "red_before": self.red_before,
+                "green_after": self.green_after,
+                "proof_mode": self.proof_mode,
+                "anti_gaming_checklist": self.anti_gaming_checklist,
+            }
+        }
+
+
+def _process_finding(
+    finding: dict,
+    warrant: Warrant,
+    run: Run,
+    implementer: ImplementerBackend,
+    repo_root: Path,
+    worktree_root: Path,
+    oracle: CIOracle,
+) -> tuple[int, str]:
+    """Process a single IMPLEMENT finding.
+
+    Returns (exit_code, status) where status is one of:
+    accepted, rejected, deferred, error.
+    """
+    finding_id = finding.get("finding_id", "unknown")
+    write_set = warrant.write_set
+
+    # 1. Determine proof_mode.
+    plan = implementer.plan(finding, write_set)
+    if plan.proof_mode == "none":
+        sys.stdout.write(
+            f"finding {finding_id}: proof_mode=none — routing to DEFER (no fix attempted)\n"
+        )
+        return 0, "deferred"
+
+    # 2. Create isolated worktree off base_ref.
+    base_ref = warrant.scope.get("base_ref", "HEAD")
+    wt_path = _worktree_path(worktree_root, finding_id)
+    branch_name = f"fix/{finding_id}"
+
+    if not create_worktree(repo_root, wt_path, branch_name, base_ref):
+        sys.stderr.write(
+            f"finding {finding_id}: worktree creation failed at {wt_path} "
+            f"off {base_ref} — aborting (no fix_proposal written)\n"
+        )
+        return 2, "error"
+
+    try:
+        # 3. Set up proof scenario.
+        implementer.setup_proof(wt_path, finding)
+
+        # 4. Capture red_before (must be non-zero).
+        red_result = oracle.run_gate(plan.gate_command, cwd=str(wt_path))
+        if red_result.exit_code == 0:
+            sys.stderr.write(
+                f"finding {finding_id}: red-before exit 0 — no red, fix not accepted\n"
+            )
+            return 1, "rejected"
+
+        # 5. Apply the fix.
+        changed_files = implementer.apply_fix(wt_path, finding)
+
+        # 6. Capture green_after (must be zero).
+        green_result = oracle.run_gate(plan.gate_command, cwd=str(wt_path))
+        if green_result.exit_code != 0:
+            sys.stderr.write(
+                f"finding {finding_id}: green-after exit {green_result.exit_code} — no green, fix not accepted\n"
+            )
+            return 1, "rejected"
+
+        # 7. Enforce write-set.
+        violations = check_write_set(changed_files, write_set)
+        if violations:
+            sys.stderr.write(
+                f"finding {finding_id}: write-set violation — files outside warrant write_set: {violations}. "
+                f"Fix REJECTED.\n"
+            )
+            return 1, "rejected"
+
+        # 8. Run anti-gaming checklist on the fix diff.
+        diff_text = get_worktree_diff(wt_path)
+        ag_result = run_anti_gaming_check(diff_text, finding=finding)
+        if not ag_result.passed:
+            failed_names = [f.name for f in ag_result.failures()]
+            sys.stderr.write(
+                f"finding {finding_id}: anti-gaming checklist FAILED — {failed_names}. "
+                f"Fix REJECTED (archived with evidence).\n"
+            )
+            return 1, "rejected"
+
+        # 9. Write fix_proposal.
+        proposal = FixProposal(
+            run_id=run.run_id,
+            finding_id=finding_id,
+            write_set_used=write_set,
+            patch_ref=branch_name,
+            red_before={
+                "command": plan.gate_command,
+                "exit_code": red_result.exit_code,
+                "key_output": red_result.stdout.strip()[:500],
+            },
+            green_after={
+                "command": plan.gate_command,
+                "exit_code": green_result.exit_code,
+                "key_output": green_result.stdout.strip()[:500],
+            },
+            proof_mode=plan.proof_mode,
+            anti_gaming_checklist=ag_result.to_dict(),
+        )
+        fp_path = run.fix_proposal_path(finding_id)
+        run.write_yaml(fp_path, proposal.to_dict())
+        run.add_finding(finding_id)
+        sys.stdout.write(
+            f"finding {finding_id}: fix accepted — fix_proposal written to {fp_path}\n"
+        )
+        return 0, "accepted"
+
+    finally:
+        # 10. Clean up the worktree (always, even on rejection).
+        cleanup_worktree(repo_root, wt_path, branch_name)
+
+
+def run_remediate(
+    warrant_path: Path,
+    run: Run,
+    implementer: ImplementerBackend,
+    repo_root: Path,
+    worktree_root: Path,
+) -> int:
+    """Execute Stage 3 remediation for all IMPLEMENT findings.
+
+    Returns 0 if all findings were accepted or deferred, 1 if any was rejected,
+    2 on a hard error (warrant invalid, no accepted_findings, etc.).
+    """
+    # Re-validate the warrant on stage entry.
+    try:
+        warrant = Warrant.load_and_check(warrant_path)
+    except WarrantError as exc:
+        return _emit_error(f"warrant stage-entry refused: {exc}")
+
+    # Load accepted_findings.jsonl.
+    findings_path = run.accepted_findings_path()
+    if not findings_path.is_file():
+        return _emit_error(
+            f"no accepted_findings.jsonl in {run.run_dir} — run prompt-audit-triage (Stage 2) first"
+        )
+    findings = run.read_jsonl(findings_path)
+
+    # Filter to IMPLEMENT findings only.
+    impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
+    if not impl_findings:
+        sys.stdout.write(
+            "no IMPLEMENT findings — nothing to remediate\n"
+        )
+        return 0
+
+    # Check budget.
+    used_fixes = sum(1 for f in impl_findings if f.get("routing") == "IMPLEMENT")
+    budget_result = warrant.check_budget(used_fixes=used_fixes)
+    if budget_result.exceeded:
+        sys.stderr.write(f"budget exceeded — {budget_result.reason}\n")
+        return 2
+
+    # Create the oracle for gate runs (PYTHONPATH = worktree at run time).
+    oracle = CIOracle(python=DEFAULT_PYTHON, repo_root=repo_root)
+
+    rejected = 0
+    accepted = 0
+    deferred = 0
+
+    for finding in impl_findings:
+        rc, status = _process_finding(
+            finding, warrant, run, implementer, repo_root, worktree_root, oracle,
+        )
+        if status == "accepted":
+            accepted += 1
+        elif status == "deferred":
+            deferred += 1
+        elif status == "rejected":
+            rejected += 1
+        elif status == "error":
+            return 2
+
+    sys.stdout.write(
+        f"prompt-audit-remediate complete: {accepted} accepted, "
+        f"{deferred} deferred, {rejected} rejected\n"
+    )
+
+    if rejected > 0:
+        return 1
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Stage 3 (Implementer): produce scoped fix proposals in isolated "
+            "git worktrees with red-before/green-after proof + anti-gaming checks."
+        ),
+    )
+    parser.add_argument("--warrant", required=True, help="path to the warrant YAML file")
+    parser.add_argument("--run-id", required=True, help="the run id (locates the run dir)")
+    parser.add_argument(
+        "--repo-root",
+        default=str(Path(__file__).resolve().parents[3]),
+        help="git repo root for worktree creation (default: mission worktree)",
+    )
+    parser.add_argument(
+        "--worktree-root",
+        default=DEFAULT_WORKTREE_ROOT,
+        help=f"root dir for fix worktrees (default: {DEFAULT_WORKTREE_ROOT})",
+    )
+    parser.add_argument(
+        "--backend",
+        default=None,
+        help="implementer backend name (stub|droid|api); defaults to LOOP_AGENT_BACKEND env or stub",
+    )
+    args = parser.parse_args(argv)
+
+    warrant_path = Path(args.warrant)
+    repo_root = Path(args.repo_root)
+    worktree_root = Path(args.worktree_root)
+    worktree_root.mkdir(parents=True, exist_ok=True)
+
+    # Select the implementer backend.
+    try:
+        implementer = get_implementer(args.backend)
+    except NotImplementedError as exc:
+        return _emit_error(f"implementer selection failed: {exc}")
+
+    # Open the run dir.
+    try:
+        run = RunManager.open_run(args.run_id)
+    except FileNotFoundError as exc:
+        return _emit_error(str(exc))
+
+    return run_remediate(warrant_path, run, implementer, repo_root, worktree_root)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
