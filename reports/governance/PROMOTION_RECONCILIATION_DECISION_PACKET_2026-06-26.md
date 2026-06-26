@@ -1,5 +1,9 @@
 # Promotion Reconciliation Decision Packet - 2026-06-26
 
+Role: report
+Subordinates to: `docs/governance/ACTIVE_TRACK.yaml`, `docs/governance/CANONICAL_DOC_STACK.md`
+Replaces: no canonical doc; this is a scoped promotion decision packet and evidence index.
+
 Status: operator-approved planning packet for scoped promotion lanes.
 
 This packet distills the June 22 reconciliation findings, June 24 preservation pass, and June 26 operator approvals into one promotion plan. It intentionally excludes raw dumps, generated receipt floods, and dirty-worktree state as canonical code.
@@ -76,12 +80,12 @@ Ready for scoped extraction:
 
 ### P1 near-term canonicalization
 
-- A2A/NATS locked spec and verifier from `/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618`.
+- A2A/NATS locked spec and verifier from `/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618`; before extraction, update `runtime-truth-nats-2026-06` owned surfaces if the lane will touch NATS transport implementation or `tests/test_nats_transport.py`.
 - DGM/reconciliation decision material from `/Users/dhyana/worktrees/dharma_swarm_reconcile_20260622`.
 - Operator Coherence Cockpit PR #677 lineage already merged to `origin/main`.
 - ADR-010 scheduler federation draft from dirty recovery evidence.
 - Helm closeout packet from `/Users/dhyana/dharma_helm_build/reports/terminal/HELM_CLOSEOUT_2026-06-16.md`.
-- Old-clone `spec-forge/runtime-pipeline-hardening/` package.
+- Old-clone `spec-forge/runtime-pipeline-hardening/` package; because `spec-forge/` is ignored, any salvage PR must either land the packet under a tracked destination or explicitly unignore/force-add the intended files.
 
 ### P2 salvage or mining
 
@@ -112,8 +116,8 @@ Ready for scoped extraction:
 | Lane | First PR scope | Exclusions | Verification gate | Approval state |
 |---|---|---|---|---|
 | Reconciliation decision packet | This distilled packet | Raw dumps and generated inventories | `git diff --check`; governance/doc checks | Approved |
-| A2A offline substrate | Locked spec pointer, topology contract, fixture verifier, NATS substrate tests | Live publish, credentials, timestamped reports | `pytest tests/test_nats_transport.py tests/test_a2a_spec_conformance.py`; contract checker | Approved for clean extraction |
-| A2A operator runtime tools | `make a2a-onboard` prevalidate, explicit blockers, domain-receipt checks | Live mode, model calls, quorum claims | A2A onboard contract verifier and targeted tests | Approved for prevalidate-only extraction |
+| A2A offline substrate | Locked spec pointer, topology contract, fixture verifier, NATS substrate tests after owned-surface alignment | Live publish, credentials, timestamped reports | `pytest tests/test_nats_transport.py tests/test_a2a_spec_conformance.py`; contract checker | Approved for clean extraction |
+| A2A operator runtime tools | Prevalidate scripts, explicit blockers, domain-receipt checks | Live mode, model calls, quorum claims | Existing Make/Python targets only: `make onboard`, `python3 scripts/governance/check_nats_substrate_contract.py`, and targeted pytest wrappers added by that lane | Approved for prevalidate-only extraction |
 | A2A governance/readiness | Replace existence-only NATS readiness with rigorous evidence requirements | Production-ready claims | `make onboard`; track checker | Approved |
 | Cockpit canonicalization | Normalize existing read-only cockpit lineage | New truth store, mutating command system | Dashboard lint/build and API smoke | Approved as read-only projection |
 | Cockpit proof hardening | Canonicality badges, production readiness cards, evidence links | Broad redesign | Focused model tests; dashboard build | Approved |
@@ -127,21 +131,24 @@ Ready for scoped extraction:
 1. Preserve ignored old-clone `spec-forge/runtime-pipeline-hardening/`. Done; see receipt in the June 24 preservation root.
 2. Land this reconciliation decision packet.
 3. Land A2A governance/readiness criteria hardening.
-4. Extract A2A offline substrate.
-5. Extract A2A prevalidate operator tools.
-6. Canonicalize cockpit as read-only projection.
-7. Harden cockpit proof model.
-8. Ratify ADR-010.
-9. Normalize Helm closeout.
-10. Triage Cashclaw.
+4. Align `runtime-truth-nats-2026-06` owned surfaces for any NATS transport/test extraction.
+5. Extract A2A offline substrate.
+6. Extract A2A prevalidate operator tools using existing verifier commands or adding the verifier target in that same lane.
+7. Canonicalize cockpit as read-only projection.
+8. Harden cockpit proof model.
+9. Ratify ADR-010.
+10. Normalize Helm closeout.
+11. Triage Cashclaw.
 
 ## Hard blockers
 
 - A2A/NATS worktree is stale relative to `origin/main`; extract patches only.
+- A2A extraction must not edit outside declared ACTIVE_TRACK owned surfaces; update ownership first if the lane needs NATS transport implementation or test surfaces.
 - A2A still lacks live `DOMAIN_RECEIPTED`, live ACL, semantic liveness, and five-agent quorum proof.
 - Dirty active-track projections conflict with origin evidence.
 - Cockpit must not become an authority surface.
 - Cleanup/discard still requires item-specific receipts.
+- Old-clone `spec-forge/` salvage must account for `.gitignore`; use a tracked destination or explicit unignore/force-add with provenance.
 
 ## Next approved action
 
