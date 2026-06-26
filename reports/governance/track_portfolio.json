@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T10:37:48+09:00",
+  "generated_at": "2026-06-26T10:44:18+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -111,7 +111,7 @@
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
       "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.62s",
+      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
       "executed": true
     }
   ],
@@ -186,6 +186,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 12,
@@ -294,7 +298,7 @@
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 1.62s",
+          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
           "executed": true
         }
       ]
@@ -324,6 +328,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 4,
@@ -355,14 +363,14 @@
           "id": "nats_transport_tests_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 5.26s",
+          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.84s",
           "executed": true
         },
         {
           "id": "nats_substrate_contract_test_pass",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 1.46s",
+          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.28s",
           "executed": true
         }
       ]
@@ -396,9 +404,14 @@
       "criteria_pass": false,
       "ship_blocks": [
         "4 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 7,
@@ -502,9 +515,14 @@
       "criteria_pass": false,
       "ship_blocks": [
         "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 10,
@@ -641,6 +659,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 17,
@@ -777,7 +799,7 @@
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 3.22s",
+          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
           "executed": true
         },
         {
@@ -821,6 +843,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 8,
@@ -894,7 +920,7 @@
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.30s",
+          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.19s",
           "executed": true
         },
         {
@@ -941,6 +967,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 9,
@@ -1021,7 +1051,7 @@
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.40s",
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.26s",
           "executed": true
         },
         {
@@ -1065,9 +1095,14 @@
       "criteria_pass": true,
       "ship_blocks": [
         "1 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 9,
@@ -1189,9 +1224,14 @@
       "criteria_pass": false,
       "ship_blocks": [
         "2 open blocker next-item(s)",
-        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)"
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
       "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 3,
@@ -1290,6 +1330,10 @@
       "criteria_pass": true,
       "ship_blocks": [],
       "has_rigorous_evidence": true,
+      "strongest_grade": 2,
+      "strongest_grade_name": "S2_LANDED",
+      "min_evidence_grade": 2,
+      "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
         "passed": 12,
@@ -1349,7 +1393,7 @@
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.29s",
+          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
           "executed": true
         },
         {
@@ -1363,7 +1407,7 @@
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.24s",
+          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.19s",
           "executed": true
         },
         {
@@ -1377,7 +1421,7 @@
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.23s",
+          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.19s",
           "executed": true
         },
         {
@@ -1391,14 +1435,14 @@
           "id": "organizer_test_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.21s",
+          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
           "executed": true
         },
         {
           "id": "fs_substrate_e2e_passes",
           "kind": "test_passes",
           "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 3.69s",
+          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.08s",
           "executed": true
         }
       ]
@@ -1468,7 +1512,7 @@
     {
       "severity": "INFO",
       "check": "track-provisional:orchestration-arena-v1-2026-06",
-      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
+      "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {
