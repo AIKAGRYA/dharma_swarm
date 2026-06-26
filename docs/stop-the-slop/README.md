@@ -1,11 +1,15 @@
-# STOP THE SLOP — _codename TBD_
+# STOP THE SLOP — _PRAMĀṆA_ (codename, settling)
 
 > guru-grade code prompts for builders, rooted in the history of computer &
 > cognitive science and verified against ground truth.
 
-**Codename (emerging — we let it settle over time):** `GROUND TRUTH` · `QUINE` ·
-`BEDROCK` · `FIRST LIGHT` · `THE RECKONER` · `PROVENANCE`. The brand is
-**"Stop the Slop"**; the second word is the addictive niche name.
+**Codename:** **`PRAMĀṆA`** (Sanskrit, *pramāṇa* — "the valid means by which one
+arrives at accurate knowledge: perception, measurement, proof"). It is this
+library's thesis in one word: knowledge earned by a valid instrument, not by
+guessing — and it is native to the host repo (`dharma_swarm/pramana.py`).
+Discernment-flavored alternative still on the table: **`VIVEKA`** (discriminating
+the real from the unreal — the true finding from the plausible-looking slop). The
+outer brand stays **"Stop the Slop"**; Pramāṇa is the soul-name.
 
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
@@ -43,6 +47,19 @@ Every prompt in this library obeys the inverse discipline:
   Hoare) are not decoration; they are *why* the analysis is correct. Bleeding-
   edge tooling is just those ideas mechanized. A finding rooted in a theorem
   outranks a finding rooted in a vibe.
+
+### Analysis prompts vs generation prompts — same discipline, two faces
+
+"Route to ground truth" means different things by task type, but it is the same
+rule:
+
+- **Analysis** (audit/triage): ground truth = **run the instrument** — the
+  profiler, the advisory DB, the SCC algorithm — and rank by what it measures.
+- **Generation** (seed scripts, rules blocks, scaffolds): ground truth =
+  **faithfulness to the real artifact** — parse the actual schema/codebase, ban
+  the anti-patterns that are *actually present* (with counts), and **refuse to
+  invent** a field, a finding, or a rule you can't point at. Inventing is the
+  generative form of slop.
 
 > This discipline is the lesson of the host repo, learned the hard way: a system
 > can have the best anti-slop *vocabulary* and almost no anti-slop *enforcement*
@@ -88,10 +105,11 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
 | 02 | **Module topology & acyclicity** | "The import graph must be a DAG; a load-time cycle is a latent boot failure. Rank by load-time danger, not cycle length." | Dijkstra THE '68; Parnas '72; Tarjan SCC '72; Kahn '62 | `circular-dependency-triage` (v0.0.1) |
 | 03 | **Performance & cost** | "Optimize only what a profiler proves dominates; a bottleneck is a measured share, not a guess. Amdahl bounds the payoff; name the floor." | Knuth '74; Amdahl '67; Gregg (USE/flame); Jain | `performance-bottleneck-triage` (v0.0.1) |
-| 04 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
-| 05 | _Failure-mode & resilience_ | _(reserved)_ | Lamport; Gray | — |
-| 06 | _Test integrity & verification_ | _(reserved)_ | Dijkstra ("testing shows presence…"); Weyuker | — |
-| 07 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
+| 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
+| 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
+| 06 | **Error handling** | "An error is information; swallowing it destroys it. Ban the anti-patterns actually present, with counts — not a generic checklist." | Goodenough '75; Parnas (fail-fast); Pike (errors-are-values) | `error-handling-rules` (v0.0.1) |
+| 07 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
+| 08 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
 
 The map grows as prompts are added; themes are not fixed in advance.
 
@@ -117,3 +135,15 @@ history. Treat the path here as a staging area, not the final home.
     from logs" prompt; routes to a profiler instead of guessing. `-X importtime`
     on `dharma_swarm` found `models` = 21% of boot (29 eager Pydantic builds),
     Amdahl-bounded, and named pydantic/ssl/stdlib as irreducible floor.
+- **2026-06-25 (batch 2)** — codename **PRAMĀṆA** pencilled in; added the
+  analysis-vs-generation discipline note.
+  - `04/retry-audit` v0.0.1 — rewrite of a kit's retry-finder. Found the canonical
+    `resilience.RetryPolicy` **under-adopted** (4 importers), credited 2 correct
+    ad-hoc backoffs, flagged 8 `while True` loops UNCONFIRMED (not guessed).
+  - `05/seed-data-generator` v0.0.1 — rewrite of a kit's seed prompt (generation:
+    faithfulness-or-stop). Honest applicability note — `dharma_swarm` has no
+    relational schema to seed; demoed the discipline on real Pydantic models
+    instead of faking a DB.
+  - `06/error-handling-rules` v0.0.1 — rewrite of a kit's `.cursorrules` prompt
+    (generation: ban what's measured). Grounded the bans in the repo's real 244
+    silent swallows + 2,275 broad catches; spared the narrow intentional ones.
