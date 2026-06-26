@@ -134,6 +134,7 @@ def run_operator_idea_spark(
         receipt.correlation_id,
         state_root,
         status="captured",
+        created_at=when,
         input_id=receipt.input_id,
     )
 
@@ -149,7 +150,10 @@ def run_operator_idea_spark(
     )
     append_candidate(candidate, state_root)
     update_lifecycle_receipt(
-        receipt.correlation_id, state_root, candidate_id=candidate.candidate_id
+        receipt.correlation_id,
+        state_root,
+        created_at=when,
+        candidate_id=candidate.candidate_id,
     )
 
     # 3. Chetana staged (untrusted) atom.
@@ -158,6 +162,7 @@ def run_operator_idea_spark(
         receipt.correlation_id,
         state_root,
         status="staged",
+        created_at=when,
         chetana_staged_atom_id=staged.atom_id,
         evidence_paths=[str(staged.path)],
     )
@@ -185,24 +190,39 @@ def run_operator_idea_spark(
     )
 
     # 7. Mock implementation/experiment receipt + lifecycle closure.
-    impl_id = _write_implementation_receipt(
-        correlation_id=receipt.correlation_id,
-        candidate_id=candidate.candidate_id,
-        action=action,
-        state_root=state_root,
-        created_at=when,
-    )
-    update_lifecycle_receipt(
-        receipt.correlation_id,
-        state_root,
-        status="implemented",
-        implementation_receipt_id=impl_id,
-    )
+    #    Only claim 'implemented' when an action lane actually fired; otherwise
+    #    reflect the real outcome (routed, or blocked when routing failed closed).
+    if action.lane != "none":
+        impl_id = _write_implementation_receipt(
+            correlation_id=receipt.correlation_id,
+            candidate_id=candidate.candidate_id,
+            action=action,
+            state_root=state_root,
+            created_at=when,
+        )
+        update_lifecycle_receipt(
+            receipt.correlation_id,
+            state_root,
+            status="implemented",
+            created_at=when,
+            implementation_receipt_id=impl_id,
+        )
+    else:
+        impl_id = ""
+        update_lifecycle_receipt(
+            receipt.correlation_id,
+            state_root,
+            status="routed" if route.resolved else "blocked",
+            created_at=when,
+        )
 
     # 8. Retrieval proof.
     probe = probe_by_correlation_id(receipt.correlation_id, state_root)
     update_lifecycle_receipt(
-        receipt.correlation_id, state_root, retrieval_probe_id=probe.retrieval_probe_id
+        receipt.correlation_id,
+        state_root,
+        created_at=when,
+        retrieval_probe_id=probe.retrieval_probe_id,
     )
 
     return LifecycleRunResult(

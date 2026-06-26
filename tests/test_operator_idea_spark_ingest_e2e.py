@@ -145,7 +145,11 @@ def test_note_to_proposal_full_chain(e2e_env) -> None:
     state_root, _commons = e2e_env
     result = _run(NOTE_FIXTURE, "proposal", e2e_env)
     assert result.route.resolved is True
-    assert result.memory.promotion_ready is True
+    # Lifecycle emits a governed memory promotion REQUEST (human-gated, not
+    # auto-approved) — the canonical receipt exists and mutates nothing.
+    assert result.memory.canonical_receipt_id
+    assert result.memory.promotion_ready is False
+    assert result.memory.write_receipt.mutation_performed is False
     assert result.action.lane == "proposal"
     # Hermetic: staged atom lives under the temp Chetana root, never ~/.dharma.
     assert str(state_root.parent) in str(result.staged.path)

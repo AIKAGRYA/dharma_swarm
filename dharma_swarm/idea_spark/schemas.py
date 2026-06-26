@@ -114,13 +114,17 @@ def is_valid_lifecycle_id(value: str) -> bool:
     return bool(_ID_GRAMMAR.match(value))
 
 
-def sanitize_lifecycle_id(value: str) -> str:
-    """Coerce ``value`` to the source_atom_id grammar (for foreign ids)."""
+def sanitize_lifecycle_id(value: str, *, max_len: int = 160) -> str:
+    """Coerce ``value`` to the source_atom_id grammar (for foreign ids).
+
+    ``max_len`` lets callers reserve room for a prefix so the final prefixed id
+    stays within the 160-char grammar (e.g. ``max_len=160-len(prefix)``).
+    """
     cleaned = _NON_ID_CHARS.sub("-", value).strip("-")
     cleaned = cleaned or "x"
     if not re.match(r"^[A-Za-z0-9]", cleaned):
         cleaned = f"x{cleaned}"
-    return cleaned[:160]
+    return cleaned[: max(1, min(160, max_len))]
 
 
 def derive_input_id(source_kind: str, source_ref: str, content_digest: str) -> str:

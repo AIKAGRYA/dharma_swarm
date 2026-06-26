@@ -239,9 +239,15 @@ def write_health_receipt(
     state_root: Path | None = None,
     *,
     now: str | None = None,
-    include_chetana_backlog: bool = False,
+    include_chetana_backlog: bool = True,
 ) -> Path:
-    """Write the daily ingest-health receipt atomically (read-only over stores)."""
+    """Write the daily ingest-health receipt atomically (read-only over stores).
+
+    The daily receipt includes the Chetana staged backlog + stale-concept sample
+    by default (DoD §8: health output must report stale wiki concepts and staged
+    backlog). Pass ``include_chetana_backlog=False`` for a fast, hermetic receipt
+    that does not scan the real Chetana roots.
+    """
     import os
 
     health = ingest_health(

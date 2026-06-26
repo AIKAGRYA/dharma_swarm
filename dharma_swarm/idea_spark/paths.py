@@ -1,10 +1,18 @@
 """Append-only target paths for the Operator Idea Spark ingest lifecycle.
 
-All roots derive from ``DHARMA_STATE_DIR`` (the One Way for ~/.dharma
-redirection) via the shared live-ops contract, so a test that sets
-``DHARMA_STATE_DIR`` to a tmp dir redirects the entire lifecycle with no
-network and no real-state writes. No new database is introduced (spec section
-5): these are append-only JSON/JSONL projections over the existing state root.
+The idea_spark PROJECTION paths defined here derive from ``DHARMA_STATE_DIR``
+(the One Way for ~/.dharma redirection) via the shared live-ops contract, so a
+test that sets ``DHARMA_STATE_DIR`` to a tmp dir redirects these receipts with
+no network and no real-state writes. No new database is introduced (spec
+section 5): these are append-only JSON/JSONL projections over the existing
+state root.
+
+Scope note: ``DHARMA_STATE_DIR`` redirects ONLY these idea_spark projection
+paths. The Chetana staging/wiki/quarantine roots (``staging.STAGING_ROOT`` et
+al.), ``stigmergy._DEFAULT_BASE``, ``chetana.governance.WITNESS_DIR``, and
+``dharma_kernel._DEFAULT_KERNEL_PATH`` are ``Path.home()``-based module
+constants; a fully hermetic lifecycle run (e.g. the e2e fixture) must
+monkeypatch those owners explicitly.
 """
 
 from __future__ import annotations

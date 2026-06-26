@@ -88,13 +88,49 @@ def test_wiki_cli_check_matches_path() -> None:
 
 def test_health_receipt_round_trip(tmp_path) -> None:
     _seed_chain(tmp_path)
-    path = write_health_receipt(tmp_path, now=FIXED_NOW)
+    # Hermetic: skip the real-Chetana backlog scan here.
+    path = write_health_receipt(tmp_path, now=FIXED_NOW, include_chetana_backlog=False)
     assert path.exists()
     loaded = load_health_receipt(tmp_path)
     assert loaded is not None
     assert loaded["schema_version"] == INGEST_HEALTH_SCHEMA
     assert loaded["generated_at"] == FIXED_NOW
     assert loaded["lifecycle"]["total"] == 1
+
+
+def test_health_receipt_reports_dod_drift_signals(tmp_path, monkeypatch) -> None:
+    # DoD §8: health output must report stale wiki concepts, staged backlog,
+    # unrouted candidates, and lifecycle completion rate. Redirect the Chetana
+    # roots to a tmp tree so the backlog scan is hermetic.
+    from datetime import date, timedelta
+
+    from dharma_swarm.chetana import staging as staging_mod
+
+    staging_root = tmp_path / "chetana" / "staging" / "2026-06-26"
+    trusted_root = tmp_path / "chetana" / "wiki" / "concepts"
+    quarantine_root = tmp_path / "chetana" / "quarantine"
+    for directory in (staging_root, trusted_root, quarantine_root):
+        directory.mkdir(parents=True, exist_ok=True)
+    (staging_root / "a.md").write_text("---\ntitle: A\n---\nbody", encoding="utf-8")
+    (staging_root / "b.md").write_text("---\ntitle: B\n---\nbody", encoding="utf-8")
+    stale_day = (date(2026, 6, 26) - timedelta(days=10)).isoformat()
+    (trusted_root / "c.md").write_text(
+        f"---\ntitle: C\nstale_after: '{stale_day}'\n---\nbody", encoding="utf-8"
+    )
+    monkeypatch.setattr(staging_mod, "STAGING_ROOT", tmp_path / "chetana" / "staging", raising=True)
+    monkeypatch.setattr(staging_mod, "TRUSTED_DEFAULT", trusted_root, raising=True)
+    monkeypatch.setattr(staging_mod, "QUARANTINE_ROOT", quarantine_root, raising=True)
+
+    _seed_chain(tmp_path)
+    health = ingest_health(tmp_path, now=FIXED_NOW, include_chetana_backlog=True)
+    backlog = health["chetana_backlog"]
+    assert backlog["available"] is True
+    assert backlog["staged"] == 2
+    assert backlog["trusted"] == 1
+    assert backlog["stale_concepts_in_sample"] == 1  # stale wiki concept
+    # The other two DoD signals are always present.
+    assert "unrouted" in health["candidates"]
+    assert "completion_rate" in health["lifecycle"]
 
 
 def _load_onboard():

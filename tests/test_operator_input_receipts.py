@@ -130,6 +130,20 @@ def test_receipt_round_trip_and_immutability(tmp_path) -> None:
         write_input_receipt(tampered, tmp_path)
 
 
+def test_re_ingest_identical_content_at_a_later_time_is_idempotent(tmp_path) -> None:
+    # Same content, different (unpinned) capture time -> same input_id; the
+    # second write is a no-op, not a conflict (captured_at is volatile).
+    first = NOTE_FIXTURE.build_receipt(captured_at="2026-06-26T00:00:00Z")
+    later = NOTE_FIXTURE.build_receipt(captured_at="2026-06-27T09:30:00Z")
+    assert first.input_id == later.input_id
+    write_input_receipt(first, tmp_path)
+    write_input_receipt(later, tmp_path)  # must not raise
+    # The original receipt (and its captured_at) is preserved.
+    stored = read_input_receipt(first.input_id, tmp_path)
+    assert stored is not None
+    assert stored.captured_at == "2026-06-26T00:00:00Z"
+
+
 def test_lifecycle_receipt_update_merges_and_persists(tmp_path) -> None:
     corr = "corr_testlifecycle01"
     first = update_lifecycle_receipt(

@@ -21,6 +21,7 @@ from pathlib import Path
 from dharma_swarm.memory_kernel import (
     REQUIRED_PROMOTION_GATES,
     MemoryKernelPromotionDecision,
+    MemoryKernelPromotionDecisionKind,
     MemoryKernelReviewedCanonicalReceipt,
     MemoryKernelWriteReceipt,
     MemoryKernelWriteReceiptInput,
@@ -38,8 +39,11 @@ from .paths import (
     memory_kernel_dir,
     memory_write_receipts_path,
 )
-from .schemas import IdeaSparkCandidate, sanitize_lifecycle_id
+from .schemas import IdeaSparkCandidate, is_valid_lifecycle_id, sanitize_lifecycle_id
 from .store import update_lifecycle_receipt
+
+_CANDIDATE_ID_PREFIX = "idea_spark_candidate:"
+_CORRELATION_ID_PREFIX = "idea_spark_correlation:"
 
 # Neutral, non-protected receipt surface (a projection log, not a memory store).
 WRITE_TARGET_SURFACE = "memory_kernel.promotion_receipts"
@@ -81,6 +85,19 @@ def candidate_summary(
     return f"{title}: {claim}"[: limit + len(title) + 2]
 
 
+def _source_atom_ids(candidate: IdeaSparkCandidate) -> tuple[str, str]:
+    ids = (
+        f"{_CANDIDATE_ID_PREFIX}"
+        f"{sanitize_lifecycle_id(candidate.candidate_id, max_len=160 - len(_CANDIDATE_ID_PREFIX))}",
+        f"{_CORRELATION_ID_PREFIX}"
+        f"{sanitize_lifecycle_id(candidate.correlation_id, max_len=160 - len(_CORRELATION_ID_PREFIX))}",
+    )
+    for sid in ids:
+        if not is_valid_lifecycle_id(sid):  # defense-in-depth before governed call
+            raise ValueError(f"invalid memory source_atom_id: {sid!r}")
+    return ids
+
+
 def emit_memory_kernel_receipt(
     candidate: IdeaSparkCandidate,
     *,
@@ -90,20 +107,26 @@ def emit_memory_kernel_receipt(
     redaction_policy: str = "none",
     target_authority_surface: str = DEFAULT_AUTHORITY_SURFACE,
     forbidden_roots: tuple[Path, ...] = (),
+    approve: bool = False,
 ) -> MemoryKernelBridgeResult:
-    """Emit a governed write + promotion + canonical receipt for a candidate."""
+    """Emit a governed memory promotion REQUEST for a candidate.
+
+    By default (``approve=False``) this only *requests* promotion: the write
+    receipt is ``pending_review`` and the canonical receipt is BLOCKED
+    (not promotion-ready) — ``human_approved`` is NOT minted without a human.
+    A real reviewer action (``approve=True``, with a ``reviewer``) is required to
+    emit a REVIEWED canonical receipt. Either way no protected memory is mutated.
+    """
     summary = candidate_summary(candidate, redaction_policy=redaction_policy)
-    source_atom_ids = (
-        f"idea_spark_candidate:{sanitize_lifecycle_id(candidate.candidate_id)}",
-        f"idea_spark_correlation:{sanitize_lifecycle_id(candidate.correlation_id)}",
-    )
+    source_atom_ids = _source_atom_ids(candidate)
+    reviewer_state = "human_approved" if approve else "pending_review"
 
     write_request = MemoryKernelWriteReceiptInput(
         source_atom_ids=source_atom_ids,
         proposed_operation="append_proposal",
         target_surface=WRITE_TARGET_SURFACE,
         reason=f"Operator Idea Spark candidate summary :: {summary}",
-        reviewer_state="human_approved",
+        reviewer_state=reviewer_state,
     )
     write_receipt = governed_write_receipt(write_request, created_at=created_at)
 
@@ -118,7 +141,12 @@ def emit_memory_kernel_receipt(
         write_receipt_id=write_receipt.receipt_id,
         reviewer=reviewer,
         rationale=f"Idea Spark promotion review :: {summary}",
-        approved_gates=REQUIRED_PROMOTION_GATES,
+        approved_gates=REQUIRED_PROMOTION_GATES if approve else (),
+        decision=(
+            MemoryKernelPromotionDecisionKind.APPROVE
+            if approve
+            else MemoryKernelPromotionDecisionKind.DEFER
+        ),
         source_proposal_id=candidate.candidate_id,
         source_decision_id=candidate.correlation_id,
         target_authority_surface=target_authority_surface,
@@ -137,16 +165,20 @@ def emit_memory_kernel_receipt(
 
     status = load_promotion_status(canonical_path)
 
+    # A pending request is not a lifecycle blocker; only surface genuine
+    # blockers when an approval was claimed yet the gate still blocked it.
+    lifecycle_blockers = list(canonical.blockers) if approve else []
     update_lifecycle_receipt(
         candidate.correlation_id,
         state_root,
         status="staged",
+        created_at=created_at,
         candidate_id=candidate.candidate_id,
         memory_write_receipt_id=write_receipt.receipt_id,
         memory_canonical_receipt_id=canonical.canonical_receipt_id,
         owner_surface=candidate.owner_surface,
         evidence_paths=[str(write_path), str(decision_path), str(canonical_path)],
-        blockers=list(canonical.blockers),
+        blockers=lifecycle_blockers,
     )
 
     return MemoryKernelBridgeResult(

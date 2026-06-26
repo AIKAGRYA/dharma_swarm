@@ -148,6 +148,7 @@ def route_candidate(
                 candidate.correlation_id,
                 state_root,
                 status="routed",
+                created_at=created_at,
                 candidate_id=candidate.candidate_id,
                 semantic_route=route.semantic_route,
                 owner_surface=route.owner_surface,
@@ -156,6 +157,7 @@ def route_candidate(
             update_lifecycle_receipt(
                 candidate.correlation_id,
                 state_root,
+                created_at=created_at,
                 candidate_id=candidate.candidate_id,
                 blockers=[UNRESOLVED_MARKER],
             )

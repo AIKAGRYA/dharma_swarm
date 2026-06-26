@@ -112,9 +112,15 @@ def write_input_receipt(
     if path.exists():
         existing = json.loads(path.read_text(encoding="utf-8"))
         if existing != payload:
-            raise ValueError(
-                f"conflicting immutable operator input receipt: {receipt.input_id}"
-            )
+            # captured_at is a volatile wall-clock field; re-ingesting identical
+            # content at a later time is an idempotent no-op (keep the original
+            # receipt), not a content conflict. Compare the content-bearing subset.
+            existing_cmp = {k: v for k, v in existing.items() if k != "captured_at"}
+            payload_cmp = {k: v for k, v in payload.items() if k != "captured_at"}
+            if existing_cmp != payload_cmp:
+                raise ValueError(
+                    f"conflicting immutable operator input receipt: {receipt.input_id}"
+                )
         return path
     _write_json_atomic(path, payload)
     return path
@@ -218,18 +224,21 @@ def update_lifecycle_receipt(
     state_root: Path | None = None,
     *,
     status: str | None = None,
+    created_at: str | None = None,
     **fields: Any,
 ) -> OperatorInputLifecycleReceipt:
     """Load-or-create the lifecycle receipt, apply non-empty fields, persist.
 
     String fields are overwritten only when a non-empty value is supplied; list
     fields (``blockers``, ``evidence_paths``) are unioned to stay append-only.
+    Pass ``created_at`` to make the receipt timestamps deterministic.
     """
+    stamp = created_at or utc_now_iso()
     existing = load_lifecycle_receipt(correlation_id, state_root)
     base = (
         existing.model_dump()
         if existing is not None
-        else {"correlation_id": correlation_id, "created_at": utc_now_iso()}
+        else {"correlation_id": correlation_id, "created_at": stamp}
     )
     for key, value in fields.items():
         if key in _LIFECYCLE_MERGE_LIST_FIELDS and value:
@@ -242,7 +251,7 @@ def update_lifecycle_receipt(
             base[key] = value
     if status:
         base["status"] = status
-    base["updated_at"] = utc_now_iso()
+    base["updated_at"] = stamp
     receipt = OperatorInputLifecycleReceipt.model_validate(base)
     write_lifecycle_receipt(receipt, state_root)
     return receipt

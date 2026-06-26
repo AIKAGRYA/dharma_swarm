@@ -24,13 +24,14 @@ def _candidate(claim: str = NOTE_FIXTURE.content):
     return candidate_from_operator_receipt(receipt, claim=claim, domain="tooling", now=FIXED_NOW)
 
 
-def test_emit_memory_kernel_receipt_is_promotion_ready(tmp_path) -> None:
+def test_default_emit_is_a_pending_request_not_auto_approved(tmp_path) -> None:
+    # Default path REQUESTS promotion; it must NOT mint human_approved with no human.
     candidate = _candidate()
     result = emit_memory_kernel_receipt(candidate, state_root=tmp_path, created_at=FIXED_NOW)
-    assert result.promotion_ready is True
-    assert result.blockers == ()
-    assert result.canonical_receipt.status == MemoryKernelPromotionReceiptStatus.REVIEWED
-    # No protected memory mutation.
+    assert result.promotion_ready is False
+    assert result.canonical_receipt.status == MemoryKernelPromotionReceiptStatus.BLOCKED
+    assert result.canonical_receipt.human_approved is False
+    # No protected memory mutation either way.
     assert result.write_receipt.mutation_performed is False
     assert result.write_receipt.artifact_record_only is True
     assert result.canonical_receipt.mutation_performed is False
@@ -38,6 +39,18 @@ def test_emit_memory_kernel_receipt_is_promotion_ready(tmp_path) -> None:
     for path in (result.write_receipt_path, result.decision_path, result.canonical_receipt_path):
         assert path.exists()
         assert str(tmp_path) in str(path)
+
+
+def test_explicit_approval_yields_promotion_ready(tmp_path) -> None:
+    candidate = _candidate()
+    result = emit_memory_kernel_receipt(
+        candidate, state_root=tmp_path, created_at=FIXED_NOW, approve=True, reviewer="operator"
+    )
+    assert result.promotion_ready is True
+    assert result.blockers == ()
+    assert result.canonical_receipt.status == MemoryKernelPromotionReceiptStatus.REVIEWED
+    assert result.canonical_receipt.human_approved is True
+    assert result.write_receipt.mutation_performed is False
 
 
 def test_canonical_receipt_links_back_to_candidate(tmp_path) -> None:
