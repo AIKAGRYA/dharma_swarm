@@ -55,6 +55,25 @@ def health_receipts_dir(state_root: Path | None = None, *, ensure: bool = False)
     return path
 
 
+def memory_kernel_dir(state_root: Path | None = None, *, ensure: bool = False) -> Path:
+    path = idea_spark_root(state_root) / "memory_kernel"
+    if ensure:
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def memory_write_receipts_path(state_root: Path | None = None) -> Path:
+    return memory_kernel_dir(state_root) / "write_receipts.jsonl"
+
+
+def memory_decisions_path(state_root: Path | None = None) -> Path:
+    return memory_kernel_dir(state_root) / "promotion_decisions.jsonl"
+
+
+def memory_canonical_receipts_path(state_root: Path | None = None) -> Path:
+    return memory_kernel_dir(state_root) / "reviewed_canonical_receipts.jsonl"
+
+
 def input_receipt_path(input_id: str, state_root: Path | None = None) -> Path:
     return input_receipts_dir(state_root) / f"{input_id}.json"
 
