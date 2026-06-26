@@ -29,14 +29,10 @@ jobs:
   observe:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      # No actions/checkout or actions/setup-python: this repo requires every
+      # action to be pinned to a full commit SHA, and this probe needs neither
+      # the repo tree nor a custom Python — the runner's system python3 is fine
+      # and the script is self-contained, reading only secrets.
       - name: Install NATS client
         run: python3 -m pip install --quiet 'nats-py>=2.9' 'aiohttp>=3.9'
 
