@@ -156,6 +156,28 @@ Fix decision:
   `501d24fbf4d1447e8db60eb0973eeadeb5ff54c2`.
 - Do not delete the worktree, branch, or local receipts during this fix.
 
+## Oz PR #705 Secret-Gate Follow-up - 2026-06-26T092229+0900 JST
+
+After pinning both actions, the workflow advanced past action setup. The next
+failure was:
+
+```text
+`warp_api_key` must be provided.
+```
+
+`gh secret list --repo AmitabhainArunachala/dharma_swarm` showed no
+`WARP_API_KEY` repository secret. PR #705 is same-repository, so the failure is
+not a fork-secret restriction.
+
+Follow-up fix decision:
+
+- Keep the pinned action SHAs.
+- Run the Oz agent only when `WARP_API_KEY` is configured.
+- When the secret is absent, pass the workflow with an explicit GitHub Actions
+  notice and step summary that Oz verification was skipped.
+- Set `cloud: true` on the Oz action when it does run, matching the workflow's
+  stated cloud-agent intent.
+
 ## Commands Run
 
 ```bash
