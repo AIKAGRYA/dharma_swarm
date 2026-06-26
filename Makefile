@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -85,6 +85,9 @@ help:
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
+	@echo "  make a2a-status   Connect to the AGNI hub: Devin identity + live fleet roster + inbox state"
+	@echo "  make a2a-up       Run the persistent Devin A2A agent (registers on fleet, drains inbox)"
+	@echo "  make a2a-send     Send a packet: make a2a-send TO=codex FILE=path/to/packet.md"
 	@echo "  make go-ci        Run Go evidence sense-organ fmt/vet/test gates"
 	@echo ""
 
@@ -429,6 +432,22 @@ status:
 
 track-strength:
 	$(VENV_PYTHON) scripts/governance/track_acceptance_strength_report.py
+
+# ── A2A (agent-to-agent over the AGNI NATS hub) ────────────────────────────
+# One-command connect + identity + live fleet roster + inbox state. The
+# bundled CA loads automatically; only DEVIN_NATS_PW must be exported.
+# See docs/ops/A2A_QUICKSTART.md.
+a2a-status:
+	$(VENV_PYTHON) scripts/runtime/a2a_doctor.py $(ARGS)
+
+# Run the persistent Devin agent: registers on the fleet and drains devin_inbox.
+a2a-up:
+	$(VENV_PYTHON) scripts/runtime/devin_a2a_agent.py $(ARGS)
+
+# Send a packet to an agent lane and wait for ack/reply.
+#   make a2a-send TO=codex FILE=inter_agent/devin/outbound/ping.md
+a2a-send:
+	$(VENV_PYTHON) scripts/runtime/a2a_send.py --to $(TO) --file $(FILE) $(ARGS)
 
 # ============================================================================
 # Go evidence sense-organ gates (Track G)
