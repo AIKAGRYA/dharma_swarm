@@ -1,5 +1,5 @@
 {
-  "audit_sha": "48e965c1be5341d4e0c5f8aec57bdd338ed816c7",
+  "audit_sha": "50c8e2b7556258d80839e9860065dad488d855cc",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -432,7 +432,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2027,
+              "line": 2092,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -445,7 +445,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 1777,
+              "line": 1831,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -458,7 +458,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 1784,
+              "line": 1838,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -1759,5 +1759,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 3802
+  "tracked_file_count": 3910
 }
