@@ -114,16 +114,19 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 10 | **Production hardening** | "Hardening is triage, not rewrite: rank by P(incident)×blast-radius; every finding names the line, the mechanism, and the consequence." | Nygard '07; Gray '85; Saltzer–Schroeder '75 | `hardening-checklist` (v0.0.1) |
 | 11 | **Onboarding & comprehension** | "A brief transfers the system's theory; be faithful to real paths or say you can't — fidelity over fluency." | Naur '85; Parnas (module guide); Brooks | `onboarding-brief` (v0.0.1) |
 | 12 | **Knowledge capture** _(adjacent)_ | "An SOP is faithful to observed actions; flag the unclear, never invent a step." | Gilbreth (motion study); Gawande; Polanyi | `recording-to-sop` (v0.0.1, drafted) |
-| 13 | **Data & queries** | "A new query per row is O(n) trips where a join is 1 — but a single query iterated is fine. Distinguish, then prove via query logs." | Codd '70; Fowler (lazy-load); EXPLAIN | `n-plus-one-query-scan` (v0.0.1) |
+| 13 | **Data & queries** | "A new query per row is O(n); a single query iterated is fine. A migration must survive the old-code-meets-new-schema window (expand/contract)." | Codd '70; Fowler; expand/contract (Sato) | `n-plus-one-query-scan` · `migration-safety` (v0.0.1) |
 | 14 | **State & lifecycle** | "Every acquired resource releases on all paths incl. exceptions — proven by a scope, not by 'we close it later'." | Dijkstra; RAII (Stroustrup); Gray '85 | `resource-leak-scan` (v0.0.1) |
 | 15 | **Security** | "A seen secret is burned; route to a real scanner over full history. An agent's attack surface is its inputs × tools — least privilege + complete mediation." | Kerckhoffs; Saltzer–Schroeder '75; OWASP LLM Top 10 | `secret-leakage-scan` · `ai-agent-security-audit` (v0.0.1) |
-| 16 | **Observability** | "At 3am you have only what you logged; a swallow with no log is a guaranteed blind spot. Measure blind spots, require queryable context." | Gray '85; Gregg (USE); structured logging | `logging-context-audit` (v0.0.1) |
+| 16 | **Observability** | "At 3am you have only what you logged; a swallow with no log is a blind spot, and a sensitive value in a log is a breach. Reference, not value." | Gray '85; Gregg (USE); GDPR (minimization) | `logging-context-audit` · `pii-in-logs-scan` (v0.0.1) |
 | 17 | **Code-health metrics** | "Complexity, duplication, and wildcard sprawl are measurable slop signals — run the instrument, extract only on shared reason-to-change, return clean honestly." | McCabe '76; Fowler (DRY); Parnas; arXiv 2508.14727 | `complexity-inflation-scan` · `duplication-ratio-scan` · `wildcard-import-audit` (v0.0.1) |
-| 18 | **Test integrity** | "A test asserts behavior, not the implementation; a mock-only/no-assert test is theater. Mutation testing is the ground truth." | Goodenough '75; Beck (TDD); mutation testing | `test-mirrors-implementation` (v0.0.1) |
+| 18 | **Test integrity** | "A test asserts behavior, not the implementation, and is deterministic; a mock-only/no-assert/flaky test is theater. Mutation + re-run are the ground truth." | Goodenough '75; Beck (TDD); Luo '14 (flaky); mutation testing | `test-mirrors-implementation` · `flaky-test-detector` (v0.0.1) |
+| 19 | **Concurrency** | "Shared mutable state crossed by concurrent paths is a bug until proven serialized — incl. await-interleaving. Flag genuine sharing, not every global." | Lamport '78; Dijkstra (mutex); TOCTOU | `race-condition-audit` (v0.0.1) |
+| 20 | **LLM integration** | "An LLM call is an unbounded, untrusted, costly network call: bound it, cap (not just track) cost, guard injection, parse defensively." | Nygard '07; OWASP LLM Top 10; defensive parsing | `llm-call-hygiene` (v0.0.1) |
+| 21 | **Drift & entropy** | "A doc that contradicts the code misleads with authority. Diff checkable claims; the durable fix is to generate the claim, not hand-maintain it." | Lehman's laws; Knuth (literate); SSOT | `doc-code-drift` (v0.0.1) |
+| 22 | **Invariant & contract** | "Every function assumes preconditions and guarantees postconditions; bugs live where a caller violates an unstated, unchecked precondition." | Hoare '69; Meyer (DbC); Ernst (Daikon) | `invariant-extractor` (v0.0.1) |
 
 The map grows as prompts are added (backlog in `ROADMAP.md`); themes are not fixed
-in advance. Reserved next: invariant/contract discovery (Hoare, Meyer), drift &
-entropy control (Shannon, Lehman).
+in advance.
 
 ## Productization note (read before extracting)
 

@@ -22,6 +22,11 @@ logging-context-audit ✅
 duplication-ratio-scan · wildcard-import-audit · test-mirrors-implementation ·
 ai-agent-security-audit · interface-replaceability-audit — **26 shipped total.**
 
+**+batch 7 (7):** race-condition-audit · flaky-test-detector · llm-call-hygiene ·
+migration-safety · doc-code-drift · invariant-extractor · pii-in-logs-scan —
+**33 shipped total across 22 themes.** Reserved themes (drift, invariant/contract)
+now opened.
+
 _(backlog markers below may lag — the cron updates them.)_
 
 ## Backlog — by theme (invariant · lineage)
