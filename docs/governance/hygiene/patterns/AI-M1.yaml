@@ -1,0 +1,17 @@
+{
+  "id": "AI-M1",
+  "title": "Claim shipped on existence evidence below required grade",
+  "cluster": "M",
+  "cluster_title": "Graded Claim/Evidence Binding",
+  "severity": "operational",
+  "stage": "advisory",
+  "created": "2026-06-25",
+  "last_verified": "2026-06-25",
+  "next_review": "2026-09-25",
+  "definition": "A track or claim is treated as shippable when its strongest passing evidence is below the required grade -- file_exists or file_contains (S0/S1) standing in for landed, tested, or independently verified work -- or when its only green test is owned by the same identity that owns the claim, so the oracle is not independent.",
+  "why_it_hurts": "Existence is not closure. A pattern present in a file proves nothing ran; a self-authored green test can be written to pass. Shipping on these inflates trust and lets slop accumulate behind a done label.",
+  "detector": {"type": "command", "command": "python3 scripts/governance/check_claim_evidence_binding.py", "rationale": "The graded evaluator reports strongest evidence grade vs required min_evidence_grade per active track; an UNDERGRADED verdict is exactly this pattern."},
+  "enforcement": {"rule": null, "promoted_on": null},
+  "sources": ["docs/governance/evidence_grades.yaml", "scripts/governance/check_track_status.py", "docs/state/REALITY_DEBT_LEDGER.md"],
+  "audit_questions": ["What is the strongest evidence grade this claim rests on, and does it meet the required min_evidence_grade?", "If the binding evidence is a passing test, is its oracle independent of the claim owner (signer is not the committer), or was it downgraded?"]
+}

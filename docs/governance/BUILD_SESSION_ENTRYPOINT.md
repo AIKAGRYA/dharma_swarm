@@ -48,7 +48,7 @@ The governing principle: each track ships **one seam, end-to-end, with gates and
      Do not hand-edit. Run scripts/governance/render_active_track_includes.py
      after updating the YAML. -->
 
-**Active portfolio:** 8 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
+**Active portfolio:** 10 co-equal track(s) (WIP warn 5, max 10). A new project is a new track here, not a violation — model: 1..N co-equal active tracks; typed graph; WIP-limited; surface-owned.
 
 **Spine objectives (each track serves one):**
 
@@ -371,6 +371,117 @@ trained weights — training is earned only after the arena produces labels.
 - Do not introduce trained weights / SFT / GRPO in v1; this track is zero-weight by design.
 - Do not let dirty/local/candidate state feed arena fitness; only canonical origin/main.
 - Do not couple admission to the full world-ingestion (#662) seam.
+
+### Merge Master Mike — D4 persistent always-on merge agent
+
+**Track id:** `merge-master-mike-d4-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-24 (TTL 21 days)
+**Relations:** complements: runtime-truth-reconciliation-2026-06
+**Owns surfaces:** scripts/runtime/pr_merge_control.py, scripts/runtime/merge_master_mike_daemon.py, .github/workflows/automerge.yml, .github/workflows/codex-mention-router.yml, .github/workflows/merge-master-mike-backlog.yml, tests/test_pr_merge_control_github_reviews.py
+**Moves vital signs:** quality_gates, tool_coverage
+
+Operator directive 2026-06-24: make Merge Master Mike a D4-level
+PERSISTENT, always-on merge agent — up independently of any operator
+machine, responsive both reactively (@mention) and proactively (every
+PR event), with a reviewer quorum that is satisfiable in the cloud.
+
+Diagnosis (this session): Mike-the-merger is already cloud event-driven
+(automerge.yml on pull_request / check_suite / review + an hourly sweep,
+and the router on @mention). Mike-the-reviewer-LANE is not: the cloud
+router runs packet->gate->merge against an ephemeral RUNNER_TEMP state
+dir but NEVER runs the reviewer lanes (run-agent), so the required
+claude/copilot receipt FILES are never written in the cloud. Result: bot
+PRs flow (the bot-pr label WAIVES receipts) but HUMAN PRs can never
+auto-merge in the cloud — the gate always finds the receipts missing. The
+only producer today is the Mac daemon's review cycle-mode (which defaults
+to dry-run) or a manual `make pr-run-claude`. That machine dependency is
+the real clean-merge bottleneck.
+
+The fix is a reviewer-receipt SOURCE that exists in the cloud with no
+credential: teach the gate to count the native GitHub reviews it already
+receives (the Codex App review = codex; a requested Copilot review =
+copilot) as receipts, and demote claude to the deep/backup lane (built
+later as a credentialed cloud Action). Then auto-enroll every non-draft
+PR so Mike acts proactively, and give Mike a cloud heartbeat so his
+living-agent presence is continuous rather than Mac-bound.
+
+Doctrine that MUST hold (the gate's safety floor is never weakened):
+  Add receipt SOURCES, never remove gate checks. CI green, no conflict,
+  no unresolved blocking threads, and reviewDecision != CHANGES_REQUESTED
+  stay hard. Mike never silent-merges, never approves, never pushes
+  source, never bypasses governance. A native GitHub review counts as a
+  receipt ONLY from a trusted installed reviewer-App login.
+
+**Next items:**
+
+- [code] (blocker) Slice 1 (blocker): bridge native GitHub reviews -> Mike receipts in the pr_merge_control gate (Codex App = codex, Copilot = copilot), trusted-login-gated and ADDITIVE (never removes a check). + tests.
+- [code] Slice 2: auto-enroll every non-draft PR into the automerge/Mike evaluate lane (not only bot-pr / automerge-labeled).
+- [code] Slice 3 (operator-gated): cloud Claude reviewer GitHub Action that runs run-agent and posts a claude receipt on PR open/sync (needs an ANTHROPIC API credential as a repo secret — decision D4).
+- [code] Slice 4: Mike cloud heartbeat (scheduled wake / living-agent receipt) so D4 presence is continuous and machine-independent; keep the Mac daemon as an optional local mirror.
+- [governance] (blocker) Operator ratification of decisions D1-D4 before any merge-authority behavior changes.
+
+**Non-goals:**
+
+- Do not weaken or remove any existing gate check (CI green, conflict, unresolved threads, CHANGES_REQUESTED stay hard).
+- Do not let Mike silent-merge, approve PRs, push source, or bypass governance.
+- Do not commit provider/API credentials; the credentialed Claude reviewer Action is operator-provisioned.
+- Do not accept a "review" from an untrusted login as a receipt; only trusted installed reviewer-App logins.
+- Do not create a new merge authority or receipt store; extend pr_merge_control and the existing workflows.
+
+### Filesystem-Native Context Substrate — folder-as-contract + portable knowledge graph
+
+**Track id:** `filesystem-native-substrate-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-24 (TTL 21 days)
+**Relations:** complements: truth-graph-platform-2026-06, runtime-truth-spine-adoption-2026-06
+**Owns surfaces:** docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md, docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md, docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md, dharma_swarm/fs_substrate/**, tests/test_stage_contracts.py, tests/test_okf_projection.py, tests/test_semantic_fs.py, tests/test_organizer.py, tests/test_fs_substrate_e2e.py
+**Moves vital signs:** context_efficiency, tool_coverage, memory_persistence
+
+Operator directive 2026-06-24: consolidate four convergent "filesystem-as-
+agent-substrate" sources into one substrate power and wire it into the swarm.
+The four: LSFS (arXiv 2410.11843, semantic syscalls over a vector index),
+LlamaFS (iyaja/llama-fs, self-organizing propose-then-apply), Van Clief's
+ICM/MWP (arXiv 2603.16021, numbered folders as pipeline stages + CONTEXT.md
+contracts + token-firewall folders), and Google's OKF v0.1 (2026-06-12,
+portable markdown knowledge graph: required `type`, index.md/log.md, links).
+
+This is a Tier-1 substrate/organizer power (NORTH_STAR.md §4), realizing
+self-organs the genome already names (THE_ORGANISM.md ③: self-onboarding,
+self-ontology-maintenance, self-memory-curation) and grounding the
+categorical-systems-theory pillar (genome ①) physically: CONTEXT.md
+Inputs/Outputs tables are morphism declarations; OKF `type`+links are
+objects+morphisms — compositional interfaces the organism can read and
+rewrite without losing coherence.
+
+The track creates NO new truth store and NO authority surface. Every slice
+projects from / converges on existing owners: the spine (invoke_agent /
+EvidenceReceipt), the orchestrator + TaskBoard DAG, handoff.py, and the
+MemoryKernel front door + surface registry.
+
+Doctrine line that must hold (inherited from reconciliation + truth-graph):
+  Read models project truth from owners; they do not become authority.
+
+Anti-pattern guard (THE_ORGANISM.md needle): this must not become "a paper
+about our own architecture." The outward licence is OKF interchange — making
+the swarm's knowledge portable to external humans and agent systems
+(NORTH_STAR.md §6 noosphere propagation; §8 trust-gate auditability).
+
+**Next items:**
+
+- [docs] SHIPPED: single-location research dossier consolidating LSFS, LlamaFS, ICM/MWP, OKF with the organism tie (docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md).
+- [code] SHIPPED (2026-06-24): Slice A — read-only CONTEXT.md stage-contract reader (dharma_swarm/fs_substrate/{stage_contracts,stage_executor}.py). Numbered stage-folders -> Task.depends_on DAG; each stage dispatched through invoke_agent(); stage output -> handoff -> next stage. Reuses spine/TaskBoard/handoff/skills; no new orchestrator. tests/test_stage_contracts.py: 8 passed, 1 skipped.
+- [code] SHIPPED (2026-06-24): Slice B — OKF projector (dharma_swarm/fs_substrate/okf.py). write_bundle/read_bundle (tolerant consumer) + project_semantic_objects() projects docs/ontology/semantic_objects.yaml to a portable OKF bundle (required `type` from each object's kind, index.md/log.md, cross-links). 13 ontology objects round-trip. tests/test_okf_projection.py: 6 passed. The outward/Arjuna licence: the knowledge graph is now portable.
+- [code] SHIPPED (2026-06-24): Slice C — LSFS-style semantic-query facade (dharma_swarm/fs_substrate/semantic_fs.py): keywords_retrieve/semantic_retrieve/group_semantic/integrated_retrieve + a parse_query LSFS-Parser analog, all delegating to the MemoryKernel front door (iter_memory_atoms). No new vector DB; lexical proxy with an embedding seam noted. tests/test_semantic_fs.py: 5 passed.
+- [code] SHIPPED (2026-06-24): Slice D — propose-then-apply organizer (dharma_swarm/fs_substrate/organizer.py): propose_organization (pure dry-run, by-family classification) + apply_proposal (GATED: refuses without confirm=True; write_ok predicate is the MemoryWritePolicy seam; never overwrites/escapes root). Watch-mode + LLM-summary deferred. tests/test_organizer.py: 5 passed.
+
+**Non-goals:**
+
+- Do not create a new daemon, database, vector store, event log, or truth store.
+- Do not mint a second receipt type; project over spine.EvidenceReceipt.
+- Do not mutate files without a dry-run proposal + operator approval (Slice D); writes go through MemoryWritePolicy.
+- Do not broadly refactor orchestrator.py, agent_runner.py, or swarm.py; plug in at dispatch_next()/TaskBoard, honoring spine-adoption's owned surfaces.
+- Do not touch operator_core/** or runtime_state.py.
+- Do not duplicate the truth-graph-platform repo_context projection; this owns the portable on-disk interchange format, not the in-repo render.
+- Do not commit provider API keys or any credentials.
 
 **Recently closed tracks:**
 

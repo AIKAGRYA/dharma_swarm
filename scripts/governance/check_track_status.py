@@ -34,6 +34,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_TRACK_PATH = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
+EVIDENCE_GRADES_PATH = REPO_ROOT / "docs/governance/evidence_grades.yaml"
 REPORTS_DIR = REPO_ROOT / "reports/governance"
 SCHEMA_VERSION = 2                       # current schema authored by this checker
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}       # v1 (singular active_track) read via adapter
@@ -60,6 +61,11 @@ class CriterionResult:
     kind: str
     passed: bool
     detail: str = ""
+    # False when the check could not be RUN in this environment (e.g. the
+    # governance gate's minimal-deps job has no pytest). An unverified check
+    # is neither a pass nor a regression — it is "could not observe", and
+    # must be reported as such instead of being scored as a hard failure.
+    executed: bool = True
 
 
 def load_active_track(path: Path) -> dict[str, Any]:
@@ -277,8 +283,114 @@ def check_pr_merged(pr_number: int) -> CriterionResult:
 # open blocker next-items. Pattern borrowed from
 # cybernetics_codex._evaluate_loop_closure_replay (compute closure from
 # structural evidence; never trust a bare boolean) and REALITY_DEBT_LEDGER.md.
-RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged"})
+RIGOROUS_KINDS = frozenset({"test_passes", "commit_on_main", "receipt_valid", "pr_merged", "mutation_score_gte"})
 EXISTENCE_KINDS = frozenset({"file_exists", "file_contains"})
+
+
+# --- Graded evidence ladder (Pudgala Forge Phase 1) ---------------------------
+# The RIGOROUS bar above is binary: ONE rigorous criterion of any strength
+# suffices. That still lets a track ship on a single self-authored green test.
+# The ladder turns "rigorous yes/no" into a GRADED floor (min_evidence_grade):
+# a claim ships only when its strongest passing evidence meets the required
+# grade, and an oracle the claimant owns is downgraded (not independent).
+#
+# Strength is declared declaratively in docs/governance/evidence_grades.yaml so
+# new grades need no code change here; this module only reads that projection.
+# Default floor (S2 = commit_on_main) is used when neither the ladder file nor a
+# track declares one — keeping the gate functional even if the YAML is absent.
+_DEFAULT_MIN_GRADE = 2
+_DEFAULT_ORACLE_DOWNGRADE = 2
+_GRADE_LADDER_CACHE: dict[str, Any] | None = None
+
+
+def _load_grade_ladder() -> dict[str, Any]:
+    """Load + cache evidence_grades.yaml into a lookup of active kind->grade.
+
+    Missing/malformed ladder is non-fatal: we fall back to a built-in active
+    map (S0..S3) so the gate degrades to its pre-ladder rigorous behaviour
+    rather than crashing (a governance gate must not crash on bad config)."""
+    global _GRADE_LADDER_CACHE
+    if _GRADE_LADDER_CACHE is not None:
+        return _GRADE_LADDER_CACHE
+
+    builtin_active = {
+        "file_exists": 0,
+        "file_contains": 1,
+        "pr_merged": 1,
+        "commit_on_main": 2,
+        "receipt_valid": 2,
+        "test_passes": 3,
+        "mutation_score_gte": 6,  # S6 active (Pudgala Forge P3-09): primary anti-gaming oracle
+    }
+    ladder = {
+        "kind_to_grade": dict(builtin_active),
+        "default_min_grade": _DEFAULT_MIN_GRADE,
+        "oracle_downgrade_to": _DEFAULT_ORACLE_DOWNGRADE,
+        "grade_names": {0: "S0", 1: "S1", 2: "S2", 3: "S3", 6: "S6"},
+    }
+    if EVIDENCE_GRADES_PATH.exists():
+        try:
+            raw = load_active_track(EVIDENCE_GRADES_PATH)  # same YAML-subset loader
+        except (OSError, ValueError):
+            raw = None
+        if isinstance(raw, dict):
+            kind_to_grade: dict[str, int] = dict(builtin_active)
+            parsed_active_kinds = False
+            names: dict[int, str] = {}
+            for row in raw.get("grades") or []:
+                if not isinstance(row, dict):
+                    continue
+                try:
+                    g = int(row.get("grade"))
+                except (TypeError, ValueError):
+                    continue
+                names[g] = str(row.get("name", f"S{g}"))
+                # Only ACTIVE grades contribute scoring kinds; reserved kinds
+                # remain unmapped and therefore score S0 until they land.
+                if str(row.get("status", "active")) != "active":
+                    continue
+                for kind in row.get("kinds") or []:
+                    kind_to_grade[str(kind)] = g
+                    parsed_active_kinds = True
+            # receipt_valid is a checker-native rigorous kind not listed as its
+            # own ladder row; pin it to S2 (landed-equivalent) if unmapped.
+            kind_to_grade.setdefault("receipt_valid", 2)
+            if parsed_active_kinds:
+                ladder["kind_to_grade"] = kind_to_grade
+                ladder["grade_names"] = names or ladder["grade_names"]
+            try:
+                ladder["default_min_grade"] = int(raw.get("default_min_grade", _DEFAULT_MIN_GRADE))
+            except (TypeError, ValueError):
+                ladder["default_min_grade"] = _DEFAULT_MIN_GRADE
+            try:
+                ladder["oracle_downgrade_to"] = int(
+                    raw.get("oracle_dependent_downgrade_to", _DEFAULT_ORACLE_DOWNGRADE))
+            except (TypeError, ValueError):
+                ladder["oracle_downgrade_to"] = _DEFAULT_ORACLE_DOWNGRADE
+    _GRADE_LADDER_CACHE = ladder
+    return ladder
+
+
+def grade_of_criterion(crit: dict[str, Any], result: "CriterionResult",
+                       track: dict[str, Any]) -> int:
+    """Grade a PASSING criterion on the S0..S8 ladder. Failing/unmapped/reserved
+    kinds score 0. A `test_passes` whose `oracle_source` is absent or equals the
+    track owner is oracle-DEPENDENT and downgraded (a self-owned green test is
+    not independent evidence)."""
+    if not result.passed:
+        return 0
+    ladder = _load_grade_ladder()
+    grade = int(ladder["kind_to_grade"].get(result.kind, 0))
+    if result.kind == "test_passes":
+        oracle = str(crit.get("oracle_source") or "").strip()
+        owner = str(track.get("owner") or "").strip()
+        if not oracle or oracle == owner:
+            grade = min(grade, int(ladder["oracle_downgrade_to"]))
+    return grade
+
+
+def grade_name(grade: int) -> str:
+    return _load_grade_ladder()["grade_names"].get(grade, f"S{grade}")
 
 
 def check_commit_on_main(commit: str) -> CriterionResult:
@@ -317,33 +429,189 @@ def check_test_passes(test_target: str, timeout: int = 180) -> CriterionResult:
             capture_output=True, text=True, timeout=timeout, cwd=REPO_ROOT,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        return CriterionResult(id="", kind="test_passes", passed=False,
+        return CriterionResult(id="", kind="test_passes", passed=False, executed=False,
                                detail=f"pytest {test_target}: {type(exc).__name__} (could not execute)")
+    out = (res.stdout or "") + (res.stderr or "")
+    # pytest itself absent (minimal-deps environment): the check could not be
+    # RUN. Report it as unverified rather than a hard fail — a missing test
+    # runner is not evidence the code regressed.
+    if res.returncode != 0 and "No module named pytest" in out:
+        return CriterionResult(id="", kind="test_passes", passed=False, executed=False,
+                               detail=f"pytest {test_target}: pytest not installed (could not execute)")
     passed = res.returncode == 0
-    lines = [ln for ln in (res.stdout or res.stderr or "").splitlines() if ln.strip()]
+    lines = [ln for ln in out.splitlines() if ln.strip()]
     tail = lines[-1] if lines else ""
     return CriterionResult(id="", kind="test_passes", passed=passed,
                            detail=f"pytest {test_target}: {'PASS' if passed else 'FAIL'} — {tail}")
 
 
-def check_receipt_valid(file_path: str, requires_keys: list[str]) -> CriterionResult:
+# Canonicalisation must match dharma_swarm/memory_kernel/write_receipts.py
+# (canonical_json / stable_digest) byte-for-byte so a digest produced by a
+# VerifiedMachineReceipt verifies here. Inlined to keep this gate stdlib-only
+# and import-light (it must run even when dharma_swarm deps are unavailable).
+def _canonical_json(payload: object) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _stable_digest(payload: object) -> str:
+    import hashlib
+    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def _recompute_digest(row: dict[str, Any]) -> str:
+    """Digest covers every field EXCEPT `digest` itself; `prev_digest` IS
+    included (that is what chains receipts). Mirrors the producer in
+    dharma_swarm/spine/receipt.py::VerifiedMachineReceipt.with_chain."""
+    return _stable_digest({k: v for k, v in row.items() if k != "digest"})
+
+
+def _receipt_timestamp(row: dict[str, Any]) -> str | None:
+    for key in ("produced_at", "generated_at", "finished_at", "started_at", "verified_at"):
+        val = row.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+    return None
+
+
+def check_receipt_valid(file_path: str, requires_keys: list[str], *,
+                        fresh_ttl_days: int | None = None,
+                        expect_digest: bool = False,
+                        expect_chain: bool = False) -> CriterionResult:
     """A receipt artifact must EXIST and carry the required structural keys —
-    behavioral evidence, not just file presence."""
+    behavioral evidence, not just file presence. Optionally (Pudgala Forge
+    Phase 1) it must also be FRESH (within fresh_ttl_days), DIGEST-INTACT
+    (stored digest recomputes), and CHAIN-INTACT (JSONL where each row's
+    prev_digest links to the previous row's digest). Any failed check ->
+    NOT passed (a stale or tampered receipt is not evidence)."""
     path = repo_path(file_path)
     if not path.exists():
         return CriterionResult(id="", kind="receipt_valid", passed=False,
                                detail=f"receipt {file_path} MISSING")
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
         return CriterionResult(id="", kind="receipt_valid", passed=False,
                                detail=f"receipt {file_path} unreadable: {type(exc).__name__}")
+
+    # Chain mode: parse as JSONL and verify digest + prev_digest linkage.
+    if expect_chain:
+        rows: list[dict[str, Any]] = []
+        for ln in text.splitlines():
+            if not ln.strip():
+                continue
+            try:
+                row = json.loads(ln)
+            except json.JSONDecodeError:
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                       detail=f"receipt chain {file_path} has a non-JSON line")
+            if not isinstance(row, dict):
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                       detail=f"receipt chain {file_path} row {len(rows)} is not a JSON object")
+            rows.append(row)
+        if not rows:
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                   detail=f"receipt chain {file_path} is empty")
+        prev = ""
+        for i, row in enumerate(rows):
+            stored = str(row.get("digest", ""))
+            if not stored or stored != _recompute_digest(row):
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                    detail=f"receipt chain {file_path} row {i} digest mismatch (tampered)")
+            link = str(row.get("prev_digest", ""))
+            if i == 0 and link:
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                    detail=f"receipt chain {file_path} row 0 has non-empty prev_digest (missing genesis anchor)")
+            if i > 0 and link != prev:
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                    detail=f"receipt chain {file_path} broken at row {i}: prev_digest != prior digest")
+            prev = stored
+        data = rows[-1]
+    else:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                   detail=f"receipt {file_path} unreadable: {type(exc).__name__}")
+        if not isinstance(data, dict):
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                   detail=f"receipt {file_path} is not a JSON object")
+        if expect_digest:
+            stored = str(data.get("digest", ""))
+            if not stored:
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                       detail=f"receipt {file_path} has no digest to verify")
+            if stored != _recompute_digest(data):
+                return CriterionResult(id="", kind="receipt_valid", passed=False,
+                                       detail=f"receipt {file_path} digest mismatch (tampered)")
+
     missing = [k for k in (requires_keys or []) if k not in data]
     if missing:
         return CriterionResult(id="", kind="receipt_valid", passed=False,
                                detail=f"receipt {file_path} missing keys: {', '.join(missing)}")
+
+    if fresh_ttl_days is not None:
+        ts = _receipt_timestamp(data)
+        if ts is None:
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                detail=f"receipt {file_path} has no timestamp to check freshness")
+        age = days_since(ts[:10])
+        if age is None:
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                detail=f"receipt {file_path} timestamp malformed: {ts!r}")
+        if age > fresh_ttl_days:
+            return CriterionResult(id="", kind="receipt_valid", passed=False,
+                detail=f"receipt {file_path} is stale: {age}d old > fresh_ttl_days={fresh_ttl_days}")
+
+    bits = [f"{len(requires_keys or [])} keys present"]
+    if expect_chain:
+        bits.append("chain intact")
+    if expect_digest:
+        bits.append("digest intact")
+    if fresh_ttl_days is not None:
+        bits.append("fresh")
     return CriterionResult(id="", kind="receipt_valid", passed=True,
-                           detail=f"receipt {file_path} valid ({len(requires_keys or [])} keys present)")
+                           detail=f"receipt {file_path} valid ({', '.join(bits)})")
+
+
+def check_mutation_score_gte(file_path: str, threshold: float, *,
+                             fresh_ttl_days: int | None = None) -> CriterionResult:
+    """A mutation-score report must EXIST, be FRESH, and show a score >= threshold
+    — proof the test suite actually KILLS injected faults (S6, the primary
+    anti-gaming oracle: it resists the seven deadly AI test patterns — a trivially
+    -asserting/mock-everything/tautological test survives mutants). The report is
+    produced by `make mutation-test` (runs mutmut on the changed surfaces); this
+    gate READS it and never runs mutmut inline, so the governance gate stays fast.
+    Conservative: a missing / stale / below-threshold report does NOT pass."""
+    path = repo_path(file_path)
+    if not path.exists():
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} MISSING — run `make mutation-test`")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} unreadable: {type(exc).__name__}")
+    if not isinstance(data, dict):
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} is not a JSON object")
+    try:
+        score = float(data.get("score"))
+    except (TypeError, ValueError):
+        return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                               detail=f"mutation report {file_path} has no numeric 'score'")
+    if fresh_ttl_days is not None:
+        ts = _receipt_timestamp(data)
+        age = days_since(ts[:10]) if ts else None
+        if age is None:
+            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                                   detail=f"mutation report {file_path} has no usable timestamp for freshness")
+        if age > fresh_ttl_days:
+            return CriterionResult(id="", kind="mutation_score_gte", passed=False,
+                                   detail=f"mutation report {file_path} is stale ({age}d > {fresh_ttl_days}d ttl)")
+    passed = score >= threshold
+    return CriterionResult(id="", kind="mutation_score_gte", passed=passed,
+                           detail=f"mutation score {score:.2f} {'>=' if passed else '<'} {threshold:.2f} "
+                                  f"({data.get('killed', '?')}/{data.get('total', '?')} mutants killed)")
 
 
 def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
@@ -387,7 +655,24 @@ def evaluate_criterion(crit: dict[str, Any]) -> CriterionResult:
                 res = CriterionResult(id="", kind=kind, passed=False,
                                       detail="malformed criterion: 'file' must be a non-empty string")
             else:
-                res = check_receipt_valid(crit["file"], crit.get("requires_keys") or [])
+                ttl = crit.get("fresh_ttl_days")
+                res = check_receipt_valid(
+                    crit["file"], crit.get("requires_keys") or [],
+                    fresh_ttl_days=int(ttl) if ttl is not None else None,
+                    expect_digest=bool(crit.get("expect_digest")),
+                    expect_chain=bool(crit.get("expect_chain")),
+                )
+        elif kind == "mutation_score_gte":
+            report = crit.get("file") or "reports/governance/mutation_score.json"
+            try:
+                threshold = float(crit.get("threshold", 0.6))
+            except (TypeError, ValueError):
+                threshold = 0.6
+            ttl = crit.get("fresh_ttl_days")
+            res = check_mutation_score_gte(
+                report, threshold,
+                fresh_ttl_days=int(ttl) if ttl is not None else None,
+            )
         else:
             res = CriterionResult(id="", kind=kind, passed=False,
                                   detail=f"unknown predicate kind: {kind!r}")
@@ -633,12 +918,32 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
     next_items = [ni for ni in (t.get("next_items") or []) if isinstance(ni, dict)]
     open_blockers = [ni for ni in next_items if ni.get("blocker") is True]
     has_rigorous_evidence = any(c.passed and c.kind in RIGOROUS_KINDS for c in comps)
+
+    # --- GRADED bar (Pudgala Forge Phase 1) ------------------------------------
+    # Pair each completion criterion with its declared criterion dict so we can
+    # read per-criterion ladder hints (oracle_source). zip is safe: comps is
+    # built 1:1 from completion_criteria in order.
+    crit_dicts = [c for c in (t.get("completion_criteria") or []) if isinstance(c, dict)]
+    ladder = _load_grade_ladder()
+    grades = [grade_of_criterion(cd, res, t)
+              for cd, res in zip(crit_dicts, comps) if res.passed]
+    strongest_grade = max(grades) if grades else 0
+    try:
+        min_evidence_grade = int(t.get("min_evidence_grade", ladder["default_min_grade"]))
+    except (TypeError, ValueError):
+        min_evidence_grade = int(ladder["default_min_grade"])
+
     ship_blocks: list[str] = []
     if open_blockers:
         ship_blocks.append(f"{len(open_blockers)} open blocker next-item(s)")
     if not has_rigorous_evidence:
         ship_blocks.append("no rigorous evidence (criteria are existence-only: "
                            "file_exists/file_contains — add test_passes / commit_on_main / receipt_valid)")
+    if strongest_grade < min_evidence_grade:
+        ship_blocks.append(
+            f"strongest evidence {grade_name(strongest_grade)} "
+            f"< required {grade_name(min_evidence_grade)} "
+            "(raise evidence strength or lower min_evidence_grade with justification)")
     shippable = criteria_pass and not ship_blocks
 
     return {
@@ -646,10 +951,14 @@ def evaluate_track(t: dict[str, Any]) -> dict[str, Any]:
         "prereqs": prereqs,
         "completion": comps,
         "prereqs_ok": prereqs_ok,
-        "shippable": shippable,            # RIGOROUS bar
+        "shippable": shippable,            # RIGOROUS + GRADED bar
         "criteria_pass": criteria_pass,    # legacy lenient bar (existence checks)
         "ship_blocks": ship_blocks,
         "has_rigorous_evidence": has_rigorous_evidence,
+        "strongest_grade": strongest_grade,
+        "strongest_grade_name": grade_name(strongest_grade),
+        "min_evidence_grade": min_evidence_grade,
+        "min_evidence_grade_name": grade_name(min_evidence_grade),
         "open_blocker_count": len(open_blockers),
         "passed": sum(1 for c in comps if c.passed),
         "total": len(comps),
@@ -731,6 +1040,37 @@ def run(args: argparse.Namespace) -> int:
 
         r = evaluate_track(t)
 
+        # ENFORCING rigor gate (operator directive 2026-06-25): a track may not
+        # DECLARE itself shippable without earning it under the rigorous bar.
+        # Previously the rigor verdict was advisory (INFO only); a YAML that set
+        # `status: shippable` on existence-only criteria would still pass green.
+        # This is the "AI slop" trap the operator named: a green flag with no
+        # real check behind it. Now a declared-shippable track that fails the
+        # rigorous bar is a hard ERROR (non-zero exit), so the false-closure
+        # claim blocks instead of merely informing.
+        declared_status = str(t.get("status") or "").lower()
+        if declared_status == "shippable" and not r["shippable"]:
+            # Only block for a REAL false-closure reason. A rigorous criterion
+            # that could not be RUN in this environment (e.g. the minimal-deps
+            # gate has no pytest) is unverified, not a false claim — blocking on
+            # it would manufacture exactly the kind of untrustworthy signal we
+            # are trying to remove. Fire when: an open blocker exists, OR the
+            # track declares NO rigorous criterion at all (existence-only
+            # theater — the core trap), OR a criterion actually ran and failed.
+            declares_rigorous = any(c.kind in RIGOROUS_KINDS for c in r["completion"])
+            executed_failure = any(
+                (not c.passed) and getattr(c, "executed", True)
+                for c in (r["completion"] + r["prereqs"]))
+            real_false_claim = (
+                r["open_blocker_count"] > 0 or not declares_rigorous or executed_failure)
+            if real_false_claim:
+                blocks = "; ".join(r["ship_blocks"]) or "rigorous bar not met"
+                findings.append(Finding("ERROR", f"false-shippable-claim:{tid}",
+                    f"[{tid}] declares status: shippable but FAILS the rigorous bar: {blocks}. "
+                    "A track cannot be marked shippable without >=1 rigorous criterion "
+                    "(test_passes / commit_on_main / receipt_valid / pr_merged) and zero "
+                    "open blockers. Either add real evidence or change status back to ACTIVE."))
+
         # Prerequisite failures => track mis-declared.
         for c in r["prereqs"]:
             if not c.passed and c.kind in {"file_exists", "file_contains"}:
@@ -739,9 +1079,18 @@ def run(args: argparse.Namespace) -> int:
                     "does not exist.", criterion_id=c.id))
 
         # Regression drift => previously-passing completion criterion now fails.
+        # A criterion that could not be RUN in this environment (e.g. the
+        # minimal-deps governance gate has no pytest) is NOT a regression — the
+        # code did not change, the runner is absent. Surface it as INFO so the
+        # gap is visible without producing a false-positive block.
         prev = prior_passed.get(tid, set())
         for c in r["completion"]:
             if c.id in prev and not c.passed:
+                if not getattr(c, "executed", True):
+                    findings.append(Finding("INFO", f"unverified:{tid}:{c.id}",
+                        f"[{tid}] UNVERIFIED — '{c.id}' could not run here (not a regression): {c.detail}",
+                        criterion_id=c.id))
+                    continue
                 findings.append(Finding("ERROR", f"regression:{tid}:{c.id}",
                     f"[{tid}] REGRESSION — '{c.id}' passed before and now fails: {c.detail}",
                     criterion_id=c.id))
@@ -784,6 +1133,10 @@ def _track_payload(t: dict[str, Any], r: dict[str, Any]) -> dict[str, Any]:
         "criteria_pass": r.get("criteria_pass", r["shippable"]),
         "ship_blocks": r.get("ship_blocks", []),
         "has_rigorous_evidence": r.get("has_rigorous_evidence", False),
+        "strongest_grade": r.get("strongest_grade", 0),
+        "strongest_grade_name": r.get("strongest_grade_name", "S0"),
+        "min_evidence_grade": r.get("min_evidence_grade", _DEFAULT_MIN_GRADE),
+        "min_evidence_grade_name": r.get("min_evidence_grade_name", "S2"),
         "prerequisites_ok": r["prereqs_ok"],
         "completion_progress": {"passed": r["passed"], "total": r["total"]},
         "criteria": [asdict(c) for c in (r["prereqs"] + r["completion"])],
