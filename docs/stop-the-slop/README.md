@@ -107,11 +107,14 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
 | 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
 | 06 | **Error handling** | "An error is information; swallowing it destroys it. Ban the anti-patterns actually present, with counts — not a generic checklist." | Goodenough '75; Parnas (fail-fast); Pike (errors-are-values) | `error-handling-rules` (v0.0.1) |
-| 07 | **Debugging & reproduction** | "A repro is a falsifiable, minimal witness that FAILS now. If it can't fail honestly, you have questions, not a repro." | Zeller–Hildebrandt '02 (delta debugging); Popper | `minimal-repro-builder` (v0.0.1) |
+| 07 | **Debugging & reproduction** | "A repro fails for the right reason or it's questions; a fix without a traced causal chain is a guess — fix the cause, not the crash site." | Zeller '02 (delta debugging); Popper; Weiser '81 (slicing); Kildall '73 | `minimal-repro-builder` (v0.0.1) · `bug-trace-before-fix` (v0.0.1) |
 | 08 | **Change management & flags** | "A flag is ONE boundary with a safe default and a removal path; scattering checks is a 2^N state explosion." | Parnas '72; Fowler (branch-by-abstraction); Knuth | `feature-flag-wrap` (v0.0.1) |
 | 09 | **Dead code & reachability** | "Deletion requires proof of unreachability; dynamic/string/framework references defeat static proof, so grade confidence and protect contracts." | Aho–Sethi–Ullman (dead-code elim); tree-shaking | `dead-code-scan` (v0.0.1) |
-| 10 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
-| 11 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
+| 10 | **Production hardening** | "Hardening is triage, not rewrite: rank by P(incident)×blast-radius; every finding names the line, the mechanism, and the consequence." | Nygard '07; Gray '85; Saltzer–Schroeder '75 | `hardening-checklist` (v0.0.1) |
+| 11 | **Onboarding & comprehension** | "A brief transfers the system's theory; be faithful to real paths or say you can't — fidelity over fluency." | Naur '85; Parnas (module guide); Brooks | `onboarding-brief` (v0.0.1) |
+| 12 | **Knowledge capture** _(adjacent)_ | "An SOP is faithful to observed actions; flag the unclear, never invent a step." | Gilbreth (motion study); Gawande; Polanyi | `recording-to-sop` (v0.0.1, drafted) |
+| 13 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
+| 14 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
 
 The map grows as prompts are added; themes are not fixed in advance.
 
@@ -160,3 +163,14 @@ history. Treat the path here as a staging area, not the final home.
   - `09/dead-code-scan` v0.0.1 — rewrite of a kit's dead-code analyzer. 181 orphan-
     module candidates, correctly **capped at MEDIUM** (this repo loads dynamically);
     registry/API/CLI files marked LOW — review checklist, never auto-delete.
+- **2026-06-25 (batch 4)** — debugging theme gains a sibling; 3 new themes (10–12).
+  - `07/bug-trace-before-fix` v0.0.1 — trace-before-fix (Weiser slicing). Demoed on
+    the real provider/router chain: pinned the cause to the eager `__init__` import
+    (hop 1), which is where the fix landed — not the crash site.
+  - `10/hardening-checklist` v0.0.1 — production triage (Nygard/Gray). On
+    `web_search.py`: 5 line+mechanism findings (must-fix = unchecked `choices[0]`
+    shape at :126); cleared the auth/secret bucket (return-clean).
+  - `11/onboarding-brief` v0.0.1 — fidelity-over-fluency (Naur/Parnas/Brooks). Real
+    verified brief for `dharma_swarm` + pointer to its own `make onboard`.
+  - `12/recording-to-sop` v0.0.1 (**adjacent, drafted**) — knowledge capture; honest
+    non-applicability (no recording here to test, not faked).
