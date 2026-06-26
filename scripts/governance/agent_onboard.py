@@ -52,7 +52,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # (Previously a hidden insert inside render_manifest_health was load-bearing.)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-from dharma_swarm.operator_core.live_ops_census_contract import (
+from dharma_swarm.operator_core.live_ops_census_contract import (  # noqa: E402
     census_payload_freshness,
     default_output_path,
     validate_census_payload,
@@ -914,6 +914,58 @@ def _live_ops_census_freshness(payload: Any) -> dict[str, Any]:
         }
 
 
+def render_idea_spark_ingest_health() -> None:
+    """Read-only Operator Idea Spark ingest health (counts; promotes nothing)."""
+    section("IDEA SPARK INGEST HEALTH (owner: ~/.dharma/meta/idea_spark/*)")
+    try:
+        state_dir = Path(os.environ.get("DHARMA_STATE_DIR", "~/.dharma")).expanduser()
+        root = state_dir / "meta" / "idea_spark"
+        if not root.exists():
+            print("  Receipts      : none yet (no operator idea spark ingest captured)")
+            print("  Promotion     : gate-only (chetana.promote); never bulk-promoted")
+            print("  Authority     : read-only; counts append-only receipts, executes nothing")
+            return
+
+        input_dir = root / "input_receipts"
+        input_receipts = len(list(input_dir.glob("*.json"))) if input_dir.exists() else 0
+
+        candidate_ids: set[str] = set()
+        candidates_file = root / "candidates.jsonl"
+        if candidates_file.exists():
+            for line in candidates_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except (ValueError, TypeError):
+                    continue
+                cid = row.get("candidate_id")
+                if cid:
+                    candidate_ids.add(str(cid))
+
+        lifecycle_dir = root / "lifecycle_receipts"
+        total = 0
+        implemented = 0
+        for path in sorted(lifecycle_dir.glob("*.json")) if lifecycle_dir.exists() else []:
+            try:
+                row = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                continue
+            total += 1
+            if row.get("status") == "implemented":
+                implemented += 1
+        completion = round(implemented / total, 3) if total else 0.0
+
+        print(f"  Input receipts: {input_receipts}")
+        print(f"  Candidates    : {len(candidate_ids)}")
+        print(f"  Lifecycle     : {total} (implemented {implemented}, completion {completion})")
+        print("  Promotion     : gate-only (chetana.promote); never bulk-promoted")
+        print("  Authority     : read-only; counts append-only receipts, executes nothing")
+    except Exception as exc:  # never break the exit-0 onboard contract
+        print(f"  (idea spark ingest health unavailable: {exc})")
+
+
 def render_live_ops_cockpit() -> None:
     section("LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL")
     runbook = REPO_ROOT / "docs/ops/LIVE_OPS_COCKPIT.md"
@@ -1726,6 +1778,50 @@ def render_model_key_routing() -> None:
     print("  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)")
 
 
+def render_live_provider_routes() -> dict[str, Any]:
+    section("LIVE PROVIDER/MODEL ROUTES — current served evidence")
+    try:
+        from dharma_swarm.runtime_context import provider_route_snapshot
+
+        routes = provider_route_snapshot()
+    except Exception as exc:
+        print(f"  (provider route context unavailable: {type(exc).__name__}: {exc})")
+        return {}
+
+    print(f"  Truth source : {routes.get('source')}")
+    print(f"  Runtime DB   : {routes.get('db_path')}")
+    print(f"  Available    : {routes.get('available')}")
+    if routes.get("error"):
+        print(f"  Error        : {routes.get('error')}")
+    print(
+        "  Recent       : "
+        f"attempts={routes.get('recent_attempt_count', 0)} "
+        f"successes={routes.get('recent_success_count', 0)} "
+        f"failures={routes.get('recent_failure_count', 0)} "
+        f"latest={routes.get('latest_created_at', '') or 'none'}"
+    )
+    successes = routes.get("recent_success_lanes") or []
+    blocked = routes.get("blocked_lanes") or []
+    degraded = routes.get("degraded_lanes") or []
+    print(f"  Recent green : {', '.join(successes[:6]) if successes else 'none'}")
+    print(f"  Blocked      : {', '.join(blocked[:6]) if blocked else 'none'}")
+    print(f"  Degraded     : {', '.join(degraded[:6]) if degraded else 'none'}")
+    lanes = [lane for lane in routes.get("lanes") or [] if isinstance(lane, dict)]
+    if lanes:
+        print("  Lane rollup:")
+        for lane in lanes[:8]:
+            print(
+                "    - "
+                f"{lane.get('route_key')} "
+                f"status={lane.get('status')} "
+                f"ok={lane.get('successes')} "
+                f"fail={lane.get('failures')} "
+                f"latest={lane.get('latest_outcome')}"
+            )
+    print("  Rule         : route from provider_attempts/live receipts, not memory or prose.")
+    return routes
+
+
 def render_enforcement_and_depth() -> None:
     section("ENFORCEMENT (run before opening a PR)")
     print("  make agent-build-preflight # onboarding + hygiene integrity at session start")
@@ -1929,8 +2025,17 @@ def main(argv: list[str] | None = None) -> int:
             repo_state = render_repo_state(fast=args.fast)
             lanes = render_parallel_work_lanes()
             rows = render_runtime_truth(evidence, track)
+            provider_routes = render_live_provider_routes()
             prs = render_pr_hygiene(net=net)
-        payload = _receipt_payload(repo_state, lanes, rows, prs, evidence, track)
+        payload = _receipt_payload(
+            repo_state,
+            lanes,
+            rows,
+            prs,
+            evidence,
+            track,
+            provider_routes,
+        )
         _write_receipt(payload)
         print(json.dumps(payload, sort_keys=True, indent=1))
         return 0
@@ -1941,6 +2046,7 @@ def main(argv: list[str] | None = None) -> int:
     lanes = render_parallel_work_lanes()
     render_live_ops()
     render_live_ops_cockpit()
+    render_idea_spark_ingest_health()
     if args.fast:
         section("SURFACE MANIFEST HEALTH (skipped — --fast)")
         print("  Rerun without --fast for the manifest health report.")
@@ -1951,6 +2057,7 @@ def main(argv: list[str] | None = None) -> int:
     render_recent_activity(track)
     render_spine_status()
     rows = render_runtime_truth(evidence, track)
+    provider_routes = render_live_provider_routes()
     prs = render_pr_hygiene(net=net)
     render_hygiene_system()
     render_decay_watch()
@@ -1992,7 +2099,15 @@ def main(argv: list[str] | None = None) -> int:
     print("  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.")
 
     receipt_path = _write_receipt(
-        _receipt_payload(repo_state, lanes, rows, prs, evidence, track))
+        _receipt_payload(
+            repo_state,
+            lanes,
+            rows,
+            prs,
+            evidence,
+            track,
+            provider_routes,
+        ))
     if receipt_path:
         print(f"  Machine receipt: {receipt_path}  (fleet-readable; also: --json)")
 
@@ -2007,6 +2122,7 @@ def _receipt_payload(
     prs: list[dict[str, Any]],
     evidence: dict[str, Any] | None,
     track: dict[str, Any],
+    provider_routes: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     active_tracks = (evidence or {}).get("active_tracks") or []
     broken = _parse_broken_register()
@@ -2045,6 +2161,7 @@ def _receipt_payload(
              "isDraft": p.get("isDraft")} for p in prs if isinstance(p, dict)
         ],
         "runtime_truth_packets": rows,
+        "provider_routes": provider_routes or {},
     }
 
 
