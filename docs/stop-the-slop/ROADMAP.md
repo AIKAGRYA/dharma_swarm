@@ -22,12 +22,22 @@ logging-context-audit ✅
 duplication-ratio-scan · wildcard-import-audit · test-mirrors-implementation ·
 ai-agent-security-audit · interface-replaceability-audit — **26 shipped total.**
 
-**+batch 7 (7):** race-condition-audit · flaky-test-detector · llm-call-hygiene ·
-migration-safety · doc-code-drift · invariant-extractor · pii-in-logs-scan —
-**33 shipped total across 22 themes.** Reserved themes (drift, invariant/contract)
-now opened.
+**+batch 7 (7):** race-condition · flaky-test · llm-call-hygiene · migration-safety ·
+doc-code-drift · invariant-extractor · pii-in-logs.
 
-_(backlog markers below may lag — the cron updates them.)_
+**+batch 8 (16) — v0.0.1 COMPLETE:** idempotency-key · deadlock-lock-order ·
+cache-invalidation · transaction-boundary · api-breaking-change · boundary-input-
+validation · authz-coverage · injection-ssrf · critical-path-instrumentation ·
+stale-closure-effect-deps · graceful-shutdown · coverage-gap-by-risk ·
+assertion-quality · config-drift · legacy-modernization · compliance-pii-readiness.
+
+## ✅ v0.0.1 COMPLETE — 49 prompts across 25 themes + flagship
+The curated first-principles backlog is fully built. Every item ran on
+`dharma_swarm` ground truth. Further growth comes from new angles (`SOURCES.md`)
+and operator requests, not from padding. The cron/next-session continues any
+new angles added below.
+
+_(backlog markers below are historical; all are now ✅.)_
 
 ## Backlog — by theme (invariant · lineage)
 
