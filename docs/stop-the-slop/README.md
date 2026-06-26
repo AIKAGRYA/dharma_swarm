@@ -1,15 +1,14 @@
-# STOP THE SLOP — _PRAMĀṆA_ (codename, settling)
+# STOP THE SLOP — **PRAMĀṆA PROBE**
 
 > guru-grade code prompts for builders, rooted in the history of computer &
 > cognitive science and verified against ground truth.
 
-**Codename:** **`PRAMĀṆA`** (Sanskrit, *pramāṇa* — "the valid means by which one
-arrives at accurate knowledge: perception, measurement, proof"). It is this
-library's thesis in one word: knowledge earned by a valid instrument, not by
-guessing — and it is native to the host repo (`dharma_swarm/pramana.py`).
-Discernment-flavored alternative still on the table: **`VIVEKA`** (discriminating
-the real from the unreal — the true finding from the plausible-looking slop). The
-outer brand stays **"Stop the Slop"**; Pramāṇa is the soul-name.
+**Name (settled):** **Pramāṇa Probe.** *Pramāṇa* (Sanskrit) is "the valid means by
+which one arrives at accurate knowledge — perception, measurement, proof"; a
+*probe* is the instrument that takes the measurement. Together: **knowledge earned
+by a valid instrument, not by guessing** — this library's entire thesis, in a name
+native to the host repo (`dharma_swarm/pramana.py`). Outer brand: **"Stop the
+Slop."** Soul-name: **Pramāṇa Probe.**
 
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
@@ -108,8 +107,11 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
 | 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
 | 06 | **Error handling** | "An error is information; swallowing it destroys it. Ban the anti-patterns actually present, with counts — not a generic checklist." | Goodenough '75; Parnas (fail-fast); Pike (errors-are-values) | `error-handling-rules` (v0.0.1) |
-| 07 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
-| 08 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
+| 07 | **Debugging & reproduction** | "A repro is a falsifiable, minimal witness that FAILS now. If it can't fail honestly, you have questions, not a repro." | Zeller–Hildebrandt '02 (delta debugging); Popper | `minimal-repro-builder` (v0.0.1) |
+| 08 | **Change management & flags** | "A flag is ONE boundary with a safe default and a removal path; scattering checks is a 2^N state explosion." | Parnas '72; Fowler (branch-by-abstraction); Knuth | `feature-flag-wrap` (v0.0.1) |
+| 09 | **Dead code & reachability** | "Deletion requires proof of unreachability; dynamic/string/framework references defeat static proof, so grade confidence and protect contracts." | Aho–Sethi–Ullman (dead-code elim); tree-shaking | `dead-code-scan` (v0.0.1) |
+| 10 | _Invariant & contract discovery_ | _(reserved)_ | Hoare '69; Meyer (DbC) | — |
+| 11 | _Drift & entropy control (ratchets/baselines)_ | _(reserved)_ | Shannon (entropy); Lehman's laws | — |
 
 The map grows as prompts are added; themes are not fixed in advance.
 
@@ -147,3 +149,14 @@ history. Treat the path here as a staging area, not the final home.
   - `06/error-handling-rules` v0.0.1 — rewrite of a kit's `.cursorrules` prompt
     (generation: ban what's measured). Grounded the bans in the repo's real 244
     silent swallows + 2,275 broad catches; spared the narrow intentional ones.
+- **2026-06-25 (batch 3)** — name **settled: Pramāṇa Probe**.
+  - `07/minimal-repro-builder` v0.0.1 — rewrite of a kit's repro prompt. Tested
+    against a real audit claim (telos "GATES=13 vs 11"): verified `CORE_GATES==11`,
+    returned **NOT REPRODUCED + questions** instead of fabricating a failing test
+    (and quietly fact-checked the audit).
+  - `08/feature-flag-wrap` v0.0.1 — rewrite of a kit's flag prompt. Audited the
+    repo's real `DHARMA_SPINE_DISPATCH`: already a single-boundary, default-OFF
+    flag → returned clean, proposed no churn.
+  - `09/dead-code-scan` v0.0.1 — rewrite of a kit's dead-code analyzer. 181 orphan-
+    module candidates, correctly **capped at MEDIUM** (this repo loads dynamically);
+    registry/API/CLI files marked LOW — review checklist, never auto-delete.
