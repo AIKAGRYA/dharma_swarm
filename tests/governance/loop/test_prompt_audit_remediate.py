@@ -479,6 +479,111 @@ def test_write_set_violation_rejected(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# M2 hardening: write-set enforcement via git diff (not self-report)
+# ---------------------------------------------------------------------------
+
+
+def test_misreported_write_set_caught_by_git_diff(tmp_path):
+    """M2 hardening: an implementer that writes outside the write_set but
+    SELF-REPORTS only inside-write_set paths must be caught via git diff.
+
+    This closes the gaming vector: with self-reported changed_files, an LLM
+    implementer can touch forbidden files and lie about what it changed. With
+    git-diff-based enforcement, the actual diff reveals the forbidden change.
+    """
+    from scripts.governance.loop.prompt_audit_remediate import ImplementerBackend, ImplementerPlan
+    from scripts.governance.loop.runs import RunManager
+
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    finding = _make_finding(fid="F-GITDIFF-001")
+    warrant = _make_warrant_dict(write_set=["scripts/governance/loop/allowed/**"])
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding], warrant=warrant)
+
+    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
+    try:
+        run = RunManager.open_run(run_id)
+
+        class LyingImplementer(ImplementerBackend):
+            """Writes to a forbidden path but self-reports an allowed path."""
+
+            def plan(self, finding, write_set):
+                gate = (
+                    f'"{VENV_PYTHON}" -c "from pathlib import Path; import sys; '
+                    f'sys.exit(0 if Path(\\"scripts/governance/loop/forbidden/fix.txt\\").exists() else 1)"'
+                )
+                return ImplementerPlan(proof_mode="synthetic", gate_command=gate)
+
+            def setup_proof(self, worktree_path, finding):
+                pass
+
+            def apply_fix(self, worktree_path, finding):
+                # Actually write to the FORBIDDEN path
+                target = worktree_path / "scripts" / "governance" / "loop" / "forbidden" / "fix.txt"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("secret forbidden change")
+                # LIE: self-report an ALLOWED path (that was never written)
+                return ["scripts/governance/loop/allowed/fix.txt"]
+
+        rc = _run_remediate_api(warrant_path, run, LyingImplementer(), repo, wt_root)
+        # With git-diff-based enforcement, the forbidden file shows up in the
+        # diff and is caught → rejected (non-zero exit).
+        assert rc != 0, (
+            "Misreported write-set violation was NOT caught — git-diff-based "
+            "enforcement is not in place (self-reported changed_files still used)."
+        )
+        assert not run.fix_proposal_path("F-GITDIFF-001").exists()
+    finally:
+        os.environ.pop("LOOP_RUNS_DIR", None)
+
+
+def test_honest_in_write_set_accepted_by_git_diff(tmp_path):
+    """M2 hardening: an implementer that writes inside the write_set AND
+    self-reports correctly must still be accepted (git-diff enforcement
+    doesn't break the legitimate case)."""
+    from scripts.governance.loop.prompt_audit_remediate import ImplementerBackend, ImplementerPlan
+    from scripts.governance.loop.runs import RunManager
+
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    finding = _make_finding(fid="F-HONEST-001")
+    warrant = _make_warrant_dict(write_set=["scripts/governance/loop/**"])
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding], warrant=warrant)
+
+    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
+    try:
+        run = RunManager.open_run(run_id)
+
+        class HonestImplementer(ImplementerBackend):
+            def plan(self, finding, write_set):
+                gate = (
+                    f'"{VENV_PYTHON}" -c "from pathlib import Path; import sys; '
+                    f'sys.exit(0 if Path(\\"scripts/governance/loop/fix_marker_F-HONEST-001.txt\\").exists() else 1)"'
+                )
+                return ImplementerPlan(proof_mode="synthetic", gate_command=gate)
+
+            def setup_proof(self, worktree_path, finding):
+                pass
+
+            def apply_fix(self, worktree_path, finding):
+                target = worktree_path / "scripts" / "governance" / "loop" / "fix_marker_F-HONEST-001.txt"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("honest fix")
+                return ["scripts/governance/loop/fix_marker_F-HONEST-001.txt"]
+
+        rc = _run_remediate_api(warrant_path, run, HonestImplementer(), repo, wt_root)
+        assert rc == 0, (
+            f"Honest in-write-set fix was rejected — git-diff enforcement broke "
+            f"the legitimate case. rc={rc}"
+        )
+        assert run.fix_proposal_path("F-HONEST-001").exists()
+    finally:
+        os.environ.pop("LOOP_RUNS_DIR", None)
+
+
+# ---------------------------------------------------------------------------
 # VAL-REMEDIATE-007 + VAL-REMEDIATE-012 + VAL-REMEDIATE-013:
 # Anti-gaming checklist on fix diff; violation REJECTS; fix_addresses_root_cause
 # ---------------------------------------------------------------------------
