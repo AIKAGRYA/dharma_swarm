@@ -139,26 +139,33 @@ jobs:
                       print(f"INBOX devin_inbox: ERROR {exc}")
 
                   # --- live roster via message-history scan (works on scoped creds) ---
+                  # Concurrent batched get_msg: pipelines requests so the scan is
+                  # seconds not minutes (sequential get_msg is O(N x RTT)).
                   agg = {}
-                  seq, n = last, 0
-                  while seq >= first and n < scan:
+                  seqs = list(range(last, max(first - 1, last - scan), -1))
+                  async def fetch(s):
                       try:
-                          m = await js.get_msg("DHARMA_A2A", seq)
+                          return (await js.get_msg("DHARMA_A2A", s)).data
                       except Exception:
-                          seq -= 1; continue
-                      n += 1; seq -= 1
-                      try:
-                          d = json.loads(m.data.decode())
-                      except Exception:
-                          continue
-                      frm = str(d.get("from") or d.get("agent") or "?")
-                      kind = str(d.get("kind") or d.get("schema_version") or "?")
-                      ts = str(d.get("timestamp") or d.get("sent_at") or "")
-                      e = agg.setdefault(frm, {"msgs": 0, "kinds": defaultdict(int), "last_ts": ""})
-                      e["msgs"] += 1
-                      e["kinds"][kind] += 1
-                      if ts > e["last_ts"]:
-                          e["last_ts"] = ts
+                          return None
+                  batch, n = 40, 0
+                  for i in range(0, len(seqs), batch):
+                      for data in await asyncio.gather(*[fetch(s) for s in seqs[i:i + batch]]):
+                          if not data:
+                              continue
+                          n += 1
+                          try:
+                              d = json.loads(data.decode())
+                          except Exception:
+                              continue
+                          frm = str(d.get("from") or d.get("agent") or "?")
+                          kind = str(d.get("kind") or d.get("schema_version") or "?")
+                          ts = str(d.get("timestamp") or d.get("sent_at") or "")
+                          e = agg.setdefault(frm, {"msgs": 0, "kinds": defaultdict(int), "last_ts": ""})
+                          e["msgs"] += 1
+                          e["kinds"][kind] += 1
+                          if ts > e["last_ts"]:
+                              e["last_ts"] = ts
                   r["scanned"] = n
                   roster = sorted(agg.items(), key=lambda kv: kv[1]["last_ts"], reverse=True)
                   r["roster"] = {k: {"msgs": v["msgs"], "last_ts": v["last_ts"],
@@ -174,8 +181,10 @@ jobs:
                   probe_id = uuid.uuid4().hex[:12]
                   reply_sub = f"dharma.a2a.fleet.reply.{probe_id}"
                   replies = []
+                  async def on_reply(msg):
+                      replies.append(msg.subject)
                   try:
-                      sub = await nc.subscribe(reply_sub, cb=lambda msg: replies.append(msg.subject))
+                      sub = await nc.subscribe(reply_sub, cb=on_reply)
                   except Exception as exc:
                       r["reply_listen"] = f"denied: {exc}"
                       sub = None
