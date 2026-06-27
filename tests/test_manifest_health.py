@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from dharma_swarm.manifest_health import (
+    _check_api_endpoint_registered,
     _check_api_router_registered,
     _check_dashboard_route_exists,
     _check_module_file_exists,
@@ -68,6 +69,53 @@ class TestHealthChecks:
         entity = {"api_dependencies": ["/api/nonexistent_xyz"]}
         passed, evidence = _check_api_router_registered(entity, manifest)
         assert passed is False
+
+    def test_api_endpoint_registered_for_real_route(self) -> None:
+        manifest = load_manifest()
+        entity = {"api_dependencies": ["/api/operator-coherence/report"]}
+        passed, evidence = _check_api_endpoint_registered(entity, manifest)
+        assert passed is True, evidence
+
+    def test_api_endpoint_unregistered_under_valid_prefix(self) -> None:
+        # The prefix /api/operator-coherence IS registered, but /nope is not a
+        # real route — endpoint-level validation must catch what prefix-level misses.
+        manifest = load_manifest()
+        entity = {"api_dependencies": ["/api/operator-coherence/nope"]}
+        prefix_passed, _ = _check_api_router_registered(entity, manifest)
+        endpoint_passed, evidence = _check_api_endpoint_registered(entity, manifest)
+        assert prefix_passed is True  # prefix-level is fooled
+        assert endpoint_passed is False, evidence  # endpoint-level is not
+
+    def test_api_endpoint_checks_mounted_app_routes(self) -> None:
+        # The module-local router can define the endpoint, but health must prove
+        # the route is mounted on api.main.app.
+        manifest = load_manifest()
+        entity = {"api_dependencies": ["/api/operator-coherence/report"]}
+        with patch("dharma_swarm.manifest_health._mounted_api_route_paths", return_value=[]):
+            passed, evidence = _check_api_endpoint_registered(entity, manifest)
+        assert passed is False
+        assert "mounted app route" in evidence
+
+
+class TestCockpitSurfaceContract:
+    def test_cockpit_surface_depends_on_operator_coherence(self) -> None:
+        manifest = load_manifest()
+        surfaces = {s["id"]: s for s in manifest.get("dashboard_surfaces", [])}
+        cockpit = surfaces["cockpit"]
+        assert cockpit["api_dependencies"] == ["/api/operator-coherence/report"]
+        assert "api_endpoint_registered" in cockpit["health_check_ids"]
+        assert not any(
+            "control-surface" in dep for dep in cockpit["api_dependencies"]
+        )
+
+    def test_control_surface_entry_untouched(self) -> None:
+        manifest = load_manifest()
+        surfaces = {s["id"]: s for s in manifest.get("dashboard_surfaces", [])}
+        cs = surfaces["control_surface"]
+        assert cs["api_dependencies"] == [
+            "/api/control-surface/summary",
+            "/api/control-surface/rows",
+        ]
 
     def test_module_file_exists(self) -> None:
         entity = {"module": "dharma_swarm/swarm.py"}
