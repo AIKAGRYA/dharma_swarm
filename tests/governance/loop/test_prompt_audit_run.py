@@ -359,12 +359,12 @@ def test_get_backend_stub_via_env():
             os.environ["LOOP_AGENT_BACKEND"] = old
 
 
-def test_get_backend_unimplemented_raises():
-    """get_backend() with an unimplemented backend raises a clear error (M2 backends)."""
+def test_get_backend_unknown_raises():
+    """get_backend() with an unknown backend raises a clear error."""
     from scripts.governance.loop.agent_backend import get_backend
 
     old = os.environ.get("LOOP_AGENT_BACKEND")
-    os.environ["LOOP_AGENT_BACKEND"] = "droid"
+    os.environ["LOOP_AGENT_BACKEND"] = "unknown-backend"
     try:
         with pytest.raises((ValueError, NotImplementedError)):
             get_backend()

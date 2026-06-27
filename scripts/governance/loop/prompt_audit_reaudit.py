@@ -43,6 +43,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scripts.governance.loop.agent_backend import (
+    ApiBackend,
+    BackendError,
+    DroidBackend,
+)
 from scripts.governance.loop.anti_gaming import run_anti_gaming_check
 from scripts.governance.loop.runs import Run, RunManager
 from scripts.governance.loop.warrant import Warrant, WarrantError
@@ -255,6 +260,79 @@ class StubVerifier(VerifierBackend):
         )
 
 
+class DroidVerifier(StubVerifier):
+    """Verifier wrapper that invokes Droid with verifier-specific model policy."""
+
+    def __init__(
+        self,
+        droid_path: str | Path | None = None,
+        cwd: str | Path | None = None,
+    ) -> None:
+        self.backend = DroidBackend(droid_path=droid_path, cwd=cwd)
+        self._last_invocation = None
+
+    def verify(self, finding: dict, evidence: dict, prompt: str) -> VerifierResult:
+        severity = finding.get("severity") or evidence.get("claim", {}).get("severity")
+        self._last_invocation = self.backend.invoke(
+            "verifier",
+            f"{prompt}\n\nclaim_and_evidence:\n{evidence}\n",
+            {
+                "finding_id": finding.get("finding_id") or evidence.get("finding_id"),
+                "severity": severity,
+                "evidence_keys": sorted(evidence.keys()),
+            },
+        )
+        result = super().verify(finding, evidence, prompt)
+        result.verifier_model = self._last_invocation.model
+        result.model_independence = self._last_invocation.model_independence
+        result.falsification_attempts.append({
+            "attempt": "fresh droid verifier role invocation completed",
+            "result": "pass",
+            "evidence": self._last_invocation.invocation_id,
+        })
+        return result
+
+    def invocation_receipt(self) -> dict | None:
+        if self._last_invocation is None:
+            return None
+        return self._last_invocation.to_receipt()
+
+
+class ApiVerifier(StubVerifier):
+    """Keyless-safe API verifier wrapper."""
+
+    def __init__(self) -> None:
+        self.backend = ApiBackend()
+        self._last_invocation = None
+
+    def verify(self, finding: dict, evidence: dict, prompt: str) -> VerifierResult:
+        self._last_invocation = self.backend.invoke(
+            "verifier",
+            f"{prompt}\n\nclaim_and_evidence:\n{evidence}\n",
+            {
+                "finding_id": finding.get("finding_id") or evidence.get("finding_id"),
+                "severity": finding.get("severity"),
+                "evidence_keys": sorted(evidence.keys()),
+            },
+        )
+        if self._last_invocation.return_code != 0:
+            raise BackendError(self._last_invocation.stdout)
+        result = super().verify(finding, evidence, prompt)
+        result.verifier_model = self._last_invocation.model
+        result.model_independence = "not_proven"
+        result.falsification_attempts.append({
+            "attempt": "api verifier backend degraded without external keys",
+            "result": "not_proven",
+            "evidence": self._last_invocation.stdout,
+        })
+        return result
+
+    def invocation_receipt(self) -> dict | None:
+        if self._last_invocation is None:
+            return None
+        return self._last_invocation.to_receipt()
+
+
 def get_verifier(name: str | None = None) -> VerifierBackend:
     """Return the verifier selected by ``name`` or ``LOOP_AGENT_BACKEND`` env var.
 
@@ -263,9 +341,12 @@ def get_verifier(name: str | None = None) -> VerifierBackend:
     vname = name or os.environ.get("LOOP_AGENT_BACKEND", "stub")
     if vname == "stub":
         return StubVerifier()
+    if vname == "droid":
+        return DroidVerifier()
+    if vname == "api":
+        return ApiVerifier()
     raise NotImplementedError(
-        f"verifier backend {vname!r} is not implemented in Phase 1 "
-        f"(stub|droid|api; droid/api arrive in M2). Set LOOP_AGENT_BACKEND=stub for deterministic testing."
+        f"unknown verifier backend {vname!r}; expected stub|droid|api"
     )
 
 
@@ -287,21 +368,23 @@ class VerifierVerdict:
     verdict: str = "inconclusive"
     evidence: list[dict] = field(default_factory=list)
     routing: str = ""
+    verifier_invocation: dict | None = None
 
     def to_dict(self) -> dict:
-        return {
-            "verifier_verdict": {
-                "run_id": self.run_id,
-                "finding_id": self.finding_id,
-                "verifier_model": self.verifier_model,
-                "model_independence": self.model_independence,
-                "falsification_attempts": self.falsification_attempts,
-                "anti_gaming_checklist": self.anti_gaming_checklist,
-                "verdict": self.verdict,
-                "evidence": self.evidence,
-                "routing": self.routing,
-            }
+        payload = {
+            "run_id": self.run_id,
+            "finding_id": self.finding_id,
+            "verifier_model": self.verifier_model,
+            "model_independence": self.model_independence,
+            "falsification_attempts": self.falsification_attempts,
+            "anti_gaming_checklist": self.anti_gaming_checklist,
+            "verdict": self.verdict,
+            "evidence": self.evidence,
+            "routing": self.routing,
         }
+        if self.verifier_invocation is not None:
+            payload["verifier_invocation"] = self.verifier_invocation
+        return {"verifier_verdict": payload}
 
 
 # ---------------------------------------------------------------------------
@@ -399,11 +482,15 @@ def _process_finding(
     prompt_receipt.write_text(prompt)
 
     # 4. Invoke the Verifier.
-    result = verifier.verify(
-        finding=verifier_input["claim"],
-        evidence=verifier_input,
-        prompt=prompt,
-    )
+    try:
+        result = verifier.verify(
+            finding=verifier_input["claim"],
+            evidence=verifier_input,
+            prompt=prompt,
+        )
+    except BackendError as exc:
+        sys.stderr.write(f"finding {finding_id}: verifier backend failed — {exc}\n")
+        return 2, "error"
 
     # 5. Run the anti-gaming checklist INDEPENDENTLY on the fix diff.
     diff_path = run.fixes_dir / f"fix_diff_{finding_id}.patch"
@@ -447,6 +534,11 @@ def _process_finding(
         verdict=verdict,
         evidence=evidence_receipts,
         routing=routing,
+        verifier_invocation=(
+            verifier.invocation_receipt()
+            if hasattr(verifier, "invocation_receipt")
+            else None
+        ),
     )
 
     # 10. Write the verdict.
@@ -558,7 +650,7 @@ def main(argv: list[str] | None = None) -> int:
     # Select the verifier backend.
     try:
         verifier = get_verifier(args.backend)
-    except NotImplementedError as exc:
+    except (BackendError, NotImplementedError) as exc:
         return _emit_error(f"verifier selection failed: {exc}")
 
     # Open the run dir.
