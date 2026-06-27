@@ -922,6 +922,9 @@ def render_idea_spark_ingest_health() -> None:
         root = state_dir / "meta" / "idea_spark"
         if not root.exists():
             print("  Receipts      : none yet (no operator idea spark ingest captured)")
+            print("  Root          : missing " + str(root))
+            print("  Front door    : python -m dharma_swarm.idea_spark.cli ingest --text '<note>'")
+            print("  Health check  : python -m dharma_swarm.idea_spark.cli health --json")
             print("  Promotion     : gate-only (chetana.promote); never bulk-promoted")
             print("  Authority     : read-only; counts append-only receipts, executes nothing")
             return
@@ -957,9 +960,12 @@ def render_idea_spark_ingest_health() -> None:
                 implemented += 1
         completion = round(implemented / total, 3) if total else 0.0
 
+        print(f"  Root          : {root}")
         print(f"  Input receipts: {input_receipts}")
         print(f"  Candidates    : {len(candidate_ids)}")
         print(f"  Lifecycle     : {total} (implemented {implemented}, completion {completion})")
+        print("  Front door    : python -m dharma_swarm.idea_spark.cli ingest --text '<note>'")
+        print("  Health check  : python -m dharma_swarm.idea_spark.cli health --json")
         print("  Promotion     : gate-only (chetana.promote); never bulk-promoted")
         print("  Authority     : read-only; counts append-only receipts, executes nothing")
     except Exception as exc:  # never break the exit-0 onboard contract
