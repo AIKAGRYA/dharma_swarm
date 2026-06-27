@@ -89,6 +89,15 @@ Full breakdown: `03_MATURITY_AND_ROADMAP.md`.
   minting invariant.
 - **`03_MATURITY_AND_ROADMAP.md`** — 0–100 component scoring and the staged path
   to a first verifiable external receipt, then a first paying buyer.
+- **`04_LANDSCAPE_MAP.md`** — the field mapped: ~90 actors across 8 clusters
+  (authors, standards, integrity, MRV/nature-tech, finance, NGOs, AI-for-nature,
+  market operators), each with its blind spot. From a 7-lane parallel research scan.
+- **`05_INVARIANTS_AND_BRIDGE.md`** — **the centerpiece.** The twelve cross-cluster
+  invariants, the one diagnosis under all of them (the field is a textbook failure
+  of the three Transcendence conditions — diverse competence, but no error
+  decorrelation and no quality aggregation), and the bridge: decorrelated
+  aggregation + a provenance/commensurability ledger + the welfare unit, with an
+  honest fence around what we are *not*.
 
 ---
 
