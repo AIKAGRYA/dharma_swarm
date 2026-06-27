@@ -39,6 +39,22 @@ new angles added below.
 
 _(backlog markers below are historical; all are now ✅.)_
 
+## v0.1.0 — TOP PRIORITY: the runner (from adversarial review)
+
+An external reviewer ran 5 prompts and found the cardinal sin: 2 of 5 demos didn't
+reproduce (complexity used a homemade proxy instead of the named `radon`; the cycle
+"shipped→0" was true only on an unmerged branch; the flagship overstated ratchet
+coverage 4→2 and mixed scopes). **Fixed in v0.0.2** of those three prompts, and a
+**runner** shipped (`runner/slop_probe.py`) so demos are executable, not prose.
+
+- ▶ **runner: a script per prompt** — extend `slop_probe.py` to every prompt that
+  names a tool; **regenerate every Demonstration run from runner output** so "trust
+  the markdown" becomes "run it yourself." The single highest-leverage fix.
+- ◻ **advisory-DB provenance** — pin advisory IDs + snapshot date in security/dep demos.
+- ◻ **CI wiring** — wire the runner's RED exits into a check.
+- ◻ **confidence rubric** — define HIGH/MEDIUM/LOW instead of a vibe knob.
+- ◻ **clean-repo + non-Python/JS demos** — prove return-clean & portability off this repo.
+
 ## v0.1.0 — proposed angles (operator greenlight before building)
 
 Genuine future angles, each with a real invariant + lineage + a runnable demo on

@@ -1,6 +1,6 @@
 ---
 id: circular-dependency-triage
-version: 0.0.1
+version: 0.0.2
 theme: 02-module-topology
 status: tested
 invariant: >
@@ -110,29 +110,36 @@ custodians ↔ foreman` — 0 load-time edges) — **already mitigated; do not
 refactor.** A heuristic prompt nags about all 12; the disciplined one says *one*
 is real.
 
-### Minimum break (and it landed)
+### Minimum break (proposed on a branch — NOT yet on mainline)
 Make the package's provider re-exports lazy (PEP 562 `__getattr__` in
 `__init__.py`), so importing the package no longer drags the provider/router
-graph into init time. One file, public API unchanged. **Shipped** on
-`claude/fix-provider-router-import-cycle`; re-running pass 2 after the fix:
-**0 load-time cycles — the load-time import graph is now a DAG.**
+graph into init time. One file, public API unchanged. The fix is **proposed on
+`claude/fix-provider-router-import-cycle`** (PR #712); checked out there, pass 2
+reaches **0 load-time cycles**.
+
+> **Correction (v0.0.2).** v0.0.1 said the fix "shipped" and the graph "is now a
+> DAG." That is true **only on the unmerged fix branch**. On `main` and on this
+> library branch the fix is **not present** — `router_v1.py:16` still has the eager
+> `from dharma_swarm import model_pool` back-edge and `__init__.py:5–6` still imports
+> providers eagerly, so **mainline still has 1 load-time cycle**. An adversarial
+> reviewer caught the overclaim. Status: *proposed + verified-on-branch, unmerged.*
 
 ### Verdict
-Full graph: not a DAG (12 SCCs). Genuine boot risk: **1** (provider/router core),
-now fixed and verified to 0. The other 11 are lazy-mitigated and were correctly
-left alone. The lesson the prompt enforces — *rank by when the cycle resolves,
-not by how big it looks* — is the exact thing its own first draft got wrong, and
-the rigorous load-time pass caught it.
+Full graph: not a DAG (12 SCCs). Genuine boot risk: **1** (provider/router core) —
+mainline **still 1**; a one-file fix is proposed on PR #712 (verified → 0 there,
+unmerged). The other 11 are lazy-mitigated and were correctly left alone. The lesson
+the prompt enforces — *rank by when the cycle resolves, not by how big it looks* —
+is the exact thing its own first draft got wrong, and the rigorous load-time pass
+caught it (as a *second* adversarial reviewer later caught the overclaimed "shipped").
 
 ## Changelog
 
-- **v0.0.1** (2026-06-25) — initial rewrite of a kit's circular-dependency prompt.
-  Replaced "read the import lines" with AST-graph + Tarjan SCC; added the
-  load-time-vs-lazy classification as the primary ranking axis; mandated
-  minimum-feedback-edge break points at `file:line`; required leaving fully-lazy
-  (already-mitigated) cycles alone; added return-clean. Tested against
-  `dharma_swarm/`: full graph has 12 SCCs but a rigorous load-time-only pass
-  (`TYPE_CHECKING` excluded) found **exactly 1** genuine load-time cycle
-  (provider/router core) — the other 11 close via lazy imports. The fix shipped
-  and re-running the pass confirms 0 load-time cycles. (The demo also records the
-  author's own first-draft slip — ranking SCCs by size — as the cautionary case.)
+- **v0.0.2** (2026-06-27) — **correction after adversarial review.** v0.0.1 claimed
+  the fix "shipped" and the load-time graph "is now a DAG." True only on the *unmerged*
+  fix branch (PR #712); **mainline still has 1 load-time cycle.** Corrected to
+  "proposed + verified-on-branch, unmerged." The Tarjan analysis itself reproduced
+  exactly (12 SCCs; 1 load-time) — only the deploy-state claim was overstated.
+- **v0.0.1** (2026-06-25) — rewrite of a kit's prompt: AST-graph + Tarjan SCC;
+  load-time-vs-lazy ranking; minimum-feedback-edge breaks; leave fully-lazy cycles
+  alone; return-clean. 12 SCCs / exactly 1 load-time cycle. *(Records the author's
+  own first-draft slip — ranking SCCs by size — as a cautionary case.)*
