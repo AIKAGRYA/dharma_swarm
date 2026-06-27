@@ -64,7 +64,7 @@ is shipped so demos are run, not trusted.
   `dead_code` routed to `vulture`.)
 - ◻ **advisory-DB provenance** — pin advisory IDs + snapshot date in security/dep demos.
 - ◻ **CI wiring** — wire the runner's RED exits into a check.
-- ◻ **clean-repo + non-Python/JS demos** — prove return-clean & portability off this repo.
+- ✓ **clean-repo + non-Python/JS demos** — SHIPPED (v0.1.1, `26-portability/`): a clean Python repo grades CLEAN (RED0/AMBER0/GREEN13); ripgrep (99 `.rs`, 0 `.py`) gets honest UNASSESSED on all 10 Python-AST signals while god-objects (line count) and churn/co-change (git) travel. Includes a before/after showing the pre-fix runner called a 7,779-line Rust file "clean." Two return-clean fixes: `coupling`/`broad_catches` can now grade GREEN, not pinned at AMBER.
 
 ## v0.1.0 — proposed angles (operator greenlight before building)
 

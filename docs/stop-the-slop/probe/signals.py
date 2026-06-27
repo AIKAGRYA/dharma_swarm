@@ -13,11 +13,37 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from _common import (
-    Confidence, Grade, SignalResult, git, iter_py_files, parse, run_json, tool_path,
+    SOURCE_EXTS, Confidence, Grade, SignalResult, git, iter_py_files,
+    iter_source_files, parse, run_json, tool_path,
 )
+
+# Source extensions whose stems we treat as "code files" for language-agnostic
+# signals (god objects by line count, co-change coupling). Excludes header-only
+# and markup so the denominator stays meaningful.
+_CODE_EXTS = tuple(sorted(set(SOURCE_EXTS)))
+
+
+def _no_python(root: Path, signal: str, confirm_with: str, instrument: str) -> SignalResult:
+    """Uniform UNASSESSED for a Python-AST signal pointed at a tree with no .py
+    sources. The distinction from GREEN is the whole point: GREEN means the
+    instrument ran and found nothing; UNASSESSED means the instrument could not
+    run here at all. A Python-AST probe must never report a Go/Rust repo as
+    'clean' — that would be manufacturing the exact false verdict the library
+    exists to prevent."""
+    return SignalResult(
+        signal=signal,
+        measured="UNASSESSED (no .py sources at this path)",
+        grade=Grade.UNASSESSED, confidence=Confidence.UNASSESSED,
+        confirm_with=confirm_with,
+        scope=f"{root}/ (0 Python files; this instrument is Python-only)",
+        pressure=0.0,
+        instrument=instrument,
+    )
+
 
 GOD_OBJECT_LINES = 3000        # Parnas/SRP: a module with one reason to change stays small
 COMPLEXITY_THRESHOLD = 20      # McCabe: above this a function is a test-coverage liability
+COUPLING_HOTSPOT = 8           # Martin: below this max fan-in there is no coupling hotspot
 
 # Set by the CLI (--online). Hermetic by default: an offline run must never
 # *claim* a phantom verdict it can only confirm against a live index.
@@ -37,8 +63,21 @@ _IMPORT_DIST_ALIASES = {
 # 1. God objects (Parnas / SRP) — AST line count, HIGH confidence.
 # --------------------------------------------------------------------------- #
 def god_objects(root: Path) -> SignalResult:
+    # Language-agnostic: a 3000-line file is a god object in Python, Go, or Rust
+    # alike. Route over every source language present, not just .py — this is one
+    # of the few signals whose instrument (line count) genuinely travels.
+    files = iter_source_files(root)
+    if not files:
+        return SignalResult(
+            signal="God objects",
+            measured="UNASSESSED (no source files at this path)",
+            grade=Grade.UNASSESSED, confidence=Confidence.UNASSESSED,
+            confirm_with="point the probe at a source tree",
+            scope=f"{root}/ (0 recognized source files)",
+            pressure=0.0, instrument="line-count",
+        )
     sizes = []
-    for f in iter_py_files(root):
+    for f in files:
         try:
             n = sum(1 for _ in f.open("r", encoding="utf-8", errors="replace"))
         except OSError:
@@ -46,15 +85,16 @@ def god_objects(root: Path) -> SignalResult:
         sizes.append((n, f))
     big = sorted((s for s in sizes if s[0] >= GOD_OBJECT_LINES), reverse=True)
     worst = big[0][0] if big else 0
+    langs = sorted({f.suffix for _, f in sizes})
     grade = Grade.RED if len(big) >= 3 else Grade.AMBER if big else Grade.GREEN
     return SignalResult(
         signal="God objects",
-        measured=f"{len(big)} modules \u2265{GOD_OBJECT_LINES} ln" + (f" (max {worst:,})" if big else ""),
+        measured=f"{len(big)} files \u2265{GOD_OBJECT_LINES} ln" + (f" (max {worst:,})" if big else ""),
         grade=grade, confidence=Confidence.HIGH,
         confirm_with="wc -l on the listed files",
-        scope=f"{root}/ (.py, deps excluded)",
+        scope=f"{root}/ ({len(sizes):,} source files [{', '.join(langs)}], deps excluded)",
         pressure=min(1.0, len(big) / 8),
-        instrument="AST/line-count",
+        instrument="line-count (language-agnostic)",
         detail=[f"{n:>6}  {f.relative_to(root)}" for n, f in big[:8]],
     )
 
@@ -63,6 +103,10 @@ def god_objects(root: Path) -> SignalResult:
 # 2. Complexity inflation (McCabe) — route to radon; refuse to proxy silently.
 # --------------------------------------------------------------------------- #
 def complexity(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Complexity inflation",
+                          "gocyclo (Go) / rust-code-analysis (Rust) / lizard (multi-lang)",
+                          "radon is Python-only — not run")
     radon = tool_path("radon")
     if radon:
         data = run_json([radon, "cc", "-s", "-j", str(root)])
@@ -133,6 +177,9 @@ def _ast_branch_counts(root: Path):
 # 3. Wildcard imports (Parnas — explicit interfaces) — AST, HIGH, return-clean.
 # --------------------------------------------------------------------------- #
 def wildcard_imports(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Wildcard imports",
+                          "language-specific import linter", "AST is Python-only — not run")
     hits = []
     for f in iter_py_files(root):
         tree = parse(f)
@@ -182,6 +229,9 @@ def _except_stats(root: Path):
 
 
 def silent_swallows(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Silent swallows",
+                          "language-specific error-handling lint", "AST is Python-only — not run")
     silent, _broad, locs, _ = _except_stats(root)
     return SignalResult(
         signal="Silent swallows",
@@ -197,11 +247,17 @@ def silent_swallows(root: Path) -> SignalResult:
 
 
 def broad_catches(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Broad catches",
+                          "language-specific error-handling lint", "AST is Python-only — not run")
     _silent, broad, _, locs = _except_stats(root)
     return SignalResult(
         signal="Broad catches",
         measured=f"{broad} (except Exception/bare)",
-        grade=Grade.AMBER,   # broad-but-logged is legitimate; this needs review, not auto-RED
+        # zero broad catches is genuinely clean (return-clean); any present are
+        # AMBER not RED, because broad-but-logged-and-re-raised is legitimate and
+        # needs review, not an auto-fail.
+        grade=Grade.GREEN if broad == 0 else Grade.AMBER,
         confidence=Confidence.HIGH,
         confirm_with="review each for log + re-raise vs swallow",
         scope=f"{root}/",
@@ -215,6 +271,10 @@ def broad_catches(root: Path) -> SignalResult:
 # 6. Coupling hotspots (Parnas / Martin instability) — static import graph.
 # --------------------------------------------------------------------------- #
 def coupling(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Coupling",
+                          "language-specific import graph (e.g. go list, cargo-modules)",
+                          "AST import graph is Python-only — not run")
     pkg = root.name
     fan_out: dict[str, set[str]] = defaultdict(set)
     fan_in: Counter = Counter()
@@ -239,13 +299,20 @@ def coupling(root: Path) -> SignalResult:
                 fan_in[target] += 1
     top_in = fan_in.most_common(1)
     top_out = max(((len(v), k) for k, v in fan_out.items()), default=(0, ""))
-    measured = (f"max fan-in {top_in[0][1] if top_in else 0} "
+    max_in = top_in[0][1] if top_in else 0
+    measured = (f"max fan-in {max_in} "
                 f"({top_in[0][0].split('.')[-1] if top_in else '-'}); "
                 f"max fan-out {top_out[0]} ({top_out[1].split('.')[-1]})")
+    # GREEN floor: a module set with no coupling hotspot is genuinely clean on
+    # this axis — coupling must be allowed to return clean, not pinned at AMBER
+    # forever (a signal that can never say GREEN is the "always finds something"
+    # smell this library exists to kill). The ceiling stays AMBER, never RED:
+    # static fan-in is a lead to confirm with a real import graph, not a verdict.
+    grade = Grade.GREEN if max_in < COUPLING_HOTSPOT else Grade.AMBER
     return SignalResult(
         signal="Coupling",
         measured=measured,
-        grade=Grade.AMBER,
+        grade=grade,
         confidence=Confidence.MEDIUM,   # static imports only; dynamic wiring invisible
         confirm_with="grimp / pydeps import graph",
         scope=f"intra-{pkg} import edges (static)",
@@ -259,6 +326,10 @@ def coupling(root: Path) -> SignalResult:
 # 7. Dead code (Aho–Sethi–Ullman reachability) — vulture if present, else honest.
 # --------------------------------------------------------------------------- #
 def dead_code(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Dead code",
+                          "language-specific dead-code analysis (e.g. staticcheck, cargo-udeps)",
+                          "vulture is Python-only — not run")
     vulture = tool_path("vulture")
     if vulture:
         import subprocess
@@ -446,6 +517,10 @@ def _tarjan(edges: dict[str, set[str]]) -> list[list[str]]:
 
 
 def cycles(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Import cycles",
+                          "language-specific cycle check (go vet, cargo-modules)",
+                          "AST import graph + Tarjan is Python-only — not run")
     load, alle = _import_edges(root)
     scc_all = _tarjan(alle)
     scc_load = _tarjan(load)
@@ -500,6 +575,10 @@ def _func_body_key(node: ast.AST) -> tuple[str, int] | None:
 
 
 def duplication(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Duplication",
+                          "jscpd / pmd-cpd (multi-language token clone detectors)",
+                          "AST body-hashing is Python-only — not run")
     import hashlib
     # hash -> list of (qualname, file:line)
     clusters: dict[str, list[str]] = defaultdict(list)
@@ -547,6 +626,10 @@ def duplication(root: Path) -> SignalResult:
 #   to the stdlib or an installed distribution? Unresolved = audit-before-install.
 # --------------------------------------------------------------------------- #
 def phantom_deps(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Phantom deps",
+                          "language-specific dependency resolver (e.g. cargo, go mod)",
+                          "Python import resolution is Python-only — not run")
     import importlib.metadata as im
     # Build the set of importable top-level names provided by installed dists.
     provided: set[str] = set(sys.stdlib_module_names)
@@ -661,7 +744,9 @@ def change_coupling(root: Path, window: int = 400, min_support: int = 8) -> Sign
             if cur:
                 commits.append(cur)
             cur = []
-        elif ln.strip().endswith(".py"):
+        elif ln.strip().endswith(_CODE_EXTS):
+            # language-agnostic: co-change coupling is a property of git history,
+            # not of any one language. Route over every source extension present.
             cur.append(ln.strip())
     if cur:
         commits.append(cur)
@@ -702,6 +787,10 @@ def change_coupling(root: Path, window: int = 400, min_support: int = 8) -> Sign
 #   Proxy is explicit (LOW): comment-to-code ratio + obvious restatement regex.
 # --------------------------------------------------------------------------- #
 def narrative_comments(root: Path) -> SignalResult:
+    if not iter_py_files(root):
+        return _no_python(root, "Narrative comments",
+                          "language-aware comment analysis",
+                          "#-comment regex is Python-only — not run")
     restate = 0
     total_comments = 0
     locs = []

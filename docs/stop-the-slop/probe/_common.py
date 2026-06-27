@@ -100,6 +100,36 @@ def iter_py_files(root: Path, excludes: tuple[str, ...] = _DEFAULT_EXCLUDES) -> 
     return out
 
 
+# Language-agnostic source extensions. Used by the signals whose instrument does
+# not depend on a Python AST (a 3000-line file is a god object in any language;
+# co-change coupling is a property of git history, not syntax). Python-AST
+# signals deliberately do NOT use this set — they return UNASSESSED rather than
+# pretend to read a language they cannot parse.
+SOURCE_EXTS = (
+    ".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+    ".go", ".rs", ".java", ".kt", ".kts", ".rb", ".php", ".cs",
+    ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".m", ".mm",
+    ".swift", ".scala", ".clj", ".ex", ".exs",
+)
+
+
+def iter_source_files(
+    root: Path,
+    exts: tuple[str, ...] = SOURCE_EXTS,
+    excludes: tuple[str, ...] = _DEFAULT_EXCLUDES,
+) -> list[Path]:
+    extset = {e.lower() for e in exts}
+    excl = set(excludes)
+    out: list[Path] = []
+    for p in root.rglob("*"):
+        if p.suffix.lower() not in extset or not p.is_file():
+            continue
+        if set(p.parts) & excl:
+            continue
+        out.append(p)
+    return out
+
+
 def parse(path: Path) -> ast.AST | None:
     try:
         return ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=str(path))

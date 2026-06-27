@@ -148,6 +148,41 @@ def test_duplication_returns_clean_then_detects_clone():
         assert dirty.pressure >= clean.pressure           # planted clone raises pressure
 
 
+def test_python_signals_unassessed_on_non_python_tree():
+    """The integrity invariant: a Python-AST signal pointed at a tree with no .py
+    sources must return UNASSESSED, never a false-GREEN 'clean' verdict on a
+    language it cannot parse."""
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "rustish"
+        pkg.mkdir()
+        _write(pkg, "main.rs", "fn main() {\n    println!(\"hi\");\n}\n")
+        _write(pkg, "lib.rs", "pub fn add(a: i32, b: i32) -> i32 { a + b }\n")
+        for sig in (S.complexity, S.wildcard_imports, S.silent_swallows,
+                    S.broad_catches, S.coupling, S.dead_code, S.duplication,
+                    S.cycles, S.phantom_deps, S.narrative_comments):
+            r = sig(pkg)
+            assert r.grade is Grade.UNASSESSED, f"{sig.__name__} must abstain, got {r.grade}"
+            assert r.confidence is Confidence.UNASSESSED
+            assert r.pressure == 0.0  # an abstention must never drive the composite
+
+
+def test_god_objects_travels_to_other_languages():
+    """Line count is language-agnostic: a huge .rs file is a god object too, and a
+    tree with no recognized source at all is UNASSESSED, not GREEN."""
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "rustish"
+        pkg.mkdir()
+        _write(pkg, "huge.rs", "// big\n" + ("let _x = 0;\n" * 3200))
+        r = S.god_objects(pkg)
+        assert r.grade in (Grade.AMBER, Grade.RED)   # found the oversized .rs file
+        assert "language-agnostic" in r.instrument
+        assert ".rs" in r.scope
+        empty = Path(t) / "empty"
+        empty.mkdir()
+        (empty / "notes.txt").write_text("not source\n", encoding="utf-8")
+        assert S.god_objects(empty).grade is Grade.UNASSESSED
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

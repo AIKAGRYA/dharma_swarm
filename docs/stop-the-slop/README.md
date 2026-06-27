@@ -13,11 +13,22 @@ Slop."** Soul-name: **Pramāṇa Probe.**
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
 
-> **Status: v0.1.0 — 52 prompts across 25 themes + the flagship, now with an
-> EXECUTABLE RUNNER.** Every demo is regenerated from `probe/` (route-to-tool,
-> return-clean, honest confidence), not hand-written prose. Backlog/angles in
-> `ROADMAP.md`; landscape in `SOURCES.md`; lineage canon in `FOUNDATIONS.md`;
-> pricing/tiers in `PRODUCTIZATION.md`.
+> **Status: v0.1.1 — 52 prompts across 25 themes + the flagship, now with an
+> EXECUTABLE RUNNER and a cross-language portability proof.** Every demo is
+> regenerated from `probe/` (route-to-tool, return-clean, honest confidence),
+> not hand-written prose. Backlog/angles in `ROADMAP.md`; landscape in
+> `SOURCES.md`; lineage canon in `FOUNDATIONS.md`; pricing/tiers in
+> `PRODUCTIZATION.md`.
+>
+> **What's new in v0.1.1 (portability):** the runner now proves it travels.
+> Language-agnostic signals (god objects by line count, churn/co-change by git)
+> run on any language; Python-AST signals return **UNASSESSED** — never a
+> false-GREEN — on a tree they can't parse. Demos: `26-portability/`
+> (`clean-repo-proof.md` → a clean repo grades CLEAN; `rust-portability-demo.md`
+> → ripgrep gets honest UNASSESSED, with a before/after that catches the old
+> runner calling a 7,779-line Rust file "clean"). Two return-clean fixes:
+> `coupling` and `broad_catches` can now grade GREEN instead of being pinned at
+> AMBER forever.
 >
 > **What's new in v0.1.0:** (1) `probe/` runner — each signal routes to its real
 > instrument (radon, npm/pip audit, git log, AST, PyPI) and emits its own honest

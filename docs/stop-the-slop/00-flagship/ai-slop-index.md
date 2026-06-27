@@ -73,7 +73,7 @@ sums signals over **one** denominator — no per-package/whole-repo mixing.
 
 | Signal | Measured | Grade | Confidence | Confirm with |
 |---|---|---|---|---|
-| God objects | **8** modules ≥3000 ln (max **5,255** `thinkodynamic_director.py`) | 🔴 RED | HIGH | `wc -l` on the listed files |
+| God objects | **8** files ≥3000 ln (max **5,255** `thinkodynamic_director.py`) | 🔴 RED | HIGH | `wc -l` on the listed files |
 | Complexity inflation | **227** fns cc>20; worst **cc=231** (`main` @ `dgc_cli.py:1303`) | 🔴 RED | HIGH | `radon cc -n D` |
 | Import cycles | **1** load-time cyclic SCC; **11** total; largest load-time = 3 modules | 🔴 RED | HIGH | `grimp` / `import-linter` contract |
 | Wildcard imports | **0** | 🟢 GREEN | HIGH | `grep -rn 'import \*'` |
