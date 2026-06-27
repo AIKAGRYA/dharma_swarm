@@ -1,6 +1,6 @@
 ---
 id: dead-code-scan
-version: 0.0.1
+version: 0.1.0
 theme: 09-dead-code-and-reachability
 status: tested
 invariant: >
@@ -64,30 +64,59 @@ isn't fully known statically, so confidence must be graded, not asserted.
 
 ## Demonstration run
 
-**Target:** `dharma_swarm/` (784 internal modules), 2026-06-25. Tool: AST
-import-reachability (no `vulture` installed).
+**Target:** `dharma_swarm/`, 2026-06-27. **Runner-generated** (not hand-transcribed)
+— `python docs/stop-the-slop/probe/probe.py dead_code dharma_swarm`. The `dead_code`
+signal **routes to the real tool** (`vulture`, now installed) and refuses to proxy:
+if `vulture` is absent it returns UNASSESSED rather than guessing.
 
-- **181 candidate orphan modules** (imported by no other module, entry points
-  excluded) of 784 — e.g. `a2a.node_gateway`, `api`, `auto_grade.*`,
-  `api_key_audit`, `auditor`.
-- **Confidence is capped at MEDIUM for almost all of them**, and the analyzer says
-  so up front: this repo resolves modules **dynamically** — CLI subcommand
-  discovery, the orchestrator/agent registries, MCP tool loading, and API routers
-  are imported by string, not by a static `import`. So "no static importer" ≠
-  "dead." `api`, `node_gateway`, and the `auto_grade.*` graders are almost
-  certainly framework/registry-loaded → **LOW (contract — keep)**.
-- **Honest output:** a *review checklist*, not a delete list — 181 candidates, each
-  graded, with the dynamic-loading caveat stated, and API/registry/CLI files marked
-  LOW. The recommended next probe for the genuine HIGH candidates: `grep` for the
-  symbol name as a **string** before touching it.
+```
+| Dead code | 36 items (vulture ≥80%) | AMBER | MEDIUM | vulture + string-ref grep before delete |
+  archaeology_ingestion.py:414: unused variable 'max_hits' (100% confidence)
+  chetana/revival.py:451:        unused variable 'own_body'  (100% confidence)
+  dynamic_correction.py:262:     unused variable 'current_mission' (100% confidence)
+  file_lock.py:164: unused variable 'exc_type' (100% confidence)
+  file_lock.py:165: unused variable 'exc_val'  (100% confidence)
+  file_lock.py:166: unused variable 'exc_tb'   (100% confidence)
+```
 
-A naive tool would print "181 dead modules — delete." This one prints "181
-candidates, mostly MEDIUM because your loader is dynamic; here are the few worth
-investigating, and do not touch the registry/route files." That gap is the
+**The grade is MEDIUM for a reason this very output demonstrates.** vulture reports
+"100% confidence" on all six, yet they split cleanly into two kinds:
+
+- **`file_lock.py:164-166` (`exc_type`/`exc_val`/`exc_tb`) are NOT dead — they are
+  the `__aexit__(self, exc_type, exc_val, exc_tb)` async-context-manager protocol
+  parameters.** Python *requires* those positional names; deleting them breaks the
+  `with` protocol. vulture's "100%" is a false positive — exactly why the signal
+  caps at MEDIUM and the confirm step is `vulture + string-ref grep before delete`,
+  never auto-delete.
+- **`archaeology_ingestion.py:414 max_hits` is a genuine candidate** — an unused
+  keyword parameter (`max_hits: int = 20`) that the function body never reads. Still
+  *investigate*, not *delete*: a caller may pass it positionally, or it may be part
+  of a kept signature contract.
+
+**Complementary reachability pass (module-level, the prompt's other half).** A
+separate AST import-reachability scan finds **~181 candidate orphan modules**
+(imported by no other module, entry points excluded) — e.g. `a2a.node_gateway`,
+`api`, `auto_grade.*`. Confidence is capped at MEDIUM for almost all of them and the
+analyzer says so up front: this repo resolves modules **dynamically** (CLI
+subcommand discovery, orchestrator/agent registries, MCP tool loading, API routers
+imported by string). So "no static importer" ≠ "dead"; `api`, `node_gateway`, and
+the `auto_grade.*` graders are framework/registry-loaded → **LOW (contract — keep)**.
+
+A naive tool prints "36 unused names + 181 dead modules — delete." This one routes
+to vulture, then shows that half its "100% confident" hits are a protocol contract,
+caps module orphans at MEDIUM because the loader is dynamic, and emits a *review
+checklist* with a `grep`-for-the-string-name confirm step. That gap is the
 difference between a cleanup and an outage.
 
 ## Changelog
 
+- **v0.1.0** (2026-06-27) — demo is now **runner-generated** (`probe.py dead_code`),
+  routing to the real `vulture` (installed) and returning UNASSESSED when it is
+  absent rather than proxying. Output makes the MEDIUM grade self-justifying: the
+  `__aexit__` protocol params (`file_lock.py:164-166`) are vulture false positives
+  (must keep) while `archaeology_ingestion.py:414 max_hits` is a genuine candidate —
+  same "100% confidence", opposite correct action. Module-orphan reachability (~181
+  candidates, dynamic-loader caveat) retained as the complementary pass.
 - **v0.0.1** (2026-06-25) — rewrite of a kit's dead-code analyzer. Made contract-
   protection and dynamic-loading-humility load-bearing (cap confidence when the
   repo loads by string); kept the HIGH/MEDIUM/LOW ladder and no-modify rule. Tested

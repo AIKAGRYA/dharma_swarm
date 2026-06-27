@@ -11,8 +11,9 @@ Usage:
     python probe.py <signal> <path>       # one signal
     python probe.py index   <path> --json # machine-readable
 
-Signals: god_objects complexity wildcard_imports silent_swallows broad_catches
-         coupling dead_code churn phantom_deps change_coupling narrative_comments
+Signals: god_objects complexity cycles wildcard_imports silent_swallows
+         broad_catches coupling dead_code duplication churn phantom_deps
+         change_coupling narrative_comments
 
 Composite discipline (scope normalization): signals are NOT summed into one number
 across different denominators. The index reports a per-axis vector, the dominant
@@ -34,11 +35,13 @@ from _common import Confidence, Grade, SignalResult, render_table
 SIGNALS = {
     "god_objects": S.god_objects,
     "complexity": S.complexity,
+    "cycles": S.cycles,
     "wildcard_imports": S.wildcard_imports,
     "silent_swallows": S.silent_swallows,
     "broad_catches": S.broad_catches,
     "coupling": S.coupling,
     "dead_code": S.dead_code,
+    "duplication": S.duplication,
     "churn": S.churn,
     "phantom_deps": S.phantom_deps,
     "change_coupling": S.change_coupling,
@@ -68,7 +71,9 @@ def composite(results: list[SignalResult]) -> dict:
         headline = "CLEAN"
     return {
         "headline": headline,
-        "drivers": [r.signal for r in drivers[:3]],
+        # every HIGH/MEDIUM-confidence RED is a driver; do not silently truncate
+        # the list (that would let a real RED axis vanish from the headline).
+        "drivers": [r.signal for r in drivers],
         "counts": {"RED": len(reds), "AMBER": len(ambers),
                    "GREEN": len(greens), "UNASSESSED": len(unassessed)},
         "highest_leverage_fix": _leverage(drivers),
@@ -84,6 +89,14 @@ def _leverage(drivers: list[SignalResult]) -> str:
     return f"Reduce '{top.signal}' ({top.measured})."
 
 
+def _driver_line(names: list[str], cap: int = 5) -> str:
+    if not names:
+        return "none"
+    if len(names) <= cap:
+        return ", ".join(names)
+    return ", ".join(names[:cap]) + f" (+{len(names) - cap} more)"
+
+
 def run_index(root: Path, as_json: bool) -> str:
     results = [fn(root) for fn in SIGNALS.values()]
     comp = composite(results)
@@ -96,7 +109,7 @@ def run_index(root: Path, as_json: bool) -> str:
            f"**Composite: {comp['headline']}.** "
            f"RED {comp['counts']['RED']} / AMBER {comp['counts']['AMBER']} / "
            f"GREEN {comp['counts']['GREEN']} / UNASSESSED {comp['counts']['UNASSESSED']}.",
-           f"**Drivers (high-confidence RED): {', '.join(comp['drivers']) or 'none'}.**",
+           f"**Drivers (high-confidence RED): {_driver_line(comp['drivers'])}.**",
            f"**Highest-leverage fix:** {comp['highest_leverage_fix']}", "",
            "_Scopes (denominators) per axis:_"]
     for r in results:

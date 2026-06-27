@@ -318,6 +318,229 @@ def churn(root: Path, days: int = 90) -> SignalResult:
 
 
 # --------------------------------------------------------------------------- #
+# 9. Import cycles (Tarjan SCC) — load-time vs lazy. HIGH: a found cycle is real.
+#   The static import graph can only UNDER-count edges (dynamic imports are
+#   invisible), so every SCC it reports is a genuine cycle — no false positives.
+#   Load-time cycles (module-level imports) are the dangerous ones: they can
+#   deadlock import or force partial-module states. Lazy (function-local) edges
+#   break the cycle at import time and are reported separately.
+# --------------------------------------------------------------------------- #
+def _module_name(f: Path, root: Path) -> str:
+    rel = f.relative_to(root.parent).with_suffix("")
+    parts = [p for p in rel.parts if p != "__init__"]
+    return ".".join(parts)
+
+
+def _import_edges(root: Path) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    """Return (load_time_edges, all_edges) over intra-package modules."""
+    pkg = root.name
+    names: dict[Path, str] = {f: _module_name(f, root) for f in iter_py_files(root)}
+    known = set(names.values())
+    load: dict[str, set[str]] = defaultdict(set)
+    alle: dict[str, set[str]] = defaultdict(set)
+
+    def targets(node: ast.AST) -> list[str]:
+        out = []
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(pkg):
+            out.append(node.module)
+            # `from pkg import sub` names the package as module and the submodule
+            # as an imported name — resolve `pkg.sub` so the edge isn't missed.
+            out += [f"{node.module}.{a.name}" for a in node.names]
+        elif isinstance(node, ast.Import):
+            out += [a.name for a in node.names if a.name.startswith(pkg)]
+        return out
+
+    def nearest(t: str) -> str | None:
+        # map an import target onto a known module (exact, or its package head)
+        if t in known:
+            return t
+        while "." in t:
+            t = t.rsplit(".", 1)[0]
+            if t in known:
+                return t
+        return None
+
+    def is_type_checking(test: ast.AST) -> bool:
+        # `if TYPE_CHECKING:` / `if typing.TYPE_CHECKING:` blocks never execute at
+        # runtime, so their imports are type-only edges — not load-time ones.
+        return ((isinstance(test, ast.Name) and test.id == "TYPE_CHECKING")
+                or (isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING"))
+
+    for f, mod in names.items():
+        tree = parse(f)
+        if not tree:
+            continue
+        # walk tracking (inside def/lambda) and (inside TYPE_CHECKING) so we can
+        # split load-time edges from lazy and type-only ones.
+        def visit(node: ast.AST, in_func: bool, type_only: bool) -> None:
+            for child in ast.iter_child_nodes(node):
+                if isinstance(child, ast.If) and is_type_checking(child.test):
+                    for n in child.body:
+                        visit(n, in_func, True)
+                    for n in child.orelse:
+                        visit(n, in_func, type_only)
+                    continue
+                deeper = in_func or isinstance(
+                    child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
+                if isinstance(child, (ast.Import, ast.ImportFrom)):
+                    for t in targets(child):
+                        m = nearest(t)
+                        if m and m != mod:
+                            alle[mod].add(m)
+                            if not in_func and not type_only:
+                                load[mod].add(m)
+                visit(child, deeper, type_only)
+        visit(tree, False, False)
+    return load, alle
+
+
+def _tarjan(edges: dict[str, set[str]]) -> list[list[str]]:
+    """Iterative Tarjan SCC. Returns SCCs of size>1 (true cycles), largest first."""
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    on_stack: set[str] = set()
+    stack: list[str] = []
+    sccs: list[list[str]] = []
+    counter = 0
+    nodes = set(edges) | {t for ts in edges.values() for t in ts}
+
+    for start in nodes:
+        if start in index:
+            continue
+        work = [(start, iter(sorted(edges.get(start, ()))))]
+        index[start] = low[start] = counter
+        counter += 1
+        stack.append(start)
+        on_stack.add(start)
+        while work:
+            node, it = work[-1]
+            advanced = False
+            for nxt in it:
+                if nxt not in index:
+                    index[nxt] = low[nxt] = counter
+                    counter += 1
+                    stack.append(nxt)
+                    on_stack.add(nxt)
+                    work.append((nxt, iter(sorted(edges.get(nxt, ())))))
+                    advanced = True
+                    break
+                if nxt in on_stack:
+                    low[node] = min(low[node], index[nxt])
+            if advanced:
+                continue
+            if low[node] == index[node]:
+                comp = []
+                while True:
+                    w = stack.pop()
+                    on_stack.discard(w)
+                    comp.append(w)
+                    if w == node:
+                        break
+                if len(comp) > 1:
+                    sccs.append(sorted(comp))
+            work.pop()
+            if work:
+                low[work[-1][0]] = min(low[work[-1][0]], low[node])
+    sccs.sort(key=len, reverse=True)
+    return sccs
+
+
+def cycles(root: Path) -> SignalResult:
+    load, alle = _import_edges(root)
+    scc_all = _tarjan(alle)
+    scc_load = _tarjan(load)
+    n_all, n_load = len(scc_all), len(scc_load)
+    biggest_load = scc_load[0] if scc_load else []
+    measured = (f"{n_load} load-time cyclic SCC(s); {n_all} total cyclic SCC(s)"
+                + (f"; largest load-time = {len(biggest_load)} modules" if biggest_load else ""))
+    grade = Grade.RED if n_load else Grade.AMBER if n_all else Grade.GREEN
+    detail = []
+    for comp in scc_load[:3]:
+        detail.append("LOAD-TIME: " + " \u2192 ".join(m.split(".")[-1] for m in comp))
+    for comp in scc_all[:5 - len(detail)]:
+        if comp not in scc_load:
+            detail.append("lazy-broken: " + ", ".join(m.split(".")[-1] for m in comp[:6]))
+    return SignalResult(
+        signal="Import cycles",
+        measured=measured,
+        grade=grade,
+        confidence=Confidence.HIGH,   # a statically-found cycle is a real cycle
+        confirm_with="grimp / import-linter contract",
+        scope=f"intra-{root.name} import graph ({len(alle)} modules with edges)",
+        pressure=min(1.0, n_load / 2 + n_all / 20),
+        instrument="AST import graph + Tarjan SCC",
+        detail=detail,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# 10. Duplication (copy-paste convergence) — clone CLUSTERS, not text diff.
+#   Instrument: AST function/method body hashing (docstring-stripped, decorator-
+#   and-signature-independent). This is a real Type-1 clone detector — identical
+#   logic clusters even across different enclosing classes. Its structural blind
+#   spot is Type-2/3 (renamed-variable / near-miss) clones, which only a token
+#   detector like jscpd/pmd-cpd sees — hence MEDIUM, not HIGH, and jscpd is the
+#   named confirm. Copy-paste convergence is a core AI-slop tell: models
+#   regenerate near-identical bodies instead of factoring a shared helper.
+# --------------------------------------------------------------------------- #
+def _func_body_key(node: ast.AST) -> tuple[str, int] | None:
+    """A structural key for a function/method body, docstring stripped. Returns
+    (key, n_statements) or None for trivially-short bodies not worth clustering."""
+    body = list(getattr(node, "body", []))
+    if body and isinstance(body[0], ast.Expr) and isinstance(
+            getattr(body[0], "value", None), ast.Constant) and isinstance(
+            body[0].value.value, str):
+        body = body[1:]  # drop docstring
+    if len(body) < 3:
+        return None
+    dump = "\n".join(ast.dump(b, annotate_fields=False) for b in body)
+    if len(dump) < 160:  # skip trivial getters/setters/passthroughs
+        return None
+    return dump, len(body)
+
+
+def duplication(root: Path) -> SignalResult:
+    import hashlib
+    # hash -> list of (qualname, file:line)
+    clusters: dict[str, list[str]] = defaultdict(list)
+    total_funcs = 0
+    for f in iter_py_files(root):
+        tree = parse(f)
+        if not tree:
+            continue
+        rel = str(f.relative_to(root))
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                total_funcs += 1
+                key = _func_body_key(node)
+                if key is None:
+                    continue
+                h = hashlib.blake2b(key[0].encode(), digest_size=16).hexdigest()
+                clusters[h].append(f"{node.name} @ {rel}:{node.lineno}")
+    dup_clusters = {h: locs for h, locs in clusters.items() if len(locs) > 1}
+    n_clusters = len(dup_clusters)
+    cloned_funcs = sum(len(locs) - 1 for locs in dup_clusters.values())
+    ratio = cloned_funcs / max(1, total_funcs)
+    grade = (Grade.RED if ratio >= 0.03 else Grade.AMBER if n_clusters else Grade.GREEN)
+    detail = []
+    for locs in sorted(dup_clusters.values(), key=len, reverse=True)[:6]:
+        name = locs[0].split(" @ ")[0]
+        detail.append(f"{len(locs)}x  {name}  ({locs[0].split(' @ ')[1]} == {locs[1].split(' @ ')[1]})")
+    return SignalResult(
+        signal="Duplication",
+        measured=(f"{n_clusters} clone clusters; {cloned_funcs} cloned fns "
+                  f"({ratio:.1%} of {total_funcs:,})"),
+        grade=grade,
+        confidence=Confidence.MEDIUM,   # Type-1 exact bodies; Type-2/3 need jscpd
+        confirm_with="jscpd / pmd-cpd for Type-2/3 (renamed/near-miss) clones",
+        scope=f"{root}/ ({total_funcs:,} functions)",
+        pressure=min(1.0, cloned_funcs / 150),
+        instrument="AST function-body hashing (Type-1)",
+        detail=detail,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # NEW DIMENSION A — Phantom dependencies / slopsquatting surface.
 #   LLMs hallucinate import names at 5–21% (Spracklen et al.); attackers
 #   pre-register them. Ground truth: does every imported top-level name resolve

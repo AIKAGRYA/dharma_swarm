@@ -48,16 +48,20 @@ coverage 4→2 and mixed scopes). All three are corrected **and** an executable 
 is shipped so demos are run, not trusted.
 
 - ✅ **runner shipped: `probe/`** — a package (`_common.py`, `signals.py`, `probe.py`,
-  `test_probe.py`) covering **11 signals**, each routed to its real instrument (radon,
-  npm/pip audit, git log, AST, PyPI). It operationalizes the confidence rubric,
-  enforces return-clean, and has self-tests proving return-clean AND detection.
-  (Supersedes the first-cut `runner/slop_probe.py` from v0.0.2, now folded in.)
+  `test_probe.py`) covering **13 signals**, each routed to its real instrument (radon,
+  npm/pip audit, git log, AST+Tarjan, `vulture`, PyPI). It operationalizes the
+  confidence rubric, enforces return-clean, and has **6 self-tests** proving
+  return-clean AND detection (incl. the `TYPE_CHECKING`-exclusion and Type-1 clone
+  cases). (Supersedes the first-cut `runner/slop_probe.py` from v0.0.2, now folded in.)
 - ✅ **confidence rubric** — HIGH/MEDIUM/LOW/UNASSESSED defined in `FOUNDATIONS.md`;
   the vibe knob is gone.
-- ✅ **demos regenerated from runner output** for the flagship and the three corrected
-  prompts, plus the three new dimensions.
+- ✅ **demos regenerated from runner output** for the flagship and the corrected
+  prompts (complexity, circular-deps, duplication, dead-code), plus the three new
+  dimensions.
 - ▶ **runner: every remaining prompt** — extend `probe/signals.py` to the prompts that
-  still carry hand-written demos; regenerate each from runner output.
+  still carry hand-written demos; regenerate each from runner output. (Now at 13:
+  added `cycles` via AST+Tarjan and `duplication` via structural clone clustering;
+  `dead_code` routed to `vulture`.)
 - ◻ **advisory-DB provenance** — pin advisory IDs + snapshot date in security/dep demos.
 - ◻ **CI wiring** — wire the runner's RED exits into a check.
 - ◻ **clean-repo + non-Python/JS demos** — prove return-clean & portability off this repo.

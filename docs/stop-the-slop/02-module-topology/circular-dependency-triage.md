@@ -1,6 +1,6 @@
 ---
 id: circular-dependency-triage
-version: 0.1.0
+version: 0.1.1
 theme: 02-module-topology
 status: tested
 invariant: >
@@ -83,15 +83,28 @@ Kahn. The analysis is correct because the theory is.
 
 ## Demonstration run
 
-**Target:** `dharma_swarm/` (784 internal modules, 565 with internal imports),
-2026-06-25. Tool: stdlib AST import-graph + Tarjan SCC (same algorithm as
-`grimp`/`pydeps`; none were installed).
+**Target:** `dharma_swarm/` (546 modules with internal import edges), 2026-06-27.
+Tool: stdlib AST import-graph + Tarjan SCC (same algorithm as `grimp`/`pydeps`;
+none were installed). **This run is now produced by the executable runner**, not
+hand-transcribed — `python docs/stop-the-slop/probe/probe.py cycles dharma_swarm`:
+
+```
+| Import cycles | 1 load-time cyclic SCC(s); 11 total cyclic SCC(s); largest load-time = 3 modules | RED | HIGH | grimp / import-linter contract |
+  LOAD-TIME: dharma_swarm → providers → router_v1
+```
+
+The `cycles` signal classifies each edge by where it sits in the AST: a
+module-level import is load-time, a function-local one is lazy, and — critically —
+an import under `if TYPE_CHECKING:` is type-only and excluded from load-time (a bug
+caught in the runner's own self-tests: without that exclusion, the post-merge
+provider-routing rewrite reported 4 spurious load-time cycles instead of 1).
 
 ### The honest two-pass result (and a self-correction worth keeping)
 
-**Pass 1 — full import graph (load + lazy edges): 12 cyclic SCCs.** This is the
-number a naive run reports, and the first draft of this demo ranked those 12 by
-*size* (an 8-module SCC, three 7-module SCCs, …) and implied several were
+**Pass 1 — full import graph (load + lazy edges): 11 cyclic SCCs** (was 12 before
+main merged the provider-routing consolidation; the load-time core below is
+unchanged). This is the number a naive run reports, and the first draft of this
+demo ranked those SCCs by *size* (an 8-module SCC, several 7-module SCCs, …) and implied several were
 boot-risks. **That was this prompt's own trap, committed by its author** — size
 is not danger. A cycle only threatens boot if it closes through *load-time*
 edges, and `TYPE_CHECKING` imports never execute at runtime and must be excluded.
@@ -107,10 +120,9 @@ re-confirmed 2026-06-27 by parsing each module's top-level body:
 - `dharma_swarm/providers.py:76` — `from dharma_swarm.router_v1 import build_routing_signals, …` **[load-time]**
 - `dharma_swarm/router_v1.py:16` — `from dharma_swarm import model_pool` **[load-time]** ← re-enters the package while `__init__` is still on line 6 (half-initialized-module trap)
 
-The other **11 SCCs close only via lazy/deferred imports** (e.g. `build_engine ↔
-custodians ↔ foreman` — 0 load-time edges) — **already mitigated; do not
-refactor.** A heuristic prompt nags about all 12; the disciplined one says *one*
-is real.
+The other **10 SCCs close only via lazy/deferred imports** (0 load-time edges) —
+**already mitigated; do not refactor.** A heuristic prompt nags about all 11; the
+disciplined one says *one* is real.
 
 ### Minimum break (proposed; verified on a branch, NOT yet on mainline)
 Make the package's provider re-exports lazy (PEP 562 `__getattr__` in
@@ -127,15 +139,23 @@ re-read the files to confirm). The accurate statement: **fix proposed and verifi
 carries exactly 1 load-time cycle.**
 
 ### Verdict
-Full graph: not a DAG (12 SCCs). Genuine boot risk on mainline: **1**
+Full graph: not a DAG (11 SCCs). Genuine boot risk on mainline: **1**
 (provider/router core), still present here; a verified fix exists on an unmerged
-branch. The other 11 are lazy-mitigated and were correctly left alone. The lesson
+branch. The other 10 are lazy-mitigated and were correctly left alone. The lesson
 the prompt enforces — *rank by when the cycle resolves, not by how big it looks* —
 is the exact thing its own first draft got wrong, and the rigorous load-time pass
 caught it.
 
 ## Changelog
 
+- **v0.1.1** (2026-06-27) — demo is now **runner-generated** (`probe.py cycles`),
+  not hand-transcribed. Wired the `cycles` signal (AST import graph + iterative
+  Tarjan) into the runner with a `TYPE_CHECKING`-exclusion fix that its self-tests
+  pin (a planted load-time cycle goes RED; a `TYPE_CHECKING` or function-local
+  back-edge does not). Reconciled the full-graph count 12 → **11** after main
+  merged the provider-routing consolidation; the single load-time core
+  (`dharma_swarm → providers → router_v1`) is unchanged and re-verified at the
+  cited `file:line`s.
 - **v0.1.0** (2026-06-27) — corrected an overclaim: the provider/router fix is
   verified on the unmerged branch `claude/fix-provider-router-import-cycle`, NOT on
   mainline. Re-confirmed the 3 eager edges still present on this branch by parsing

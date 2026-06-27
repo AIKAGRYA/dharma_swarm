@@ -26,7 +26,8 @@ python probe.py index <path> --json
 No third-party install is required to run it; signals whose dedicated tool is absent
 degrade honestly (see the confidence rubric) rather than guessing. `radon` upgrades
 the complexity signal from a LOW proxy to HIGH; `vulture` upgrades dead-code from
-UNASSESSED to a real result.
+UNASSESSED to a real result. `cycles` and `duplication` are pure-stdlib (AST +
+Tarjan SCC; AST function-body hashing) and need no install at all.
 
 ## Signals and where each routes
 
@@ -34,11 +35,13 @@ UNASSESSED to a real result.
 |---|---|---|---|
 | `god_objects` | AST line count per module | HIGH | yes (0 → GREEN) |
 | `complexity` | **radon cc** (proxy AST only if radon absent) | HIGH (LOW on proxy) | yes |
+| `cycles` | AST import graph + **Tarjan SCC** (load-time vs `TYPE_CHECKING`/lazy) | HIGH | yes (DAG → GREEN) |
 | `wildcard_imports` | AST `ImportFrom` with `*` | HIGH | yes |
 | `silent_swallows` | AST `ExceptHandler` whose body is a sole `pass` | HIGH | yes |
 | `broad_catches` | AST `ExceptHandler` catching `Exception`/bare | HIGH | yes |
 | `coupling` | AST static import fan-in/fan-out | MEDIUM (dynamic wiring invisible) | yes |
-| `dead_code` | `vulture` if present, else **UNASSESSED** | HIGH / UNASSESSED | yes |
+| `dead_code` | `vulture` if present, else **UNASSESSED** | MEDIUM / UNASSESSED | yes |
+| `duplication` | AST function-body hashing (Type-1 clones; `jscpd` for Type-2/3) | MEDIUM | yes (0 → GREEN) |
 | `churn` | `git log` revert rate, 90-day window | HIGH | yes |
 | `phantom_deps` | unresolved imports × **PyPI existence** (`--online`) | MEDIUM | yes |
 | `change_coupling` | `git log --name-only` co-change association rules | HIGH | yes |
@@ -80,7 +83,9 @@ call them "phantom" — because "unresolved locally" is not "hallucinated." Only
 python test_probe.py        # or: python -m pytest test_probe.py
 ```
 
-The tests prove the two properties the product lives on: **return-clean** (clean code
-grades GREEN, not "something") and **detect** (planted slop goes RED with the right
-evidence), plus that `phantom_deps` refuses to accuse offline and `complexity` routes
-to radon when present.
+The tests (6) prove the two properties the product lives on: **return-clean** (clean
+code grades GREEN, not "something") and **detect** (planted slop goes RED with the
+right evidence), plus that `phantom_deps` refuses to accuse offline, `complexity`
+routes to radon when present, `cycles` counts a load-time cycle as RED while
+excluding `TYPE_CHECKING`-only and function-local back-edges, and `duplication`
+returns clean on unique code then flags an exact Type-1 clone at MEDIUM.

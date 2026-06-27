@@ -85,6 +85,69 @@ def test_complexity_routes_to_radon_when_present():
         assert "radon" in r.instrument
 
 
+def test_cycles_flags_load_time_but_not_typecheck_or_lazy():
+    """A module-level mutual import is a RED load-time cycle; a TYPE_CHECKING-guarded
+    or function-local back-edge is NOT load-time and must not inflate the count."""
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "pkg"
+        pkg.mkdir()
+        _write(pkg, "__init__.py", "")
+        # a <-> b: genuine module-level (load-time) cycle
+        _write(pkg, "a.py", "from pkg import b\nX = 1\n")
+        _write(pkg, "b.py", "from pkg import a\nY = 2\n")
+        # c <-> d: back-edge only under TYPE_CHECKING (not a runtime cycle)
+        _write(pkg, "c.py", "from pkg import d\n")
+        _write(pkg, "d.py", """
+            from typing import TYPE_CHECKING
+            if TYPE_CHECKING:
+                from pkg import c
+        """)
+        # e -> f at module level, f -> e only inside a function (lazy, breaks cycle)
+        _write(pkg, "e.py", "from pkg import f\n")
+        _write(pkg, "f.py", "def use():\n    from pkg import e\n    return e\n")
+        r = S.cycles(pkg)
+        assert r.confidence is Confidence.HIGH
+        assert r.grade is Grade.RED                       # the a<->b load-time cycle
+        assert "1 load-time" in r.measured                # exactly one load-time SCC
+        joined = " ".join(r.detail)
+        assert "a" in joined and "b" in joined            # the load-time pair is named
+
+
+def test_duplication_returns_clean_then_detects_clone():
+    """Unique code grades GREEN; an exact copy-paste of a block is flagged as a
+    candidate clone at LOW confidence (a proxy for jscpd, never a confirmed RED)."""
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "pkg"
+        pkg.mkdir()
+        _write(pkg, "__init__.py", "")
+        _write(pkg, "uniq.py", """
+            def alpha(x):
+                total = x + 1
+                scaled = total * 2
+                shifted = scaled - 3
+                squared = shifted ** 2
+                return squared
+        """)
+        clean = S.duplication(pkg)
+        assert clean.grade is Grade.GREEN
+        assert clean.confidence is Confidence.MEDIUM      # Type-1 only; never HIGH
+        # plant an exact copy of a >=6-line block in a second file
+        block = """
+            def beta(x):
+                total = x + 1
+                scaled = total * 2
+                shifted = scaled - 3
+                squared = shifted ** 2
+                doubled = squared + squared
+                return doubled
+        """
+        _write(pkg, "one.py", block)
+        _write(pkg, "two.py", block.replace("beta", "gamma"))
+        dirty = S.duplication(pkg)
+        assert dirty.detail                               # clone evidence is emitted
+        assert dirty.pressure >= clean.pressure           # planted clone raises pressure
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
