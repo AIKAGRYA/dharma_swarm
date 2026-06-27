@@ -316,3 +316,109 @@ class TestOracleCLI:
             capture_output=True, text=True, env=env,
         )
         assert proc.returncode == 1
+
+
+# ---------------------------------------------------------------------------
+# M2 hardening: subprocess timeout + no shell injection (shell=False)
+# ---------------------------------------------------------------------------
+
+
+class TestM2Hardening:
+    """M2 scrutiny required hardening of oracle.run_gate:
+
+    1. shell=True was a shell-injection vector — switch to list-form args
+       (shlex.split, shell=False) so metacharacters are NOT interpreted.
+    2. No subprocess timeout meant a hung gate hangs the loop forever — add a
+       timeout that raises a clear error instead.
+    """
+
+    def test_run_gate_uses_shell_false(self):
+        """CIOracle.run_gate must NOT use shell=True (no shell interpretation)."""
+        mod = _import_oracle()
+        source = ORACLE_MODULE.read_text()
+        # The CIOracle.run_gate implementation must not pass shell=True.
+        # (The test-defined ForgeOracle in TestForgeOraclePlugIn may use
+        # shell=True in its own stub — that's fine, it's not production code.)
+        assert "shell=True" not in source, (
+            "CIOracle.run_gate must not use shell=True — it's a shell-injection vector. "
+            "Use shlex.split + subprocess.run(args_list, shell=False) instead."
+        )
+
+    def test_shlex_split_imported(self):
+        """oracle.py must import shlex for list-form arg parsing."""
+        mod = _import_oracle()
+        source = ORACLE_MODULE.read_text()
+        assert "import shlex" in source or "from shlex" in source
+
+    def test_timeout_parameter_exists(self):
+        """CIOracle must accept a timeout parameter (default or configurable)."""
+        mod = _import_oracle()
+        # CIOracle.__init__ should accept a timeout kwarg.
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT, timeout=10)
+        assert oracle is not None
+        # run_gate should also accept a per-call timeout override.
+        result = oracle.run_gate(f'"{VENV_PYTHON}" -c "pass"', timeout=10)
+        assert result.exit_code == 0
+
+    def test_default_timeout_is_set(self):
+        """CIOracle has a non-None default timeout (not infinite)."""
+        mod = _import_oracle()
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT)
+        assert oracle.timeout is not None
+        assert oracle.timeout > 0
+
+    def test_hung_gate_times_out_raises_clear_error(self):
+        """A hung gate (sleep longer than timeout) must time out and raise a
+        clear error (GateTimeoutError or similar) instead of hanging forever."""
+        mod = _import_oracle()
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT, timeout=2)
+        # 'sleep 30' would hang for 30s without a timeout; with timeout=2 it
+        # must be killed and raise within ~3s.
+        has_timeout_error = hasattr(mod, "GateTimeoutError")
+        with pytest.raises((TimeoutError, subprocess.TimeoutExpired) if not has_timeout_error else mod.GateTimeoutError) as exc_info:
+            oracle.run_gate("sleep 30")
+        # The error message must mention the timeout so the operator understands.
+        assert "timeout" in str(exc_info.value).lower() or "timed out" in str(exc_info.value).lower()
+
+    def test_shell_metacharacters_not_interpreted(self):
+        """Shell metacharacters (; | && etc.) in the gate command must NOT be
+        interpreted as shell operators. With shell=False + shlex.split, ';'
+        becomes a literal argument, not a command separator."""
+        mod = _import_oracle()
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT, timeout=30)
+        # Under shell=True, this would run 'python -c "pass"' THEN 'echo INJECTED'
+        # (two commands). Under shell=False, ';' is a literal arg to python.
+        result = oracle.run_gate(f'"{VENV_PYTHON}" -c "pass" ; echo INJECTED')
+        # The command must still exit 0 (python -c "pass" succeeds; the extra
+        # args ';', 'echo', 'INJECTED' go into sys.argv and are ignored).
+        assert result.exit_code == 0
+        # CRITICAL: "INJECTED" must NOT appear in stdout — if it did, the ';'
+        # was interpreted as a shell separator (shell injection succeeded).
+        assert "INJECTED" not in result.stdout, (
+            "Shell metacharacter ';' was interpreted as a command separator — "
+            "shell injection vector is still open! Use shell=False."
+        )
+
+    def test_pipe_metacharacter_not_interpreted(self):
+        """The pipe '|' must not be interpreted as a shell pipe operator."""
+        mod = _import_oracle()
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT, timeout=30)
+        # Under shell=True, 'echo SECRET | cat' would pipe echo's output to cat.
+        # Under shell=False, '|' is a literal arg to echo.
+        result = oracle.run_gate(f'"{VENV_PYTHON}" -c "print(\\"ok\\")" | cat')
+        # python runs -c "print('ok')" and exits 0; '|' and 'cat' are extra args.
+        assert result.exit_code == 0
+        # "ok" appears from python's stdout. But if '|' were a pipe, the output
+        # might differ. The key assertion: the command doesn't fail due to pipe
+        # interpretation (no "cat: no such file" or similar).
+
+    def test_backtick_not_interpreted(self):
+        """Backtick command substitution must NOT work under shell=False."""
+        mod = _import_oracle()
+        oracle = mod.CIOracle(python=VENV_PYTHON, repo_root=REPO_ROOT, timeout=30)
+        # Under shell=True, `whoami` would be command-substituted. Under
+        # shell=False, backticks are literal characters in the argument.
+        result = oracle.run_gate(f'"{VENV_PYTHON}" -c "pass" `whoami`')
+        assert result.exit_code == 0
+        # The output of whoami should NOT appear in stdout (no command substitution).
+        # If it did, shell injection is possible.

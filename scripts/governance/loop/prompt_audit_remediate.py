@@ -275,6 +275,31 @@ def check_write_set(changed_files: list[str], write_set: list[str]) -> list[str]
 
 
 # ---------------------------------------------------------------------------
+# Git-diff path extraction (M2 hardening: replaces self-reported changed_files)
+# ---------------------------------------------------------------------------
+
+_DIFF_GIT_RE = re.compile(r"^diff --git a/(.+?) b/(.+)$")
+
+
+def extract_changed_paths(diff_text: str) -> list[str]:
+    """Extract changed file paths from a unified git diff.
+
+    Parses ``diff --git a/<path> b/<path>`` header lines to determine which
+    files were actually changed. This is the M2 hardening replacement for the
+    implementer's self-reported ``changed_files`` list — the git diff cannot
+    be gamed by an LLM implementer misreporting paths.
+    """
+    paths: list[str] = []
+    for line in diff_text.splitlines():
+        m = _DIFF_GIT_RE.match(line)
+        if m:
+            b_path = m.group(2)
+            if b_path and b_path != "/dev/null":
+                paths.append(b_path)
+    return paths
+
+
+# ---------------------------------------------------------------------------
 # Worktree management
 # ---------------------------------------------------------------------------
 
@@ -440,7 +465,11 @@ def _process_finding(
             return 1, "rejected"
 
         # 5. Apply the fix.
-        changed_files = implementer.apply_fix(wt_path, finding)
+        #    The implementer's self-reported changed_files return value is
+        #    intentionally NOT used for write-set enforcement (M2 hardening):
+        #    an LLM implementer could misreport paths. The actual git diff
+        #    (step 7 below) is the ground truth.
+        implementer.apply_fix(wt_path, finding)
 
         # 6. Capture green_after (must be zero).
         green_result = oracle.run_gate(plan.gate_command, cwd=str(wt_path))
@@ -450,17 +479,21 @@ def _process_finding(
             )
             return 1, "rejected"
 
-        # 7. Enforce write-set.
-        violations = check_write_set(changed_files, write_set)
+        # 7. Enforce write-set from the ACTUAL git diff (M2 hardening).
+        #    The implementer's self-reported changed_files list is NOT trusted —
+        #    an LLM implementer could misreport paths. The git diff is the
+        #    ground truth for what was actually changed.
+        diff_text = get_worktree_diff(wt_path)
+        diff_changed_paths = extract_changed_paths(diff_text)
+        violations = check_write_set(diff_changed_paths, write_set)
         if violations:
             sys.stderr.write(
-                f"finding {finding_id}: write-set violation — files outside warrant write_set: {violations}. "
+                f"finding {finding_id}: write-set violation (git-diff) — files outside warrant write_set: {violations}. "
                 f"Fix REJECTED.\n"
             )
             return 1, "rejected"
 
-        # 8. Run anti-gaming checklist on the fix diff.
-        diff_text = get_worktree_diff(wt_path)
+        # 8. Run anti-gaming checklist on the fix diff (same diff as step 7).
         # Save the fix diff so Stage 4 (reaudit) can run the anti-gaming
         # checklist independently on the same diff.
         diff_path = run.fixes_dir / f"fix_diff_{finding_id}.patch"

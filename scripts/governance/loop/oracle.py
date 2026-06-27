@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -34,6 +35,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+DEFAULT_GATE_TIMEOUT = 300
 
 
 def _default_repo_root() -> Path:
@@ -71,6 +73,15 @@ class GateResult:
         return d
 
 
+class GateTimeoutError(Exception):
+    """Raised when a gate command exceeds the configured subprocess timeout.
+
+    This prevents a hung gate (e.g. ``sleep`` or an infinite loop) from
+    hanging the loop forever. The error message names the command and the
+    timeout so the operator can diagnose the hang.
+    """
+
+
 class Oracle(ABC):
     """Abstract deterministic oracle.
 
@@ -96,10 +107,12 @@ class CIOracle(Oracle):
         python: str = DEFAULT_PYTHON,
         repo_root: Path | None = None,
         env: dict[str, str] | None = None,
+        timeout: int | float | None = DEFAULT_GATE_TIMEOUT,
     ) -> None:
         self.python = python
         self.repo_root = repo_root or _default_repo_root()
         self.env = env
+        self.timeout = timeout
 
     def _build_env(self) -> dict[str, str]:
         full = os.environ.copy()
@@ -108,16 +121,24 @@ class CIOracle(Oracle):
             full.update(self.env)
         return full
 
-    def run_gate(self, command: str, cwd: str | None = None) -> GateResult:
+    def run_gate(self, command: str, cwd: str | None = None, timeout: int | float | None = None) -> GateResult:
         work_cwd = cwd or str(self.repo_root)
-        proc = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            cwd=work_cwd,
-            env=self._build_env(),
-        )
+        effective_timeout = timeout if timeout is not None else self.timeout
+        args = shlex.split(command)
+        try:
+            proc = subprocess.run(
+                args,
+                shell=False,
+                capture_output=True,
+                text=True,
+                cwd=work_cwd,
+                env=self._build_env(),
+                timeout=effective_timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise GateTimeoutError(
+                f"gate timed out after {effective_timeout}s: {command!r}"
+            ) from exc
         return GateResult(
             exit_code=proc.returncode,
             stdout=proc.stdout,
