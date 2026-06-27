@@ -178,8 +178,12 @@ jobs:
                       print(f"  {k:<22} {v['msgs']:>5}  {a:>9}  {active:<7}  {max(v['kinds'], key=v['kinds'].get)}")
 
                   # --- reach latency: publish a tiny probe, time the JetStream pub-ack ---
+                  # Reply channel must live in OUR account's own namespace: the
+                  # devin account may subscribe to dharma.a2a.devin.> but not
+                  # dharma.a2a.fleet.reply.* (scoped perms). A peer replies here.
                   probe_id = uuid.uuid4().hex[:12]
-                  reply_sub = f"dharma.a2a.fleet.reply.{probe_id}"
+                  own_lane = "devin" if os.environ.get("DEVIN_NATS_URL") else "merge_master_mike"
+                  reply_sub = f"dharma.a2a.{own_lane}.reply.{probe_id}"
                   replies = []
                   async def on_reply(msg):
                       replies.append(msg.subject)
