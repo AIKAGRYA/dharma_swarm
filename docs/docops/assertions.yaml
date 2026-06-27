@@ -152,7 +152,8 @@
       "docs/plans/**",
       "docs/specs/**",
       "docs/sovereign_holons/**",
-      "dharma_swarm/chetana/claude_code_plugin/**"
+      "dharma_swarm/chetana/claude_code_plugin/**",
+      "docs/stop-the-slop/**"
     ],
       "registered": [
         "AGENTS.md",

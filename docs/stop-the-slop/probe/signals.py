@@ -553,8 +553,9 @@ def phantom_deps(root: Path) -> SignalResult:
     try:
         mapping = im.packages_distributions()  # top-level module -> [dist,...]
         provided |= set(mapping.keys())
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001 — best-effort enrichment, surfaced not swallowed
+        print(f"phantom_deps: packages_distributions() unavailable ({e!r}); "
+              "proceeding with stdlib-only provider set", file=sys.stderr)
     # First-party names importable from within the repo: every package dir and
     # every module stem anywhere in the tree (repos routinely insert subdirs onto
     # sys.path, so a nested module name can be imported top-level). Missing these
