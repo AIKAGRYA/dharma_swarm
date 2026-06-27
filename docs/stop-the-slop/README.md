@@ -13,9 +13,18 @@ Slop."** Soul-name: **Pramāṇa Probe.**
 A versioned, evidence-routed family of prompts for taking AI-generated software
 from "it runs" to "it's defensible." Two jobs, one artifact:
 
-> **Status: v0.0.1 COMPLETE — 49 prompts across 25 themes + the flagship.** Every
-> prompt ran on this repo's real ground truth. Backlog/angles in `ROADMAP.md`;
-> landscape in `SOURCES.md`; lineage canon in `FOUNDATIONS.md`.
+> **Status: v0.1.0 — 52 prompts across 25 themes + the flagship, now with an
+> EXECUTABLE RUNNER.** Every demo is regenerated from `probe/` (route-to-tool,
+> return-clean, honest confidence), not hand-written prose. Backlog/angles in
+> `ROADMAP.md`; landscape in `SOURCES.md`; lineage canon in `FOUNDATIONS.md`;
+> pricing/tiers in `PRODUCTIZATION.md`.
+>
+> **What's new in v0.1.0:** (1) `probe/` runner — each signal routes to its real
+> instrument (radon, npm/pip audit, git log, AST, PyPI) and emits its own honest
+> row; self-tests prove return-clean AND detection. (2) Three corrected demos
+> (complexity ranking vs radon, ratchet 2-not-4, scope mixing, the unmerged
+> "shipped→0" overclaim). (3) Three new AI-specific dimensions:
+> `phantom-deps-audit`, `change-coupling-hotspots`, `narrative-comment-scan`.
 
 1. **Inward** — level up *this* repo from the level of invariants and first
    principles, not surface lint.
@@ -106,14 +115,14 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | # | Theme | Defends the invariant | Lineage | Prompts |
 |---|---|---|---|---|
 | ⭐ | **FLAGSHIP — AI-Slop Index** | "Slop is measurable: compose orthogonal, instrument-backed signals into one decomposable, trend-aware score. Never a vibe-grade." | Larridin (Slop Index); arXiv 2508.14727; Lehman | `ai-slop-index` (v0.0.1) |
-| 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75 | `dependency-risk-triage` (v0.0.1) |
+| 01 | **Supply-chain & dependency integrity** | "A dependency is a liability you don't control; risk = exploitability × reachability × blast radius, never staleness." | Thompson *Trusting Trust* '84; Saltzer–Schroeder '75; Spracklen '25 (slopsquatting) | `dependency-risk-triage` (v0.0.1) · `phantom-deps-audit` (v0.1.0) |
 | 02 | **Module topology & structure** | "The import graph must be a DAG; change cost = coupling; a module has one reason to change; the implementation should be replaceable behind its interface." | Dijkstra '68; Parnas '72; Tarjan '72; Kahn '62; Martin (SRP/DIP); Steenberg | `circular-dependency-triage` · `coupling-hotspot-map` · `god-object-decomposition-plan` · `interface-replaceability-audit` (v0.0.1) |
 | 03 | **Performance & cost** | "Optimize only what a profiler proves dominates; a bottleneck is a measured share, not a guess. Amdahl bounds the payoff; name the floor." | Knuth '74; Amdahl '67; Gregg (USE/flame); Jain | `performance-bottleneck-triage` (v0.0.1) |
 | 04 | **Resilience & retries** | "A retry must be bounded, jittered, narrow, and idempotent — or it's an outage amplifier. Find the canonical primitive and measure adoption." | Metcalfe–Boggs '76; Nygard '07; Brooker (jitter) | `retry-audit` (v0.0.1) |
 | 05 | **Test data & fixtures** | "Seed data must be schema-faithful, referentially sound, production-distributed, edge-covering, and reproducible. Don't invent fields." | Claessen–Hughes (QuickCheck) '00; Myers (boundaries); Codd '70 | `seed-data-generator` (v0.0.1) |
 | 06 | **Error handling** | "An error is information; swallowing it destroys it. Ban the anti-patterns actually present, with counts — not a generic checklist." | Goodenough '75; Parnas (fail-fast); Pike (errors-are-values) | `error-handling-rules` (v0.0.1) |
 | 07 | **Debugging & reproduction** | "A repro fails for the right reason or it's questions; a fix without a traced causal chain is a guess — fix the cause, not the crash site." | Zeller '02 (delta debugging); Popper; Weiser '81 (slicing); Kildall '73 | `minimal-repro-builder` (v0.0.1) · `bug-trace-before-fix` (v0.0.1) |
-| 08 | **Change management & flags** | "A flag is ONE boundary with a safe default and a removal path; scattering checks is a 2^N state explosion." | Parnas '72; Fowler (branch-by-abstraction); Knuth | `feature-flag-wrap` (v0.0.1) |
+| 08 | **Change management & flags** | "A flag is ONE boundary with a safe default and a removal path; scattering checks is a 2^N state explosion." | Parnas '72; Fowler (branch-by-abstraction); Knuth; D'Ambros '09 (change coupling) | `feature-flag-wrap` (v0.0.1) · `change-coupling-hotspots` (v0.1.0) |
 | 09 | **Dead code & reachability** | "Deletion requires proof of unreachability; dynamic/string/framework references defeat static proof, so grade confidence and protect contracts." | Aho–Sethi–Ullman (dead-code elim); tree-shaking | `dead-code-scan` (v0.0.1) |
 | 10 | **Production hardening** | "Hardening is triage, not rewrite: rank by P(incident)×blast-radius; every finding names the line, the mechanism, and the consequence." | Nygard '07; Gray '85; Saltzer–Schroeder '75 | `hardening-checklist` (v0.0.1) |
 | 11 | **Onboarding & comprehension** | "A brief transfers the system's theory; be faithful to real paths or say you can't — fidelity over fluency." | Naur '85; Parnas (module guide); Brooks | `onboarding-brief` (v0.0.1) |
@@ -122,7 +131,7 @@ Versions evolve **in place** (git is the version store); the frontmatter
 | 14 | **State & lifecycle** | "Resources release on all paths (scope-bound); on shutdown the process drains in-flight work, not gets torn by SIGKILL." | Dijkstra; RAII; Gray '85; crash-only (Candea–Fox); 12-factor | `resource-leak-scan` · `graceful-shutdown-audit` |
 | 15 | **Security** | "Seen secret = burned; agent surface = inputs × tools; every protected op gated (authz≠authn); untrusted input never reaches a sink; PII has a data map + erasure path." | Kerckhoffs; Saltzer–Schroeder '75; OWASP API/LLM Top 10; GDPR | `secret-leakage-scan` · `ai-agent-security-audit` · `authz-coverage` · `injection-ssrf-surface` · `compliance-pii-readiness` |
 | 16 | **Observability** | "At 3am you have only what you logged; the value paths must emit golden signals; a sensitive value in a log is a breach." | Gray '85; Gregg (USE); SRE golden signals; GDPR | `logging-context-audit` · `pii-in-logs-scan` · `critical-path-instrumentation` |
-| 17 | **Code-health metrics** | "Complexity, duplication, and wildcard sprawl are measurable slop signals — run the instrument, extract only on shared reason-to-change, return clean honestly." | McCabe '76; Fowler (DRY); Parnas; arXiv 2508.14727 | `complexity-inflation-scan` · `duplication-ratio-scan` · `wildcard-import-audit` |
+| 17 | **Code-health metrics** | "Complexity, duplication, and wildcard sprawl are measurable slop signals — run the instrument, extract only on shared reason-to-change, return clean honestly." | McCabe '76; Campbell '17 (cognitive); Fowler (DRY); Parnas; Shannon '48; arXiv 2508.14727 | `complexity-inflation-scan` · `duplication-ratio-scan` · `wildcard-import-audit` · `narrative-comment-scan` (v0.1.0) |
 | 18 | **Test integrity** | "A test asserts specific behavior, is deterministic, and guards the high-risk code; no-assert/weak/flaky/risk-blind suites are theater. Mutation + re-run are ground truth." | Goodenough '75; Beck; Weyuker; Luo '14; mutation testing | `test-mirrors-implementation` · `flaky-test-detector` · `coverage-gap-by-risk` · `assertion-quality-audit` |
 | 19 | **Concurrency** | "Shared mutable state crossed by concurrent paths is a bug until proven serialized; retried mutations need idempotency keys; locks need one global order." | Lamport '78; Dijkstra; Coffman '71; REST idempotency | `race-condition-audit` · `idempotency-key-audit` · `deadlock-lock-order` |
 | 20 | **LLM integration** | "An LLM call is an unbounded, untrusted, costly network call: bound it, cap (not just track) cost, guard injection, parse defensively." | Nygard '07; OWASP LLM Top 10; defensive parsing | `llm-call-hygiene` |

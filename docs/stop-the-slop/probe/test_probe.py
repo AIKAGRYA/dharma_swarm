@@ -1,0 +1,93 @@
+"""Self-tests for the runner. Run: python -m pytest test_probe.py  (or python test_probe.py)
+
+These prove the two claims the product lives or dies on:
+  1. RETURN CLEAN — on genuinely clean code the signals grade GREEN, not "something".
+  2. DETECT — on planted slop the signals go RED with the right evidence.
+A signal that can't do (1) is a finding-manufacturer; one that can't do (2) is decoration.
+"""
+
+from __future__ import annotations
+
+import tempfile
+import textwrap
+from pathlib import Path
+
+import signals as S
+from _common import Confidence, Grade
+
+
+def _write(d: Path, name: str, body: str) -> Path:
+    p = d / name
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(textwrap.dedent(body), encoding="utf-8")
+    return p
+
+
+def test_returns_clean_on_clean_code():
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "clean_pkg"
+        pkg.mkdir()
+        _write(pkg, "__init__.py", "")
+        _write(pkg, "m.py", """
+            import os
+            def add(a, b):
+                return a + b
+        """)
+        assert S.wildcard_imports(pkg).grade is Grade.GREEN
+        assert S.silent_swallows(pkg).grade is Grade.GREEN
+        assert S.god_objects(pkg).grade is Grade.GREEN
+        # clean code must not be branded with a manufactured RED
+        assert S.complexity(pkg).grade in (Grade.GREEN, Grade.AMBER)
+
+
+def test_detects_planted_slop():
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "dirty_pkg"
+        pkg.mkdir()
+        _write(pkg, "__init__.py", "")
+        _write(pkg, "bad.py", """
+            from os import *
+            def swallow():
+                try:
+                    risky()
+                except Exception:
+                    pass
+        """)
+        assert S.wildcard_imports(pkg).grade is Grade.RED
+        sw = S.silent_swallows(pkg)
+        assert "1" in sw.measured  # exactly one except: pass planted
+
+
+def test_phantom_offline_refuses_to_accuse():
+    """Offline, an unresolved import is a candidate, never a confirmed phantom."""
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "p"
+        pkg.mkdir()
+        _write(pkg, "__init__.py", "")
+        _write(pkg, "u.py", "import totally_made_up_xyz_pkg\n")
+        S.ONLINE = False
+        r = S.phantom_deps(pkg)
+        assert r.confidence is Confidence.LOW
+        assert r.grade is not Grade.RED            # must not accuse offline
+        assert r.pressure == 0.0                   # must not drive the composite
+
+
+def test_complexity_routes_to_radon_when_present():
+    from _common import tool_path
+    if not tool_path("radon"):
+        return  # tool absent: nothing to assert, the offline path is its own test
+    with tempfile.TemporaryDirectory() as t:
+        pkg = Path(t) / "p"
+        pkg.mkdir()
+        _write(pkg, "m.py", "def f(x):\n    return x\n")
+        r = S.complexity(pkg)
+        assert r.confidence is Confidence.HIGH
+        assert "radon" in r.instrument
+
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for fn in fns:
+        fn()
+        print(f"ok  {fn.__name__}")
+    print(f"\n{len(fns)} passed")

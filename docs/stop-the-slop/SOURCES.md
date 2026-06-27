@@ -51,6 +51,14 @@ angles** to widen the roadmap. **Sourcing ethics (non-negotiable, it's the brand
 - [arXiv 2508.14727](https://arxiv.org/pdf/2508.14727) — quality & security of AI-generated code (**364 smells; Wildcard Usage #1 @ 97; dead code 34–42%**)
 - [arXiv 2412.13801](https://arxiv.org/pdf/2412.13801) — PEFT for code-smell detection
 
+**Added in v0.1 (new-dimension lineage):**
+- **Tufano et al. (2025), Propensity Smelly Score (PSC)** — probabilistic, model-comparable smell propensity; AI code skews to god-classes/method bloat → grade structural smells as a distribution, expect the AI signature
+- **Spracklen et al. (2025), package hallucination / "slopsquatting"** — 5–30% of LLM-suggested installs name non-existent packages; attackers pre-register them → `phantom-deps-audit` (a phantom import is a supply-chain attack surface, not a typo)
+- **D'Ambros, Lanza, Robbes (2009), logical/change coupling** — git co-change predicts defects better than static coupling → `change-coupling-hotspots`
+- **DeMillo, Lipton & Sayward (1978), mutation testing** — coverage proves a line ran, not that a test would catch a bug; the oracle gap = mutation-score deficit → measurable "test theater"
+- **Campbell / SonarSource (2017), Cognitive Complexity** — nesting/breaks, not raw branch count, track comprehension → flat-dispatch vs nested-spaghetti distinction
+- **Dhuliawala et al. (2023), Chain-of-Verification** — draft→verify-against-tool cuts hallucination → the "confirm with <tool>" step is the verification pass, not decoration
+
 ## What the survey added to the roadmap (new angles)
 
 The topics are commodity; the survey's value is a few **angles we didn't have** — now

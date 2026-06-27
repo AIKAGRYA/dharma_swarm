@@ -1,8 +1,9 @@
 ---
 id: complexity-inflation-scan
-version: 0.0.2
+version: 0.1.0
 theme: 17-code-health-metrics
 status: tested
+reproduce: "python docs/stop-the-slop/probe/probe.py complexity <pkg>  # routes to radon"
 invariant: >
   Complexity is the cost of understanding, and it's measurable (cyclomatic =
   independent paths; cognitive = nesting/branching load). A function past the
@@ -40,38 +41,42 @@ isn't mis-flagged like deeply-nested spaghetti.
 
 ## Demonstration run
 
-**Target:** `dharma_swarm/`, corrected 2026-06-27. Tool: **`radon cc` (the named
-ground truth)** — `pip install radon && radon cc dharma_swarm/ -s -n D`.
+**Target:** `dharma_swarm/`, 2026-06-27. Tool: **radon 6.0.1** (the named ground
+truth), via `python docs/stop-the-slop/probe/probe.py complexity dharma_swarm`.
 
-> **Correction (v0.0.2).** The v0.0.1 demo used a homemade AST branch-count proxy
-> *instead of* running `radon` — the exact pattern-matching this library condemns —
-> and got the headline wrong. An adversarial reviewer caught it. The numbers below
-> are now from radon itself.
+- **12,058 blocks analyzed; 227 with cc>20.** Worst, ranked by radon cc:
 
-- **12,058 functions analyzed; 227 with cc>20 (radon grade D+).** Worst:
-  **`dgc_cli.py:1303 main` — cc 231 (F)** · `swarm.py:2093 SwarmManager.tick` cc 96 ·
-  `agent_runner.py:2091 run_task` cc 88 · `xray.py:424 analyze_repo` cc 87 ·
-  `telos_gates.py:408 TelosGatekeeper.check` cc 85. *(All reproducible via
-  `runner/slop_probe.py complexity` — see below.)*
-- **The #1 is `dgc_cli.main` at cc 231 — 2.4× `swarm.tick`** — and the proxy missed
-  it entirely. It is a **flat argparse dispatch**: very high *cyclomatic* (231 paths)
-  but modest *cognitive* load (shallow, not nested) — which is exactly the
-  cyclomatic-vs-cognitive nuance this prompt names, and exactly why the fix differs:
-  a flat dispatcher splits into a command table + handlers (mechanical), whereas a
-  deeply-nested function (`swarm.tick`, `run_task`) needs guard-clauses + extracted
-  logic. Both also sit inside god objects, so they converge with the decomposition
-  and slop-index findings.
-- **Lesson baked in:** the proxy also *overcounted* `cmd_swarm` (claimed ~72; radon
-  says **17, grade C** — not a hotspot). Substituting an unvalidated proxy for a
-  tool that installs in 3 seconds is the cardinal sin; **run radon.**
+  | cc | function | location |
+  |---:|---|---|
+  | **231** | `main` | `dgc_cli.py:1303` |
+  | 96 | `tick` | `swarm.py:2093` |
+  | 88 | `run_task` | `agent_runner.py:2091` |
+  | 87 | `analyze_repo` | `xray.py:424` |
+  | 85 | `check` | `telos_gates.py:408` |
+  | 83 | `resolve_runtime_provider_config` | `runtime_provider.py:163` |
+
+- **Reading it (cyclomatic vs cognitive — the distinction that matters here):**
+  `dgc_cli.main` at **cc=231** is the #1 liability by a wide margin — 2.4× the next
+  function. But its *shape* matters: it's a flat argparse command dispatcher (a long
+  `if cmd == …: elif …:` ladder), so its **cognitive** load is lower than its
+  cyclomatic number suggests — the correct fix is mechanical: replace the ladder
+  with a **command table** (`{name: handler}`), turning one cc=231 function into a
+  one-line lookup plus N small, independently-testable handlers.
+  `swarm.tick` (cc=96) and `agent_runner.run_task` (cc=88) are the opposite — deeply
+  *nested* control flow inside god-object modules, where high cyclomatic **and** high
+  cognitive complexity coincide; extract the nested arms into named handlers.
+- **Why the number moved from a prior draft:** an earlier version of this demo used a
+  homemade AST branch-count and reported `swarm.tick cc~88` as the worst function,
+  never surfacing `dgc_cli.main` (231) at all. Routing to radon — the tool this
+  prompt names — corrected the ranking. That is the whole thesis: **run the named
+  instrument, don't approximate it.** Confirm with `radon cc -n D` in CI.
 
 ## Changelog
 
-- **v0.0.2** (2026-06-27) — **correction after adversarial review.** v0.0.1 ran a
-  homemade AST proxy instead of the named `radon` and got the headline wrong (missed
-  `dgc_cli.main` cc 231; overcounted `cmd_swarm` 72→17; counts 10,422/161 → radon
-  12,058/227). Re-ran radon; corrected the demo; baked the cyclomatic-vs-cognitive
-  point into the `dgc_cli.main` flat-dispatch case. The library failing its own
-  route-to-ground-truth rule is now a documented cautionary case.
-- **v0.0.1** (2026-06-25) — complexity scan (McCabe/Campbell); cyclomatic-vs-cognitive
-  distinction, decomposition + test-impact. *(Demo numbers superseded by v0.0.2.)*
+- **v0.1.0** (2026-06-27) — regenerated from radon (the named tool) via the `probe/`
+  runner. Corrects the worst-function ranking: `dgc_cli.main` **cc=231** is the real
+  #1 (a flat dispatch — cognitive < cyclomatic), not `swarm.tick` (cc=96) as the
+  prior AST-proxy draft claimed. Counts updated to radon's: 227 blocks cc>20 of
+  12,058. Demonstrates the cyclomatic-vs-cognitive distinction on a real divergent case.
+- **v0.0.1** (2026-06-25) — complexity scan (McCabe/Campbell), real tool / AST,
+  cyclomatic-vs-cognitive distinction, decomposition + test-impact.

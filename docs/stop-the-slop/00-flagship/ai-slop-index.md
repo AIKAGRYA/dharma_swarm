@@ -1,6 +1,6 @@
 ---
 id: ai-slop-index
-version: 0.0.2
+version: 0.1.0
 theme: 00-flagship
 status: tested
 flagship: true
@@ -14,8 +14,9 @@ lineage:
   - "Larridin — AI Slop Index (duplication, revert rate, complexity, architectural coherence, test-behavior coverage)"
   - "arXiv 2508.14727 — AI code introduces measurable smells (Wildcard #1; dead code 34–42%)"
   - "Lehman — software evolution/rot; + the per-signal canon (Tarjan, McCabe, Parnas…)"
-ground_truth_tools: ["the repo's own quality ratchet counters", "AST scans per signal", "radon/jscpd/vulture where available", "git revert/churn history"]
+ground_truth_tools: ["probe/ runner (radon, git, AST, PyPI)", "the repo's own quality ratchet counters", "radon/jscpd/vulture where available", "git revert/churn history"]
 returns_clean: true
+reproduce: "python docs/stop-the-slop/probe/probe.py index <pkg> --online"
 ---
 
 ## Prompt
@@ -56,52 +57,65 @@ each signal wires to a ratchet, turning a one-time score into a monotonic gate.
 
 ## Demonstration run
 
-**Target:** `dharma_swarm/`, corrected 2026-06-27. Instruments: `radon`, AST scans,
-the repo's `ratchet_counters.py`. **Scope is disclosed per row** (the composite must
-not sum signals over different denominators silently).
+**Target:** `dharma_swarm/`, 2026-06-27. **This table is emitted verbatim by the
+runner** — not hand-written prose:
 
-> **Correction (v0.0.2).** v0.0.1 inherited the complexity prompt's wrong proxy
-> numbers, miscounted ratchet coverage (said 4, truth is 2), and called the index
-> "improving" without measuring a trend. An adversarial reviewer caught all three.
-> Fixed below.
+```
+python docs/stop-the-slop/probe/probe.py index dharma_swarm --online
+```
 
-| Signal | Measured | Scope | Grade | Confidence | Confirm with |
-|---|---|---|---|---|---|
-| God objects | **8** modules >3000 ln (max 5,255) | `dharma_swarm/` | 🔴 RED | HIGH | `ratchet largest_module_lines` ✓ratcheted |
-| Complexity inflation | **227** fns cc>20; worst **`dgc_cli.py:1303 main` cc 231** | `dharma_swarm/` (radon) | 🔴 RED | HIGH | `radon cc -n D` (not ratcheted) |
-| Dead code | **181** orphan-module candidates | `dharma_swarm/` | 🟡 AMBER | MEDIUM (dynamic loader) | `vulture` (not ratcheted) |
-| Silent swallows | **244** (`except…: pass`) | whole-repo | 🟡 AMBER | HIGH | `ratchet silent_exception_swallows` ✓ratcheted |
-| Broad catches | **2,275** `except Exception` | whole-repo | 🟡 AMBER | HIGH | manual review (not ratcheted) |
-| Wildcard imports | **0** | `dharma_swarm/` | 🟢 GREEN | HIGH | `grep 'import \*'` (not ratcheted) |
-| Test theater | 0 in `tests/`; 15 out-of-suite scripts | repo tests | 🟢 GREEN | MEDIUM | mutation/assertion audit |
-| Coupling | `models` **156** fan-in; `swarm` **57** fan-out | `dharma_swarm/` | 🟡 AMBER | HIGH | fan-in/out map (not ratcheted) |
-| Churn/revert | UNASSESSED (history not analyzed) | — | — | — | `git log` revert rate |
+Every row's scope is `dharma_swarm/` (deps excluded) unless noted, so the composite
+sums signals over **one** denominator — no per-package/whole-repo mixing.
 
-**Composite: ELEVATED.** Driven by **complexity inflation** (`dgc_cli.main` cc **231**,
-`swarm.tick` 96, `run_task` 88) and **god objects** (8 files >3000). Clean on imports
-and tests. **Single highest-leverage fix:** `dgc_cli.main` (cc 231, a flat argparse
-dispatch) → command table; then the nested `swarm.tick`/`run_task` (god-object *and*
-complexity hotspots).
-- **Trend is NOT claimed:** the churn/revert axis is UNASSESSED, so "improving" would
-  be unproven — the index is a *point-in-time* score here, not a trend.
-- **Ratchet coverage is partial:** only **2 of 8** signals are actually gated by a
-  ratchet counter today (`largest_module_lines`/`modules_over_500_lines` → god objects;
-  `silent_exception_swallows` → swallows). The other 6 are **aspirational** — wiring
-  complexity/dead-code/broad-catch/wildcard/coupling/test-theater to ratchets is real
-  follow-on work, not a current fact.
+| Signal | Measured | Grade | Confidence | Confirm with |
+|---|---|---|---|---|
+| God objects | **8** modules ≥3000 ln (max **5,255** `thinkodynamic_director.py`) | 🔴 RED | HIGH | `wc -l` on the listed files |
+| Complexity inflation | **227** fns cc>20; worst **cc=231** (`main` @ `dgc_cli.py:1303`) | 🔴 RED | HIGH | `radon cc -n D` |
+| Wildcard imports | **0** | 🟢 GREEN | HIGH | `grep -rn 'import \*'` |
+| Silent swallows | **337** (`except…: pass`) | 🔴 RED | HIGH | `ratchet silent_exception_swallows` |
+| Broad catches | **1,865** (`except Exception`/bare) | 🟡 AMBER | HIGH | review each for log + re-raise vs swallow |
+| Coupling | max fan-in **188** (`models`); max fan-out **56** (`swarm`) | 🟡 AMBER | MEDIUM | `grimp` / `pydeps` import graph |
+| Dead code | **UNASSESSED** (vulture absent) | — | UNASSESSED | `pip install vulture`; then re-run |
+| Churn/revert | **5/1047** commits are reverts (0.5%) in 90d | 🟢 GREEN | HIGH | `git log --grep=revert --since` |
+| Phantom deps | **1** phantom of 24 unresolved (23 real-but-uninstalled) | 🔴 RED | MEDIUM | verify it exists AND predates the project on PyPI |
+| Change coupling | **1** file-pair co-changes ≥8× at ≥60% conf | 🟡 AMBER | HIGH | `git log --name-only`; inspect for a hidden contract |
+| Narrative comments | **~86** restate-the-code comments (0.9% of 9,700) | 🟡 AMBER | LOW | human read of the flagged lines |
 
-This is the whole library in one number — decomposable, instrument-backed, scope-
-disclosed, and honest about what is *not* yet measured (trend) or *not* yet gated
-(6 of 8 signals).
+**Composite: ELEVATED.** RED 4 / AMBER 4 / GREEN 2 / UNASSESSED 1.
+**Drivers (high-confidence RED only): God objects, Complexity inflation, Silent
+swallows.** Note the composite refuses to be driven by the LOW/MEDIUM rows —
+`Phantom deps` is RED but only MEDIUM, so it is *not* a driver.
+**Single highest-leverage fix:** decompose `thinkodynamic_director.py` (5,255 ln)
+and `dgc_cli.main` (cc=231) — the worst god-object and the worst complexity hotspot.
+
+**Two honesty notes the runner forces (and the prior hand-written demo got wrong):**
+- **Complexity driver.** The real worst function is `dgc_cli.main` at **cc=231**
+  (radon), not `swarm.tick` (cc=96). An earlier draft used a homemade AST
+  branch-count and crowned the wrong function; routing to radon fixed it.
+- **Phantom deps confirm.** The runner flags **1** candidate (`run_agent` @
+  `build_engine.py:100`) at MEDIUM. The mandatory confirm step shows it is imported
+  after `sys.path.insert(HERMES_DIR)` — an external local module, **not** a
+  hallucinated PyPI package. True phantom count for this repo: **0**. This is the
+  signal's MEDIUM confidence and "confirm with" discipline doing their job.
+
+**Trend lever:** **2** of these signals sit on the repo's quality ratchet today
+(`largest_module_lines` → god objects, `silent_exception_swallows` → silent
+swallows). The other axes are *ratchetable* but not yet gated — claiming otherwise
+would be the exact overclaim this library exists to kill.
+
+This is the whole library in one number — decomposable, instrument-backed, honest
+about the clean axes, honest about what is *not* yet ratcheted, and reproducible by
+re-running the one command above.
 
 ## Changelog
 
-- **v0.0.2** (2026-06-27) — **correction after adversarial review.** Three real
-  defects fixed: (1) complexity row used the wrong proxy numbers — corrected to radon
-  (`dgc_cli.main` cc 231 is the true #1, not `swarm.tick`; 227 not 161); (2) ratchet
-  coverage overstated as "4 of 8" — truth is **2 of 8**, now disclosed with the other
-  6 marked aspirational; (3) "improving"/"trend-aware" dropped — no trend was measured
-  (churn UNASSESSED). Added per-row **scope disclosure** (the composite mixed
-  `dharma_swarm/`-scoped and whole-repo signals). The flagship now passes its own test.
-- **v0.0.1** (2026-06-25) — flagship composite; 8 orthogonal signals, graded with
-  confidence. *(Numbers/claims superseded by v0.0.2.)*
+- **v0.1.0** (2026-06-27) — regenerated entirely from the `probe/` runner (no
+  hand-written numbers). Fixes three defects from independent review: complexity
+  driver now radon-routed (`dgc_cli.main` cc=231, was the wrong function at a proxy
+  cc~88); ratchet claim corrected to **2 of 8** (was 4); all rows scope-normalized
+  to `dharma_swarm/` (was silently mixing per-package and whole-repo denominators).
+  Adds three new dimensions to the composite: phantom/hallucinated deps, change
+  (logical) coupling, narrative-comment density.
+- **v0.0.1** (2026-06-25) — flagship composite. 8 orthogonal slop signals, each
+  routed to a real instrument and graded with confidence; composite + driving
+  signals + highest-leverage fix; ratchet-wired for trend.
