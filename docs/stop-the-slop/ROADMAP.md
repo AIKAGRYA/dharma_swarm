@@ -39,20 +39,27 @@ new angles added below.
 
 _(backlog markers below are historical; all are now ✅.)_
 
-## v0.1.0 — TOP PRIORITY: the runner (from adversarial review)
+## v0.1.0 — SHIPPED: the runner (from adversarial review)
 
 An external reviewer ran 5 prompts and found the cardinal sin: 2 of 5 demos didn't
 reproduce (complexity used a homemade proxy instead of the named `radon`; the cycle
 "shipped→0" was true only on an unmerged branch; the flagship overstated ratchet
-coverage 4→2 and mixed scopes). **Fixed in v0.0.2** of those three prompts, and a
-**runner** shipped (`runner/slop_probe.py`) so demos are executable, not prose.
+coverage 4→2 and mixed scopes). All three are corrected **and** an executable runner
+is shipped so demos are run, not trusted.
 
-- ▶ **runner: a script per prompt** — extend `slop_probe.py` to every prompt that
-  names a tool; **regenerate every Demonstration run from runner output** so "trust
-  the markdown" becomes "run it yourself." The single highest-leverage fix.
+- ✅ **runner shipped: `probe/`** — a package (`_common.py`, `signals.py`, `probe.py`,
+  `test_probe.py`) covering **11 signals**, each routed to its real instrument (radon,
+  npm/pip audit, git log, AST, PyPI). It operationalizes the confidence rubric,
+  enforces return-clean, and has self-tests proving return-clean AND detection.
+  (Supersedes the first-cut `runner/slop_probe.py` from v0.0.2, now folded in.)
+- ✅ **confidence rubric** — HIGH/MEDIUM/LOW/UNASSESSED defined in `FOUNDATIONS.md`;
+  the vibe knob is gone.
+- ✅ **demos regenerated from runner output** for the flagship and the three corrected
+  prompts, plus the three new dimensions.
+- ▶ **runner: every remaining prompt** — extend `probe/signals.py` to the prompts that
+  still carry hand-written demos; regenerate each from runner output.
 - ◻ **advisory-DB provenance** — pin advisory IDs + snapshot date in security/dep demos.
 - ◻ **CI wiring** — wire the runner's RED exits into a check.
-- ◻ **confidence rubric** — define HIGH/MEDIUM/LOW instead of a vibe knob.
 - ◻ **clean-repo + non-Python/JS demos** — prove return-clean & portability off this repo.
 
 ## v0.1.0 — proposed angles (operator greenlight before building)
