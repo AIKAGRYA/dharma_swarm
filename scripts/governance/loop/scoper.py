@@ -41,6 +41,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import subprocess
 import sys
@@ -110,19 +111,18 @@ def prompt_to_council(prompt_id: str) -> str | None:
 
 
 def _match_glob(pattern: str, path: str) -> bool:
-    """Match a path against a glob pattern that supports ``**``.
+    """Match a path against a glob pattern using the stdlib ``fnmatch`` engine.
 
-    ``**`` matches any number of path segments (including zero); ``*`` matches
-    within a single segment. The match is path-segment aware so ``tests/**``
-    matches ``tests/foo/bar.py`` but ``tests`` alone is matched literally.
+    ``fnmatch`` treats ``*`` as matching any run of characters (including path
+    separators) and ``**`` identically, so ``tests/**`` matches
+    ``tests/foo/bar.py`` and ``dharma_swarm/spine/**`` matches
+    ``dharma_swarm/spine/routing.py``. Literal patterns (e.g.
+    ``dharma_swarm/providers.py``) match exactly.
+
+    ``fnmatchcase`` is used (not ``fnmatch``) for platform-independent,
+    case-sensitive matching — deterministic across macOS/Linux.
     """
-    pat = pattern.replace("**", "\x00")
-    pat = pat.replace("*", "[!/]*").replace("\x00", "*")
-    pat = pat.replace("?", "[!/]")
-    regex = "^" + pat + "$"
-    import re
-
-    return re.match(regex, path) is not None
+    return fnmatch.fnmatchcase(path, pattern)
 
 
 def map_file_to_prompts(path: str) -> list[str]:
