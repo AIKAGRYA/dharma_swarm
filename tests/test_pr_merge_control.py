@@ -267,6 +267,280 @@ def test_select_fanout_items_prefers_allowed_statuses_in_order():
     assert [item["number"] for item in selected] == [12, 13, 11]
 
 
+def _write_current_fanout_packet(
+    state_root,
+    *,
+    pr_number=12,
+    head_sha="abc123",
+    base_sha="base123",
+    updated_at="2026-06-01T02:00:00Z",
+    gate_decision="MERGE_CANDIDATE",
+):
+    packet_dir = state_root / f"pr-{pr_number}" / "20260601T020000Z"
+    packet_dir.mkdir(parents=True)
+    prc.write_json(
+        packet_dir / "FACTS.json",
+        {
+            "pr": {
+                "number": pr_number,
+                "headRefOid": head_sha,
+                "baseRefOid": base_sha,
+                "updatedAt": updated_at,
+            },
+            "classification": {
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "reviewDecision": "NONE",
+            },
+        },
+    )
+    prc.write_json(packet_dir / "MERGE_GATE.json", {"decision": gate_decision, "blockers": []})
+    return packet_dir
+
+
+def test_select_fanout_plan_skips_current_packet_gate(tmp_path):
+    packet_dir = _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "already packeted",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            },
+            {
+                "number": 13,
+                "title": "new work",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T03:00:00Z",
+                "reviewDecision": "NONE",
+            },
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [13]
+    assert plan["skipped_current"][0]["number"] == 12
+    assert plan["skipped_current"][0]["packet_dir"] == str(packet_dir)
+
+
+def test_select_fanout_plan_reprocesses_when_pr_updated_timestamp_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, updated_at="2026-06-01T02:00:00Z")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "metadata changed",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_when_head_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, head_sha="abc123")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new head",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "def456",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:05:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_when_base_changes(tmp_path):
+    _write_current_fanout_packet(tmp_path, base_sha="base123")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "new base",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base456",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_reprocesses_blocked_gate(tmp_path):
+    _write_current_fanout_packet(tmp_path, gate_decision="BLOCKED")
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "blocked gate",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_can_force_reprocess_current(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "force",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=1,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert [item["number"] for item in plan["selected"]] == [12]
+    assert plan["skipped_current"] == []
+
+
+def test_select_fanout_plan_zero_max_selects_none(tmp_path):
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "would otherwise select",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=False,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
+def test_select_fanout_plan_zero_max_does_not_scan_current_packets(tmp_path):
+    _write_current_fanout_packet(tmp_path)
+    summary = {
+        "items": [
+            {
+                "number": 12,
+                "title": "current but disabled",
+                "status": "GITHUB_GREEN_NEEDS_PACKET",
+                "head_sha": "abc123",
+                "base_sha": "base123",
+                "updatedAt": "2026-06-01T02:00:00Z",
+                "reviewDecision": "NONE",
+            }
+        ]
+    }
+
+    plan = prc.select_fanout_plan(
+        summary,
+        statuses=["GITHUB_GREEN_NEEDS_PACKET"],
+        max_prs=0,
+        state_root=tmp_path,
+        skip_current=True,
+    )
+
+    assert plan == {"selected": [], "skipped_current": []}
+
+
+def test_should_skip_current_fanout_only_for_packet_only_off_mode():
+    base = {
+        "reprocess_current": False,
+        "packet_only": True,
+        "merge_mode": "off",
+    }
+
+    assert prc.should_skip_current_fanout(argparse.Namespace(**base)) is True
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "packet_only": False})) is False
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "merge_mode": "auto-when-clean"})) is False
+    assert prc.should_skip_current_fanout(argparse.Namespace(**{**base, "reprocess_current": True})) is False
+
+
 def test_build_queue_summary_counts_statuses():
     prs = [
         {
