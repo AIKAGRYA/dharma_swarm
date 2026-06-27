@@ -43,15 +43,13 @@ from pathlib import Path
 
 from scripts.governance.loop.oracle import CIOracle, GateResult
 from scripts.governance.loop.runs import Run, RunManager
+from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
 from scripts.governance.loop.warrant import Warrant, WarrantError
-
-# The existing on-main ratchet engine (VAL-LEARN-002: drive this, not a parallel one).
-from scripts.governance.hygiene import ratchet as ratchet_engine  # noqa: F401 (drives existing engine)
-from scripts.governance.hygiene import promote as promote_engine  # noqa: F401 (drives existing engine)
 
 DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
 RATCHET_SCRIPT = "scripts/governance/hygiene/ratchet.py"
 PROMOTE_SCRIPT = "scripts/governance/hygiene/promote.py"
+DEFAULT_CI_WORKFLOW = ".github/workflows/loop-ratchet-gates.yml"
 
 
 def _emit_error(message: str) -> int:
@@ -85,8 +83,10 @@ class RatchetRecord:
     root_cause: str = ""
     fix_patch_ref: str = ""
     new_gate: dict = field(default_factory=dict)
-    prevents_recurrence: bool = True
+    prevents_recurrence: bool = False
+    prevents_recurrence_note: str = ""
     ci_receipt_ref: str = ""
+    promote_deferral: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -97,7 +97,9 @@ class RatchetRecord:
                 "fix_patch_ref": self.fix_patch_ref,
                 "new_gate": self.new_gate,
                 "prevents_recurrence": self.prevents_recurrence,
+                "prevents_recurrence_note": self.prevents_recurrence_note,
                 "ci_receipt_ref": self.ci_receipt_ref,
+                "promote_deferral": self.promote_deferral,
             }
         }
 
@@ -236,6 +238,62 @@ def _drive_ratchet_engine(oracle: CIOracle, repo_root: Path) -> dict:
     }
 
 
+def _assess_prevents_recurrence(
+    run: Run,
+    red_before_ref: str,
+    green_after_ref: str,
+) -> tuple[bool, str]:
+    """Honestly assess whether the new_gate prevents recurrence (VAL-LEARN-008).
+
+    Returns (prevents_recurrence, note). True only when the new_gate has a real
+    red_before_ref receipt proving the slop class existed (non-zero exit) AND a
+    green_after_ref receipt proving the gate passes after the fix (zero exit).
+    False (with a note) otherwise — never hardcoded True.
+    """
+    red_path = run.run_dir / red_before_ref
+    if not red_path.is_file():
+        return False, f"red_before_ref receipt not found: {red_before_ref}"
+    green_path = run.run_dir / green_after_ref
+    if not green_path.is_file():
+        return False, f"green_after_ref receipt not found: {green_after_ref}"
+
+    import json
+
+    red_receipt = json.loads(red_path.read_text())
+    green_receipt = json.loads(green_path.read_text())
+
+    red_exit = red_receipt.get("exit_code")
+    if red_exit is None or red_exit == 0:
+        return False, f"red_before_ref receipt exit_code={red_exit} — no genuine red (slop must have existed)"
+
+    green_exit = green_receipt.get("exit_code")
+    if green_exit is None or green_exit != 0:
+        return False, f"green_after_ref receipt exit_code={green_exit} — no genuine green (gate must pass after fix)"
+
+    return True, "red_before_ref shows non-zero (slop existed), green_after_ref shows zero (gate passes after fix)"
+
+
+def _promote_deferral_note(finding: dict, fix_proposal: dict) -> str:
+    """Document concretely why promote.py is deferred for this finding (VAL-LEARN-002).
+
+    promote.py moves a hygiene pattern through the lifecycle (advisory -> enforced).
+    In M1 stub mode the finding is synthetic — there is no real hygiene pattern
+    in ``docs/governance/hygiene/patterns/`` to promote. An advisory->enforced
+    promotion is therefore not warranted. The ratchet engine (ratchet.py) IS
+    driven via subprocess (see ``_drive_ratchet_engine``); promote.py is deferred
+    until a real hygiene pattern exists to promote.
+    """
+    failure_class = finding.get("failure_class", "UNKNOWN")
+    return (
+        f"promote.py deferred: no real hygiene pattern for {failure_class} in "
+        f"docs/governance/hygiene/patterns/ (M1 stub mode — synthetic finding). "
+        f"ratchet.py was driven via subprocess for a state receipt; "
+        f"promote.py (advisory->enforced promotion) is not warranted until a "
+        f"real pattern exists. PROMOTE_SCRIPT={PROMOTE_SCRIPT} available for "
+        f"subprocess invocation when a promotion is warranted."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Receipt + record writers
 # ---------------------------------------------------------------------------
@@ -326,6 +384,30 @@ def _write_defer_record(run: Run, finding_id: str, reason: str) -> str:
     return _relative_ref(run, path)
 
 
+def _write_ci_wire_receipt(
+    run: Run,
+    finding_id: str,
+    workflow_path: Path,
+    gate_id: str,
+    gate_name: str,
+    gate_command: str,
+    added: bool,
+) -> str:
+    receipt = {
+        "kind": "ci_wire",
+        "finding_id": finding_id,
+        "workflow_path": str(workflow_path),
+        "gate_id": gate_id,
+        "gate_name": gate_name,
+        "gate_command": gate_command,
+        "added": added,
+        "timestamp_utc": _utc_now_iso(),
+    }
+    path = run.receipt_path(f"ci_wire_receipt_{finding_id}.json")
+    run.write_json(path, receipt)
+    return _relative_ref(run, path)
+
+
 # ---------------------------------------------------------------------------
 # Stage core
 # ---------------------------------------------------------------------------
@@ -339,6 +421,8 @@ def _process_finding(
     oracle: CIOracle,
     repo_root: Path,
     ci_gate_command: str,
+    wire_ci: bool = False,
+    ci_workflow: Path | None = None,
 ) -> tuple[int, str]:
     """Process a single confirmed finding through the learn stage.
 
@@ -388,7 +472,15 @@ def _process_finding(
         green_after_ref=ci_receipt_ref,
     )
 
-    # 8. Build the ratchet record (§6.4).
+    # 8. Honestly assess prevents_recurrence from receipt evidence (VAL-LEARN-008).
+    prevents, prevents_note = _assess_prevents_recurrence(
+        run, red_before_ref, ci_receipt_ref,
+    )
+
+    # 9. Document promote.py deferral concretely (VAL-LEARN-002).
+    promote_note = _promote_deferral_note(finding, fp)
+
+    # 10. Build the ratchet record (§6.4).
     root_cause = finding.get("observed", finding.get("title", ""))
     ratchet = RatchetRecord(
         run_id=run.run_id,
@@ -396,13 +488,15 @@ def _process_finding(
         root_cause=root_cause,
         fix_patch_ref=fp.get("patch_ref", ""),
         new_gate=new_gate,
-        prevents_recurrence=True,
+        prevents_recurrence=prevents,
+        prevents_recurrence_note=prevents_note,
         ci_receipt_ref=ci_receipt_ref,
+        promote_deferral=promote_note,
     )
     ratchet_path = run.ratchet_path(finding_id)
     run.write_yaml(ratchet_path, ratchet.to_dict())
 
-    # 9. Build the ledger entry (§6.5).
+    # 11. Build the ledger entry (§6.5).
     commit = _git_commit(repo_root)
     ledger = LedgerEntry(
         timestamp_utc=_utc_now_iso(),
@@ -417,8 +511,32 @@ def _process_finding(
     ledger_path = run.ledger_entry_path(finding_id)
     run.write_yaml(ledger_path, ledger.to_dict())
 
-    # 10. Update the run manifest.
-    run.add_gate({
+    ci_wire_ref = ""
+    if wire_ci:
+        workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
+        gate_name = f"{finding_id}: {failure_class}"
+        try:
+            added = wire_gate(
+                workflow_path,
+                gate_id=finding_id,
+                name=gate_name,
+                command=new_gate["location"] or ci_gate_command,
+            )
+        except WorkflowError as exc:
+            sys.stderr.write(f"finding {finding_id}: CI workflow wiring failed — {exc}\n")
+            return 2, "error"
+        ci_wire_ref = _write_ci_wire_receipt(
+            run=run,
+            finding_id=finding_id,
+            workflow_path=workflow_path,
+            gate_id=finding_id,
+            gate_name=gate_name,
+            gate_command=new_gate["location"] or ci_gate_command,
+            added=added,
+        )
+
+    # 12. Update the run manifest.
+    gate_manifest = {
         "finding_id": finding_id,
         "kind": new_gate["kind"],
         "location": new_gate["location"],
@@ -426,7 +544,10 @@ def _process_finding(
         "ledger_ref": _relative_ref(run, ledger_path),
         "ci_receipt_ref": ci_receipt_ref,
         "ratchet_engine_receipt_ref": ratchet_receipt_ref,
-    })
+    }
+    if ci_wire_ref:
+        gate_manifest["ci_wire_receipt_ref"] = ci_wire_ref
+    run.add_gate(gate_manifest)
 
     sys.stdout.write(
         f"finding {finding_id}: RATCHETED — new gate ({new_gate['kind']}) at "
@@ -441,6 +562,8 @@ def run_learn(
     oracle: CIOracle,
     repo_root: Path,
     ci_gate_command: str | None = None,
+    wire_ci: bool = False,
+    ci_workflow: Path | None = None,
 ) -> int:
     """Execute Stage 5 (learn/ratchet) for all confirmed findings.
 
@@ -505,6 +628,8 @@ def run_learn(
 
         rc, status = _process_finding(
             finding, fp_doc, vv, run, oracle, repo_root, gate_cmd,
+            wire_ci=wire_ci,
+            ci_workflow=ci_workflow,
         )
         if status == "ratcheted":
             ratcheted += 1
@@ -550,6 +675,16 @@ def main(argv: list[str] | None = None) -> int:
         default=str(Path(__file__).resolve().parents[3]),
         help="git repo root (default: mission worktree)",
     )
+    parser.add_argument(
+        "--wire-ci",
+        action="store_true",
+        help="wire ratcheted gates into loop-ratchet-gates.yml (Phase 3 path)",
+    )
+    parser.add_argument(
+        "--ci-workflow",
+        default=None,
+        help=f"workflow path for --wire-ci (default: {DEFAULT_CI_WORKFLOW})",
+    )
     args = parser.parse_args(argv)
 
     warrant_path = Path(args.warrant)
@@ -564,7 +699,16 @@ def main(argv: list[str] | None = None) -> int:
     # Create the oracle for gate runs.
     oracle = CIOracle(python=DEFAULT_PYTHON, repo_root=repo_root)
 
-    return run_learn(warrant_path, run, oracle, repo_root, ci_gate_command=args.ci_gate)
+    ci_workflow = Path(args.ci_workflow) if args.ci_workflow else None
+    return run_learn(
+        warrant_path,
+        run,
+        oracle,
+        repo_root,
+        ci_gate_command=args.ci_gate,
+        wire_ci=args.wire_ci,
+        ci_workflow=ci_workflow,
+    )
 
 
 if __name__ == "__main__":
