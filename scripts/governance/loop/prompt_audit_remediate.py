@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -47,6 +48,11 @@ from datetime import datetime, timezone
 from fnmatch import fnmatch
 from pathlib import Path
 
+from scripts.governance.loop.agent_backend import (
+    ApiBackend,
+    BackendError,
+    DroidBackend,
+)
 from scripts.governance.loop.anti_gaming import run_anti_gaming_check
 from scripts.governance.loop.oracle import CIOracle
 from scripts.governance.loop.runs import Run, RunManager
@@ -166,6 +172,69 @@ class StubImplementer(ImplementerBackend):
         ]
 
 
+class DroidImplementer(StubImplementer):
+    """Implementer wrapper that invokes Droid in an isolated role session."""
+
+    def __init__(
+        self,
+        droid_path: str | Path | None = None,
+        cwd: str | Path | None = None,
+    ) -> None:
+        self.backend = DroidBackend(droid_path=droid_path, cwd=cwd)
+        self._last_invocation = None
+
+    def plan(self, finding: dict, write_set: list[str]) -> ImplementerPlan:
+        prompt = (
+            "ROLE: Implementer\n"
+            "Propose a minimal fix under the warrant write_set. "
+            "Do not claim truth; deterministic gates decide.\n"
+            f"finding: {finding}\n"
+            f"write_set: {write_set}\n"
+        )
+        self._last_invocation = self.backend.invoke(
+            "implementer",
+            prompt,
+            {
+                "finding_id": finding.get("finding_id"),
+                "severity": finding.get("severity"),
+                "write_set": write_set,
+            },
+        )
+        return super().plan(finding, write_set)
+
+    def invocation_receipt(self) -> dict | None:
+        if self._last_invocation is None:
+            return None
+        return self._last_invocation.to_receipt()
+
+
+class ApiImplementer(StubImplementer):
+    """Keyless-safe API implementer wrapper."""
+
+    def __init__(self) -> None:
+        self.backend = ApiBackend()
+        self._last_invocation = None
+
+    def plan(self, finding: dict, write_set: list[str]) -> ImplementerPlan:
+        self._last_invocation = self.backend.invoke(
+            "implementer",
+            "ROLE: Implementer\nAPI backend degradation-safe proposal request.",
+            {
+                "finding_id": finding.get("finding_id"),
+                "severity": finding.get("severity"),
+                "write_set": write_set,
+            },
+        )
+        if self._last_invocation.return_code != 0:
+            raise BackendError(self._last_invocation.stdout)
+        return super().plan(finding, write_set)
+
+    def invocation_receipt(self) -> dict | None:
+        if self._last_invocation is None:
+            return None
+        return self._last_invocation.to_receipt()
+
+
 def get_implementer(name: str | None = None) -> ImplementerBackend:
     """Return the implementer selected by ``name`` or ``LOOP_AGENT_BACKEND`` env var.
 
@@ -174,9 +243,12 @@ def get_implementer(name: str | None = None) -> ImplementerBackend:
     impl_name = name or os.environ.get("LOOP_AGENT_BACKEND", "stub")
     if impl_name == "stub":
         return StubImplementer()
+    if impl_name == "droid":
+        return DroidImplementer()
+    if impl_name == "api":
+        return ApiImplementer()
     raise NotImplementedError(
-        f"implementer backend {impl_name!r} is not implemented in Phase 1 "
-        f"(stub|droid|api; droid/api arrive in M2). Set LOOP_AGENT_BACKEND=stub for deterministic testing."
+        f"unknown implementer backend {impl_name!r}; expected stub|droid|api"
     )
 
 
@@ -211,15 +283,32 @@ def _worktree_path(worktree_root: Path, finding_id: str) -> Path:
     return worktree_root / f"ds_loop_fix_{finding_id}"
 
 
+@dataclass
+class WorktreeCreateResult:
+    """Result of creating a temporary fix worktree."""
+
+    ok: bool
+    stderr: str = ""
+
+
+def _branch_safe(value: str) -> str:
+    """Return a conservative git-ref segment from a run/finding id."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-") or "unknown"
+
+
+def _fix_branch_name(run_id: str, finding_id: str) -> str:
+    return f"fix/{_branch_safe(run_id)}-{_branch_safe(finding_id)}"
+
+
 def create_worktree(
     repo_root: Path,
     worktree_path: Path,
     branch_name: str,
     base_ref: str,
-) -> bool:
+) -> WorktreeCreateResult:
     """Create an isolated git worktree off ``base_ref``.
 
-    Returns True on success, False on failure (caller handles graceful abort).
+    Returns a structured result so callers can report the exact git failure.
     """
     proc = subprocess.run(
         ["git", "-C", str(repo_root), "worktree", "add", str(worktree_path),
@@ -227,7 +316,7 @@ def create_worktree(
         capture_output=True,
         text=True,
     )
-    return proc.returncode == 0
+    return WorktreeCreateResult(ok=proc.returncode == 0, stderr=proc.stderr.strip())
 
 
 def cleanup_worktree(repo_root: Path, worktree_path: Path, branch_name: str) -> None:
@@ -277,20 +366,22 @@ class FixProposal:
     green_after: dict = field(default_factory=dict)
     proof_mode: str = "none"
     anti_gaming_checklist: dict = field(default_factory=dict)
+    implementer_invocation: dict | None = None
 
     def to_dict(self) -> dict:
-        return {
-            "fix_proposal": {
-                "run_id": self.run_id,
-                "finding_id": self.finding_id,
-                "write_set_used": self.write_set_used,
-                "patch_ref": self.patch_ref,
-                "red_before": self.red_before,
-                "green_after": self.green_after,
-                "proof_mode": self.proof_mode,
-                "anti_gaming_checklist": self.anti_gaming_checklist,
-            }
+        payload = {
+            "run_id": self.run_id,
+            "finding_id": self.finding_id,
+            "write_set_used": self.write_set_used,
+            "patch_ref": self.patch_ref,
+            "red_before": self.red_before,
+            "green_after": self.green_after,
+            "proof_mode": self.proof_mode,
+            "anti_gaming_checklist": self.anti_gaming_checklist,
         }
+        if self.implementer_invocation is not None:
+            payload["implementer_invocation"] = self.implementer_invocation
+        return {"fix_proposal": payload}
 
 
 def _process_finding(
@@ -311,7 +402,11 @@ def _process_finding(
     write_set = warrant.write_set
 
     # 1. Determine proof_mode.
-    plan = implementer.plan(finding, write_set)
+    try:
+        plan = implementer.plan(finding, write_set)
+    except BackendError as exc:
+        sys.stderr.write(f"finding {finding_id}: implementer backend failed — {exc}\n")
+        return 2, "error"
     if plan.proof_mode == "none":
         sys.stdout.write(
             f"finding {finding_id}: proof_mode=none — routing to DEFER (no fix attempted)\n"
@@ -321,12 +416,14 @@ def _process_finding(
     # 2. Create isolated worktree off base_ref.
     base_ref = warrant.scope.get("base_ref", "HEAD")
     wt_path = _worktree_path(worktree_root, finding_id)
-    branch_name = f"fix/{finding_id}"
+    branch_name = _fix_branch_name(run.run_id, finding_id)
 
-    if not create_worktree(repo_root, wt_path, branch_name, base_ref):
+    created = create_worktree(repo_root, wt_path, branch_name, base_ref)
+    if not created.ok:
+        detail = f" ({created.stderr})" if created.stderr else ""
         sys.stderr.write(
             f"finding {finding_id}: worktree creation failed at {wt_path} "
-            f"off {base_ref} — aborting (no fix_proposal written)\n"
+            f"off {base_ref}{detail} — aborting (no fix_proposal written)\n"
         )
         return 2, "error"
 
@@ -396,6 +493,11 @@ def _process_finding(
             },
             proof_mode=plan.proof_mode,
             anti_gaming_checklist=ag_result.to_dict(),
+            implementer_invocation=(
+                implementer.invocation_receipt()
+                if hasattr(implementer, "invocation_receipt")
+                else None
+            ),
         )
         fp_path = run.fix_proposal_path(finding_id)
         run.write_yaml(fp_path, proposal.to_dict())
@@ -520,7 +622,7 @@ def main(argv: list[str] | None = None) -> int:
     # Select the implementer backend.
     try:
         implementer = get_implementer(args.backend)
-    except NotImplementedError as exc:
+    except (BackendError, NotImplementedError) as exc:
         return _emit_error(f"implementer selection failed: {exc}")
 
     # Open the run dir.

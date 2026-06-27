@@ -31,7 +31,7 @@ import json
 import sys
 from pathlib import Path
 
-from scripts.governance.loop.agent_backend import AgentBackend, get_backend
+from scripts.governance.loop.agent_backend import AgentBackend, BackendError, get_backend
 from scripts.governance.loop.councils import resolve_prompt_path
 from scripts.governance.loop.runs import Run, RunManager
 from scripts.governance.loop.scoper import prompt_to_council
@@ -100,7 +100,13 @@ def run_audit(
             )
         prompt_text = _resolve_prompt_text(prompt_id, council_id, root)
 
-        audit_doc = backend.audit(prompt_id, council_id, prompt_text, dict(context))
+        try:
+            audit_doc = backend.audit(prompt_id, council_id, prompt_text, dict(context))
+        except BackendError as exc:
+            return _emit_error(
+                f"auditor backend failed for prompt {prompt_id!r} — hard abort (exit 2). "
+                f"Error: {exc}"
+            )
 
         # Hard gate: validate BEFORE writing. Schema-invalid = abort, no artifact.
         result = validate_audit_doc(audit_doc, repo_root=root)
@@ -143,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     # Select the backend (env var or explicit --backend).
     try:
         backend = get_backend(args.backend)
-    except NotImplementedError as exc:
+    except (BackendError, NotImplementedError) as exc:
         return _emit_error(f"backend selection failed: {exc}")
 
     # Open the run dir.
