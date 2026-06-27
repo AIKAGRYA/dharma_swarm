@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -374,7 +374,29 @@ operator-prod-smoke:
 # convergence). It is intentionally NOT a separate governance-all
 # dependency — running it once via uplift-guards is enough. The standalone
 # `make spine-check` target stays as an operator-convenience alias only.
-governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity
+governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget docops-integrity claim-evidence-check
+
+# Pudgala Forge (graded claim/evidence binding). claim-evidence-check is
+# STAGE-DRIVEN: it blocks iff the AI-M1 hygiene pattern is at stage 'enforced'
+# (operator-promoted via scripts/governance/hygiene/promote.py). AI-M1 is advisory
+# today and binding_stage() fail-safes to advisory, so this exits 0 in
+# governance-all NOW and starts blocking the moment AI-M1 is promoted — ONE switch
+# (the stage), no separate --warn-only flag to also remember to drop. It reports
+# per-track strongest evidence grade vs required min_evidence_grade so existence-
+# only "shipped" claims surface. (Force advisory anywhere with --warn-only; force
+# blocking with --enforce.) claim-evidence (below) appends the receipt.
+claim-evidence-check:
+	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py
+
+claim-evidence:
+	$(REPO_PYTHON) scripts/governance/check_claim_evidence_binding.py --warn-only --emit-receipt
+
+# S6 mutation gate (Pudgala Forge P3-09): runs mutmut on the configured surfaces
+# (pyproject [tool.mutmut]) and writes reports/governance/mutation_score.json, the
+# report the `mutation_score_gte` criterion reads. SLOW — a separate step, NOT in
+# governance-all. Needs `pip install mutmut`.
+mutation-test:
+	$(REPO_PYTHON) scripts/governance/run_mutation_score.py
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
 	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"

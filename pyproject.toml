@@ -62,3 +62,13 @@ filterwarnings = [
     "ignore:'asyncio.set_event_loop_policy' is deprecated and slated for removal in Python 3.16:DeprecationWarning",
     "ignore:`torch.jit.script` is not supported in Python 3.14\\+ and may break\\. Please switch to `torch.compile` or `torch.export`\\.:DeprecationWarning",
 ]
+
+[tool.mutmut]
+# S6 mutation gate (Pudgala Forge P3-09). Scoped to the kernel's load-bearing
+# surface so one run is tractable; widen paths_to_mutate as the gate is adopted.
+# The runner is the kernel's own fast test file, so mutants are scored against
+# meaningful assertions (a trivially-true test lets mutants survive -> low score
+# -> the gate blocks). Produce the report with `make mutation-test`.
+paths_to_mutate = "dharma_swarm/spine/receipt.py"
+runner = "python -m pytest -x -q tests/test_claim_evidence_binding.py"
+tests_dir = "tests/"
