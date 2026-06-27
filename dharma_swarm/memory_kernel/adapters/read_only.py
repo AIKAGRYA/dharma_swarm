@@ -91,6 +91,7 @@ class JsonlReadRecord:
     line_number: int
     payload: dict[str, Any]
     warnings: tuple[str, ...] = ()
+    schema_version: str = "dharma.memory_kernel.jsonl_read_record.v1"
 
 
 class BaseReadOnlyAdapter:

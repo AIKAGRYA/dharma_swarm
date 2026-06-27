@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from dharma_swarm.daemon_config import dharma_state_dir
+
+logger = logging.getLogger(__name__)
 
 REGISTERED_AGENT_UIDS = [
     "codex_composer",
@@ -111,7 +114,8 @@ def _load_agents_json(path: Path) -> dict[str, dict[str, Any]]:
         return {}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        logger.debug("Skipping unreadable A2A agents projection %s: %s", path, exc)
         return {}
     agents = payload.get("agents") if isinstance(payload, dict) else None
     if not isinstance(agents, dict):
@@ -133,7 +137,8 @@ def _load_first_json(paths: list[Path]) -> tuple[dict[str, Any], Path]:
             continue
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Skipping unreadable agent presence payload %s: %s", path, exc)
             payload = {}
         return (payload if isinstance(payload, dict) else {}, path)
     return {}, paths[0]

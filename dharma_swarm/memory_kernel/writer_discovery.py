@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from dharma_swarm.memory_kernel.writer_models import (
     DiscoveryTriageCategory,
     MemoryWriterSpec,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _symbol_exists(source_path: Path, symbol: str) -> bool:
@@ -320,7 +323,8 @@ def _assigned_names(target: ast.AST) -> set[str]:
 def _safe_unparse(node: ast.AST) -> str:
     try:
         return ast.unparse(node)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Falling back after AST unparse failed for %s: %s", node.__class__.__name__, exc)
         return node.__class__.__name__
 
 

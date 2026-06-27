@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict debug-corral debug-corral-deep debug-corral-strict debug-corral-full hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -82,6 +82,9 @@ help:
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
+	@echo "  make debug-corral One door for ALL self-debug: anti-slop signals + ratchet + broken/mismatch/loop maps + corral"
+	@echo "  make debug-corral-strict  Same + run the core gate battery (fails on RED)"
+	@echo "  make debug-corral-full    Maximal local debug view: deep static signals + strict gates + specialist probes"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
 	@echo "  make status       Quick cross-agent state snapshot (PRs, stale, hotlist, track)"
@@ -279,6 +282,22 @@ verify-corral:
 
 verify-corral-strict:
 	$(PYTHON) scripts/governance/verify_corral_findings.py --strict
+
+# DE-BUG CORRAL — one door for the whole self-debug system. Projects from existing
+# owners (anti-slop signals, the ratchet, BROKEN_REGISTER, the mismatch/loop maps,
+# the corral findings) into one render; creates no new authority. Sibling to
+# onboard/orient. `-strict` runs the core gate battery and fails on RED.
+debug-corral:
+	$(REPO_PYTHON) scripts/governance/debug_corral.py
+
+debug-corral-deep:
+	$(REPO_PYTHON) scripts/governance/debug_corral.py --deep
+
+debug-corral-strict:
+	$(REPO_PYTHON) scripts/governance/debug_corral.py --strict --deep
+
+debug-corral-full:
+	$(REPO_PYTHON) scripts/governance/debug_corral.py --full
 
 hygiene-delta-ratchet:
 	$(PYTHON) scripts/governance/hygiene/delta_ratchet.py \

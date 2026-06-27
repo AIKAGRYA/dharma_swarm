@@ -77,6 +77,8 @@ class EvidenceReceipt:
     # Free-form attributes
     attributes: dict[str, Any] = field(default_factory=dict)
 
+    schema_version: str = "dharma.spine.evidence_receipt.v1"
+
     def to_otel_span(self) -> dict[str, Any]:
         """Serialize as OTel GenAI span attributes."""
         attrs: dict[str, Any] = {

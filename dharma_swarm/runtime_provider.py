@@ -7,6 +7,7 @@ ModelRouter policy and provider implementations unchanged.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 from dataclasses import dataclass
@@ -50,6 +51,8 @@ from dharma_swarm.ollama_config import (
     resolve_ollama_base_url,
     resolve_ollama_model,
 )
+
+logger = logging.getLogger(__name__)
 
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -263,6 +266,7 @@ def resolve_runtime_provider_config(
                 api_key=token,
             )
         except Exception:
+            logger.debug("Failed to build Ollama headers; continuing without headers", exc_info=True)
             metadata["headers"] = {}
         return RuntimeProviderConfig(
             provider=provider,
@@ -686,6 +690,7 @@ async def complete_via_preferred_runtime_providers(
                 response = await provider.complete(request)
             return response, config
         except Exception as exc:
+            logger.debug("Runtime provider %s failed; trying next provider", config.provider, exc_info=True)
             last_exc = exc
         finally:
             close = getattr(provider, "close", None)

@@ -601,7 +601,7 @@ def _inherit_trace_id() -> str:
         if corr.trace_id:
             return corr.trace_id
     except Exception:
-        pass
+        logger.debug("Unable to read correlation context for A2A server trace inheritance", exc_info=True)
     return f"trc_{uuid.uuid4().hex[:16]}"
 
 

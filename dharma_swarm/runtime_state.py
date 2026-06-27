@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import sqlite3
 from dataclasses import dataclass, field, replace
@@ -28,6 +29,7 @@ from dharma_swarm.engine.event_memory import (
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
 DEFAULT_RUNTIME_DB = Path.home() / ".dharma" / "state" / "runtime.db"
+logger = logging.getLogger(__name__)
 
 _SESSIONS_DDL = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -369,7 +371,8 @@ def _json_load(raw: str | None, fallback: Any) -> Any:
         return fallback
     try:
         return json.loads(raw)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Falling back after JSON load failed: %s", exc)
         return fallback
 
 
@@ -378,7 +381,8 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
     try:
         return datetime.fromisoformat(raw)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Ignoring unparsable datetime %r: %s", raw, exc)
         return None
 
 
@@ -478,8 +482,8 @@ async def ensure_runtime_state_schema_async(
     ):
         try:
             await db.execute(f"ALTER TABLE {tbl} ADD COLUMN {column_sql}")
-        except Exception:
-            pass  # column already exists
+        except Exception as exc:
+            logger.debug("Skipping runtime schema migration for %s.%s: %s", tbl, column_sql, exc)
     for idx in _INDEXES:
         await db.execute(idx)
     if include_memory_plane:
@@ -561,6 +565,7 @@ class ArtifactRecord:
     promotion_state: str = "ephemeral"
     created_at: datetime = field(default_factory=_utc_now)
     metadata: dict[str, Any] = field(default_factory=dict)
+    schema_version: str = "dharma.runtime.artifact_record.v1"
 
 
 @dataclass(frozen=True)
@@ -607,6 +612,7 @@ class ContextBundleRecord:
     checksum: str = ""
     created_at: datetime = field(default_factory=_utc_now)
     metadata: dict[str, Any] = field(default_factory=dict)
+    schema_version: str = "dharma.runtime.context_bundle_record.v1"
 
 
 @dataclass(frozen=True)
@@ -635,6 +641,7 @@ class SessionEventRecord:
     event_text: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utc_now)
+    schema_version: str = "dharma.runtime.session_event_record.v1"
 
 
 @dataclass(frozen=True)
@@ -653,6 +660,7 @@ class RuntimeReceipt:
     side_effect_key: str = ""
     payload: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utc_now)
+    schema_version: str = "dharma.runtime.receipt.v1"
 
 
 @dataclass(frozen=True)
@@ -668,6 +676,7 @@ class IdempotencyRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utc_now)
     updated_at: datetime = field(default_factory=_utc_now)
+    schema_version: str = "dharma.runtime.idempotency_record.v1"
 
 
 def _row_to_session(row: sqlite3.Row | aiosqlite.Row) -> SessionState:
@@ -1412,7 +1421,8 @@ class RuntimeStateStore:
                         continue
                     try:
                         record = json.loads(raw)
-                    except Exception:
+                    except json.JSONDecodeError as exc:
+                        logger.debug("Skipping malformed runtime ledger line in %s: %s", path, exc)
                         continue
                     event = build_session_event_from_ledger_record(
                         session_id=session_id,
