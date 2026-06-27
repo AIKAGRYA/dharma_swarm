@@ -588,7 +588,7 @@ Historical agent identity notes now live at [`docs/_archive/2026-04/AGENT_IDENTI
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **dharma_swarm** (122773 symbols, 206424 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **dharma_swarm** (130947 symbols, 219088 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

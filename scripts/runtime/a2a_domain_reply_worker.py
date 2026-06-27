@@ -24,6 +24,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.runtime.a2a_send import ACK_TIER_NO_CONTACT, resolve_agent_uid  # noqa: E402
+from dharma_swarm.operator_core.semantic_receipt import (  # noqa: E402
+    SemanticReceiptValidationError,
+    validate_semantic_receipt,
+)
 from scripts.runtime.pr_merge_control import (  # noqa: E402
     NATSConfig,
     _nats_config,
@@ -80,6 +84,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
     with os.fdopen(fd, "wb") as handle:
         handle.write(data)
+    path.chmod(0o600)
 
 
 def _safe_token(value: object, *, fallback: str = "unknown") -> str:
@@ -118,6 +123,63 @@ def _artifact_actor(artifact: dict[str, Any]) -> str:
         or artifact.get("agent_uid")
         or ""
     ).strip()
+
+
+def _semantic_claim_requested(artifact: dict[str, Any]) -> bool:
+    return bool(artifact.get("semantic_reply_claim") or artifact.get("peer_model_processed_claim"))
+
+
+def _receipt_matches_reply(
+    receipt: dict[str, Any],
+    *,
+    agent_uid: str,
+    packet_id: str,
+    reply_subject: str,
+) -> bool:
+    if not bool(receipt.get("semantic_reply_claim")):
+        return False
+    if str(receipt.get("agent_uid") or "") != agent_uid:
+        return False
+    if str(receipt.get("correlation_id") or "") != packet_id:
+        return False
+    if str(receipt.get("reply_to") or "") != reply_subject:
+        return False
+    return packet_id in str(receipt.get("review_target") or "")
+
+
+def _validated_semantic_receipt_refs(
+    *,
+    artifact: dict[str, Any],
+    agent_uid: str,
+    packet_id: str,
+    reply_subject: str,
+) -> list[str]:
+    refs = artifact.get("evidence_refs")
+    if not isinstance(refs, list):
+        refs = []
+    semantic_path = artifact.get("semantic_receipt_path")
+    if semantic_path:
+        refs = [*refs, str(semantic_path)]
+
+    valid_refs: list[str] = []
+    for ref in refs:
+        path = Path(str(ref)).expanduser()
+        if not path.exists() or not path.is_file():
+            continue
+        try:
+            payload = _read_json(path)
+            receipt = validate_semantic_receipt(payload)
+        except (OSError, ValueError, SemanticReceiptValidationError, json.JSONDecodeError):
+            continue
+        if not _receipt_matches_reply(
+            receipt,
+            agent_uid=agent_uid,
+            packet_id=packet_id,
+            reply_subject=reply_subject,
+        ):
+            continue
+        valid_refs.append(str(path.resolve()))
+    return list(dict.fromkeys(valid_refs))
 
 
 def _validate_artifact(
@@ -164,6 +226,20 @@ def _validate_artifact(
     if not any(str(artifact.get(key) or "").strip() for key in ("summary", "verdict", "decision")):
         raise ValueError("reply artifact needs summary, verdict, or decision")
 
+    if _semantic_claim_requested(artifact):
+        valid_semantic_refs = _validated_semantic_receipt_refs(
+            artifact=artifact,
+            agent_uid=agent_uid,
+            packet_id=packet_id,
+            reply_subject=reply_subject,
+        )
+        if not valid_semantic_refs:
+            raise ValueError(
+                "semantic reply claims require a linked, validated SemanticReceipt "
+                "with authored_by_model=true and matching agent_uid, packet_id, and reply_subject"
+            )
+        artifact["validated_semantic_receipt_refs"] = valid_semantic_refs
+
 
 def load_domain_reply_target(
     *,
@@ -209,6 +285,14 @@ def build_domain_receipt_payload(target: DomainReplyTarget) -> dict[str, Any]:
         evidence_refs = []
     peer_model_processed = bool(artifact.get("peer_model_processed_claim", False))
     semantic_reply_claim = bool(artifact.get("semantic_reply_claim", peer_model_processed))
+    source_audit_claim = bool(artifact.get("source_audit_claim", False))
+    authenticated_target_runtime_claim = bool(artifact.get("authenticated_target_runtime_claim", False))
+    if source_audit_claim:
+        semantic_audit_depth = "source_audit"
+    elif semantic_reply_claim:
+        semantic_audit_depth = "packet_only"
+    else:
+        semantic_audit_depth = "typed_failure"
     return {
         "schema_version": DOMAIN_RECEIPT_SCHEMA,
         "timestamp": utc_now(),
@@ -219,7 +303,10 @@ def build_domain_receipt_payload(target: DomainReplyTarget) -> dict[str, Any]:
         "domain_receipt": True,
         "semantic_reply_claim": semantic_reply_claim,
         "target_owned_artifact_claim": True,
+        "authenticated_target_runtime_claim": authenticated_target_runtime_claim,
         "peer_model_processed_claim": peer_model_processed,
+        "source_audit_claim": source_audit_claim,
+        "semantic_audit_depth": semantic_audit_depth,
         "author_kind": str(artifact.get("author_kind") or "target_outbox_artifact"),
         "verdict": str(artifact.get("verdict") or artifact.get("decision") or "received"),
         "summary": str(artifact.get("summary") or ""),
@@ -227,12 +314,14 @@ def build_domain_receipt_payload(target: DomainReplyTarget) -> dict[str, Any]:
         "source_artifact_schema": str(artifact.get("schema_version") or artifact.get("schema") or ""),
         "source_artifact_path": str(target.reply_artifact_path),
         "source_artifact_sha256": sha256_file(target.reply_artifact_path),
+        "validated_semantic_receipt_refs": list(artifact.get("validated_semantic_receipt_refs") or []),
         "causation_send_receipt_path": str(target.send_receipt_path),
         "causation_send_receipt_sha256": sha256_file(target.send_receipt_path),
         "operator_contact_note": (
             "target-owned reply artifact was validated and published to the recorded "
             "reply_subject as a typed domain receipt; semantic_reply_claim follows "
-            "the artifact's explicit peer/model-processing claim"
+            "the artifact's explicit peer/model-processing claim; target_owned_artifact_claim "
+            "is a path and metadata ownership claim, not an authenticated target-runtime signature"
         ),
     }
 

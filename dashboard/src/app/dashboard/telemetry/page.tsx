@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { RouteTraceMatrix } from "@/components/dashboard/RouteTraceMatrix";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { colors, glowBorder, glowBox, statusColor } from "@/lib/theme";
 import { timeAgo } from "@/lib/utils";
@@ -98,6 +99,8 @@ export default function TelemetryPage() {
           index={3}
         />
       </div>
+
+      <RouteTraceMatrix routes={routes} policies={policies} isLoading={isLoading} />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <motion.section

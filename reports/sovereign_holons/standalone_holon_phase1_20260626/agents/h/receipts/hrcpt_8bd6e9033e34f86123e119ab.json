@@ -1,0 +1,107 @@
+{
+  "artifact_refs": [],
+  "created_at": "2026-06-26T01:30:54.828664Z",
+  "digest": "sha256:6f91743e659f344cac477e3a33ddbad4f4557a9540218a7e8fb589a39c4136cb",
+  "kind": "holon_supervisor_run",
+  "payload": {
+    "health": {
+      "cycle_count": 7,
+      "holon": "h",
+      "identity_present": true,
+      "kill_requested": false,
+      "last_status": "ran",
+      "living_dock_path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h"
+    },
+    "lock": {
+      "acquired": true,
+      "expires_at": "2026-06-26T01:35:54Z",
+      "holder": "holon-burn-in",
+      "lock_id": "sha256:e18bca7eb28d40b6b51cf0de88d1fd76e92c6fd40a7f167a7311e99409ef0da9",
+      "path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/supervisor.lock",
+      "reason": "",
+      "released": true
+    },
+    "results": [
+      {
+        "artifacts": [],
+        "cost_usd": 0.0,
+        "cycle": 6,
+        "error": "",
+        "finish_reason": "stop",
+        "metadata": {
+          "signal": {
+            "at": "2026-06-26T01:30:54.826714Z",
+            "holon": "h",
+            "schema_version": "holon.compass_signal.v1",
+            "telos_alignment": 0.5
+          }
+        },
+        "model": "holon-echo-v1",
+        "provider": "echo",
+        "provider_attempts": [
+          {
+            "cost_usd": 0.0,
+            "error": "",
+            "finish_reason": "stop",
+            "latency_ms": 0,
+            "model": "holon-echo-v1",
+            "provider": "echo",
+            "status": "success"
+          }
+        ],
+        "receipt_refs": [
+          "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/receipts/hrcpt_1bbd1063372382455ddcf781.json"
+        ],
+        "reply": "[echo:holon-echo-v1] multi-hour continuity burn-in",
+        "status": "ran",
+        "task": "multi-hour continuity burn-in",
+        "tool_calls": [],
+        "verifier_refs": []
+      }
+    ],
+    "service_heartbeat": {
+      "claim_scope": {
+        "clean_completion": true,
+        "lock_acquired": true,
+        "supervisor_started": true
+      },
+      "holon": "h",
+      "observed_at": "2026-06-26T01:30:54Z",
+      "previous_record_hash": "sha256:ff1f7701d1673921936dd798da8b88f40f265d45f7b6ea360689b7b1a4f96d31",
+      "proof_ref": {},
+      "record_hash": "sha256:e26ba0e4e2aa42675d629da782b9eb4c391280bc03d5d2ab0826256a78fd881d",
+      "runtime_ref": {
+        "cycles_attempted": 1,
+        "last_status": "ran",
+        "start_cycle": 6
+      },
+      "schema_version": "holon.service_heartbeat.v1",
+      "service_id": "holon-burn-in",
+      "session_id": "supervisor:h:6",
+      "status": "idle"
+    },
+    "service_liveness": {
+      "age_seconds": 0.0,
+      "fresh": true,
+      "fresh_after_seconds": 300,
+      "heartbeat_path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/service_heartbeats.jsonl",
+      "heartbeat_seen": true,
+      "holon": "h",
+      "latest_observed_at": "2026-06-26T01:30:54Z",
+      "latest_record_hash": "sha256:e26ba0e4e2aa42675d629da782b9eb4c391280bc03d5d2ab0826256a78fd881d",
+      "latest_service_id": "holon-burn-in",
+      "ledger_errors": [],
+      "ledger_ok": true,
+      "schema_version": "holon.service_liveness.v1",
+      "service_alive": true,
+      "status": "idle"
+    },
+    "status": "completed"
+  },
+  "receipt_id": "hrcpt_8bd6e9033e34f86123e119ab",
+  "schema_version": "holon.runtime_receipt.v1",
+  "side_effect_key": "supervisor-run:h:6:1:multi-hour continuity burn-in",
+  "status": "pass",
+  "subject": "h",
+  "verifier_refs": []
+}

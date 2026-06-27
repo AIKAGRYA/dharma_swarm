@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,10 @@ spec = importlib.util.spec_from_file_location("orientation_graph", SCRIPT)
 og = importlib.util.module_from_spec(spec)
 sys.modules["orientation_graph"] = og
 spec.loader.exec_module(og)
+
+
+def _fresh_generated_at() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def test_packet_has_all_axes():
@@ -89,7 +94,7 @@ def test_liveness_projects_daemon_dispatch_without_env_dump(tmp_path, monkeypatc
     receipt.write_text(
         json.dumps({
             "schema_version": "live_ops_census.v1",
-            "generated_at": "2026-06-13T18:57:03Z",
+            "generated_at": _fresh_generated_at(),
             "surfaces": [
                 {
                     "id": "substrate.dharma_daemon",
@@ -259,7 +264,7 @@ def test_liveness_projects_dashboard_proof_gaps_from_census(tmp_path, monkeypatc
     receipt.write_text(
         json.dumps({
             "schema_version": "live_ops_census.v1",
-            "generated_at": "2026-06-13T19:43:30Z",
+            "generated_at": _fresh_generated_at(),
             "surfaces": [
                 {
                     "id": "dashboard.local",
@@ -355,12 +360,13 @@ def test_orientation_subprocess_validates_census_from_repo_root_import_path(
 ):
     state = tmp_path / "state"
     receipt = state / "ops" / "live_process_census.json"
+    generated_at = _fresh_generated_at()
     receipt.parent.mkdir(parents=True)
     receipt.write_text(
         json.dumps(
             {
                 "schema_version": "live_ops_census.v1",
-                "generated_at": "2026-06-14T02:10:00Z",
+                "generated_at": generated_at,
                 "surfaces": [
                     {
                         "id": "substrate.dharma_daemon",
@@ -384,5 +390,5 @@ def test_orientation_subprocess_validates_census_from_repo_root_import_path(
 
     assert result.returncode == 0
     assert "Receipt: " + str(receipt) in result.stdout
-    assert "Generated: 2026-06-14T02:10:00Z" in result.stdout
+    assert f"Generated: {generated_at}" in result.stdout
     assert "No module named 'scripts'" not in result.stdout

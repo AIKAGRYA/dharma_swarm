@@ -36,6 +36,7 @@ DEFAULT_HEARTBEAT_DIR = DEFAULT_A2A_BUS / "bridge_heartbeats"
 STATUS_NO_MESSAGES = "NO_MESSAGES"
 STATUS_DELIVERED_AND_ACKED = "DELIVERED_AND_ACKED"
 STATUS_DELIVERY_FAILED = "DELIVERY_FAILED"
+STATUS_INVALID_ENVELOPE_ACKED = "INVALID_ENVELOPE_ACKED"
 STATUS_NATS_CLIENT_MISSING = "NATS_CLIENT_MISSING"
 
 
@@ -163,6 +164,37 @@ async def process_message(
     receipt = _base_receipt(config, message)
     try:
         payload = _parse_envelope(message)
+    except Exception as exc:
+        envelope_sha = hashlib.sha256(message.data).hexdigest()
+        try:
+            await message.ack()
+            broker_ack = True
+        except Exception as ack_exc:  # pragma: no cover - defensive receipt detail
+            broker_ack = False
+            receipt["broker_ack_error"] = f"{type(ack_exc).__name__}: {ack_exc}"
+        receipt.update(
+            {
+                "status": STATUS_INVALID_ENVELOPE_ACKED,
+                "packet_id": "unknown",
+                "error": f"{type(exc).__name__}: {exc}",
+                "envelope_sha256": envelope_sha,
+                "broker_ack": broker_ack,
+                "broker_nak": False,
+                "envelope_ack_published": False,
+                "contact_evidence_tier": "NO_CONTACT",
+                "collaboration_claim": "none",
+                "poison_message_quarantined": True,
+                "operator_contact_note": (
+                    "invalid non-canonical inbox payload was broker-acked so the "
+                    "durable consumer cannot redeliver it forever"
+                ),
+            }
+        )
+        receipt_path = write_receipt(config.receipt_dir, receipt)
+        receipt["receipt_path"] = str(receipt_path)
+        return receipt
+
+    try:
         packet_id = str(payload.get("packet_id") or "")
         ack_subject = str(payload["ack_subject"])
         envelope_sha = hashlib.sha256(message.data).hexdigest()

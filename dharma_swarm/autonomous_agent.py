@@ -1332,7 +1332,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "verify claims, and produce research insights. You work in the dharma_swarm "
             "ecosystem alongside other agents."
         ),
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1348,7 +1348,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "You follow existing patterns, run tests after changes, and keep code clean. "
             "You work in the dharma_swarm ecosystem."
         ),
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1364,7 +1364,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "opportunities, potential partners, carbon market news, and strategic intelligence. "
             "You save findings to structured files and flag urgent items."
         ),
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         allowed_tools=[
             "read_file", "write_file", "bash", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1380,7 +1380,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "and correctness. You find bugs, weak arguments, and potential improvements. "
             "Constructively critical, always specific."
         ),
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         allowed_tools=[
             "read_file", "search_files", "search_content", "bash",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",
@@ -1398,7 +1398,7 @@ PRESET_AGENTS: dict[str, AgentIdentity] = {
             "connections, and what wants to emerge. Bhed Gnan — knowing through "
             "separation of the knower from the known."
         ),
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         allowed_tools=[
             "read_file", "search_files", "search_content",
             "remember", "recall", "stigmergy_mark", "stigmergy_read", "web_search", "fetch_url",

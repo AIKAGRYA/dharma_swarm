@@ -1,6 +1,6 @@
 # NORTH STAR — the whole vision on one page
 
-**Role:** reference (vision). Operator-authored via interview, 2026-06-11 (locked in same day after a full-day grounding dialogue).
+**Role:** reference (vision), canonical North Star v2. Operator-authored via interview, 2026-06-11 (locked in same day after a full-day grounding dialogue).
 **Authority:** subordinate to `docs/governance/SOVEREIGN_MANIFEST.md` §Telos Hierarchy and `docs/governance/CANONICAL_DOC_STACK.md`. This file is the *why*; it owns no rules and no state.
 **Subordinates / braids (does not replace):** `foundations/FIVE_FOURTEEN_A.md`, `docs/vision_maps/2026-05-07_operating_company_kernel.md`, `docs/vision_maps/MASTER_2026-05-07_attractor_closure_synthesis.md`, `lodestones/seeds/self_reference_attractor.md`, `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`, `reports/swarm_genome/2026-06-11/SYNTHESIS.md`.
 **Source of words:** the operator (John / Dhyana), interview of 2026-06-11. Nothing below is agent-invented; bracketed pointers ground each claim in its full document. External-world claims in §5 and §10 are separated into verified receipts versus operator comparators so agents do not silently promote unsourced market shorthand into canon.

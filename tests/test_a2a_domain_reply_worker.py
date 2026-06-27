@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm.operator_core.semantic_receipt import SCHEMA_VERSION
 from scripts.runtime import a2a_domain_reply_worker
 
 
@@ -67,6 +68,44 @@ def _reply_artifact(tmp_path: Path, *, outbox_root: Path | None = None, actor: s
     return path
 
 
+def _semantic_receipt(tmp_path: Path, *, agent_uid: str = "hermes-m5") -> Path:
+    path = tmp_path / "semantic_receipt.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "receipt_id": "semr-hermes",
+                "created_at": "2026-06-11T16:40:00Z",
+                "agent_uid": agent_uid,
+                "critic_agent_id": "ollama:glm-5:cloud",
+                "model_identity": {"provider": "ollama", "model": "glm-5:cloud"},
+                "authored_by_model": True,
+                "review_target": "a2a:packet-1",
+                "intent_ack": True,
+                "capability_match": 0.9,
+                "understood_request": True,
+                "missing_context": [],
+                "verdict": "pass",
+                "summary": "Hermes semantic receipt is model-authored.",
+                "recommendations": [],
+                "acceptance_gates": [{"name": "semantic", "condition": "valid", "met": True}],
+                "explicit_disagreement": "",
+                "evidence_refs": ["memory://hermes/example"],
+                "confidence": 0.84,
+                "not_claimed_agents": ["codex", "claude", "fable", "devin"],
+                "failure_type": "",
+                "failure_reason": "",
+                "correlation_id": "packet-1",
+                "reply_to": "dharma.agent.hermes-m5.inbox.reply.packet-1",
+                "model_call_latency_ms": 17,
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_load_domain_reply_target_requires_target_owned_outbox(tmp_path: Path) -> None:
     send = _send_receipt(tmp_path)
     artifact = _reply_artifact(tmp_path, outbox_root=tmp_path / "wrong-outboxes")
@@ -84,6 +123,45 @@ def test_load_domain_reply_target_rejects_codex_authored_peer_artifact(tmp_path:
     artifact = _reply_artifact(tmp_path, actor="codex_composer")
 
     with pytest.raises(ValueError, match="does not match target agent"):
+        a2a_domain_reply_worker.load_domain_reply_target(
+            send_receipt_path=send,
+            reply_artifact_path=artifact,
+            outbox_root=tmp_path / "outboxes",
+        )
+
+
+def test_load_domain_reply_target_rejects_unbacked_semantic_claim(tmp_path: Path) -> None:
+    send = _send_receipt(tmp_path)
+    artifact = _reply_artifact(tmp_path)
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    payload["peer_model_processed_claim"] = True
+    payload["semantic_reply_claim"] = True
+    artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="semantic reply claims require"):
+        a2a_domain_reply_worker.load_domain_reply_target(
+            send_receipt_path=send,
+            reply_artifact_path=artifact,
+            outbox_root=tmp_path / "outboxes",
+        )
+
+
+def test_load_domain_reply_target_rejects_wrong_packet_semantic_receipt(tmp_path: Path) -> None:
+    send = _send_receipt(tmp_path)
+    artifact = _reply_artifact(tmp_path)
+    semantic = _semantic_receipt(tmp_path)
+    semantic_payload = json.loads(semantic.read_text(encoding="utf-8"))
+    semantic_payload["correlation_id"] = "packet-2"
+    semantic_payload["review_target"] = "a2a:packet-2"
+    semantic.write_text(json.dumps(semantic_payload, sort_keys=True), encoding="utf-8")
+    payload = json.loads(artifact.read_text(encoding="utf-8"))
+    payload["peer_model_processed_claim"] = True
+    payload["semantic_reply_claim"] = True
+    payload["semantic_receipt_path"] = str(semantic)
+    payload["evidence_refs"] = [str(semantic)]
+    artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="matching agent_uid, packet_id, and reply_subject"):
         a2a_domain_reply_worker.load_domain_reply_target(
             send_receipt_path=send,
             reply_artifact_path=artifact,
@@ -123,6 +201,9 @@ async def test_publish_domain_reply_emits_typed_domain_receipt(tmp_path: Path) -
     assert payload["packet_id"] == "packet-1"
     assert payload["domain_receipt"] is True
     assert payload["target_owned_artifact_claim"] is True
+    assert payload["authenticated_target_runtime_claim"] is False
+    assert payload["source_audit_claim"] is False
+    assert payload["semantic_audit_depth"] == "typed_failure"
     assert payload["semantic_reply_claim"] is False
     assert payload["peer_model_processed_claim"] is False
     assert Path(receipt["receipt_path"]).is_file()
@@ -132,9 +213,12 @@ async def test_publish_domain_reply_emits_typed_domain_receipt(tmp_path: Path) -
 async def test_publish_domain_reply_preserves_explicit_peer_model_semantic_claim(tmp_path: Path) -> None:
     send = _send_receipt(tmp_path)
     artifact = _reply_artifact(tmp_path)
+    semantic = _semantic_receipt(tmp_path)
     payload = json.loads(artifact.read_text(encoding="utf-8"))
     payload["peer_model_processed_claim"] = True
     payload["semantic_reply_claim"] = True
+    payload["semantic_receipt_path"] = str(semantic)
+    payload["evidence_refs"] = [str(semantic)]
     artifact.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
     target = a2a_domain_reply_worker.load_domain_reply_target(
         send_receipt_path=send,
@@ -156,6 +240,8 @@ async def test_publish_domain_reply_preserves_explicit_peer_model_semantic_claim
     published = json.loads(publisher.published[0][1].decode("utf-8"))
     assert published["semantic_reply_claim"] is True
     assert published["peer_model_processed_claim"] is True
+    assert published["authenticated_target_runtime_claim"] is False
+    assert published["validated_semantic_receipt_refs"] == [str(semantic.resolve())]
 
 
 @pytest.mark.asyncio

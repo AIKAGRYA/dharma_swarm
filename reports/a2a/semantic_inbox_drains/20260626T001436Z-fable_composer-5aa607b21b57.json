@@ -1,0 +1,19 @@
+{
+  "agent_uid": "fable_composer",
+  "delivery_record_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/5aa607b21b57.json",
+  "domain_reply_artifact_author_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_artifacts/20260626T001436Z-fable_composer-5aa607b21b57.json",
+  "domain_reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+  "handler_ack_is_semantic_cognition": false,
+  "operator_contact_note": "This records a typed semantic drain failure and target-owned artifact creation; it is not a semantic cognition proof. Publishing remains scripts/runtime/a2a_domain_reply_worker.py.",
+  "packet_id": "5aa607b21b57",
+  "peer_model_processed_claim": false,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md",
+  "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "schema_version": "dharma.a2a.semantic_inbox_drain.v1",
+  "semantic_receipt_id": "semr_12df8e74ff6d49e59b28e125d32d7d15",
+  "semantic_receipt_path": "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001436Z-ollama-llama3_2_latest-semr_12df8e74ff6d49e59b28e125d32d7d15.json",
+  "semantic_reply_claim": false,
+  "status": "SEMANTIC_INBOX_DRAIN_TYPED_FAILURE",
+  "timestamp": "2026-06-26T00:14:36Z",
+  "typed_reply_publish_required_next": true
+}

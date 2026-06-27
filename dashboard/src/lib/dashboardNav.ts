@@ -12,6 +12,7 @@ export type DashboardNavIcon =
   | "Globe"
   | "Grid3X3"
   | "HeartPulse"
+  | "IdCard"
   | "LayoutDashboard"
   | "ListTodo"
   | "MessageSquare"
@@ -62,8 +63,8 @@ export function buildDashboardNavSections(): DashboardNavSection[] {
         { label: "Ecosystem Map", href: "/dashboard/ecosystem", icon: "Orbit", level: 1 },
         { label: "Synthesizer", href: "/dashboard/synthesizer", icon: "Sparkles", level: 1 },
         { label: "Agents", href: "/dashboard/agents", icon: "Bot", level: 1 },
+        { label: "Agent Cards", href: "/dashboard/agent-cards", icon: "IdCard", level: 1 },
         { label: "Tasks", href: "/dashboard/tasks", icon: "ListTodo", level: 1 },
-        { label: "Opportunities", href: "/dashboard/opportunities", icon: "Sparkles", level: 1 },
       ],
     },
     {

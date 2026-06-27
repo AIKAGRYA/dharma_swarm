@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -30,8 +29,6 @@ from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     TaskClaim,
     _new_id,
-    _utc_now,
-    _utc_now_iso,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
 
@@ -200,7 +197,13 @@ class OpportunityDispatcher:
                 "claim_id": identity.claim_id,
                 "idempotency_key": identity.idempotency_key,
             }
-            task.metadata.update(identity_metadata)
+            provider_truth = {
+                "provider_execution": False,
+                "provider_model_applicability": "not_applicable",
+                "provider_model_truth_source": "opportunity_dispatcher.no_provider_execution",
+                "no_provider_model_reason": "opportunity_dispatch_control_plane_no_provider_call",
+            }
+            task.metadata.update({**identity_metadata, **provider_truth})
 
             proposal_id: str | None = None
             if self._telic_seam is not None:
@@ -225,7 +228,7 @@ class OpportunityDispatcher:
                 }
                 if identity.proposal_id:
                     identity_metadata["proposal_id"] = identity.proposal_id
-                task.metadata.update(identity_metadata)
+                task.metadata.update({**identity_metadata, **provider_truth})
                 self._store.create_task_claim_sync(
                     TaskClaim(
                         claim_id=claim_id,
@@ -238,6 +241,7 @@ class OpportunityDispatcher:
                             "opportunity_id": opp_id,
                             "stage": stage,
                             **identity_metadata,
+                            **provider_truth,
                         },
                     )
                 )
@@ -254,6 +258,7 @@ class OpportunityDispatcher:
                             "opportunity_id": opp_id,
                             "stage": stage,
                             **identity_metadata,
+                            **provider_truth,
                         },
                     )
                 )

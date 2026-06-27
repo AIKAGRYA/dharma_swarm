@@ -1,0 +1,70 @@
+{
+  "acceptance_gates": [],
+  "agent_uid": "hermes-m5",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 0.95,
+  "correlation_id": "cf4716e01dc7",
+  "created_at": "2026-06-26T00:14:09Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/cf4716e01dc7.json",
+    "reports/sovereign_holons/standalone_holon_phase1_20260626/PHASE1_RECEIPT.md",
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/cf4716e01dc7.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 13372,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 1
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "9a6eebeb260ae8466d0cd153b4462f735792c54df97f57e61dfcf86d21ab8522",
+  "raw_response_sha256": "7f73f03245f835b8e394b16a240b7a1c8a7d7f701bdcdb00edb8f9737472925a",
+  "receipt_id": "cf4716e01dc7-semantic-response",
+  "recommendations": [
+    {
+      "description": "Continue testing the standalone holon package and address the highest-priority gap before claiming Hermes-grade or better.",
+      "impact": "critical"
+    }
+  ],
+  "reply_to": "dharma.agent.hermes-m5.inbox.reply.cf4716e01dc7",
+  "review_target": "a2a:cf4716e01dc7",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The A2A audit request for the standalone Holon Phase 1 is well-structured and provides a clear scope of inspection, questions to address, and expected deliverables. The holon package changes have been evaluated and deemed materially more standalone and independently installable. However, it's important to note that these changes do not justify a Hermes-grade verdict yet. To achieve that, there are still gaps to be addressed.",
+  "understood_request": true,
+  "verdict": "approve"
+}

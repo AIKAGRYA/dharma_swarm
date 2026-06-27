@@ -1,0 +1,33 @@
+{
+  "agent_uid": "codex_composer",
+  "contact_evidence_tier": "NO_CONTACT",
+  "domain_receipt_claim": false,
+  "endpoint": "",
+  "missing": [
+    "MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"
+  ],
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [
+      "MERGE_MASTER_MIKE_NATS_URL or DEVIN_NATS_URL or DHARMA_NATS_URL or NATS_URL"
+    ],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "NATS credentials or endpoint missing; domain receipt not published",
+  "packet_id": "hermes-codex-holon-peer-contract-79b9f667f3",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/codex_composer/hermes-codex-holon-peer-contract-79b9f667f3-domain-reply.json",
+  "reply_evidence_tier": "NO_CONTACT",
+  "reply_subject": "dharma.agent.codex_composer.inbox.reply.hermes-codex-holon-peer-contract-79b9f667f3",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": false,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260618T160646Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+  "status": "NATS_SECRETS_MISSING",
+  "stream": "DHARMA_FLEET",
+  "timestamp": "2026-06-25T15:28:54Z"
+}

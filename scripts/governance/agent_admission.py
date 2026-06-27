@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -412,6 +411,7 @@ def validate_semantic_commons(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     active_aliases = sorted(alias_targets)
     for item in forbidden:
         alias = _normalize_alias(item["alias"])
+        forbidden_target = str(item.get("canonical_id") or "")
         if alias in alias_targets:
             errors.append(
                 Finding(
@@ -423,6 +423,9 @@ def validate_semantic_commons(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
             )
         for active in active_aliases:
             if _compact_alias(alias) == _compact_alias(active):
+                continue
+            active_targets = alias_targets.get(active, set())
+            if active_targets and active_targets <= {forbidden_target}:
                 continue
             distance = _levenshtein(_compact_alias(alias), _compact_alias(active))
             if len(alias) >= 5 and distance <= 2:

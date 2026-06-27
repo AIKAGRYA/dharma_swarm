@@ -41,6 +41,10 @@ external/
 .dharma_witness_link
 .memory_fallback/
 
+# Shared / generated runtime state (not source).
+shared/
+droid-wiki/
+
 # Hyperfile branch runtime state (heartbeats, pids, ephemeral vision dumps).
 # These were committed by mistake; they are machine-local agent state, not source.
 .dharma_psmv_hyperfile_branch/
@@ -69,6 +73,9 @@ reports/docops/
 reports/system_map/latest.json
 reports/revenue_wedge/
 reports/forge/
+!reports/forge/
+reports/forge/*
+!reports/forge/FORGE_CANONICAL_INDEX.md
 results.tsv
 run.log
 synthesizer_memory.json
@@ -112,8 +119,20 @@ reports/capital_lab/goal_a_12h/session_logs/*.log
 reports/a2a/palantir_pilot_worker_receipts/
 reports/a2a/inbox_bridge_receipts/
 reports/a2a/send_receipts/
+reports/a2a/NATS_*_20260617.md
+reports/a2a/CODEX_HOLON_SEMANTIC_REPLY_P0_*.md
+reports/a2a/archive_20260617_canonicalized/
+reports/a2a/nats_connect_signoffs/
 reports/model_pool/
 reports/model_routing/e2e/
+reports/sovereign_holons/verify_holon_harness_prod_*.json
+reports/sovereign_holons/verify_holon_harness_prod_*.md
+reports/governance/greptile_review_intake_*.json
+reports/governance/greptile_review_intake_*.md
+reports/governance/name_drift_preflight_*.json
+reports/research/
+reports/runtime_truth/
+eval_probe_result.md
 
 # obey plugin (personal rules)
 .claude/obey.rules.local.json

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-17T01:08:48+09:00",
+  "generated_at": "2026-06-28T01:21:08+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
   "shippable": true,
@@ -98,7 +98,7 @@
     "active": 11,
     "max_active": 11,
     "warn_active": 11,
-    "shippable": 6
+    "shippable": 7
   },
   "spine_objectives": [
     {
@@ -360,10 +360,10 @@
           "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py"
         },
         {
-          "id": "agent_runner_calls_spine",
+          "id": "agent_runner_direct_paths_drained",
           "kind": "file_contains",
           "passed": true,
-          "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py"
+          "detail": "pattern 'assert report\\\\[\"summary\"\\\\]\\\\[\"agent_runner_legacy_direct\"\\\\] == 0' found in tests/test_spine_dispatch_mode_report.py"
         },
         {
           "id": "dispatch_emits_evidence_receipt",
@@ -1159,7 +1159,7 @@
       "shippable": false,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 4,
+        "passed": 6,
         "total": 7
       },
       "criteria": [
@@ -1202,14 +1202,14 @@
         {
           "id": "telos_product_surface_registered",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "pattern 'TELOS' NOT FOUND in PRODUCT_SURFACE.md"
+          "passed": true,
+          "detail": "pattern 'TELOS' found in PRODUCT_SURFACE.md"
         },
         {
           "id": "consent_boundary_test_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "tests/test_telos_morning_refinery.py MISSING"
+          "passed": true,
+          "detail": "tests/test_telos_morning_refinery.py present"
         },
         {
           "id": "first_external_receipt_exists",
@@ -1329,10 +1329,10 @@
       "verified_at": "2026-06-14",
       "ttl_days": 14,
       "owner": "@codex_composer",
-      "shippable": false,
+      "shippable": true,
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 0,
+        "passed": 7,
         "total": 7
       },
       "criteria": [
@@ -1351,49 +1351,55 @@
         {
           "id": "cloud_contact_module_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "dharma_swarm/a2a/a2a_cloud_contact.py MISSING"
+          "passed": true,
+          "detail": "dharma_swarm/a2a/a2a_cloud_contact.py present"
         },
         {
           "id": "cloud_contact_publishes_to_nats",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "dharma_swarm/a2a/a2a_cloud_contact.py missing"
+          "passed": true,
+          "detail": "pattern 'jetstream.publish' found in dharma_swarm/a2a/a2a_cloud_contact.py"
         },
         {
           "id": "contact_registry_supports_cloud_agents",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "dharma_swarm/a2a/contact_registry.py missing"
+          "passed": true,
+          "detail": "pattern 'cloud_agent' found in dharma_swarm/a2a/contact_registry.py"
         },
         {
           "id": "verifier_includes_cloud_population",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "dharma_swarm/a2a/verifier.py missing"
+          "passed": true,
+          "detail": "pattern 'cloud_agent_denominator' found in dharma_swarm/a2a/verifier.py"
         },
         {
           "id": "score_denominator_doc_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/state/a2a_score_denominator.md MISSING"
+          "passed": true,
+          "detail": "reports/state/a2a_score_denominator.md present"
         },
         {
           "id": "design_doc_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "docs/architecture/A2A_CLOUD_BRIDGE.md MISSING"
+          "passed": true,
+          "detail": "docs/architecture/A2A_CLOUD_BRIDGE.md present"
         },
         {
           "id": "round_trip_test_exists",
           "kind": "file_contains",
-          "passed": false,
-          "detail": "tests/test_a2a_cloud_contact.py missing"
+          "passed": true,
+          "detail": "pattern 'test_round_trip_without_operator_transport' found in tests/test_a2a_cloud_contact.py"
         }
       ]
     }
   ],
   "findings": [
+    {
+      "severity": "ERROR",
+      "check": "track-stale:runtime-truth-reconciliation-2026-06",
+      "message": "[runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
     {
       "severity": "INFO",
       "check": "track-shippable:runtime-truth-reconciliation-2026-06",
@@ -1425,6 +1431,12 @@
       "criterion_id": null
     },
     {
+      "severity": "ERROR",
+      "check": "track-stale:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.",
+      "criterion_id": null
+    },
+    {
       "severity": "INFO",
       "check": "track-shippable:composer-holon-spine-longrun-2026-06",
       "message": "[composer-holon-spine-longrun-2026-06] all 6 completion criteria pass \u2014 SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.",
@@ -1445,7 +1457,7 @@
     {
       "severity": "INFO",
       "check": "track-in-progress:telos-ai-morning-refinery-2026-06",
-      "message": "[telos-ai-morning-refinery-2026-06] 4/7 completion criteria pass.",
+      "message": "[telos-ai-morning-refinery-2026-06] 6/7 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1456,8 +1468,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:a2a-cloud-agent-bridge-2026-06",
-      "message": "[a2a-cloud-agent-bridge-2026-06] 0/7 completion criteria pass.",
+      "check": "track-shippable:a2a-cloud-agent-bridge-2026-06",
+      "message": "[a2a-cloud-agent-bridge-2026-06] all 7 completion criteria pass \u2014 SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.",
       "criterion_id": null
     }
   ]

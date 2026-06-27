@@ -12,11 +12,11 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
     AgentConfig,
@@ -58,13 +58,7 @@ from dharma_swarm.telos_gates import check_with_reflective_reroute
 # the actual call inside an invoke_agent() invoker closure to emit exactly one
 # EvidenceReceipt per dispatch. This import declares the surface's place in
 # the single blessed path; no god-object bypass of the spine for orchestrated work.
-from dharma_swarm.spine.invoke import invoke_agent
-from dharma_swarm.spine.receipt import EvidenceReceipt
-from dharma_swarm.spine.routing import RoutingDecision
-
 logger = logging.getLogger(__name__)
-
-from dharma_swarm.config import DEFAULT_CONFIG as _SWARM_CFG
 
 _HEARTBEAT_THRESHOLD = timedelta(seconds=_SWARM_CFG.agent.heartbeat_threshold_seconds)
 _ERROR_PREFIXES = (
@@ -170,26 +164,43 @@ def _parse_tool_calls_from_text(
     return results
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
-_TOOLING_HINTS = (
+_NON_LOCAL_TOOLING_DIRECTIVES = (
+    "direct answer only",
+    "do not edit files",
+    "do not modify files",
+    "do not change files",
+    "do not write files",
+    "do not use local tools",
+    "do not use tools",
+    "no file changes",
+    "no file edits",
+    "no local tools",
+)
+_TOOLING_PHRASE_HINTS = (
     "apply patch",
+    "fetch_url",
+    "grep_search",
+    "read file",
+    "run pytest",
+    "run tests",
+    "shell command",
+    "shell_exec",
+    "web_search",
+    "write file",
+)
+_TOOLING_WORD_HINTS = (
     "bug",
     "code",
     "edit",
-    "fetch_url",
     "file",
     "fix",
     "implement",
     "module",
     "patch",
     "pytest",
-    "read",
     "refactor",
-    "research",
     "script",
-    "search",
     "test",
-    "web_search",
-    "write",
 )
 _FRONTIER_HINTS = (
     "analyze",
@@ -514,6 +525,29 @@ def _metadata_bool(metadata: dict[str, Any], *keys: str) -> bool | None:
     return None
 
 
+def _has_tooling_hint(text: str) -> bool:
+    lowered = text.lower()
+    if any(phrase in lowered for phrase in _TOOLING_PHRASE_HINTS):
+        return True
+    return any(
+        re.search(rf"\b{re.escape(marker)}\b", lowered)
+        for marker in _TOOLING_WORD_HINTS
+    )
+
+
+def _forbids_local_tooling(task: Task, metadata: dict[str, Any]) -> bool:
+    override = _metadata_bool(
+        metadata,
+        "direct_answer_only",
+        "no_local_tooling",
+        "no_local_tools",
+    )
+    if override is not None:
+        return override
+    lowered = _task_text(task).lower()
+    return any(directive in lowered for directive in _NON_LOCAL_TOOLING_DIRECTIVES)
+
+
 def _priority_score(priority: TaskPriority) -> float:
     return {
         TaskPriority.LOW: 0.18,
@@ -549,14 +583,17 @@ def _requires_tooling(task: Task, config: AgentConfig) -> bool:
     )
     if override is not None:
         return override
+    if _task_requires_local_side_effects(task):
+        return True
+    if _forbids_local_tooling(task, metadata):
+        return False
     if metadata.get("modified"):
         return True
     if config.provider in {ProviderType.CLAUDE_CODE, ProviderType.CODEX}:
         return True
     if config.role in {AgentRole.CODER, AgentRole.TESTER, AgentRole.SURGEON}:
         return True
-    lowered = _task_text(task).lower()
-    return any(marker in lowered for marker in _TOOLING_HINTS)
+    return _has_tooling_hint(_task_text(task))
 
 
 def _requires_frontier_precision(task: Task, config: AgentConfig) -> bool:
@@ -1499,7 +1536,6 @@ def _local_tool_workdir(task: Task, config: AgentConfig) -> Path:
 def _resolve_local_tool_path(raw_path: str, *, workdir: Path) -> Path:
     # Normalize ~ and ~/ to the actual home directory
     raw = raw_path.strip()
-    home = str(Path.home())
     if raw.startswith("~/"):
         candidate = Path.home() / raw[2:]
     elif raw.startswith("~"):
@@ -1642,7 +1678,13 @@ class AgentRunner:
         self._runtime_fields = build_runtime_field_registry_from_agent_config(config)
         self.actual_served_provider = ""
         self.actual_served_model = ""
+        self.selected_provider = ""
+        self.selected_model = ""
         self.provider_model_truth_source = ""
+        self.provider_execution: bool | str = ""
+        self.provider_model_applicability = ""
+        self.provider_model_missing_reason = ""
+        self.no_provider_model_reason = ""
         self.served_provider = ""
         self.served_model = ""
         self.provider_served = ""
@@ -1681,7 +1723,13 @@ class AgentRunner:
     def _clear_served_route(self) -> None:
         self.actual_served_provider = ""
         self.actual_served_model = ""
+        self.selected_provider = ""
+        self.selected_model = ""
         self.provider_model_truth_source = ""
+        self.provider_execution = ""
+        self.provider_model_applicability = ""
+        self.provider_model_missing_reason = ""
+        self.no_provider_model_reason = ""
         self.served_provider = ""
         self.served_model = ""
         self.provider_served = ""
@@ -1690,30 +1738,70 @@ class AgentRunner:
     def _direct_provider_runtime_label(self) -> str:
         if self._provider is None or _is_routed_provider(self._provider):
             return ""
-        return str(getattr(self._provider, "runtime_provider_type", "") or "").strip()
+        label = getattr(self._provider, "runtime_provider_type", "")
+        return label.strip() if isinstance(label, str) else ""
 
     def _record_served_route(self, response: LLMResponse | None) -> None:
-        self._clear_served_route()
         if response is None:
             return
-        provider = str(
-            getattr(response, "provider", "") or self._direct_provider_runtime_label()
-        ).strip()
+        self._clear_served_route()
+        response_provider = str(getattr(response, "provider", "") or "").strip()
+        direct_runtime_provider = self._direct_provider_runtime_label()
+        provider = str(response_provider or direct_runtime_provider).strip()
         model = str(getattr(response, "model", "") or "").strip()
         if not provider or not model:
             return
-        source = (
-            "agent_runner.llm_response"
-            if str(getattr(response, "provider", "") or "").strip()
-            else "agent_runner.runtime_provider_object"
-        )
+        source = "runtime_provider.actual_served"
         self.actual_served_provider = provider
         self.actual_served_model = model
         self.provider_model_truth_source = source
+        self.provider_execution = True
+        self.provider_model_applicability = "actual_served"
+        self.no_provider_model_reason = ""
         self.served_provider = provider
         self.served_model = model
         self.provider_served = provider
         self.model_served = model
+
+    def _record_no_provider_execution(self, task: Task, *, reason: str) -> None:
+        self._clear_served_route()
+        self.provider_execution = False
+        self.provider_model_applicability = "not_applicable"
+        self.provider_model_truth_source = "agent_runner.no_provider_execution"
+        self.no_provider_model_reason = reason
+        metadata = _task_metadata(task)
+        task.metadata = {
+            **metadata,
+            "provider_execution": False,
+            "provider_model_applicability": "not_applicable",
+            "provider_model_truth_source": self.provider_model_truth_source,
+            "no_provider_model_reason": reason,
+        }
+
+    def _record_attempted_route_from_exception(self, exc: BaseException) -> None:
+        provider = str(
+            getattr(exc, "last_attempt_provider", "")
+            or getattr(exc, "selected_provider", "")
+            or getattr(exc, "planned_provider", "")
+            or ""
+        ).strip()
+        model = str(
+            getattr(exc, "last_attempt_model", "")
+            or getattr(exc, "selected_model", "")
+            or getattr(exc, "planned_model", "")
+            or ""
+        ).strip()
+        if not provider or not model:
+            return
+        self._clear_served_route()
+        self.selected_provider = provider
+        self.selected_model = model
+        self.provider_model_truth_source = "agent_runner.provider_chain_failure"
+        self.provider_execution = True
+        self.provider_model_applicability = "failed_before_serve"
+        self.provider_model_missing_reason = (
+            "provider_chain_failed_before_actual_served_response"
+        )
 
     @property
     def advanced_memory(self) -> AgentMemoryManager | None:
@@ -1764,7 +1852,7 @@ class AgentRunner:
         async def remember(key: str, content: str, scope: str = "working", ttl: int | None = None) -> str:
             """Store a memory. Scope: working, short_term, long_term, shared."""
             s = MemoryScope(scope)
-            mem = await mgr.remember(key, content, scope=s, ttl=ttl)
+            await mgr.remember(key, content, scope=s, ttl=ttl)
             return f"Remembered '{key}' in {scope}"
 
         async def recall(query: str, scope: str | None = None, limit: int = 5) -> str:
@@ -1819,11 +1907,15 @@ class AgentRunner:
                 request,
                 available_provider_types=available_provider_types,
             )
-            route_decision, response = await self._provider.complete_for_task(
-                route_request,
-                request,
-                available_provider_types=available_provider_types,
-            )
+            try:
+                route_decision, response = await self._provider.complete_for_task(
+                    route_request,
+                    request,
+                    available_provider_types=available_provider_types,
+                )
+            except Exception as exc:
+                self._record_attempted_route_from_exception(exc)
+                raise
             return route_request, route_decision, response
         return None, None, await self._provider.complete(request)
 
@@ -1975,6 +2067,7 @@ class AgentRunner:
                 task,
                 current_request,
             )
+            self._record_served_route(response)
             if route_request is not None:
                 last_route_request = route_request
             if route_decision is not None:
@@ -2029,6 +2122,49 @@ class AgentRunner:
 
             current_request = current_request.model_copy(update={"messages": updated_messages})
 
+        if not _task_requires_local_side_effects(task):
+            final_messages = list(current_request.messages)
+            final_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "The local tool round budget is exhausted. Do not call more tools. "
+                        "Return the best concise final answer now, based only on the task "
+                        "and the tool results already visible in this conversation."
+                    ),
+                }
+            )
+            final_request = current_request.model_copy(
+                update={
+                    "system": (
+                        f"{request.system}\n\n"
+                        "Tool-use budget exhausted. Produce a final answer without tool calls."
+                    ),
+                    "messages": final_messages,
+                    "tools": [],
+                }
+            )
+            route_request, route_decision, response = await self._invoke_provider(
+                task,
+                final_request,
+            )
+            self._record_served_route(response)
+            if route_request is not None:
+                last_route_request = route_request
+            if route_decision is not None:
+                last_route_decision = route_decision
+            if response.content and response.content.strip():
+                logger.warning(
+                    "Local tool loop exhausted for task %s; accepted final no-tool answer",
+                    task.id,
+                )
+                return (
+                    last_route_request,
+                    last_route_decision,
+                    response,
+                    response.content,
+                )
+
         raise RuntimeError(
             f"Local tool loop exceeded max rounds ({_tool_loop_max_rounds(task, self._config)})"
         )
@@ -2068,6 +2204,7 @@ class AgentRunner:
                     task,
                     request,
                 )
+                self._record_served_route(response)
                 result = response.content
             completion_latency_ms = (time.monotonic() - completion_started) * 1000.0
             return route_request, route_decision, response, result, completion_latency_ms
@@ -2378,6 +2515,10 @@ class AgentRunner:
                     attempts_remaining -= 1
                     attempt_index += 1
             else:
+                self._record_no_provider_execution(
+                    task,
+                    reason="agent_runner_no_provider_attached",
+                )
                 result = (
                     f"[mock] Agent {self._config.name} completed: {task.title}"
                 )

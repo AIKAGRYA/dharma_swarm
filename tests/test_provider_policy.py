@@ -179,6 +179,49 @@ def test_provider_policy_prefers_japanese_quality_lanes() -> None:
     assert decision.selected_provider == ProviderType.OPENROUTER
 
 
+def test_provider_policy_exposes_sanitized_route_trace() -> None:
+    router = ProviderPolicyRouter()
+    decision = router.route(
+        ProviderRouteRequest(
+            action_name="summarize_logs",
+            risk_score=0.08,
+            uncertainty=0.10,
+            novelty=0.12,
+            urgency=0.5,
+            expected_impact=0.2,
+            estimated_latency_ms=200,
+            estimated_tokens=300,
+            preferred_low_cost=True,
+            context={
+                "last_user_message": "summarize this sk-live-secret-token",
+                "api_key": "sk-live-secret-token",
+            },
+        ),
+        available_providers=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.ANTHROPIC,
+            ProviderType.CODEX,
+        ],
+    )
+
+    stages = [entry["stage"] for entry in decision.route_trace]
+    assert stages == [
+        "decision_path",
+        "candidate_seed",
+        "availability_filter",
+        "smart_router",
+        "telemetry_overlay",
+        "selection",
+    ]
+    assert decision.route_trace[-1]["metadata"]["selected_provider"] == (
+        decision.selected_provider.value
+    )
+    assert decision.route_trace[-1]["metadata"]["fallback_count"] == len(
+        decision.fallback_providers
+    )
+    assert "sk-live-secret-token" not in repr(decision.route_trace)
+
+
 def test_provider_policy_can_promote_provider_from_telemetry_signal(tmp_path) -> None:
     telemetry_db = tmp_path / "telemetry.db"
 
@@ -489,6 +532,59 @@ class _CountingFailingProvider:
 
     async def stream(self, request: LLMRequest):
         yield ""
+
+
+@pytest.mark.asyncio
+async def test_model_router_records_provider_policy_route_trace_in_telemetry(
+    tmp_path,
+) -> None:
+    telemetry = TelemetryPlaneStore(tmp_path / "runtime.db")
+    router = ModelRouter(
+        {
+            ProviderType.OPENROUTER_FREE: _DummyProvider("cheap"),
+            ProviderType.ANTHROPIC: _DummyProvider("frontier"),
+        },
+        telemetry=telemetry,
+    )
+
+    decision, response = await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="triage_notes",
+            risk_score=0.10,
+            uncertainty=0.12,
+            novelty=0.10,
+            urgency=0.3,
+            expected_impact=0.2,
+            context={
+                "session_id": "sess-route-trace",
+                "task_id": "task-route-trace",
+                "run_id": "run-route-trace",
+            },
+        ),
+        LLMRequest(
+            model="ignored",
+            messages=[{"role": "user", "content": "summarize these notes"}],
+        ),
+        available_provider_types=[
+            ProviderType.OPENROUTER_FREE,
+            ProviderType.ANTHROPIC,
+        ],
+    )
+
+    routes = await telemetry.list_routing_decisions(
+        task_id="task-route-trace",
+        limit=5,
+    )
+    policies = await telemetry.list_policy_decisions(
+        task_id="task-route-trace",
+        policy_name="provider_policy",
+        limit=5,
+    )
+
+    assert response.content == "cheap"
+    assert decision.route_trace
+    assert routes[0].metadata["route_trace"] == decision.route_trace
+    assert policies[0].metadata["route_trace"] == decision.route_trace
 
 
 @pytest.mark.asyncio

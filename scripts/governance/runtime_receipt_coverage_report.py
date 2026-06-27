@@ -22,7 +22,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from dharma_swarm.operator_core.live_ops_census_contract import (
+from dharma_swarm.operator_core.live_ops_census_contract import (  # noqa: E402
     census_payload_freshness,
     default_output_path,
     validate_census_payload,
@@ -93,9 +93,13 @@ MODEL_SELECTED_OR_AMBIGUOUS_FIELD_KEYS = (
     "selected_model_hint",
     "model",
 )
+RUNTIME_PROVIDER_ACTUAL_SERVED_TRUTH_SOURCE = "runtime_provider.actual_served"
+PROVIDER_FAILED_BEFORE_SERVE_TRUTH_SOURCES = (
+    "agent_runner.provider_chain_failure",
+)
 PROVIDER_MODEL_PROVENANCE_CLASSES = (
     "served_field",
-    "source_marked_non_probe",
+    "failed_before_serve",
     "no_provider_execution",
 )
 NO_PROVIDER_EXECUTION_TRUTH_SOURCES = (
@@ -104,6 +108,9 @@ NO_PROVIDER_EXECUTION_TRUTH_SOURCES = (
     "runtime_lifecycle.dispatch_dropoff_no_provider_execution",
     "living_agent_kernel.no_provider_execution",
     "ds_goal.no_provider_execution",
+    "agent_runner.no_provider_execution",
+    "holon_orchestrate.no_provider_execution",
+    "opportunity_dispatcher.no_provider_execution",
 )
 PRE_WORKER_NO_PROVIDER_FAILURE_CODES = (
     "claim_timeout",
@@ -419,6 +426,8 @@ def _provider_model_truth_source(payload: dict[str, Any]) -> str:
 def _provider_model_payload_class(payload: dict[str, Any]) -> str:
     if _payload_declares_no_provider_execution(payload):
         return "no_provider_execution"
+    if _payload_declares_provider_failed_before_serve(payload):
+        return "failed_before_serve"
     has_provider = _payload_has_provider(payload)
     has_model = _payload_has_model(payload)
     if not has_provider and not has_model:
@@ -437,10 +446,17 @@ def _provider_model_payload_class(payload: dict[str, Any]) -> str:
         return "probe_selected"
     if _payload_declares_legacy_provider_model_probe(payload):
         return "legacy_probe_selected_unmarked"
-    if _payload_has_any(payload, PROVIDER_SERVED_FIELD_KEYS) and _payload_has_any(
-        payload, MODEL_SERVED_FIELD_KEYS
+    has_served_provider_model = _payload_has_any(
+        payload,
+        PROVIDER_SERVED_FIELD_KEYS,
+    ) and _payload_has_any(payload, MODEL_SERVED_FIELD_KEYS)
+    if (
+        has_served_provider_model
+        and truth_source == RUNTIME_PROVIDER_ACTUAL_SERVED_TRUTH_SOURCE
     ):
         return "served_field"
+    if has_served_provider_model:
+        return "served_field_unproven_source"
     if truth_source:
         return "source_marked_non_probe"
     return "selected_or_ambiguous_unmarked"
@@ -469,6 +485,54 @@ def _payload_declares_no_provider_execution(payload: dict[str, Any]) -> bool:
     return bool(
         str(
             payload.get("no_provider_model_reason")
+            or payload.get("provider_model_applicability")
+            or ""
+        ).strip()
+    )
+
+
+def _payload_declares_provider_failed_before_serve(payload: dict[str, Any]) -> bool:
+    raw_provider_execution = payload.get("provider_execution")
+    provider_execution_true = raw_provider_execution is True or str(
+        raw_provider_execution
+    ).strip().lower() in {"true", "1", "yes"}
+    if not provider_execution_true:
+        return False
+    truth_source = _provider_model_truth_source(payload)
+    if truth_source not in PROVIDER_FAILED_BEFORE_SERVE_TRUTH_SOURCES:
+        return False
+    has_selected_provider_model = _payload_has_any(
+        payload,
+        PROVIDER_SELECTED_OR_AMBIGUOUS_FIELD_KEYS,
+    ) and _payload_has_any(payload, MODEL_SELECTED_OR_AMBIGUOUS_FIELD_KEYS)
+    has_served_provider_model = _payload_has_any(
+        payload,
+        PROVIDER_SERVED_FIELD_KEYS,
+    ) and _payload_has_any(payload, MODEL_SERVED_FIELD_KEYS)
+    if not has_selected_provider_model or has_served_provider_model:
+        return False
+    applicability = str(payload.get("provider_model_applicability") or "").strip()
+    reason = str(payload.get("provider_model_missing_reason") or "").strip()
+    return bool(
+        applicability in {"failed_before_serve", "actual_served_unproven"}
+        and reason
+        in {
+            "provider_chain_failed_before_actual_served_response",
+            "attempted_route_selected_without_actual_served_runtime_evidence",
+        }
+    )
+
+
+def _payload_declares_pending_provider_execution(payload: dict[str, Any]) -> bool:
+    raw_provider_execution = str(payload.get("provider_execution") or "").strip().lower()
+    if raw_provider_execution != "pending":
+        return False
+    truth_source = _provider_model_truth_source(payload)
+    if truth_source != "runtime_lifecycle.provider_execution_pending":
+        return False
+    return bool(
+        str(
+            payload.get("provider_model_pending_reason")
             or payload.get("provider_model_applicability")
             or ""
         ).strip()
@@ -537,8 +601,12 @@ def _provider_model_payload_class_for_status(
     producer_context: dict[str, Any] | None = None,
     sibling_no_provider_execution: bool = False,
 ) -> str:
+    payload_class = _provider_model_payload_class(payload)
+    if payload_class == "no_provider_execution":
+        return payload_class
+    if _payload_declares_pending_provider_execution(payload):
+        return "pending_execution"
     if _is_terminal_receipt_status(status):
-        payload_class = _provider_model_payload_class(payload)
         if (
             payload_class == "missing"
             and (
@@ -2119,6 +2187,10 @@ def build_report(
             has_provenance = (
                 provider_model_class in PROVIDER_MODEL_PROVENANCE_CLASSES
                 or _payload_has_provider_model_provenance(payload)
+                or (
+                    provider_model_class == "pending_execution"
+                    and _payload_declares_pending_provider_execution(payload)
+                )
             )
             latest_major_with_provider_model_provenance += int(has_provenance)
             latest_major_with_provider_model_accounted += int(has_provenance)
@@ -2587,19 +2659,23 @@ def build_report(
         production_readiness_blockers = []
         if major_total <= 0:
             blockers.append("no major task receipts found for selected scope")
-        if not core_fields_ok:
+        if major_total > 0 and not core_fields_ok:
             blockers.append("runtime_receipts have missing core identity/idempotency fields")
-        if not idempotency_match_ok:
+        if major_total > 0 and not idempotency_match_ok:
             blockers.append("major task receipts do not all join to idempotency_records")
-        if not mission_ok:
+        if major_total > 0 and not mission_ok:
             blockers.append("latest major task receipts do not all carry mission_id-like payloads")
-        if not artifact_ok:
+        if major_total > 0 and not artifact_ok:
             blockers.append("major task receipts do not all join to artifact_records or explicit no-artifact reasons")
-        if not provider_model_accounted_ok and not provider_model_ok:
+        if major_total > 0 and not provider_model_accounted_ok and not provider_model_ok:
             production_readiness_blockers.append(
                 "latest major task receipts do not all carry provider/model payloads"
             )
-        if not provider_model_accounted_ok and not provider_model_provenance_ok:
+        if (
+            major_total > 0
+            and not provider_model_accounted_ok
+            and not provider_model_provenance_ok
+        ):
             production_readiness_blockers.append(
                 "latest major task receipts do not all carry provider/model provenance beyond probe-selected metadata"
             )

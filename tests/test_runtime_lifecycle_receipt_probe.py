@@ -146,6 +146,61 @@ def test_runtime_lifecycle_receipt_probe_can_stamp_provider_model_truth(tmp_path
     )
 
 
+def test_runtime_lifecycle_receipt_probe_can_stamp_no_provider_truth(tmp_path):
+    mod = _load_probe_module()
+    db_path = tmp_path / "state" / "runtime.db"
+
+    result = asyncio.run(
+        mod.run_probe(
+            db_path,
+            ledger_dir=tmp_path / "ledgers",
+            artifact_dir=tmp_path / "artifacts",
+            mission_id="mission-no-provider-probe-test",
+            run_id="run-no-provider-probe-test",
+            task_id="task-no-provider-probe-test",
+            claim_id="claim-no-provider-probe-test",
+            trace_id="trace-no-provider-probe-test",
+            correlation_id="corr-no-provider-probe-test",
+            session_id="sess-no-provider-probe-test",
+            no_provider_execution=True,
+            no_provider_model_reason="unit_test_no_provider_execution",
+        )
+    )
+
+    assert result["provider_execution"] is False
+    assert result["provider_model_truth_source"] == "runtime_control.no_provider_execution"
+    assert result["no_provider_model_reason"] == "unit_test_no_provider_execution"
+    assert result["coverage"]["summary"]["score_gate_70_to_75"] is True
+    assert result["coverage"]["summary"]["provider_model_accounted_complete"] is True
+    assert result["coverage"]["summary"]["production_readiness_blockers"] == []
+    assert result["coverage"]["major_task_receipts"][
+        "latest_provider_model_payload_class_breakdown"
+    ] == {"no_provider_execution": 2}
+    assert result["coverage"]["major_task_receipts"][
+        "latest_terminal_provider_model_payload_class_breakdown"
+    ] == {"no_provider_execution": 1}
+
+    with sqlite3.connect(db_path) as db:
+        payload_json = db.execute(
+            """
+            SELECT payload_json
+            FROM runtime_receipts
+            WHERE run_id = ?
+              AND receipt_type = 'delegation_run'
+              AND status = 'completed'
+            """,
+            ("run-no-provider-probe-test",),
+        ).fetchone()[0]
+
+    payload = json.loads(payload_json)
+    assert payload["provider_execution"] is False
+    assert payload["provider_model_applicability"] == "not_applicable"
+    assert payload["provider_model_truth_source"] == (
+        "runtime_control.no_provider_execution"
+    )
+    assert payload["no_provider_model_reason"] == "unit_test_no_provider_execution"
+
+
 def test_runtime_lifecycle_receipt_probe_preserves_actual_served_provider_model(tmp_path):
     mod = _load_probe_module()
     db_path = tmp_path / "state" / "runtime.db"
@@ -325,6 +380,67 @@ def test_runtime_lifecycle_receipt_probe_can_exercise_orchestrator_spine_produce
     )
 
 
+def test_orchestrator_spine_probe_can_stamp_no_provider_truth(tmp_path):
+    mod = _load_probe_module()
+    db_path = tmp_path / "state" / "runtime.db"
+
+    result = asyncio.run(
+        mod.run_orchestrator_spine_probe(
+            db_path,
+            ledger_dir=tmp_path / "ledgers",
+            artifact_dir=tmp_path / "artifacts",
+            mission_id="mission-orch-spine-no-provider-test",
+            run_id="run-orch-spine-no-provider-test",
+            task_id="task-orch-spine-no-provider-test",
+            claim_id="claim-orch-spine-no-provider-test",
+            trace_id="trace-orch-spine-no-provider-test",
+            correlation_id="corr-orch-spine-no-provider-test",
+            session_id="sess-orch-spine-no-provider-test",
+            no_provider_execution=True,
+            no_provider_model_reason="unit_test_orchestrator_no_provider_execution",
+        )
+    )
+
+    assert result["probe"] == "orchestrator_spine_dispatch_probe"
+    assert result["provider_execution"] is False
+    assert result["provider_model_truth_source"] == "runtime_control.no_provider_execution"
+    assert result["no_provider_model_reason"] == (
+        "unit_test_orchestrator_no_provider_execution"
+    )
+    assert result["coverage"]["summary"]["score_gate_70_to_75"] is True
+    assert result["coverage"]["summary"]["provider_model_accounted_complete"] is True
+    assert result["coverage"]["summary"]["terminal_provider_model_accounted_complete"] is True
+    assert result["coverage"]["summary"]["production_readiness_blockers"] == []
+    assert result["coverage"]["major_task_receipts"][
+        "latest_provider_model_payload_class_breakdown"
+    ] == {"no_provider_execution": 2}
+    assert result["coverage"]["major_task_receipts"][
+        "latest_terminal_provider_model_payload_class_breakdown"
+    ] == {"no_provider_execution": 1}
+
+    with sqlite3.connect(db_path) as db:
+        payload_json = db.execute(
+            """
+            SELECT payload_json
+            FROM runtime_receipts
+            WHERE run_id = ?
+              AND receipt_type = 'delegation_run'
+              AND status = 'completed'
+            """,
+            ("run-orch-spine-no-provider-test",),
+        ).fetchone()[0]
+
+    payload = json.loads(payload_json)
+    assert payload["provider_execution"] is False
+    assert payload["provider_model_applicability"] == "not_applicable"
+    assert payload["provider_model_truth_source"] == (
+        "runtime_control.no_provider_execution"
+    )
+    assert payload["no_provider_model_reason"] == (
+        "unit_test_orchestrator_no_provider_execution"
+    )
+
+
 def test_orchestrator_spine_probe_can_exercise_fanout_success(tmp_path):
     mod = _load_probe_module()
     db_path = tmp_path / "state" / "runtime.db"
@@ -391,6 +507,78 @@ def test_orchestrator_spine_probe_can_exercise_fanout_success(tmp_path):
         "artifact_records:artifact_run-orch-fanout-success-test"
     ]
     assert metadata["topology"] == "fan_out"
+
+
+def test_orchestrator_spine_probe_records_real_success_artifact_without_preseed(tmp_path):
+    mod = _load_probe_module()
+    db_path = tmp_path / "state" / "runtime.db"
+
+    result = asyncio.run(
+        mod.run_orchestrator_spine_probe(
+            db_path,
+            ledger_dir=tmp_path / "ledgers",
+            artifact_dir=tmp_path / "artifacts",
+            mission_id="mission-orch-real-artifact-test",
+            run_id="run-orch-real-artifact-test",
+            task_id="task-orch-real-artifact-test",
+            claim_id="claim-orch-real-artifact-test",
+            trace_id="trace-orch-real-artifact-test",
+            correlation_id="corr-orch-real-artifact-test",
+            session_id="sess-orch-real-artifact-test",
+            topology="fan-out",
+            actual_served_provider="openrouter",
+            actual_served_model="qwen3-coder-live",
+            provider_model_truth_source="runtime_provider.actual_served",
+            preseed_artifact=False,
+        )
+    )
+
+    expected_artifact = "artifact_task_result_task-orch-real-artifact-test"
+    assert result["preseed_artifact"] is False
+    assert result["task_result_artifact_id"] == expected_artifact
+    assert result["coverage"]["summary"]["score_gate_70_to_75"] is True
+    assert result["coverage"]["summary"][
+        "latest_terminal_major_task_receipts_provider_model_provenance_percent"
+    ] == 100.0
+
+    with sqlite3.connect(db_path) as db:
+        payload_json = db.execute(
+            """
+            SELECT payload_json
+            FROM runtime_receipts
+            WHERE run_id = ?
+              AND receipt_type = 'delegation_run'
+              AND status = 'completed'
+            """,
+            ("run-orch-real-artifact-test",),
+        ).fetchone()[0]
+        current_artifact_id = db.execute(
+            """
+            SELECT current_artifact_id
+            FROM delegation_runs
+            WHERE run_id = ?
+              AND status = 'completed'
+            """,
+            ("run-orch-real-artifact-test",),
+        ).fetchone()[0]
+        artifact_run_id, artifact_kind = db.execute(
+            """
+            SELECT run_id, artifact_kind
+            FROM artifact_records
+            WHERE artifact_id = ?
+            """,
+            (expected_artifact,),
+        ).fetchone()
+
+    payload = json.loads(payload_json)
+    assert payload["artifact_refs"] == [f"artifact_records:{expected_artifact}"]
+    assert payload["no_artifact_refs_reason"] == ""
+    assert payload["actual_served_provider"] == "openrouter"
+    assert payload["actual_served_model"] == "qwen3-coder-live"
+    assert payload["provider_model_truth_source"] == "runtime_provider.actual_served"
+    assert current_artifact_id == expected_artifact
+    assert artifact_run_id == "run-orch-real-artifact-test"
+    assert artifact_kind == "task_result"
 
 
 def test_orchestrator_spine_probe_can_exercise_fanout_execution_error(tmp_path):
@@ -493,7 +681,7 @@ def test_orchestrator_spine_probe_preserves_actual_served_provider_model(tmp_pat
     assert result["topology"] == "fan_out"
     assert result["coverage"]["summary"]["score_gate_70_to_75"] is True
     assert result["coverage"]["summary"]["provider_model_coverage_complete"] is False
-    assert result["coverage"]["summary"]["provider_model_provenance_complete"] is False
+    assert result["coverage"]["summary"]["provider_model_provenance_complete"] is True
     assert result["coverage"]["summary"]["terminal_provider_model_coverage_complete"] is True
     assert result["coverage"]["summary"]["terminal_provider_model_provenance_complete"] is True
     assert result["coverage"]["summary"]["terminal_provider_model_accounted_complete"] is True
@@ -509,7 +697,7 @@ def test_orchestrator_spine_probe_preserves_actual_served_provider_model(tmp_pat
     assert result["coverage"]["major_task_receipts"][
         "latest_terminal_provider_model_payload_class_breakdown"
     ] == {"served_field": 1}
-    assert result["coverage"]["summary"]["production_readiness_blockers"]
+    assert result["coverage"]["summary"]["production_readiness_blockers"] == []
     assert result["board_updates"] >= 1
     assert result["pool_releases"] == 1
 
@@ -553,7 +741,6 @@ def test_orchestrator_spine_probe_preserves_actual_served_provider_model(tmp_pat
     assert "Topology:      fan_out" in rendered
     assert "Terminal provider/model: 100.0% proof=100.0% accounted=100.0% terminal=1" in rendered
     assert "Provider/model pending execution: 1" in rendered
-    assert "Production-readiness blockers:" in rendered
 
 
 def test_runtime_lifecycle_receipt_probe_can_exercise_dispatch_dropoff(tmp_path):
@@ -846,8 +1033,14 @@ def test_runtime_lifecycle_receipt_probe_can_exercise_long_timeout(tmp_path):
     assert failed_payload["no_artifact_refs_reason"] == (
         "delegation_run has no current_artifact_id"
     )
-    assert "provider_execution" not in failed_payload
-    assert "provider_model_truth_source" not in failed_payload
+    assert failed_payload["provider_execution"] is True
+    assert failed_payload["provider_model_applicability"] == "actual_served_unproven"
+    assert failed_payload["provider_model_truth_source"] == (
+        "runtime_lifecycle.provider_execution_unproven"
+    )
+    assert failed_payload["provider_model_missing_reason"] == (
+        "terminal_receipt_missing_actual_served_or_no_provider_evidence"
+    )
     assert idem_status == "completed"
     assert result_receipt_id == failed_receipt[0]
 
@@ -890,6 +1083,50 @@ def test_runtime_lifecycle_receipt_probe_long_timeout_cli_text_handles_no_artifa
     assert "RUNTIME_LIFECYCLE_LONG_TIMEOUT_PROBE" in captured.out
     assert "70->75 gate:   PASS" in captured.out
     assert "Payload:" not in captured.out
+
+
+def test_runtime_lifecycle_receipt_probe_cli_passes_no_provider_execution(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    mod = _load_probe_module()
+    db_path = tmp_path / "state" / "runtime.db"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "probe",
+            "--db",
+            str(db_path),
+            "--run-id",
+            "run-no-provider-cli-test",
+            "--task-id",
+            "task-no-provider-cli-test",
+            "--claim-id",
+            "claim-no-provider-cli-test",
+            "--trace-id",
+            "trace-no-provider-cli-test",
+            "--correlation-id",
+            "corr-no-provider-cli-test",
+            "--session-id",
+            "sess-no-provider-cli-test",
+            "--no-provider-execution",
+            "--no-provider-model-reason",
+            "cli_no_provider_execution",
+            "--json",
+        ],
+    )
+
+    exit_code = mod.main()
+
+    captured = capsys.readouterr()
+    result = json.loads(captured.out)
+    assert exit_code == 0
+    assert result["provider_execution"] is False
+    assert result["provider_model_truth_source"] == "runtime_control.no_provider_execution"
+    assert result["no_provider_model_reason"] == "cli_no_provider_execution"
+    assert result["coverage"]["summary"]["production_readiness_blockers"] == []
 
 
 def test_runtime_lifecycle_receipt_probe_requires_live_opt_in(tmp_path, monkeypatch, capsys):

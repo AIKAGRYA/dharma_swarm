@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dharma Swarm Expert Audit Output",
+  "type": "object",
+  "required": ["prompt_id", "council_id", "repo_path", "git_ref", "scope", "summary", "findings", "not_proven"],
+  "properties": {
+    "prompt_id": {"type": "string"},
+    "council_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "operator": {"type": "string"},
+    "model": {"type": "string"},
+    "repo_path": {"type": "string"},
+    "git_ref": {"type": "string"},
+    "timestamp_utc": {"type": "string"},
+    "mode": {"enum": ["issue", "pr", "weekly", "release"]},
+    "scope": {
+      "type": "object",
+      "required": ["files_examined", "commands_run", "commands_not_run"],
+      "properties": {
+        "files_examined": {"type": "array", "items": {"type": "string"}},
+        "commands_run": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["command", "cwd", "exit_code"],
+            "properties": {
+              "command": {"type": "string"},
+              "cwd": {"type": "string"},
+              "exit_code": {"type": "integer"},
+              "key_output": {"type": "string"}
+            }
+          }
+        },
+        "commands_not_run": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["command", "reason"],
+            "properties": {
+              "command": {"type": "string"},
+              "reason": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["verdict", "confidence"],
+      "properties": {
+        "verdict": {"enum": ["pass", "warn", "fail", "inconclusive"]},
+        "confidence": {"enum": ["low", "medium", "high"]},
+        "evidence_floor": {"enum": ["E0_none", "E1_static", "E2_tested", "E3_cross_checked", "E4_regression_proven"]}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "severity", "evidence_level", "observed", "recommendation"],
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "severity": {"enum": ["low", "medium", "high", "critical"]},
+          "evidence_level": {"enum": ["E0_none", "E1_static", "E2_tested", "E3_cross_checked", "E4_regression_proven"]},
+          "confidence": {"enum": ["low", "medium", "high"]},
+          "files": {"type": "array", "items": {"type": "string"}},
+          "line_refs": {"type": "array", "items": {"type": "string"}},
+          "observed": {"type": "string"},
+          "inferred": {"type": "string"},
+          "risk": {"type": "string"},
+          "failure_class": {"type": "string"},
+          "recommendation": {"type": "string"},
+          "verification": {"type": "string"}
+        }
+      }
+    },
+    "not_proven": {"type": "array", "items": {"type": "string"}},
+    "open_questions": {"type": "array", "items": {"type": "string"}},
+    "follow_up_issues": {"type": "array", "items": {"type": "string"}}
+  }
+}

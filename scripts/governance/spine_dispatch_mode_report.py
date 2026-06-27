@@ -17,6 +17,7 @@ import importlib.util
 import json
 import os
 import plistlib
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -131,6 +132,20 @@ def _live_census_freshness(payload: Any) -> dict[str, Any]:
     }
 
 
+def _launch_uses_repo_module(command: str, repo_root: Path) -> bool:
+    repo_text = str(repo_root)
+    return "-m dharma_swarm.dgc_cli orchestrate-live" in command and (
+        f"PYTHONPATH={repo_text}" in command
+        or "PYTHONPATH=." in command
+        or f"cd {repo_text}" in command
+        or ".venv/bin/python" in command
+    )
+
+
+def _launch_uses_ambient_dgc(command: str) -> bool:
+    return re.search(r"(^|[\s/])dgc\s+orchestrate-live\b", command) is not None
+
+
 def _inspect_launch_plist(path: Path) -> dict[str, Any]:
     result: dict[str, Any] = {
         "file": _rel(path),
@@ -159,10 +174,27 @@ def _inspect_launch_plist(path: Path) -> dict[str, Any]:
     env_value = str(env_vars.get("DHARMA_SPINE_DISPATCH", ""))
     command_mentions_flag = "DHARMA_SPINE_DISPATCH" in command
     spine_enabled = env_value == "1" or "DHARMA_SPINE_DISPATCH=1" in command
+    repo_module_invocation = _launch_uses_repo_module(command, _REPO_ROOT)
+    ambient_dgc_invocation = _launch_uses_ambient_dgc(command)
 
-    if spine_enabled:
+    if spine_enabled and repo_module_invocation:
         state = "spine_enabled_launch_spec"
-        evidence = "launch spec declares DHARMA_SPINE_DISPATCH=1"
+        evidence = (
+            "launch spec declares DHARMA_SPINE_DISPATCH=1 and invokes "
+            "repo-pinned dharma_swarm.dgc_cli module"
+        )
+    elif spine_enabled and ambient_dgc_invocation:
+        state = "ambient_dgc_spine_launch_spec"
+        evidence = (
+            "launch spec declares DHARMA_SPINE_DISPATCH=1 but invokes ambient "
+            "dgc console script instead of the repo-pinned module"
+        )
+    elif spine_enabled:
+        state = "unblessed_spine_launch_spec"
+        evidence = (
+            "launch spec declares DHARMA_SPINE_DISPATCH=1 but command is not "
+            "repo-pinned to this checkout"
+        )
     elif env_value or command_mentions_flag:
         state = "explicit_non_spine_launch_spec"
         evidence = "launch spec mentions DHARMA_SPINE_DISPATCH but does not set it to 1"
@@ -175,6 +207,8 @@ def _inspect_launch_plist(path: Path) -> dict[str, Any]:
         command=command,
         env=env_vars,
         evidence=evidence,
+        repo_module_invocation=repo_module_invocation,
+        ambient_dgc_invocation=ambient_dgc_invocation,
     )
     return result
 
@@ -949,7 +983,16 @@ def _orchestrator_entry(env: Mapping[str, str]) -> DispatchModeEntry:
 
 def _launch_entry(primary_plist: dict[str, Any]) -> DispatchModeEntry:
     state = str(primary_plist["state"])
-    risk = "medium" if state == "legacy_default_launch_spec" else "low"
+    risk = (
+        "medium"
+        if state
+        in {
+            "legacy_default_launch_spec",
+            "ambient_dgc_spine_launch_spec",
+            "unblessed_spine_launch_spec",
+        }
+        else "low"
+    )
     if state in {"launch_spec_missing", "launch_spec_unreadable"}:
         risk = "high"
 
@@ -961,6 +1004,10 @@ def _launch_entry(primary_plist: dict[str, Any]) -> DispatchModeEntry:
         default_path=(
             "launchd dgc orchestrate-live inherits legacy orchestrator default"
             if state == "legacy_default_launch_spec"
+            else "launchd invokes ambient dgc console script, not this checkout"
+            if state == "ambient_dgc_spine_launch_spec"
+            else "launch spec is spine-enabled but not repo-pinned"
+            if state == "unblessed_spine_launch_spec"
             else "launch spec declares an explicit dispatch mode"
         ),
         activation="LaunchAgent EnvironmentVariables or command string",
@@ -1118,7 +1165,7 @@ def build_report(
     persistent_daemon = entries[1].mode
     explicit_modes = (
         orchestrator_mode != "ambiguous"
-        and persistent_daemon not in {"launch_spec_missing", "launch_spec_unreadable"}
+        and persistent_daemon == "spine_enabled_launch_spec"
         and a2a_unknown == 0
         and intentional_quarantine_complete
     )

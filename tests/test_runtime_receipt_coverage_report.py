@@ -205,6 +205,209 @@ def test_receipt_coverage_report_passes_complete_fixture(tmp_path):
     assert report["major_task_receipts"]["top_missing_side_effect_groups"] == []
 
 
+def test_receipt_coverage_report_requires_runtime_provider_actual_served_source(tmp_path):
+    mod = _load_report_module()
+    db_path = tmp_path / "runtime.db"
+    _init_db(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs"
+            " (run_id, task_id, metadata_json, current_artifact_id, receipt_json)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                "run-wrong-source",
+                "task-wrong-source",
+                '{"mission_id":"mission-wrong-source"}',
+                "artifact-wrong-source",
+                '{"receipt_id":"rr-wrong-source"}',
+            ),
+        )
+        db.execute(
+            "INSERT INTO runtime_receipts"
+            " (receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, agent_id, idempotency_key, side_effect_key,"
+            " status, payload_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "rr-wrong-source",
+                "delegation_run",
+                "run-wrong-source",
+                "task-wrong-source",
+                "trace-wrong-source",
+                "corr-wrong-source",
+                "agent-wrong-source",
+                "idem-wrong-source",
+                "side-wrong-source",
+                "completed",
+                (
+                    '{"mission_id":"mission-wrong-source",'
+                    '"artifact_refs":["artifact-wrong-source"],'
+                    '"actual_served_provider":"openrouter",'
+                    '"actual_served_model":"qwen3-coder-live",'
+                    '"provider_model_truth_source":"agent_runner.llm_response"}'
+                ),
+                "2026-06-14T00:00:00Z",
+            ),
+        )
+        db.execute(
+            "INSERT INTO idempotency_records"
+            " (idempotency_key, side_effect_key, run_id, task_id, trace_id,"
+            " correlation_id, status, result_receipt_id, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "idem-wrong-source",
+                "side-wrong-source",
+                "run-wrong-source",
+                "task-wrong-source",
+                "trace-wrong-source",
+                "corr-wrong-source",
+                "completed",
+                "rr-wrong-source",
+                "2026-06-14T00:00:00Z",
+                "2026-06-14T00:00:01Z",
+            ),
+        )
+        db.execute(
+            "INSERT INTO artifact_records (artifact_id, run_id, task_id)"
+            " VALUES (?, ?, ?)",
+            ("artifact-wrong-source", "run-wrong-source", "task-wrong-source"),
+        )
+
+    report = mod.build_report(db_path)
+
+    assert report["summary"]["score_gate_70_to_75"] is True
+    assert report["summary"]["latest_major_task_receipts_provider_model_percent"] == 100.0
+    assert (
+        report["summary"]["latest_major_task_receipts_provider_model_provenance_percent"]
+        == 0.0
+    )
+    assert (
+        report["summary"]["latest_major_task_receipts_provider_model_accounted_percent"]
+        == 0.0
+    )
+    assert report["summary"]["provider_model_coverage_complete"] is True
+    assert report["summary"]["provider_model_provenance_complete"] is False
+    assert report["summary"]["provider_model_accounted_complete"] is False
+    assert report["summary"]["terminal_provider_model_accounted_complete"] is False
+    assert report["summary"]["production_readiness_blockers"] == [
+        "latest major task receipts do not all carry provider/model provenance beyond probe-selected metadata"
+    ]
+    assert report["major_task_receipts"]["latest_provider_model_payload_class_breakdown"] == {
+        "served_field_unproven_source": 1
+    }
+    assert report["major_task_receipts"][
+        "latest_terminal_provider_model_payload_class_breakdown"
+    ] == {"served_field_unproven_source": 1}
+    assert report["major_task_receipts"]["latest_provider_model_unproven_sample"] == [
+        {
+            "receipt_id": "rr-wrong-source",
+            "receipt_type": "delegation_run",
+            "run_id": "run-wrong-source",
+            "task_id": "task-wrong-source",
+            "agent_id": "agent-wrong-source",
+            "created_at": "2026-06-14T00:00:00Z",
+            "provider_model_payload_class": "served_field_unproven_source",
+            "provider_model_truth_source": "agent_runner.llm_response",
+            "has_provider_payload": True,
+            "has_model_payload": True,
+        }
+    ]
+
+
+def test_receipt_coverage_report_accounts_provider_chain_failure_before_serve(tmp_path):
+    mod = _load_report_module()
+    db_path = tmp_path / "runtime.db"
+    _init_db(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO delegation_runs"
+            " (run_id, task_id, metadata_json, current_artifact_id, receipt_json)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (
+                "run-chain-failure",
+                "task-chain-failure",
+                '{"mission_id":"mission-chain-failure"}',
+                "artifact-chain-failure",
+                '{"receipt_id":"rr-chain-failure"}',
+            ),
+        )
+        db.execute(
+            "INSERT INTO runtime_receipts"
+            " (receipt_id, receipt_type, run_id, task_id, trace_id,"
+            " correlation_id, agent_id, idempotency_key, side_effect_key,"
+            " status, payload_json, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "rr-chain-failure",
+                "delegation_run",
+                "run-chain-failure",
+                "task-chain-failure",
+                "trace-chain-failure",
+                "corr-chain-failure",
+                "agent-chain-failure",
+                "idem-chain-failure",
+                "side-chain-failure",
+                "failed",
+                (
+                    '{"mission_id":"mission-chain-failure",'
+                    '"artifact_refs":["artifact-chain-failure"],'
+                    '"provider_execution":true,'
+                    '"selected_provider":"openrouter",'
+                    '"selected_model":"mistralai/mistral-small-3.1-24b-instruct",'
+                    '"provider_model_applicability":"actual_served_unproven",'
+                    '"provider_model_truth_source":"agent_runner.provider_chain_failure",'
+                    '"provider_model_missing_reason":'
+                    '"attempted_route_selected_without_actual_served_runtime_evidence"}'
+                ),
+                "2026-06-14T00:00:00Z",
+            ),
+        )
+        db.execute(
+            "INSERT INTO idempotency_records"
+            " (idempotency_key, side_effect_key, run_id, task_id, trace_id,"
+            " correlation_id, status, result_receipt_id, created_at, updated_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "idem-chain-failure",
+                "side-chain-failure",
+                "run-chain-failure",
+                "task-chain-failure",
+                "trace-chain-failure",
+                "corr-chain-failure",
+                "completed",
+                "rr-chain-failure",
+                "2026-06-14T00:00:00Z",
+                "2026-06-14T00:00:01Z",
+            ),
+        )
+        db.execute(
+            "INSERT INTO artifact_records (artifact_id, run_id, task_id)"
+            " VALUES (?, ?, ?)",
+            (
+                "artifact-chain-failure",
+                "run-chain-failure",
+                "task-chain-failure",
+            ),
+        )
+
+    report = mod.build_report(db_path)
+
+    assert report["summary"]["score_gate_70_to_75"] is True
+    assert report["summary"]["provider_model_coverage_complete"] is True
+    assert report["summary"]["provider_model_accounted_complete"] is True
+    assert report["summary"]["terminal_provider_model_accounted_complete"] is True
+    assert report["summary"]["production_readiness_blockers"] == []
+    assert report["major_task_receipts"]["latest_provider_model_payload_class_breakdown"] == {
+        "failed_before_serve": 1
+    }
+    assert report["major_task_receipts"][
+        "latest_provider_model_unproven_sample"
+    ] == []
+    assert report["major_task_receipts"][
+        "latest_provider_model_unproven_producer_groups"
+    ] == []
+
+
 def test_receipt_coverage_report_counts_ds_goal_preflight_payload(tmp_path):
     mod = _load_report_module()
     db_path = tmp_path / "runtime.db"
@@ -1221,6 +1424,122 @@ def test_receipt_coverage_report_accounts_for_explicit_no_provider_execution(tmp
     }
     assert report["major_task_receipts"]["latest_provider_model_unproven_sample"] == []
     assert report["major_task_receipts"]["latest_provider_model_unproven_producer_groups"] == []
+
+
+def test_receipt_coverage_report_accounts_running_explicit_no_provider_receipts(tmp_path):
+    mod = _load_report_module()
+    truth_sources = (
+        "holon_orchestrate.no_provider_execution",
+        "opportunity_dispatcher.no_provider_execution",
+    )
+
+    for index, truth_source in enumerate(truth_sources, start=1):
+        db_path = tmp_path / f"runtime-{index}.db"
+        _init_db(db_path)
+        with sqlite3.connect(db_path) as db:
+            db.execute(
+                "INSERT INTO delegation_runs"
+                " (run_id, task_id, metadata_json, current_artifact_id, receipt_json)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (
+                    f"run-no-provider-{index}",
+                    f"task-no-provider-{index}",
+                    json.dumps({"mission_id": f"mission-no-provider-{index}"}),
+                    f"artifact-no-provider-{index}",
+                    json.dumps({"receipt_id": f"rr-no-provider-{index}"}),
+                ),
+            )
+            db.execute(
+                "INSERT INTO runtime_receipts"
+                " (receipt_id, receipt_type, run_id, task_id, trace_id,"
+                " correlation_id, agent_id, idempotency_key, side_effect_key,"
+                " status, payload_json, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"rr-no-provider-{index}",
+                    "delegation_run",
+                    f"run-no-provider-{index}",
+                    f"task-no-provider-{index}",
+                    f"trace-no-provider-{index}",
+                    f"corr-no-provider-{index}",
+                    f"agent-no-provider-{index}",
+                    f"idem-no-provider-{index}",
+                    f"side-no-provider-{index}",
+                    "running",
+                    json.dumps({
+                        "mission_id": f"mission-no-provider-{index}",
+                        "artifact_refs": [f"artifact-no-provider-{index}"],
+                        "provider_execution": False,
+                        "provider_model_applicability": "not_applicable",
+                        "provider_model_truth_source": truth_source,
+                        "no_provider_model_reason": (
+                            "bounded_control_path_no_live_model_call_claimed"
+                        ),
+                    }),
+                    "2026-06-14T00:00:00Z",
+                ),
+            )
+            db.execute(
+                "INSERT INTO idempotency_records"
+                " (idempotency_key, side_effect_key, run_id, task_id, trace_id,"
+                " correlation_id, status, result_receipt_id, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    f"idem-no-provider-{index}",
+                    f"side-no-provider-{index}",
+                    f"run-no-provider-{index}",
+                    f"task-no-provider-{index}",
+                    f"trace-no-provider-{index}",
+                    f"corr-no-provider-{index}",
+                    "running",
+                    f"rr-no-provider-{index}",
+                    "2026-06-14T00:00:00Z",
+                    "2026-06-14T00:00:01Z",
+                ),
+            )
+            db.execute(
+                "INSERT INTO artifact_records (artifact_id, run_id, task_id)"
+                " VALUES (?, ?, ?)",
+                (
+                    f"artifact-no-provider-{index}",
+                    f"run-no-provider-{index}",
+                    f"task-no-provider-{index}",
+                ),
+            )
+
+        report = mod.build_report(db_path)
+
+        assert report["summary"]["production_readiness_blockers"] == []
+        assert report["summary"]["latest_major_task_receipts_provider_model_percent"] == 0.0
+        assert (
+            report["summary"][
+                "latest_major_task_receipts_provider_model_provenance_percent"
+            ]
+            == 100.0
+        )
+        assert (
+            report["summary"][
+                "latest_major_task_receipts_provider_model_accounted_percent"
+            ]
+            == 100.0
+        )
+        assert report["summary"]["provider_model_coverage_complete"] is False
+        assert report["summary"]["provider_model_provenance_complete"] is True
+        assert report["summary"]["provider_model_accounted_complete"] is True
+        assert report["summary"]["terminal_provider_model_accounted_complete"] is False
+        assert report["major_task_receipts"]["latest_provider_model_pending_execution"] == 1
+        assert report["major_task_receipts"]["latest_terminal_sample_size"] == 0
+        assert report["major_task_receipts"]["latest_with_provider_model_payload"] == 0
+        assert report["major_task_receipts"]["latest_with_provider_model_provenance"] == 1
+        assert report["major_task_receipts"]["latest_with_provider_model_accounted"] == 1
+        assert report["major_task_receipts"]["latest_provider_model_payload_class_breakdown"] == {
+            "no_provider_execution": 1
+        }
+        assert report["major_task_receipts"]["latest_provider_model_unproven_sample"] == []
+        assert (
+            report["major_task_receipts"]["latest_provider_model_unproven_producer_groups"]
+            == []
+        )
 
 
 def test_receipt_coverage_report_accounts_dispatch_dropoff_failure_code_as_no_provider_execution(

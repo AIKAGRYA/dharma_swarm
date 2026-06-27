@@ -61,6 +61,12 @@ def test_pending_reply_targets_loads_unreplied_receipt(tmp_path: Path) -> None:
     assert targets[0].reply_subject == "dharma.agent.hermes-m5.inbox.reply.pkt"
 
 
+def test_normalize_deliver_policy_accepts_latest_aliases() -> None:
+    assert a2a_reply_capture.normalize_deliver_policy("") == "all"
+    assert a2a_reply_capture.normalize_deliver_policy("all") == "all"
+    assert a2a_reply_capture.normalize_deliver_policy("last-per-subject") == "latest"
+
+
 def test_no_reply_receipt_preserves_original_handler_ack(tmp_path: Path) -> None:
     target = _target(_send_receipt(tmp_path))
 

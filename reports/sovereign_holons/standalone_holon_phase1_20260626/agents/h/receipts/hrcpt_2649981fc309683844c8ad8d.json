@@ -1,0 +1,46 @@
+{
+  "artifact_refs": [],
+  "created_at": "2026-06-26T00:04:30.178933Z",
+  "digest": "sha256:49459b756bcdff6c27c535613eb906fe2934bfee803e6d3dad0b9e2effa17307",
+  "kind": "holon_cycle",
+  "payload": {
+    "artifacts": [],
+    "cost_usd": 0.0,
+    "cycle": 0,
+    "error": "",
+    "finish_reason": "stop",
+    "metadata": {
+      "signal": {
+        "at": "2026-06-26T00:04:30.178629Z",
+        "holon": "h",
+        "schema_version": "holon.compass_signal.v1",
+        "telos_alignment": 0.58
+      }
+    },
+    "model": "holon-echo-v1",
+    "provider": "echo",
+    "provider_attempts": [
+      {
+        "cost_usd": 0.0,
+        "error": "",
+        "finish_reason": "stop",
+        "latency_ms": 0,
+        "model": "holon-echo-v1",
+        "provider": "echo",
+        "status": "success"
+      }
+    ],
+    "receipt_refs": [],
+    "reply": "[echo:holon-echo-v1] report evidence only",
+    "status": "ran",
+    "task": "report evidence only",
+    "tool_calls": [],
+    "verifier_refs": []
+  },
+  "receipt_id": "hrcpt_2649981fc309683844c8ad8d",
+  "schema_version": "holon.runtime_receipt.v1",
+  "side_effect_key": "phase1-installed-wake",
+  "status": "ran",
+  "subject": "h",
+  "verifier_refs": []
+}

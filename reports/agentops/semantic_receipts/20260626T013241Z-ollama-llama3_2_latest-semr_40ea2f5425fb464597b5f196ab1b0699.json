@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "holon-source-audit-codex-20260626",
+  "created_at": "2026-06-26T01:32:41Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/codex_composer-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "Expecting ',' delimiter: line 21 column 6 (char 668)",
+  "failure_reason": "Expecting ',' delimiter: line 21 column 6 (char 668)",
+  "failure_type": "json_parse_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 7357,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "edbdd4596759ab1db0659342d9a995652211c06f0c8aa4e09bcb4bcfb5955afc",
+  "raw_response_sha256": "387814651ec8e1844aee3439c47a62faeefff9e4798317584405857287a7d27b",
+  "receipt_id": "semr_40ea2f5425fb464597b5f196ab1b0699",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "Expecting ',' delimiter: line 21 column 6 (char 668)"
+    }
+  ],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.holon-source-audit-codex-20260626",
+  "review_target": "a2a:holon-source-audit-codex-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: json_parse_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

@@ -149,6 +149,133 @@ export interface AgentOut {
   error: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Agent Cards (GET /api/agent-cards)
+// ---------------------------------------------------------------------------
+
+export type AgentCardTrustGrade =
+  | "verified"
+  | "registered"
+  | "discovery"
+  | "evidence_only"
+  | "quarantine"
+  | string;
+
+export type AgentCardExportFormat =
+  | "public-json"
+  | "extended-json"
+  | "operator-json"
+  | "markdown"
+  | "jcard"
+  | "vcard";
+
+export interface AgentCardFindingOut {
+  severity: string;
+  check: string;
+  agent_uid: string;
+  path: string;
+  detail: string;
+}
+
+export interface AgentCardA2AOut {
+  profile?: string;
+  version?: string;
+  auth_type?: string;
+  digest?: string;
+  card_count_for_agent?: number;
+  created_at?: string;
+  updated_at?: string;
+  security_schemes_declared?: boolean;
+  signatures_declared?: boolean;
+  metadata_keys?: string[];
+  top_level_keys?: string[];
+  [key: string]: unknown;
+}
+
+export interface AgentCardHandoffOut {
+  public_card_ready?: boolean;
+  extended_card_ready?: boolean;
+  operator_card_ready?: boolean;
+  suggested_subjects?: string[];
+  [key: string]: unknown;
+}
+
+export interface AgentCardSemanticOut {
+  canonical_object_id?: string;
+  canonical_name?: string;
+  canonical_type?: string;
+  aliases?: string[];
+  forbidden_aliases?: string[];
+  routes?: string[];
+  [key: string]: unknown;
+}
+
+export interface AgentCardOut {
+  schema_version: string;
+  agent_uid: string;
+  display_name: string;
+  callsign: string;
+  role: string;
+  status: string;
+  endpoint: string;
+  provider: string;
+  model: string;
+  harness: string;
+  department: string;
+  squad_id: string;
+  team_id: string;
+  authority: string;
+  card_names: string[];
+  capabilities: string[];
+  skills: string[];
+  semantic: AgentCardSemanticOut;
+  a2a: AgentCardA2AOut;
+  registration: Record<string, unknown>;
+  identity_invariant: Record<string, unknown>;
+  authority_passport: Record<string, unknown>;
+  living_dock: Record<string, unknown>;
+  nats: Record<string, unknown>;
+  handoff: AgentCardHandoffOut;
+  sources: Record<string, string[]>;
+  findings: AgentCardFindingOut[];
+  trust_grade: AgentCardTrustGrade;
+}
+
+export interface AgentCardPublicOut {
+  schema_version: string;
+  agent_uid: string;
+  display_name: string;
+  callsign: string;
+  role: string;
+  status: string;
+  endpoint: string;
+  provider: string;
+  model: string;
+  harness: string;
+  capabilities: string[];
+  skills: string[];
+  semantic: AgentCardSemanticOut;
+  a2a: AgentCardA2AOut;
+  handoff: AgentCardHandoffOut;
+  trust_grade: AgentCardTrustGrade;
+}
+
+export interface AgentCardIndexSummaryOut {
+  status: string;
+  agent_count: number;
+  card_file_count: number;
+  finding_count: number;
+  error_count: number;
+  warning_count: number;
+  severity_counts: Record<string, number>;
+  trust_grade_counts: Record<string, number>;
+}
+
+export interface AgentCardIndexPayload {
+  summary: AgentCardIndexSummaryOut;
+  agents: AgentCardOut[];
+}
+
 export interface AgentConfigOut {
   display_name?: string | null;
   role?: string | null;

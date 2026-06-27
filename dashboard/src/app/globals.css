@@ -407,3 +407,45 @@ code, pre, kbd, samp {
 .animate-pulse-rapid {
   animation: pulse-rapid 0.8s ease-in-out infinite;
 }
+
+/* ============================================================
+   Cockpit V2 — state-encoded motion (spec 8.4).
+   Pulse is allowed ONLY for live + fresh nodes.
+   ============================================================ */
+
+@keyframes cockpit-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(143, 168, 155, 0.0); }
+  50% { box-shadow: 0 0 0 4px rgba(143, 168, 155, 0.28); }
+}
+
+.cockpit-pulse {
+  animation: cockpit-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes cockpit-pulse-ring {
+  0% { opacity: 0.5; transform-box: fill-box; transform-origin: center; transform: scale(0.9); }
+  70% { opacity: 0; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+.cockpit-pulse-ring {
+  animation: cockpit-pulse-ring 2.4s ease-out infinite;
+}
+
+/* REQ-084: reduced motion disables non-data movement. */
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-pulse,
+  .cockpit-pulse-ring,
+  .animate-pulse-gentle,
+  .animate-pulse-fast,
+  .animate-pulse-rapid,
+  .animate-glow-pulse,
+  .animate-breathe,
+  .animate-drift {
+    animation: none !important;
+  }
+  .react-flow__edge-path {
+    stroke-dasharray: none !important;
+    animation: none !important;
+  }
+}

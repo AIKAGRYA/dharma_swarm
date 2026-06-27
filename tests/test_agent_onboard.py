@@ -66,6 +66,7 @@ def test_onboard_renders_required_sections():
         "LIVE OPS SNAPSHOT",
         "LIVE OPS COCKPIT",
         "SURFACE MANIFEST HEALTH",
+        "LIVE PROVIDER/MODEL ROUTES",
         "BROKEN REGISTER",
         "LIVING AXIOMS",
         "RECENT TRACK ACTIVITY",
@@ -554,7 +555,14 @@ def test_json_mode_emits_valid_receipt(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["schema"] == "dharma_swarm.onboard_receipt.v1"
     assert payload["authority"] == "projection_only"
-    for key in ("repo", "work_lanes", "portfolio", "next_items", "broken_register"):
+    for key in (
+        "repo",
+        "work_lanes",
+        "portfolio",
+        "next_items",
+        "broken_register",
+        "provider_routes",
+    ):
         assert key in payload, f"receipt missing key: {key}"
     # The same payload must land on disk for fleet consumers.
     receipt = tmp_path / "onboard_receipt.json"

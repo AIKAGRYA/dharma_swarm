@@ -1,0 +1,22 @@
+{
+  "agent_uid": "fable_composer",
+  "authenticated_target_runtime_claim": false,
+  "delivery_record_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/5aa607b21b57.json",
+  "domain_reply_artifact_author_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_artifacts/20260626T002925Z-fable_composer-5aa607b21b57.json",
+  "domain_reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+  "handler_ack_is_semantic_cognition": false,
+  "operator_contact_note": "This proves model-authored semantic drain and target-owned artifact creation. Publishing remains scripts/runtime/a2a_domain_reply_worker.py.",
+  "packet_id": "5aa607b21b57",
+  "peer_model_processed_claim": true,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md",
+  "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "schema_version": "dharma.a2a.semantic_inbox_drain.v1",
+  "semantic_audit_depth": "packet_only",
+  "semantic_receipt_id": "r-5aa607b21b57",
+  "semantic_receipt_path": "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T002925Z-ollama-mistral_latest-r-5aa607b21b57.json",
+  "semantic_reply_claim": true,
+  "source_audit_claim": false,
+  "status": "SEMANTIC_INBOX_DRAINED",
+  "timestamp": "2026-06-26T00:29:25Z",
+  "typed_reply_publish_required_next": true
+}

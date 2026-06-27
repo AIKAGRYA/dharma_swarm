@@ -7,7 +7,7 @@ import pytest
 
 import dharma_swarm.runtime_state as runtime_state
 from dharma_swarm.opportunity_dispatcher import OPPORTUNITY_STAGES, OpportunityDispatcher
-from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore, TaskClaim
+from dharma_swarm.runtime_state import DelegationRun, RuntimeReceipt, RuntimeStateStore, TaskClaim
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
@@ -30,6 +30,15 @@ def _identity(
         session_id="session-spine-a",
         parent_run_id=parent_run_id,
     )
+
+
+def _no_provider_truth() -> dict[str, object]:
+    return {
+        "provider_execution": False,
+        "provider_model_applicability": "not_applicable",
+        "provider_model_truth_source": "runtime_control.no_provider_execution",
+        "no_provider_model_reason": "test_control_path_no_provider_call",
+    }
 
 
 def test_pytest_runtime_defaults_are_isolated_from_live_db(tmp_path: Path) -> None:
@@ -86,6 +95,138 @@ async def test_sync_legacy_helpers_fail_closed_without_identity_unless_flagged(
 
 
 @pytest.mark.asyncio
+async def test_runtime_receipt_sink_rejects_task_claim_without_side_effect_key(
+    tmp_path: Path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="side_effect_key"):
+        await store.record_runtime_receipt(
+            RuntimeReceipt(
+                receipt_id="rr-blank-side-effect",
+                receipt_type="task_claim",
+                status="claimed",
+                run_id="run-blank-side-effect",
+                task_id="task-blank-side-effect",
+                trace_id="trace-blank-side-effect",
+                correlation_id="corr-blank-side-effect",
+                agent_id="agent-blank-side-effect",
+                idempotency_key="idem-blank-side-effect",
+                side_effect_key="",
+            )
+        )
+
+
+def test_runtime_receipt_sink_rejects_delegation_run_without_idempotency_key_sync(
+    tmp_path: Path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="idempotency_key"):
+        store.record_runtime_receipt_sync(
+            RuntimeReceipt(
+                receipt_id="rr-blank-idem",
+                receipt_type="delegation_run",
+                status="completed",
+                run_id="run-blank-idem",
+                task_id="task-blank-idem",
+                trace_id="trace-blank-idem",
+                correlation_id="corr-blank-idem",
+                agent_id="agent-blank-idem",
+                idempotency_key=" ",
+                side_effect_key="delegation_run:run-blank-idem:completed",
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_runtime_receipt_sink_rejects_major_receipt_without_provider_truth(
+    tmp_path: Path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="provider/model truth"):
+        await store.record_runtime_receipt(
+            RuntimeReceipt(
+                receipt_id="rr-blank-provider-truth",
+                receipt_type="task_claim",
+                status="completed",
+                run_id="run-blank-provider-truth",
+                task_id="task-blank-provider-truth",
+                trace_id="trace-blank-provider-truth",
+                correlation_id="corr-blank-provider-truth",
+                agent_id="agent-blank-provider-truth",
+                idempotency_key="idem-blank-provider-truth",
+                side_effect_key="task_claim:claim-blank-provider-truth:completed",
+                payload={"mission": "provider truth rejection test"},
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_runtime_receipt_sink_rejects_actual_served_fields_without_runtime_provider_source(
+    tmp_path: Path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    with pytest.raises(ValueError, match="provider/model truth"):
+        await store.record_runtime_receipt(
+            RuntimeReceipt(
+                receipt_id="rr-wrong-served-source",
+                receipt_type="delegation_run",
+                status="completed",
+                run_id="run-wrong-served-source",
+                task_id="task-wrong-served-source",
+                trace_id="trace-wrong-served-source",
+                correlation_id="corr-wrong-served-source",
+                agent_id="agent-wrong-served-source",
+                idempotency_key="idem-wrong-served-source",
+                side_effect_key="delegation_run:run-wrong-served-source:completed",
+                payload={
+                    "mission_id": "mission-wrong-served-source",
+                    "actual_served_provider": "openrouter",
+                    "actual_served_model": "qwen3-coder-live",
+                    "provider_model_truth_source": "agent_runner.llm_response",
+                },
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_runtime_receipt_sink_accepts_runtime_provider_actual_served_source(
+    tmp_path: Path,
+) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db")
+
+    receipt = await store.record_runtime_receipt(
+        RuntimeReceipt(
+            receipt_id="rr-runtime-provider-served-source",
+            receipt_type="delegation_run",
+            status="completed",
+            run_id="run-runtime-provider-served-source",
+            task_id="task-runtime-provider-served-source",
+            trace_id="trace-runtime-provider-served-source",
+            correlation_id="corr-runtime-provider-served-source",
+            agent_id="agent-runtime-provider-served-source",
+            idempotency_key="idem-runtime-provider-served-source",
+            side_effect_key=(
+                "delegation_run:run-runtime-provider-served-source:completed"
+            ),
+            payload={
+                "mission_id": "mission-runtime-provider-served-source",
+                "actual_served_provider": "openrouter",
+                "actual_served_model": "qwen3-coder-live",
+                "provider_model_truth_source": "runtime_provider.actual_served",
+            },
+        )
+    )
+
+    assert receipt.payload["provider_model_truth_source"] == (
+        "runtime_provider.actual_served"
+    )
+
+
+@pytest.mark.asyncio
 async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -> None:
     store = RuntimeStateStore(tmp_path / "runtime.db")
     identity = _identity(parent_run_id="run-parent-spine-a")
@@ -100,10 +241,7 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
             metadata={
                 **identity.to_metadata(),
                 "mission_id": "mission-spine-a",
-                "provider_execution": False,
-                "provider_model_applicability": "not_applicable",
-                "provider_model_truth_source": "runtime_control.no_provider_execution",
-                "no_provider_model_reason": "kernel_control_tick_no_provider_call",
+                **_no_provider_truth(),
             },
         )
     )
@@ -119,10 +257,7 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
             metadata={
                 **identity.to_metadata(),
                 "mission_id": "mission-spine-a",
-                "provider_execution": False,
-                "provider_model_applicability": "not_applicable",
-                "provider_model_truth_source": "runtime_control.no_provider_execution",
-                "no_provider_model_reason": "kernel_control_tick_no_provider_call",
+                **_no_provider_truth(),
             },
         )
     )
@@ -174,7 +309,7 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
     )
     assert (
         claim_receipt.payload["no_provider_model_reason"]
-        == "kernel_control_tick_no_provider_call"
+        == "test_control_path_no_provider_call"
     )
     assert claim_idem is not None
     assert claim_idem.status == "completed"
@@ -189,7 +324,7 @@ async def test_sync_helpers_record_identity_trace_and_receipts(tmp_path: Path) -
     )
     assert (
         delegation_receipt.payload["no_provider_model_reason"]
-        == "kernel_control_tick_no_provider_call"
+        == "test_control_path_no_provider_call"
     )
     assert run_idem is not None
     assert run_idem.status == "completed"
@@ -215,6 +350,7 @@ async def test_async_helpers_record_identity_trace_and_receipts(tmp_path: Path) 
             metadata={
                 **identity.to_metadata(),
                 "mission_id": "mission-async-spine-a",
+                **_no_provider_truth(),
             },
         )
     )
@@ -230,6 +366,7 @@ async def test_async_helpers_record_identity_trace_and_receipts(tmp_path: Path) 
             metadata={
                 **identity.to_metadata(),
                 "mission_id": "mission-async-spine-a",
+                **_no_provider_truth(),
             },
         )
     )

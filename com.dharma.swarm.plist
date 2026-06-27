@@ -10,7 +10,7 @@
   <array>
     <string>/bin/bash</string>
     <string>-c</string>
-    <string>cd /Users/dhyana/dharma_swarm &amp;&amp; source .env &amp;&amp; TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live</string>
+    <string>cd /Users/dhyana/dharma_swarm &amp;&amp; source .env &amp;&amp; exec env PYTHONPATH=/Users/dhyana/dharma_swarm TINY_ROUTER_BACKEND=heuristic ./.venv/bin/python -m dharma_swarm.dgc_cli orchestrate-live</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -18,6 +18,8 @@
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>DHARMA_DAEMON_SELF_HEAL_STALE_PID</key>
+    <string>1</string>
     <key>DHARMA_SPINE_DISPATCH</key>
     <string>1</string>
     <key>PATH</key>
@@ -35,6 +37,13 @@
   <!-- Start on login -->
   <key>RunAtLoad</key>
   <true/>
+
+  <!-- Raise file descriptor limit (was hitting 256 limit) -->
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>10240</integer>
+  </dict>
 
   <!-- Log stdout and stderr -->
   <key>StandardOutPath</key>

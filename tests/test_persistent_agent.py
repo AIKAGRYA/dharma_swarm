@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -137,15 +138,84 @@ class TestAcceptTask:
 
 
 class TestGateCheck:
-    def test_gate_not_blocked_for_conductor_wake(self):
+    def test_gate_not_blocked_for_conductor_wake(self, monkeypatch):
         agent = PersistentAgent(
             name="gate_test",
             role=AgentRole.CONDUCTOR,
             provider_type=ProviderType.ANTHROPIC,
             model="test-model",
         )
-        # conductor_wake is NOT in MANDATORY_THINK_PHASES, so should not block
+
+        import dharma_swarm.telos_gates as telos_gates
+        from dharma_swarm.models import GateDecision
+
+        monkeypatch.setattr(
+            telos_gates,
+            "check_with_reflective_reroute",
+            lambda **_kwargs: SimpleNamespace(
+                result=SimpleNamespace(decision=GateDecision.ALLOW, reason="allowed")
+            ),
+        )
+
         result = agent._check_gate("Review system state")
-        # May return None if telos_gates has import issues, or a dict
-        if result is not None:
-            assert not result.get("blocked", False)
+
+        assert result is not None
+        assert not result.get("blocked", False)
+        assert result["gate_status"] == "passed"
+
+    def test_gate_exception_fails_closed(self, monkeypatch):
+        agent = PersistentAgent(
+            name="gate_fail_closed",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+        )
+
+        import dharma_swarm.telos_gates as telos_gates
+
+        def _boom(**_kwargs):
+            raise RuntimeError("gate evaluator unavailable")
+
+        monkeypatch.setattr(telos_gates, "check_with_reflective_reroute", _boom)
+
+        result = agent._check_gate("Attempt privileged standing-agent work")
+
+        assert result is not None
+        assert result["blocked"] is True
+        assert result["gate_status"] == "fail_closed"
+        assert result["reason"] == "gate_check_error:RuntimeError"
+
+    @pytest.mark.asyncio
+    async def test_wake_does_not_execute_when_gate_fails_closed(self, tmp_path, monkeypatch):
+        agent = PersistentAgent(
+            name="gate_wake_fail_closed",
+            role=AgentRole.CONDUCTOR,
+            provider_type=ProviderType.ANTHROPIC,
+            model="test-model",
+            state_dir=tmp_path,
+        )
+        agent._cron.tick = AsyncMock(return_value=[])
+        agent._agent.memory.load = AsyncMock()
+        agent._agent.wake = AsyncMock()
+        agent._write_witness = AsyncMock()
+        agent._check_gate = MagicMock(
+            return_value={
+                "blocked": True,
+                "reason": "gate_check_error:RuntimeError",
+                "gate_status": "fail_closed",
+            }
+        )
+
+        stigmergy = MagicMock()
+        stigmergy.hot_paths = AsyncMock(return_value=[])
+        stigmergy.high_salience = AsyncMock(return_value=[])
+        bus = MagicMock()
+        bus.receive = AsyncMock(return_value=[])
+        monkeypatch.setattr(agent, "_get_stigmergy", AsyncMock(return_value=stigmergy))
+        monkeypatch.setattr(agent, "_get_bus", AsyncMock(return_value=bus))
+
+        result = await agent.wake("Protected standing task")
+
+        assert result["blocked"] is True
+        assert result["gate_status"] == "fail_closed"
+        agent._agent.wake.assert_not_awaited()

@@ -1,0 +1,76 @@
+{
+  "acceptance_gates": [
+    {
+      "gate_uid": "audit-holon",
+      "open": true
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 1.0,
+  "correlation_id": "2bbba006f775",
+  "created_at": "2026-06-26T00:27:28Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/2bbba006f775.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 24615,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 0
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "b2fb779a50c244d97685158b8aa15fe0719404a73962af8fcaee93374c1f74c1",
+  "raw_response_sha256": "a83242392cf15681ea3dbab2f3af4e6b24bb621f9b5319094e451776a7919d66",
+  "receipt_id": "a2a_audit_request_review_2bbba006f775",
+  "recommendations": [],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.2bbba006f775",
+  "review_target": "a2a:2bbba006f775",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The A2A packet requests an audit of the standalone `holon/` package changes for the long-run Holon objective. The agent is capable and understands the request. The verdict is approval.",
+  "understood_request": true,
+  "verdict": "approve",
+  "verdict_explanation": {
+    "evidence": [
+      "The agent is capable and understands the request."
+    ],
+    "verdict_details": {
+      "audit_request_understood": "true"
+    }
+  }
+}

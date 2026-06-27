@@ -19,7 +19,6 @@ import {
   Brain,
 } from "lucide-react";
 import { useAgent } from "@/hooks/useAgent";
-import type { AgentDetailData } from "@/hooks/useAgent";
 import { HPBar } from "@/components/game/HPBar";
 import { HealthBadge } from "@/components/dashboard/HealthBadge";
 import { BackButton, agentHealthStatus, agentHPPercent, tierColor, stagger } from "@/components/agent-workspace/shared";
@@ -63,6 +62,7 @@ export default function AgentWorkspaceLayout({
   const qc = useQueryClient();
   const agentData = useAgent(id);
   const { agent, config, isLoading, error, stopAgent, respawnAgent } = agentData;
+  const holon = agentData.holon;
 
   const basePath = `/dashboard/agents/${id}`;
 
@@ -180,6 +180,17 @@ export default function AgentWorkspaceLayout({
                   >
                     {agent.role}
                   </span>
+                  {holon && (
+                    <span
+                      className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest"
+                      style={{
+                        color: colors.rokusho,
+                        backgroundColor: `color-mix(in srgb, ${colors.rokusho} 14%, transparent)`,
+                      }}
+                    >
+                      HOLON {holon.d_score?.verified_level ?? holon.living_dock_status}
+                    </span>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <HealthBadge status={healthState} size="sm" />
                     <span className="text-xs capitalize text-kitsurubami">{agent.status}</span>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 
 from scripts.runtime import a2a_domain_reply_artifact
@@ -43,6 +44,7 @@ def test_build_domain_reply_artifact_defaults_to_nonsemantic_handler_receipt(tmp
     assert artifact["packet_id"] == "packet-1"
     assert artifact["peer_model_processed_claim"] is False
     assert artifact["semantic_reply_claim"] is False
+    assert artifact["authenticated_target_runtime_claim"] is False
     assert artifact["author_kind"] == "filesystem_delivery_handler"
 
 
@@ -73,3 +75,15 @@ def test_cli_writes_target_outbox_artifact_and_author_receipt(tmp_path: Path, ca
     assert artifact["authored_by"] == "hermes-m5"
     assert artifact["semantic_reply_claim"] is False
     assert Path(payload["receipt_path"]).is_file()
+    assert stat.S_IMODE(artifact_path.stat().st_mode) == 0o600
+
+
+def test_artifact_path_sanitizes_packet_id(tmp_path: Path) -> None:
+    path = a2a_domain_reply_artifact.artifact_path_for(
+        outbox_root=tmp_path / "outboxes",
+        agent_uid="hermes-m5",
+        packet_id="../../escape",
+    )
+
+    assert path.parent == (tmp_path / "outboxes" / "hermes-m5").resolve()
+    assert path.name == "escape-domain-reply.json"

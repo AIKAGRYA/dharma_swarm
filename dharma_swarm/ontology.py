@@ -2155,6 +2155,15 @@ class Entity:
 
 
 _HOME = Path.home()
+_GRANT_PACKET_PATH = (
+    _HOME
+    / "dharma_swarm"
+    / "docs"
+    / "missions"
+    / "anthropic-economic-futures-submission-2026-03-21"
+    / "anthropic_grant_application_submission_ready_2026-03-21.md"
+)
+_GAIA_KERNEL_PATH = _HOME / "dharma_swarm" / "dharma_swarm" / "gaia_platform.py"
 
 
 def _build_ontology() -> dict[str, Entity]:
@@ -2181,17 +2190,25 @@ def _build_ontology() -> dict[str, Entity]:
         ),
         "grant_app": Entity(
             id="grant_app", type="application",
-            canonical_path=_HOME / "jagat_kalyan" / "anthropic_grant_application.md",
-            status="active",
-            description="Anthropic Economic Futures Research Award ($35-50K)",
-            relationships=("depends_on:welfare_calc", "depends_on:rv_paper"),
+            canonical_path=_GRANT_PACKET_PATH,
+            status="complete",
+            description="Anthropic Economic Futures submission packet (historical research artifact)",
+            relationships=("depends_on:gaia_kernel", "depends_on:rv_paper"),
             actions=("edit", "audit"),
+        ),
+        "gaia_kernel": Entity(
+            id="gaia_kernel", type="module",
+            canonical_path=_GAIA_KERNEL_PATH,
+            status="active",
+            description="Live GAIA proof-chain runtime authority for ecological intake, qualification, and claim artifacts",
+            relationships=("depends_on:dharma_swarm", "feeds:grant_app", "feeds:jagat_kalyan"),
+            actions=("test", "edit"),
         ),
         "welfare_calc": Entity(
             id="welfare_calc", type="module",
             canonical_path=_HOME / "jagat_kalyan" / "welfare_tons.py",
-            status="complete",
-            description="Welfare-tons calculator W=C*E*A*B*V*P (121 tests)",
+            status="blocked",
+            description="Claimed external welfare-tons calculator; missing from current checkout",
             relationships=("feeds:grant_app",),
             actions=("test", "edit"),
         ),
@@ -2278,10 +2295,10 @@ def _build_ontology() -> dict[str, Entity]:
         "jagat_kalyan": Entity(
             id="jagat_kalyan", type="module",
             canonical_path=_HOME / "jagat_kalyan",
-            status="active",
-            description="Universal welfare platform: matching + welfare-tons",
-            relationships=("depends_on:welfare_calc", "feeds:grant_app"),
-            actions=("test", "edit", "deploy"),
+            status="dormant",
+            description="Legacy external Jagat Kalyan platform surface; continuity-only until restored",
+            relationships=("depends_on:gaia_kernel", "feeds:grant_app"),
+            actions=("audit",),
         ),
         "shakti_ginko": Entity(
             id="shakti_ginko", type="venture_cell",
@@ -2327,9 +2344,11 @@ def entity_context(entity_id: str) -> str:
     if not entity:
         return f"Unknown entity: {entity_id}"
     today = date.today()
+    path_exists = entity.canonical_path.exists()
     parts = [
         f"[{entity.id}] {entity.description}",
         f"  Path: {entity.canonical_path}",
+        f"  Path exists: {'yes' if path_exists else 'no'}",
         f"  Status: {entity.status}",
     ]
     if entity.deadline:

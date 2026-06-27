@@ -31,30 +31,47 @@ _REPO_ROOT_FOR_IMPORT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT_FOR_IMPORT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT_FOR_IMPORT))
 
-from dharma_swarm.operator_core.live_ops_census_contract import (
+from dharma_swarm.operator_core.live_ops_census_contract import (  # noqa: E402
     DEFAULT_OUTPUT,
     DEFAULT_STATE_ROOT,
-    LIVE_OPS_CENSUS_MAX_AGE_HOURS,
+    LIVE_OPS_CENSUS_MAX_AGE_HOURS as LIVE_OPS_CENSUS_MAX_AGE_HOURS,
     LIVE_OPS_CENSUS_SCHEMA_VERSION,
-    census_payload_freshness,
-    default_output_path,
-    default_state_root,
-    validate_census_payload,
+    census_payload_freshness as census_payload_freshness,
+    default_output_path as default_output_path,
+    default_state_root as default_state_root,
+    validate_census_payload as validate_census_payload,
 )
-from dharma_swarm.operator_core.ds_goal_wrapper_contract import (
+from dharma_swarm.operator_core.ds_goal_wrapper_contract import (  # noqa: E402
     default_wrapper_target as ds_goal_default_wrapper_target,
     installed_wrapper_contract,
     wrapper_convergence_decision_packet,
     wrapper_longrun_preflight_gate,
 )
+from dharma_swarm.holon_persistence import (  # noqa: E402
+    load_session as load_holon_session,
+    resume_point as holon_resume_point,
+)
+from dharma_swarm.holon_service_liveness import (  # noqa: E402
+    assess_service_liveness as assess_holon_service_liveness,
+    service_heartbeat_path as holon_service_heartbeat_path,
+)
+from dharma_swarm.holon_transport_liveness import (  # noqa: E402
+    assess_a2a_inbox_bridge_liveness as assess_holon_a2a_transport_liveness,
+)
 
 
 RUNTIME_RECEIPT_HEAD_WINDOWS_MINUTES = (5, 15, 60)
 RUNTIME_RECEIPT_HEAD_MAX_AGE_HOURS = 6.0
+RUNTIME_RECEIPT_SINCE_BOOT_MAJOR_TYPES = ("a2a_task", "delegation_run", "task_claim")
+RUNTIME_TRUTH_CLEAN_EPOCH_FILENAME = "runtime_truth_clean_epoch.json"
 NATS_HOT_CONTACT_MAX_AGE_HOURS = 24.0
 NATS_OPERATOR_HOT_CONTACT_ACK_TIERS = {"HANDLER_ACKED", "DOMAIN_RECEIPTED"}
 A2A_MIRROR_MAX_AGE_HOURS = 24.0
 A2A_INBOX_BRIDGE_HEARTBEAT_MAX_AGE_HOURS = 1.0
+HOLON_L4_AGENT_UID = "codex_composer"
+HOLON_L4_SERVICE_FRESH_SECONDS = 3600
+HOLON_L4_PROOF_MAX_AGE_HOURS = 24.0
+HOLON_L4_MODEL_PROOF_MAX_AGE_HOURS = 24.0
 DEFAULT_REPO_ROOT = _REPO_ROOT_FOR_IMPORT
 
 
@@ -124,7 +141,7 @@ AUTHORITY_SOURCES: tuple[dict[str, str], ...] = (
 
 PROCESS_PATTERNS: dict[str, str] = {
     "dharma_daemon": r"dharma_swarm\.dgc_cli orchestrate-live|[ /]dgc orchestrate-live",
-    "dharma_cron": r"dharma_swarm\.dgc_cli cron daemon",
+    "dharma_cron": r"dharma_swarm\.dgc_cli cron daemon|[ /]dgc cron daemon",
     "nats": r"nats-server .*local-nats\.conf",
     "a2a_inbox_bridge": r"a2a_inbox_bridge\.py",
     "hermes_a2a": r"hermes_a2a_server\.py",
@@ -139,6 +156,34 @@ PROCESS_PATTERNS: dict[str, str] = {
     "terminal_tui": r"dharma_terminal_tui|bun run src/index\.tsx|bun .*terminal/src/index\.tsx",
     "colima_openclaw": r"colima-openclaw-secure|qemu-system-aarch64 .*openclaw",
 }
+
+LAUNCHD_PROCESS_FALLBACKS: dict[str, str] = {
+    "dharma_daemon": "com.dharma.swarm",
+    "dharma_cron": "com.dharma.cron-daemon",
+}
+
+
+def _launch_uses_repo_cli(command: str, repo_root: Path, cli_args: str) -> bool:
+    repo_text = str(repo_root)
+    return f"-m dharma_swarm.dgc_cli {cli_args}" in command and (
+        f"PYTHONPATH={repo_text}" in command
+        or "PYTHONPATH=." in command
+        or f"cd {repo_text}" in command
+        or ".venv/bin/python" in command
+    )
+
+
+def _launch_uses_repo_module(command: str, repo_root: Path) -> bool:
+    return _launch_uses_repo_cli(command, repo_root, "orchestrate-live")
+
+
+def _launch_uses_ambient_dgc_cli(command: str, cli_args: str) -> bool:
+    pattern = rf"(^|[\s/])dgc\s+{re.escape(cli_args)}\b"
+    return re.search(pattern, command) is not None
+
+
+def _launch_uses_ambient_dgc(command: str) -> bool:
+    return _launch_uses_ambient_dgc_cli(command, "orchestrate-live")
 
 
 PORTS: dict[str, int] = {
@@ -156,7 +201,14 @@ HTTP_PROBES: dict[str, str] = {
 }
 
 HTTP_PROBE_TIMEOUT_SECONDS = 5.0
-DASHBOARD_ROWS_FAST_RESPONSE_SECONDS = 1.5
+DAEMON_HEALTH_URL = "http://127.0.0.1:7433/health"
+DAEMON_HEALTH_TIMEOUT_SECONDS = 1.5
+DAEMON_RUNTIME_DISPATCH_SELF_REPORT_MAX_AGE_HOURS = 0.25
+DASHBOARD_ROWS_PROBE_TIMEOUT_SECONDS = 12.0
+DASHBOARD_ROWS_FAST_RESPONSE_SECONDS = 2.0
+FORGE_REALITY_ARENA_STATUS_PACKET = (
+    "reports/agentops/work_packets/forge-reality-arena-status.json"
+)
 PROC_PIDTBSDINFO = 3
 MAXCOMLEN = 16
 
@@ -165,6 +217,9 @@ DAEMON_SPINE_RUNTIME_PROOFS = {
     "daemon_default_receipt_proven",
     "daemon_default_spine_receipt_proven",
 }
+DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION = (
+    "dharma.daemon.runtime_dispatch_self_report.v1"
+)
 
 DAEMON_RUNTIME_SOURCE_PATHS: tuple[str, ...] = (
     "dharma_swarm/dgc_cli.py",
@@ -498,8 +553,30 @@ def _process_snapshot(run_probes: bool) -> dict[str, list[dict[str, str]]]:
     snapshot: dict[str, list[dict[str, str]]] = {}
     for key, pattern in PROCESS_PATTERNS.items():
         rc, out = _run(["pgrep", "-fl", pattern], timeout=4)
-        snapshot[key] = _parse_pgrep(out) if rc == 0 else []
+        rows = _parse_pgrep(out) if rc == 0 else []
+        if not rows and key in LAUNCHD_PROCESS_FALLBACKS:
+            rows = _launchctl_process_rows(LAUNCHD_PROCESS_FALLBACKS[key])
+        snapshot[key] = rows
     return snapshot
+
+
+def _launchctl_process_rows(label: str) -> list[dict[str, str]]:
+    rc, out = _run(["launchctl", "print", f"gui/{os.getuid()}/{label}"], timeout=4)
+    if rc != 0:
+        return []
+    state_match = re.search(r"(?m)^\s*state = ([^\n]+)", out)
+    state = state_match.group(1).strip() if state_match else ""
+    if state != "running":
+        return []
+    pid_match = re.search(r"(?m)^\s*pid = ([0-9]+)", out)
+    if not pid_match:
+        return []
+    return [
+        {
+            "pid": pid_match.group(1),
+            "command": f"launchctl:{label} state={state}",
+        }
+    ]
 
 
 def _parse_ps_lstart(value: str) -> str:
@@ -748,7 +825,229 @@ def _http_probe_snapshot(run_probes: bool) -> dict[str, dict[str, Any]]:
             }
             for key, url in HTTP_PROBES.items()
         }
-    return {key: _http_json_probe(url) for key, url in HTTP_PROBES.items()}
+    return {
+        key: _http_json_probe(
+            url,
+            timeout_seconds=(
+                DASHBOARD_ROWS_PROBE_TIMEOUT_SECONDS
+                if key == "dashboard_control_surface_rows"
+                else HTTP_PROBE_TIMEOUT_SECONDS
+            ),
+        )
+        for key, url in HTTP_PROBES.items()
+    }
+
+
+def _fetch_json_document(
+    url: str,
+    *,
+    timeout_seconds: float,
+    max_bytes: int = 65_536,
+) -> tuple[int, dict[str, Any]]:
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        body = response.read(max_bytes + 1)
+        if len(body) > max_bytes:
+            raise ValueError(f"JSON response exceeds {max_bytes} bytes")
+        payload = json.loads(body.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("JSON response is not an object")
+        return int(response.status), payload
+
+
+def _daemon_health_self_report(
+    *,
+    run_probes: bool,
+    url: str = DAEMON_HEALTH_URL,
+    timeout_seconds: float = DAEMON_HEALTH_TIMEOUT_SECONDS,
+    observed_pids: set[str] | None = None,
+) -> dict[str, Any]:
+    if not run_probes:
+        return {
+            "url": url,
+            "state": "not_inspected_no_secret_env_dump",
+            "evidence": "daemon health probe disabled",
+        }
+    try:
+        status, payload = _fetch_json_document(url, timeout_seconds=timeout_seconds)
+    except TimeoutError as exc:
+        return {
+            "url": url,
+            "state": "timeout",
+            "timeout_seconds": timeout_seconds,
+            "evidence": f"timed out after {timeout_seconds}s: {exc}",
+        }
+    except urllib.error.URLError as exc:
+        return {
+            "url": url,
+            "state": "unreachable",
+            "timeout_seconds": timeout_seconds,
+            "evidence": str(exc.reason),
+        }
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "url": url,
+            "state": "unreadable",
+            "timeout_seconds": timeout_seconds,
+            "evidence": str(exc),
+        }
+
+    runtime_dispatch = payload.get("runtime_dispatch")
+    if not isinstance(runtime_dispatch, dict):
+        return {
+            "url": url,
+            "http_status": status,
+            "state": "missing_runtime_dispatch",
+            "evidence": "daemon /health JSON did not include runtime_dispatch",
+        }
+
+    daemon_pid = payload.get("daemon_pid")
+    daemon_pid_text = str(daemon_pid) if daemon_pid not in {None, ""} else ""
+    if daemon_pid_text and observed_pids and daemon_pid_text not in observed_pids:
+        return {
+            "url": url,
+            "http_status": status,
+            "state": "daemon_pid_mismatch",
+            "daemon_pid": daemon_pid_text,
+            "observed_pids": sorted(observed_pids),
+            "evidence": "daemon /health parent PID did not match observed daemon PID",
+        }
+    if payload.get("daemon_process_alive") is False:
+        return {
+            "url": url,
+            "http_status": status,
+            "state": "daemon_parent_not_alive",
+            "daemon_pid": daemon_pid_text,
+            "evidence": "daemon /health reports its parent daemon process is gone",
+        }
+
+    enabled = runtime_dispatch.get("spine_dispatch_enabled")
+    if enabled is True:
+        state = "spine_enabled_self_report"
+    elif enabled is False:
+        state = "legacy_self_report"
+    else:
+        state = "ambiguous_runtime_dispatch"
+
+    return {
+        "url": url,
+        "http_status": status,
+        "state": state,
+        "runtime_dispatch": {
+            "spine_dispatch_enabled": enabled,
+            "dispatch_mode": runtime_dispatch.get("dispatch_mode"),
+            "env_key_present": runtime_dispatch.get("env_key_present"),
+            "source": runtime_dispatch.get("source"),
+        },
+        "daemon_pid": daemon_pid_text,
+        "daemon_process_alive": payload.get("daemon_process_alive"),
+        "health_process_pid": payload.get("health_process_pid"),
+        "evidence": "daemon /health returned non-secret runtime_dispatch block",
+    }
+
+
+def _daemon_runtime_dispatch_file_self_report(
+    state_root: Path,
+    *,
+    observed_pids: set[str],
+    observed_pid_sources: dict[str, str] | None = None,
+    now: datetime,
+    max_age_hours: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_MAX_AGE_HOURS,
+) -> dict[str, Any]:
+    path = state_root / "ops" / "daemon_runtime_dispatch_self_report.json"
+    result: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "state": "missing",
+        "max_age_hours": max_age_hours,
+        "evidence": "daemon runtime-dispatch self-report missing",
+    }
+    payload = _read_json(path)
+    if not payload:
+        return result
+    result["schema_version"] = str(payload.get("schema_version") or "")
+    if result["schema_version"] != DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION:
+        result["state"] = "schema_invalid"
+        result["evidence"] = "daemon runtime-dispatch self-report schema invalid"
+        return result
+    pid = str(payload.get("pid") or "")
+    result["pid"] = pid
+    if not pid or pid not in observed_pids:
+        result["state"] = "pid_not_observed"
+        result["observed_pids"] = sorted(observed_pids)
+        result["evidence"] = "daemon self-report pid does not match observed daemon process"
+        return result
+    if observed_pid_sources:
+        result["pid_source"] = observed_pid_sources.get(pid, "observed_process")
+    updated_at = str(payload.get("updated_at") or "")
+    result["updated_at"] = updated_at
+    parsed = _parse_iso_utc(updated_at)
+    if parsed is None:
+        result["state"] = "timestamp_invalid"
+        result["evidence"] = "daemon runtime-dispatch self-report timestamp invalid"
+        return result
+    age_hours = round((now - parsed).total_seconds() / 3600, 3)
+    result["age_hours"] = age_hours
+    if age_hours > max_age_hours:
+        result["state"] = "stale"
+        result["evidence"] = "daemon runtime-dispatch self-report is stale"
+        return result
+    runtime_dispatch = payload.get("runtime_dispatch")
+    if not isinstance(runtime_dispatch, dict):
+        result["state"] = "missing_runtime_dispatch"
+        result["evidence"] = "daemon self-report missing runtime_dispatch"
+        return result
+
+    enabled = runtime_dispatch.get("spine_dispatch_enabled")
+    if enabled is True:
+        state = "spine_enabled_self_report"
+    elif enabled is False:
+        state = "legacy_self_report"
+    else:
+        state = "ambiguous_runtime_dispatch"
+    result.update({
+        "state": state,
+        "runtime_dispatch": {
+            "spine_dispatch_enabled": enabled,
+            "dispatch_mode": runtime_dispatch.get("dispatch_mode"),
+            "env_key_present": runtime_dispatch.get("env_key_present"),
+            "source": runtime_dispatch.get("source"),
+        },
+        "source": str(payload.get("source") or ""),
+        "evidence": "fresh pid-bound daemon runtime-dispatch self-report",
+    })
+    return result
+
+
+def _daemon_pid_file_state(state_root: Path) -> dict[str, Any]:
+    path = state_root / "daemon.pid"
+    result: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "state": "missing",
+        "evidence": "daemon pid file missing",
+    }
+    try:
+        raw_pid = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return result
+    except OSError as exc:
+        result["state"] = "unreadable"
+        result["evidence"] = f"daemon pid file unreadable: {exc}"
+        return result
+    pid = raw_pid.splitlines()[0].strip() if raw_pid else ""
+    result["pid"] = pid
+    if not pid:
+        result["state"] = "empty"
+        result["evidence"] = "daemon pid file is empty"
+        return result
+    if not pid.isdigit():
+        result["state"] = "invalid"
+        result["evidence"] = "daemon pid file is not numeric"
+        return result
+    result["state"] = "present"
+    result["evidence"] = "daemon pid file declares child runtime pid"
+    return result
 
 
 def _tmux_sessions(run_probes: bool) -> list[str]:
@@ -787,6 +1086,26 @@ def _read_latest_jsonl(path: Path) -> dict[str, Any]:
     return {}
 
 
+def _read_jsonl_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            rows.append(parsed)
+    return rows
+
+
 def _receipt_timestamp(payload: dict[str, Any]) -> str:
     for key in ("ts", "timestamp", "created_at", "verified_at", "updated_at"):
         value = str(payload.get(key) or "")
@@ -800,6 +1119,28 @@ def _receipt_timestamp(payload: dict[str, Any]) -> str:
 
 def _receipt_age_hours(payload: dict[str, Any]) -> float | None:
     return _age_hours(_receipt_timestamp(payload))
+
+
+def _latest_hot_contact_send_receipt(root: Path) -> dict[str, Any]:
+    if not root.exists():
+        return {}
+    matches: list[tuple[str, Path, dict[str, Any]]] = []
+    for path in root.glob("*.json"):
+        payload = _read_json(path)
+        tier = str(payload.get("contact_evidence_tier") or payload.get("ack_tier") or "")
+        if tier not in NATS_OPERATOR_HOT_CONTACT_ACK_TIERS:
+            continue
+        ts = _receipt_timestamp(payload) or _iso_mtime(path)
+        if not ts:
+            continue
+        enriched = dict(payload)
+        enriched["_path"] = str(path)
+        enriched["_source"] = "reports/a2a/send_receipts"
+        enriched["_timestamp"] = ts
+        matches.append((ts, path, enriched))
+    if not matches:
+        return {}
+    return sorted(matches, key=lambda item: item[0], reverse=True)[0][2]
 
 
 def _latest_packet_receipt(root: Path, packet_id: str) -> dict[str, Any]:
@@ -845,19 +1186,58 @@ def _nats_ack_tier_state(
     nats_contact_receipts: Path,
     nats_oz_receipts: Path,
     latest_nats_receipt: Path | None,
+    latest_send_hot_contact: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     live_receipt = _read_json(nats_live_receipt)
     contact_receipt = _read_latest_jsonl(nats_contact_receipts)
     oz_receipt = _read_latest_jsonl(nats_oz_receipts)
     canonical_receipt = _read_json(latest_nats_receipt) if latest_nats_receipt else {}
 
-    hot_ack_tier = str(contact_receipt.get("ack_tier") or "")
-    hot_ack_age = _receipt_age_hours(contact_receipt)
-    hot_ack_fresh = (
-        hot_ack_tier in NATS_OPERATOR_HOT_CONTACT_ACK_TIERS
-        and hot_ack_age is not None
-        and hot_ack_age <= NATS_HOT_CONTACT_MAX_AGE_HOURS
-    )
+    hot_candidates: list[dict[str, Any]] = []
+    legacy_ack_tier = str(contact_receipt.get("ack_tier") or "")
+    legacy_ack_age = _receipt_age_hours(contact_receipt)
+    if legacy_ack_tier and legacy_ack_age is not None:
+        hot_candidates.append({
+            "path": str(nats_contact_receipts),
+            "exists": nats_contact_receipts.exists(),
+            "ack_tier": legacy_ack_tier,
+            "verdict": str(contact_receipt.get("verdict") or ""),
+            "agent_uid": str(contact_receipt.get("agent_uid") or ""),
+            "packet_id": str(contact_receipt.get("packet_id") or ""),
+            "source": "nats_contact_receipts.jsonl",
+            "ts": _receipt_timestamp(contact_receipt),
+            "age_hours": legacy_ack_age,
+            "fresh": (
+                legacy_ack_tier in NATS_OPERATOR_HOT_CONTACT_ACK_TIERS
+                and legacy_ack_age <= NATS_HOT_CONTACT_MAX_AGE_HOURS
+            ),
+        })
+    send_contact = latest_send_hot_contact or {}
+    send_ack_tier = str(send_contact.get("contact_evidence_tier") or send_contact.get("ack_tier") or "")
+    send_ack_age = _receipt_age_hours(send_contact)
+    if send_ack_tier and send_ack_age is not None:
+        hot_candidates.append({
+            "path": str(send_contact.get("_path") or ""),
+            "exists": bool(send_contact.get("_path")),
+            "ack_tier": send_ack_tier,
+            "verdict": str(send_contact.get("status") or ""),
+            "agent_uid": str(send_contact.get("target_uid") or send_contact.get("to") or ""),
+            "packet_id": str(send_contact.get("packet_id") or ""),
+            "source": str(send_contact.get("_source") or "send_receipts"),
+            "ts": _receipt_timestamp(send_contact),
+            "age_hours": send_ack_age,
+            "fresh": (
+                send_ack_tier in NATS_OPERATOR_HOT_CONTACT_ACK_TIERS
+                and send_ack_age <= NATS_HOT_CONTACT_MAX_AGE_HOURS
+            ),
+        })
+    fresh_hot_candidates = [candidate for candidate in hot_candidates if candidate["fresh"]]
+    selected_hot_contact = {}
+    if fresh_hot_candidates:
+        selected_hot_contact = min(fresh_hot_candidates, key=lambda item: item["age_hours"])
+    elif hot_candidates:
+        selected_hot_contact = min(hot_candidates, key=lambda item: item["age_hours"])
+    hot_ack_fresh = bool(fresh_hot_candidates)
     live_ack_verified = bool(live_receipt.get("ack_verified"))
     live_ack_tier = str(live_receipt.get("ack_tier") or "")
     return {
@@ -871,16 +1251,8 @@ def _nats_ack_tier_state(
             "ts": _receipt_timestamp(live_receipt),
             "age_hours": _receipt_age_hours(live_receipt),
         },
-        "hot_contact": {
-            "path": str(nats_contact_receipts),
-            "exists": nats_contact_receipts.exists(),
-            "ack_tier": hot_ack_tier,
-            "verdict": str(contact_receipt.get("verdict") or ""),
-            "agent_uid": str(contact_receipt.get("agent_uid") or ""),
-            "ts": _receipt_timestamp(contact_receipt),
-            "age_hours": hot_ack_age,
-            "fresh": hot_ack_fresh,
-        },
+        "hot_contact": selected_hot_contact,
+        "hot_contact_sources": hot_candidates,
         "oz_delivery": {
             "path": str(nats_oz_receipts),
             "exists": nats_oz_receipts.exists(),
@@ -1133,9 +1505,26 @@ def _dharma_launch_dispatch(repo_root: Path) -> dict[str, Any]:
         env_value = str(env.get("DHARMA_SPINE_DISPATCH", ""))
         command_mentions_flag = "DHARMA_SPINE_DISPATCH" in command
         spine_enabled = env_value == "1" or "DHARMA_SPINE_DISPATCH=1" in command
-        if spine_enabled:
+        repo_module_invocation = _launch_uses_repo_module(command, repo_root)
+        ambient_dgc_invocation = _launch_uses_ambient_dgc(command)
+        if spine_enabled and repo_module_invocation:
             state = "spine_enabled_launch_spec"
-            evidence = "launch spec declares DHARMA_SPINE_DISPATCH=1"
+            evidence = (
+                "launch spec declares DHARMA_SPINE_DISPATCH=1 and invokes "
+                "repo-pinned dharma_swarm.dgc_cli module"
+            )
+        elif spine_enabled and ambient_dgc_invocation:
+            state = "ambient_dgc_spine_launch_spec"
+            evidence = (
+                "launch spec declares DHARMA_SPINE_DISPATCH=1 but invokes ambient "
+                "dgc console script instead of the repo-pinned module"
+            )
+        elif spine_enabled:
+            state = "unblessed_spine_launch_spec"
+            evidence = (
+                "launch spec declares DHARMA_SPINE_DISPATCH=1 but command is not "
+                "repo-pinned to this checkout"
+            )
         elif env_value or command_mentions_flag:
             state = "explicit_non_spine_launch_spec"
             evidence = "launch spec mentions DHARMA_SPINE_DISPATCH but does not set it to 1"
@@ -1148,11 +1537,70 @@ def _dharma_launch_dispatch(repo_root: Path) -> dict[str, Any]:
             "evidence": evidence,
             "env_declares_spine": env_value == "1",
             "command_mentions_spine": command_mentions_flag,
+            "repo_module_invocation": repo_module_invocation,
+            "ambient_dgc_invocation": ambient_dgc_invocation,
         }
     return {
         "path": "",
         "state": "launch_spec_missing",
         "evidence": "no com.dharma.swarm.plist launch spec found",
+    }
+
+
+def _cron_launch_dispatch(repo_root: Path) -> dict[str, Any]:
+    """Read cron daemon launch dispatch mode without dumping process environments."""
+    candidates = [
+        Path.home() / "Library" / "LaunchAgents" / "com.dharma.cron-daemon.plist",
+        repo_root / "scripts" / "com.dharma.cron-daemon.plist",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            with path.open("rb") as handle:
+                data = plistlib.load(handle)
+        except (OSError, plistlib.InvalidFileException) as exc:
+            return {
+                "path": str(path),
+                "state": "cron_launch_spec_unreadable",
+                "evidence": f"unable to parse cron launch plist: {exc}",
+            }
+        args = data.get("ProgramArguments") or []
+        env = data.get("EnvironmentVariables") or {}
+        command = " ".join(str(arg) for arg in args)
+        env_pythonpath = str(env.get("PYTHONPATH", ""))
+        repo_module_invocation = _launch_uses_repo_cli(command, repo_root, "cron daemon")
+        ambient_dgc_invocation = _launch_uses_ambient_dgc_cli(command, "cron daemon")
+        if repo_module_invocation:
+            state = "repo_pinned_cron_launch_spec"
+            evidence = "cron launch spec invokes repo-pinned dharma_swarm.dgc_cli module"
+        elif ambient_dgc_invocation:
+            state = "ambient_dgc_cron_launch_spec"
+            evidence = (
+                "cron launch spec invokes ambient dgc console script instead of the "
+                "repo-pinned module"
+            )
+        elif "-m dharma_swarm.dgc_cli cron daemon" in command:
+            state = "unblessed_cron_launch_spec"
+            evidence = (
+                "cron launch spec uses dharma_swarm.dgc_cli but is not pinned to "
+                "this checkout"
+            )
+        else:
+            state = "legacy_default_cron_launch_spec"
+            evidence = "cron launch spec does not invoke dharma_swarm.dgc_cli"
+        return {
+            "path": str(path),
+            "state": state,
+            "evidence": evidence,
+            "repo_module_invocation": repo_module_invocation,
+            "ambient_dgc_invocation": ambient_dgc_invocation,
+            "env_pythonpath_pinned": env_pythonpath in {str(repo_root), "."},
+        }
+    return {
+        "path": "",
+        "state": "cron_launch_spec_missing",
+        "evidence": "no com.dharma.cron-daemon.plist launch spec found",
     }
 
 
@@ -1206,28 +1654,165 @@ def _table_exists(db: sqlite3.Connection, table: str) -> bool:
     return row is not None
 
 
+def _runtime_truth_clean_epoch_path(state_root: Path) -> Path:
+    return state_root / "state" / RUNTIME_TRUTH_CLEAN_EPOCH_FILENAME
+
+
+def _runtime_truth_clean_epoch_state(state_root: Path) -> dict[str, Any]:
+    """Read the append-only runtime truth clean-epoch marker."""
+    path = _runtime_truth_clean_epoch_path(state_root)
+    db_path = _runtime_db_path(state_root)
+    result: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "enabled": False,
+        "valid": False,
+        "receipt_verified": False,
+        "receipt_id": "",
+        "receipt_type": "",
+        "since_created_at": "",
+        "created_at": "",
+        "reason": "",
+        "historical_dirt_policy": "",
+        "scope_mode": "all",
+        "evidence": "runtime truth clean epoch file not found",
+    }
+    if not path.exists():
+        return result
+
+    payload = _read_json(path)
+    if not payload:
+        result["evidence"] = "runtime truth clean epoch file is unreadable or empty"
+        return result
+
+    since_created_at = str(payload.get("since_created_at") or "").strip()
+    receipt_id = str(payload.get("receipt_id") or "").strip()
+    result.update(
+        receipt_id=receipt_id,
+        since_created_at=since_created_at,
+        created_at=str(payload.get("created_at") or ""),
+        reason=str(payload.get("reason") or ""),
+        historical_dirt_policy=str(payload.get("historical_dirt_policy") or ""),
+        scope_mode="since_created_at" if since_created_at else "all",
+    )
+    if _parse_iso_utc(since_created_at) is None:
+        result["evidence"] = (
+            "runtime truth clean epoch since_created_at is missing or invalid"
+        )
+        return result
+    result["valid"] = True
+
+    if not receipt_id:
+        result["evidence"] = "runtime truth clean epoch receipt_id is missing"
+        return result
+    if not db_path.exists():
+        result["evidence"] = (
+            "runtime truth clean epoch receipt cannot be verified; runtime DB missing"
+        )
+        return result
+
+    try:
+        uri = f"{db_path.resolve().as_uri()}?mode=ro"
+        db = sqlite3.connect(uri, uri=True)
+        db.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        result["evidence"] = (
+            f"runtime truth clean epoch receipt cannot be verified: {exc}"
+        )
+        return result
+
+    try:
+        if not _table_exists(db, "runtime_receipts"):
+            result["evidence"] = (
+                "runtime truth clean epoch receipt cannot be verified; "
+                "runtime_receipts table missing"
+            )
+            return result
+        row = db.execute(
+            """
+            SELECT receipt_id, receipt_type, status, payload_json, created_at
+            FROM runtime_receipts
+            WHERE receipt_id = ?
+            """,
+            (receipt_id,),
+        ).fetchone()
+        if row is None:
+            result["evidence"] = (
+                "runtime truth clean epoch receipt is missing from runtime DB"
+            )
+            return result
+        receipt_type = str(row["receipt_type"] or "")
+        status = str(row["status"] or "")
+        receipt_payload = json.loads(str(row["payload_json"] or "{}"))
+        receipt_since = str(receipt_payload.get("since_created_at") or "").strip()
+        result["receipt_type"] = receipt_type
+        result["receipt_created_at"] = str(row["created_at"] or "")
+        if receipt_type != "runtime_truth_clean_epoch":
+            result["evidence"] = (
+                "runtime truth clean epoch receipt has unexpected type "
+                f"{receipt_type or '<blank>'}"
+            )
+            return result
+        if status not in {"active", "completed"}:
+            result["evidence"] = (
+                "runtime truth clean epoch receipt has unexpected status "
+                f"{status or '<blank>'}"
+            )
+            return result
+        if receipt_since != since_created_at:
+            result["evidence"] = (
+                "runtime truth clean epoch receipt boundary does not match file"
+            )
+            return result
+        result["receipt_verified"] = True
+        result["enabled"] = True
+        result["evidence"] = (
+            "active-head runtime truth is scoped to append-only clean epoch receipt"
+        )
+        return result
+    except (json.JSONDecodeError, sqlite3.Error) as exc:
+        result["evidence"] = (
+            f"runtime truth clean epoch receipt verification failed: {exc}"
+        )
+        return result
+    finally:
+        db.close()
+
+
 def _runtime_receipt_active_head_state(
     state_root: Path,
     *,
+    since_created_at: str = "",
     windows_minutes: tuple[int, ...] = RUNTIME_RECEIPT_HEAD_WINDOWS_MINUTES,
     max_age_hours: float = RUNTIME_RECEIPT_HEAD_MAX_AGE_HOURS,
 ) -> dict[str, Any]:
     """Read the canonical runtime DB head without mutating it."""
     db_path = _runtime_db_path(state_root)
+    clean_since_created_at = str(since_created_at or "").strip()
     result: dict[str, Any] = {
         "db_path": str(db_path),
         "db_exists": db_path.exists(),
         "readable": False,
         "table_exists": False,
+        "scope_mode": "since_created_at" if clean_since_created_at else "all",
+        "scope_since_created_at": clean_since_created_at,
         "latest_created_at": "",
         "latest_age_hours": None,
         "latest_max_age_hours": max_age_hours,
         "latest_fresh": None,
+        "unscoped_runtime_receipts_total": 0,
         "runtime_receipts_total": 0,
         "active_head_side_effect_key_clean": None,
         "windows": [],
         "evidence": "",
     }
+    clean_since_dt = None
+    if clean_since_created_at:
+        clean_since_dt = _parse_iso_utc(clean_since_created_at)
+        if clean_since_dt is None:
+            result["active_head_side_effect_key_clean"] = False
+            result["evidence"] = "active-head clean epoch since_created_at is invalid"
+            return result
     if not db_path.exists():
         result["evidence"] = "runtime DB not found"
         return result
@@ -1247,15 +1832,38 @@ def _runtime_receipt_active_head_state(
             result["evidence"] = "runtime_receipts table not found"
             return result
 
-        total = int(db.execute("SELECT COUNT(*) FROM runtime_receipts").fetchone()[0])
-        latest_created_at = str(
-            db.execute("SELECT MAX(created_at) FROM runtime_receipts").fetchone()[0] or ""
+        unscoped_total = int(
+            db.execute("SELECT COUNT(*) FROM runtime_receipts").fetchone()[0]
         )
+        if clean_since_created_at:
+            scope_where = "created_at >= ?"
+            scope_params = (clean_since_created_at,)
+        else:
+            scope_where = "1=1"
+            scope_params = ()
+        total = int(
+            db.execute(
+                f"SELECT COUNT(*) FROM runtime_receipts WHERE {scope_where}",
+                scope_params,
+            ).fetchone()[0]
+        )
+        latest_created_at = str(
+            db.execute(
+                f"SELECT MAX(created_at) FROM runtime_receipts WHERE {scope_where}",
+                scope_params,
+            ).fetchone()[0]
+            or ""
+        )
+        result["unscoped_runtime_receipts_total"] = unscoped_total
         result["runtime_receipts_total"] = total
         result["latest_created_at"] = latest_created_at
         if not latest_created_at:
             result["active_head_side_effect_key_clean"] = False
-            result["evidence"] = "runtime_receipts table is empty"
+            result["evidence"] = (
+                "runtime_receipts selected active-head scope is empty"
+                if clean_since_created_at
+                else "runtime_receipts table is empty"
+            )
             return result
 
         anchor = _parse_iso_utc(latest_created_at)
@@ -1269,7 +1877,10 @@ def _runtime_receipt_active_head_state(
 
         windows: list[dict[str, Any]] = []
         for minutes in windows_minutes:
-            cutoff = (anchor - timedelta(minutes=max(0, minutes))).isoformat()
+            cutoff_dt = anchor - timedelta(minutes=max(0, minutes))
+            if clean_since_dt is not None:
+                cutoff_dt = max(cutoff_dt, clean_since_dt)
+            cutoff = cutoff_dt.isoformat()
             window_total = int(
                 db.execute(
                     "SELECT COUNT(*) FROM runtime_receipts WHERE created_at >= ?",
@@ -1291,6 +1902,7 @@ def _runtime_receipt_active_head_state(
                     "window_minutes": minutes,
                     "anchor_created_at": latest_created_at,
                     "cutoff_created_at": cutoff,
+                    "scope_since_created_at": clean_since_created_at,
                     "total": window_total,
                     "missing_side_effect_key": missing_side_effect_key,
                     "missing_side_effect_key_percent": (
@@ -1322,6 +1934,154 @@ def _runtime_receipt_active_head_state(
     except sqlite3.Error as exc:
         result["active_head_side_effect_key_clean"] = None
         result["evidence"] = f"runtime_receipts query failed: {exc}"
+        return result
+    finally:
+        db.close()
+
+
+def _runtime_receipt_since_boot_state(
+    state_root: Path,
+    process_source_state: dict[str, Any],
+) -> dict[str, Any]:
+    """Read whether the current daemon boot created blank major receipts."""
+    db_path = _runtime_db_path(state_root)
+    result: dict[str, Any] = {
+        "db_path": str(db_path),
+        "db_exists": db_path.exists(),
+        "readable": False,
+        "table_exists": False,
+        "process_started_at": "",
+        "major_receipt_types": list(RUNTIME_RECEIPT_SINCE_BOOT_MAJOR_TYPES),
+        "major_since_boot_total": 0,
+        "missing_side_effect_key": 0,
+        "missing_idempotency_key": 0,
+        "since_boot_major_identity_clean": None,
+        "gap_sample": [],
+        "evidence": "",
+    }
+    starts = [
+        _parse_iso_utc(str(row.get("started_at") or ""))
+        for row in (process_source_state.get("process_starts") or [])
+        if isinstance(row, dict)
+    ]
+    parsed_starts = [started for started in starts if started is not None]
+    if not parsed_starts:
+        result["evidence"] = "daemon process start time not available"
+        return result
+    started_at = min(parsed_starts)
+    started_text = started_at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    result["process_started_at"] = started_text
+
+    if not db_path.exists():
+        result["evidence"] = "runtime DB not found"
+        return result
+
+    try:
+        uri = f"{db_path.resolve().as_uri()}?mode=ro"
+        db = sqlite3.connect(uri, uri=True)
+        db.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        result["evidence"] = f"runtime DB unreadable: {exc}"
+        return result
+
+    try:
+        result["readable"] = True
+        result["table_exists"] = _table_exists(db, "runtime_receipts")
+        if not result["table_exists"]:
+            result["evidence"] = "runtime_receipts table not found"
+            return result
+        columns = {
+            str(row[1])
+            for row in db.execute("PRAGMA table_info(runtime_receipts)").fetchall()
+        }
+        required_columns = {"receipt_type", "created_at", "idempotency_key", "side_effect_key"}
+        missing_columns = sorted(required_columns - columns)
+        if missing_columns:
+            result["evidence"] = (
+                "runtime_receipts table missing columns: " + ",".join(missing_columns)
+            )
+            return result
+
+        placeholders = ", ".join("?" for _ in RUNTIME_RECEIPT_SINCE_BOOT_MAJOR_TYPES)
+        params = (started_text, *RUNTIME_RECEIPT_SINCE_BOOT_MAJOR_TYPES)
+        type_filter = f"receipt_type IN ({placeholders})"
+        total = int(
+            db.execute(
+                f"""
+                SELECT COUNT(*) FROM runtime_receipts
+                WHERE created_at >= ? AND {type_filter}
+                """,
+                params,
+            ).fetchone()[0]
+        )
+        missing_side = int(
+            db.execute(
+                f"""
+                SELECT COUNT(*) FROM runtime_receipts
+                WHERE created_at >= ? AND {type_filter}
+                  AND (side_effect_key IS NULL OR side_effect_key = '')
+                """,
+                params,
+            ).fetchone()[0]
+        )
+        missing_idem = int(
+            db.execute(
+                f"""
+                SELECT COUNT(*) FROM runtime_receipts
+                WHERE created_at >= ? AND {type_filter}
+                  AND (idempotency_key IS NULL OR idempotency_key = '')
+                """,
+                params,
+            ).fetchone()[0]
+        )
+        sample_rows = db.execute(
+            f"""
+            SELECT receipt_id, receipt_type, status, run_id, task_id, agent_id,
+                   created_at, idempotency_key, side_effect_key
+            FROM runtime_receipts
+            WHERE created_at >= ? AND {type_filter}
+              AND (
+                side_effect_key IS NULL OR side_effect_key = ''
+                OR idempotency_key IS NULL OR idempotency_key = ''
+              )
+            ORDER BY created_at DESC
+            LIMIT 5
+            """,
+            params,
+        ).fetchall()
+        result.update(
+            major_since_boot_total=total,
+            missing_side_effect_key=missing_side,
+            missing_idempotency_key=missing_idem,
+            since_boot_major_identity_clean=missing_side == 0 and missing_idem == 0,
+            gap_sample=[
+                {
+                    "receipt_id": str(row["receipt_id"] or ""),
+                    "receipt_type": str(row["receipt_type"] or ""),
+                    "status": str(row["status"] or ""),
+                    "run_id": str(row["run_id"] or ""),
+                    "task_id": str(row["task_id"] or ""),
+                    "agent_id": str(row["agent_id"] or ""),
+                    "created_at": str(row["created_at"] or ""),
+                    "missing_idempotency_key": not bool(
+                        str(row["idempotency_key"] or "").strip()
+                    ),
+                    "missing_side_effect_key": not bool(
+                        str(row["side_effect_key"] or "").strip()
+                    ),
+                }
+                for row in sample_rows
+            ],
+        )
+        if missing_side or missing_idem:
+            result["evidence"] = "current daemon boot created blank major receipts"
+        elif total:
+            result["evidence"] = "current daemon boot major receipts have required keys"
+        else:
+            result["evidence"] = "current daemon boot has not created major receipts"
+        return result
+    except sqlite3.Error as exc:
+        result["evidence"] = f"runtime_receipts since-boot query failed: {exc}"
         return result
     finally:
         db.close()
@@ -1432,13 +2192,33 @@ def _field_gap_producer_groups_from_report(report: dict[str, Any]) -> list[dict[
     return compact
 
 
-def _runtime_receipt_coverage_state(state_root: Path) -> dict[str, Any]:
+def _runtime_receipt_coverage_state(
+    state_root: Path,
+    clean_epoch: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Summarize the canonical runtime receipt coverage report for live ops."""
     db_path = _runtime_db_path(state_root)
+    epoch = clean_epoch or {}
+    scope_since_created_at = (
+        str(epoch.get("since_created_at") or "").strip()
+        if epoch.get("enabled") is True
+        else ""
+    )
     result: dict[str, Any] = {
         "db_path": str(db_path),
         "db_exists": db_path.exists(),
         "coverage_report_available": False,
+        "scope_mode": "since_created_at" if scope_since_created_at else "all",
+        "scope_since_created_at": scope_since_created_at,
+        "active_epoch_enabled": bool(scope_since_created_at),
+        "active_epoch_receipt_id": str(epoch.get("receipt_id") or ""),
+        "active_epoch_path": str(epoch.get("path") or ""),
+        "historical_scope_note": (
+            "historical dirty receipts before the clean epoch remain inspectable "
+            "and are excluded from active-head readiness"
+            if scope_since_created_at
+            else ""
+        ),
         "runtime_receipts_total": 0,
         "major_task_receipts_total": 0,
         "latest_sample_size": 0,
@@ -1468,10 +2248,12 @@ def _runtime_receipt_coverage_state(state_root: Path) -> dict[str, Any]:
         "terminal_provider_model_provenance_complete": None,
         "terminal_provider_model_accounted_complete": None,
         "provider_model_latest_complete": None,
+        "provider_model_readiness_basis": "unproven",
         "latest_provider_model_payload_class_breakdown": {},
         "latest_terminal_provider_model_payload_class_breakdown": {},
         "latest_provider_model_unproven_producer_groups": [],
         "latest_terminal_provider_model_unproven_producer_groups": [],
+        "blockers": [],
         "production_readiness_blockers": [],
         "gate_70_to_75_components": [],
         "active_head_gap_producer_groups": [],
@@ -1491,12 +2273,21 @@ def _runtime_receipt_coverage_state(state_root: Path) -> dict[str, Any]:
             sys.path.insert(0, repo_root_text)
         from scripts.governance.runtime_receipt_coverage_report import build_report
 
-        report = build_report(db_path, latest_limit=500)
+        report = build_report(
+            db_path,
+            latest_limit=500,
+            since_created_at=scope_since_created_at,
+        )
     except Exception as exc:
         result["evidence"] = f"runtime receipt coverage report failed: {exc}"
         return result
 
     summary = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    scope = report.get("scope") if isinstance(report.get("scope"), dict) else {}
+    result["scope_mode"] = str(scope.get("mode") or result["scope_mode"])
+    result["scope_since_created_at"] = str(
+        scope.get("since_created_at") or result["scope_since_created_at"]
+    )
     major = (
         report.get("major_task_receipts")
         if isinstance(report.get("major_task_receipts"), dict)
@@ -1625,6 +2416,11 @@ def _runtime_receipt_coverage_state(state_root: Path) -> dict[str, Any]:
         result["production_readiness_blockers"] = [
             str(blocker) for blocker in blockers if str(blocker)
         ]
+    coverage_blockers = summary.get("blockers") or []
+    if isinstance(coverage_blockers, list):
+        result["blockers"] = [
+            str(blocker) for blocker in coverage_blockers if str(blocker)
+        ]
     gate_components = summary.get("gate_70_to_75_components") or report.get(
         "gate_70_to_75_components"
     )
@@ -1638,16 +2434,23 @@ def _runtime_receipt_coverage_state(state_root: Path) -> dict[str, Any]:
 
     result["coverage_report_available"] = bool(summary.get("readable"))
     latest_sample_size = result["latest_sample_size"]
-    provider_model_complete = bool(
-        latest_sample_size
-        and result["provider_model_accounted_complete"] is True
+    terminal_sample_size = result["latest_terminal_sample_size"]
+    all_latest_accounted = bool(
+        latest_sample_size and result["provider_model_accounted_complete"] is True
     )
+    terminal_latest_accounted = bool(
+        terminal_sample_size
+        and result["terminal_provider_model_accounted_complete"] is True
+    )
+    provider_model_complete = all_latest_accounted or terminal_latest_accounted
     result["provider_model_latest_complete"] = provider_model_complete
-    if provider_model_complete:
+    if all_latest_accounted:
+        result["provider_model_readiness_basis"] = "latest_major_accounted"
         result["evidence"] = (
             "latest major runtime receipts account for provider/model truth"
         )
-    elif result["terminal_provider_model_accounted_complete"] is True:
+    elif terminal_latest_accounted:
+        result["provider_model_readiness_basis"] = "latest_terminal_accounted"
         result["evidence"] = (
             "latest terminal major runtime receipts account for provider/model truth; "
             "pending receipts remain incomplete"
@@ -1814,6 +2617,419 @@ def _supervised_surface_gap_code(
     return f"{surface_token}_{status_token or 'not_live'}"
 
 
+def _forge_external_gate_state(repo_root: Path) -> dict[str, Any]:
+    status_packet = repo_root / FORGE_REALITY_ARENA_STATUS_PACKET
+    raw = _read_json(status_packet)
+    policy = _first_dict(
+        raw,
+        (
+            "control_watch_tower_visibility",
+            "autonomy_cycle_policy",
+        ),
+        ("v1_scorecard", "autonomy_cycle_policy"),
+    )
+    inputs = policy.get("decision_inputs") if isinstance(policy, dict) else {}
+    inputs = inputs if isinstance(inputs, dict) else {}
+    completion_state = str(
+        inputs.get("completion_state")
+        or _nested_value(raw, ("control_watch_tower_visibility", "completion_state"))
+        or _nested_value(raw, ("v1_scorecard", "completion_state"))
+        or ""
+    )
+    remaining_internal = inputs.get("remaining_internal_packet_count")
+    if remaining_internal is None:
+        remaining_packets = _nested_value(
+            raw,
+            ("control_watch_tower_visibility", "remaining_internal_packets"),
+        )
+        if isinstance(remaining_packets, list):
+            remaining_internal = len(remaining_packets)
+    external_lease_needed = bool(inputs.get("external_action_lease_needed"))
+    decision = str(policy.get("decision") or "") if isinstance(policy, dict) else ""
+    external_gated = (
+        status_packet.exists()
+        and decision == "stop_internal_autonomy_cycles"
+        and completion_state == "internal_exhausted_external_gated"
+        and remaining_internal == 0
+        and external_lease_needed
+    )
+    return {
+        "status_packet": str(status_packet),
+        "status_packet_exists": status_packet.exists(),
+        "state": "external_gated" if external_gated else "not_external_gated",
+        "decision": decision,
+        "completion_state": completion_state,
+        "remaining_internal_packet_count": remaining_internal,
+        "external_action_lease_needed": external_lease_needed,
+        "next_packet": str(policy.get("next_packet") or "") if isinstance(policy, dict) else "",
+        "reason": str(policy.get("reason") or "") if isinstance(policy, dict) else "",
+    }
+
+
+def _first_dict(raw: dict[str, Any], *paths: tuple[str, ...]) -> dict[str, Any]:
+    for path in paths:
+        value = _nested_value(raw, path)
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _nested_value(raw: dict[str, Any], path: tuple[str, ...]) -> Any:
+    value: Any = raw
+    for key in path:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
+
+
+def _path_from_record(raw: object, *, repo_root: Path) -> Path | None:
+    value = str(raw or "").strip()
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else repo_root / path
+
+
+def _latest_holon_prod_verifier_state(repo_root: Path) -> dict[str, Any]:
+    receipt_path = _latest_path(
+        repo_root / "reports" / "sovereign_holons",
+        "verify_holon_harness_prod_*.json",
+    )
+    raw = _read_json(receipt_path) if receipt_path else {}
+    checks = raw.get("checks") if isinstance(raw.get("checks"), dict) else {}
+    orchestration_check = (
+        checks.get("l4_orchestration_probe_stub")
+        if isinstance(checks.get("l4_orchestration_probe_stub"), dict)
+        else {}
+    )
+    return {
+        "path": str(receipt_path) if receipt_path else "",
+        "exists": bool(receipt_path),
+        "overall_pass": raw.get("overall_pass") is True,
+        "l4_orchestration_probe_stub_pass": orchestration_check.get("pass") is True,
+        "generated_at": str(raw.get("timestamp") or ""),
+    }
+
+
+def _latest_holon_model_responsiveness_state(
+    *,
+    repo_root: Path,
+    agents_root: Path,
+    holon_name: str,
+) -> dict[str, Any]:
+    events = load_holon_session(holon_name, agents_root=agents_root)
+    latest_seen: dict[str, Any] = {}
+    for event in reversed(events):
+        record = event.get("record") if isinstance(event.get("record"), dict) else {}
+        if not record:
+            continue
+        model_probe = (
+            record.get("model_probe")
+            if isinstance(record.get("model_probe"), dict)
+            else {}
+        )
+        if not model_probe:
+            continue
+        route_policy = (
+            model_probe.get("route_policy")
+            if isinstance(model_probe.get("route_policy"), dict)
+            else {}
+        )
+        lease_evidence = (
+            route_policy.get("lease_evidence")
+            if isinstance(route_policy.get("lease_evidence"), dict)
+            else {}
+        )
+        artifact = record.get("artifact") if isinstance(record.get("artifact"), dict) else {}
+        artifact_path = _path_from_record(artifact.get("path"), repo_root=repo_root)
+        proof_at = str(event.get("at") or record.get("created_at") or "")
+        age_hours = _age_hours(proof_at) if proof_at else None
+        latest_seen = {
+            "event_seen": True,
+            "event_at": proof_at,
+            "age_hours": age_hours,
+            "max_age_hours": HOLON_L4_MODEL_PROOF_MAX_AGE_HOURS,
+            "fresh": (
+                age_hours is not None
+                and age_hours <= HOLON_L4_MODEL_PROOF_MAX_AGE_HOURS
+            ),
+            "session_id": str(record.get("session_id") or ""),
+            "proof_digest": str(record.get("proof_digest") or ""),
+            "artifact_path": str(artifact_path) if artifact_path else "",
+            "artifact_exists": bool(artifact_path and artifact_path.exists()),
+            "provider_source": str(model_probe.get("provider_source") or ""),
+            "provider_type": str(model_probe.get("provider_type") or ""),
+            "model": str(model_probe.get("model") or ""),
+            "status": str(model_probe.get("status") or ""),
+            "attempted": model_probe.get("attempted") is True,
+            "responsive": model_probe.get("responsive") is True,
+            "reply_digest": str(model_probe.get("reply_digest") or ""),
+            "route_policy_decision": str(route_policy.get("decision") or ""),
+            "explicit_lease": route_policy.get("explicit_lease") is True,
+            "lease_id": str(route_policy.get("model_probe_lease_id") or ""),
+            "lease_valid": lease_evidence.get("valid") is True,
+            "lease_path": str(lease_evidence.get("path") or ""),
+        }
+        declared_route = latest_seen["provider_source"] == "declared_identity"
+        latest_seen["declared_route"] = declared_route
+        latest_seen["model_responsive_proven"] = (
+            latest_seen["fresh"]
+            and latest_seen["artifact_exists"]
+            and latest_seen["attempted"]
+            and latest_seen["responsive"]
+            and latest_seen["route_policy_decision"] == "allow"
+            and latest_seen["explicit_lease"]
+            and latest_seen["lease_valid"]
+            and declared_route
+        )
+        if latest_seen["model_responsive_proven"]:
+            return latest_seen
+    if latest_seen:
+        latest_seen["model_responsive_proven"] = False
+        return latest_seen
+    return {
+        "event_seen": False,
+        "model_responsive_proven": False,
+        "max_age_hours": HOLON_L4_MODEL_PROOF_MAX_AGE_HOURS,
+    }
+
+
+def _latest_holon_supervisor_activation_state(
+    *,
+    agents_root: Path,
+    holon_name: str,
+    tmux_sessions: list[str],
+) -> dict[str, Any]:
+    activation_dir = agents_root / holon_name / "supervisor" / "tmux_live"
+    plan_path = activation_dir / "tmux_supervisor_plan.json"
+    activation_path = activation_dir / "activation_receipts.jsonl"
+    plan = _read_json(plan_path)
+    rows = _read_jsonl_rows(activation_path)
+    tmux_session = str(plan.get("tmux_session") or "")
+    install_receipts = [
+        row
+        for row in rows
+        if row.get("target_kind") == "launch_artifact"
+        and row.get("status") == "installed"
+    ]
+    start_receipts = [
+        row
+        for row in rows
+        if row.get("target_kind") == "launch_start"
+    ]
+    activated_starts = [
+        row
+        for row in start_receipts
+        if row.get("status") == "activated"
+    ]
+    latest_install = install_receipts[-1] if install_receipts else {}
+    latest_start = start_receipts[-1] if start_receipts else {}
+    latest_activated = activated_starts[-1] if activated_starts else {}
+    service_state = (
+        latest_activated.get("service_state_ref")
+        if isinstance(latest_activated.get("service_state_ref"), dict)
+        else {}
+    )
+    tmux_session_live = bool(tmux_session and tmux_session in set(tmux_sessions))
+    strict_service_bound = (
+        bool(service_state.get("service_alive"))
+        and service_state.get("required_new_record_observed") is True
+        and service_state.get("required_service_id_matched") is True
+        and service_state.get("required_session_id_matched") is True
+    )
+    configured = bool(plan_path.exists() or activation_path.exists() or rows)
+    proof_gaps: list[str] = []
+    if configured:
+        if not latest_install:
+            proof_gaps.append("holon_l4_supervisor_install_receipt_missing")
+        if not latest_activated:
+            proof_gaps.append("holon_l4_supervisor_activation_missing")
+        elif not strict_service_bound:
+            proof_gaps.append("holon_l4_supervisor_activation_heartbeat_unbound")
+        if tmux_session and not tmux_session_live:
+            proof_gaps.append("holon_l4_supervisor_tmux_session_missing")
+        elif configured and not tmux_session:
+            proof_gaps.append("holon_l4_supervisor_tmux_session_undeclared")
+    status = (
+        "active"
+        if configured and not proof_gaps
+        else "partial"
+        if configured
+        else "not_configured"
+    )
+    return {
+        "configured": configured,
+        "status": status,
+        "activation_dir": str(activation_dir),
+        "plan_path": str(plan_path),
+        "activation_path": str(activation_path),
+        "tmux_session": tmux_session,
+        "tmux_session_live": tmux_session_live,
+        "latest_install_receipt_hash": str(latest_install.get("record_hash") or ""),
+        "latest_start_receipt_hash": str(latest_start.get("record_hash") or ""),
+        "latest_activated_start_receipt_hash": str(latest_activated.get("record_hash") or ""),
+        "latest_start_status": str(latest_start.get("status") or ""),
+        "latest_start_created_at": str(latest_start.get("created_at") or ""),
+        "strict_service_bound": strict_service_bound,
+        "service_state_ref": service_state,
+        "proof_gaps": proof_gaps,
+    }
+
+
+def _holon_l4_runtime_state(
+    repo_root: Path,
+    state_root: Path,
+    *,
+    holon_name: str = HOLON_L4_AGENT_UID,
+    tmux_sessions: list[str] | None = None,
+) -> dict[str, Any]:
+    agents_root = state_root / "agents"
+    service_liveness = assess_holon_service_liveness(
+        holon_name,
+        agents_root=agents_root,
+        fresh_after_seconds=HOLON_L4_SERVICE_FRESH_SECONDS,
+        service_id="holon-l4-service",
+    )
+    transport_heartbeat = state_root / "a2a_bus" / "bridge_heartbeats" / f"{holon_name}.json"
+    transport_liveness = assess_holon_a2a_transport_liveness(
+        holon_name,
+        heartbeat_path=transport_heartbeat,
+    )
+    event = holon_resume_point(holon_name, agents_root=agents_root) or {}
+    record = event.get("record") if isinstance(event.get("record"), dict) else {}
+    proof_levels = (
+        record.get("proof_levels") if isinstance(record.get("proof_levels"), dict) else {}
+    )
+    artifact = record.get("artifact") if isinstance(record.get("artifact"), dict) else {}
+    artifact_path = _path_from_record(artifact.get("path"), repo_root=repo_root)
+    artifact_exists = bool(artifact_path and artifact_path.exists())
+    latest_artifact = _latest_path(agents_root / holon_name / "artifacts", "*.json")
+    proof_at = str(event.get("at") or record.get("created_at") or "")
+    proof_age_hours = _age_hours(proof_at) if proof_at else None
+    proof_fresh = (
+        proof_age_hours is not None
+        and proof_age_hours <= HOLON_L4_PROOF_MAX_AGE_HOURS
+    )
+    prod_verifier = _latest_holon_prod_verifier_state(repo_root)
+    model_responsiveness = _latest_holon_model_responsiveness_state(
+        repo_root=repo_root,
+        agents_root=agents_root,
+        holon_name=holon_name,
+    )
+    supervisor_activation = _latest_holon_supervisor_activation_state(
+        agents_root=agents_root,
+        holon_name=holon_name,
+        tmux_sessions=list(tmux_sessions or []),
+    )
+
+    proof_gaps: list[str] = []
+    service_paused = bool(service_liveness.get("service_paused"))
+    if not service_liveness.get("service_alive") and not service_paused:
+        if not service_liveness.get("heartbeat_seen"):
+            proof_gaps.append("holon_service_heartbeat_missing")
+        elif not service_liveness.get("ledger_ok"):
+            proof_gaps.append("holon_service_heartbeat_ledger_invalid")
+        elif not service_liveness.get("fresh"):
+            proof_gaps.append("holon_service_heartbeat_stale")
+        else:
+            proof_gaps.append("holon_service_not_alive")
+
+    if not transport_liveness.get("transport_reachable"):
+        reasons = transport_liveness.get("failure_reasons")
+        if isinstance(reasons, list) and reasons:
+            proof_gaps.extend(f"holon_transport_{reason}" for reason in reasons)
+        else:
+            proof_gaps.append("holon_transport_unreachable")
+
+    if not record:
+        proof_gaps.append("holon_l4_persisted_proof_missing")
+    else:
+        if record.get("overall_pass") is not True:
+            proof_gaps.append("holon_l4_persisted_proof_failed")
+        if not artifact_exists:
+            proof_gaps.append("holon_l4_artifact_missing")
+        if not proof_fresh:
+            proof_gaps.append("holon_l4_persisted_proof_stale")
+        if proof_levels.get("orchestration") is not True:
+            proof_gaps.append("holon_l4_orchestration_unproven")
+
+    if not model_responsiveness.get("event_seen"):
+        proof_gaps.append("holon_l4_model_responsive_proof_missing")
+    elif not model_responsiveness.get("model_responsive_proven"):
+        if model_responsiveness.get("fresh") is False:
+            proof_gaps.append("holon_l4_model_responsive_proof_stale")
+        elif not model_responsiveness.get("artifact_exists"):
+            proof_gaps.append("holon_l4_model_responsive_artifact_missing")
+        elif not model_responsiveness.get("declared_route"):
+            proof_gaps.append("holon_l4_model_responsive_not_declared_route")
+        elif not model_responsiveness.get("explicit_lease"):
+            proof_gaps.append("holon_l4_model_responsive_lease_missing")
+        elif not model_responsiveness.get("lease_valid"):
+            proof_gaps.append("holon_l4_model_responsive_lease_invalid")
+        elif not model_responsiveness.get("responsive"):
+            proof_gaps.append("holon_l4_model_responsive_unproven")
+        else:
+            proof_gaps.append("holon_l4_model_responsive_unbound")
+
+    if not prod_verifier["exists"]:
+        proof_gaps.append("holon_l4_prod_verifier_missing")
+    elif not prod_verifier["overall_pass"]:
+        proof_gaps.append("holon_l4_prod_verifier_failed")
+    elif not prod_verifier["l4_orchestration_probe_stub_pass"]:
+        proof_gaps.append("holon_l4_prod_verifier_orchestration_unproven")
+
+    if supervisor_activation.get("configured"):
+        proof_gaps.extend(
+            str(gap)
+            for gap in supervisor_activation.get("proof_gaps", [])
+            if str(gap)
+        )
+
+    evidence_seen = bool(
+        service_liveness.get("heartbeat_seen")
+        or transport_liveness.get("heartbeat_seen")
+        or record
+        or prod_verifier["exists"]
+        or supervisor_activation.get("configured")
+    )
+    status = (
+        "paused"
+        if service_paused and not proof_gaps
+        else "live"
+        if not proof_gaps
+        else "stale"
+        if service_liveness.get("heartbeat_seen") and not service_liveness.get("fresh")
+        else "partial"
+        if evidence_seen
+        else "unknown"
+    )
+    return {
+        "holon": holon_name,
+        "status": status,
+        "agents_root": str(agents_root),
+        "service_liveness": service_liveness,
+        "transport_liveness": transport_liveness,
+        "persisted_l4_proof": {
+            "event_seen": bool(record),
+            "event_at": proof_at,
+            "age_hours": proof_age_hours,
+            "max_age_hours": HOLON_L4_PROOF_MAX_AGE_HOURS,
+            "fresh": proof_fresh,
+            "overall_pass": record.get("overall_pass") is True,
+            "proof_digest": str(record.get("proof_digest") or ""),
+            "proof_levels": dict(proof_levels),
+            "artifact_path": str(artifact_path) if artifact_path else "",
+            "artifact_exists": artifact_exists,
+            "latest_artifact": str(latest_artifact) if latest_artifact else "",
+        },
+        "model_responsiveness": model_responsiveness,
+        "prod_verifier": prod_verifier,
+        "supervisor_activation": supervisor_activation,
+        "proof_gaps": proof_gaps,
+    }
+
+
 def _surface(
     *,
     surface_id: str,
@@ -1899,6 +3115,7 @@ def build_live_ops_census(
     process_starts: dict[str, dict[str, str]] | None = None,
     ports: dict[str, dict[str, Any]] | None = None,
     http_probes: dict[str, dict[str, Any]] | None = None,
+    daemon_health_self_report: dict[str, Any] | None = None,
     tmux_sessions: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return the live-ops census as a pure data structure."""
@@ -1920,7 +3137,32 @@ def build_live_ops_census(
     forge_data = _read_json(forge_heartbeat)
     forge_freshness = str(forge_data.get("ts") or _iso_mtime(forge_heartbeat))
     forge_live = bool(processes.get("forge_hydra"))
-    forge_status = "live" if forge_live else "stopped" if forge_heartbeat.exists() else "unknown"
+    forge_external_gate = _forge_external_gate_state(root)
+    forge_is_external_gated = forge_external_gate["state"] == "external_gated"
+    forge_status = (
+        "live"
+        if forge_live
+        else "blocked"
+        if forge_is_external_gated
+        else "stopped"
+        if forge_heartbeat.exists()
+        else "unknown"
+    )
+    forge_desired_state = (
+        "blocked-until-operator-external-lease"
+        if forge_is_external_gated and not forge_live
+        else "supervised"
+    )
+    forge_next_action = (
+        "wait for operator external-action lease or Guardian countersign before resuming"
+        if forge_is_external_gated and not forge_live
+        else "read handoff before restart"
+    )
+    forge_restart_command = (
+        ""
+        if forge_is_external_gated and not forge_live
+        else "scripts/codex_overnight_autopilot.py"
+    )
 
     revenue_state = state / "state" / "revenue_wedge_last_state.json"
     revenue_data = _read_json(revenue_state)
@@ -1982,25 +3224,26 @@ def build_live_ops_census(
         a2a_mirror_age_hours is not None
         and a2a_mirror_age_hours <= A2A_MIRROR_MAX_AGE_HOURS
     )
-    a2a_mirror_proof_gaps: list[str] = []
-    if freshest_a2a_mirror and not a2a_mirror_fresh:
-        a2a_mirror_proof_gaps.append("a2a_mirror_evidence_stale")
-    a2a_mirror_next_action = (
-        "treat filesystem mirrors as historical; use NATS ack/domain receipts for live-contact proof"
-        if a2a_mirror_proof_gaps
-        else "inspect NATS ack receipts for live-contact proof"
-    )
+    a2a_mirror_stale = bool(freshest_a2a_mirror and not a2a_mirror_fresh)
     nats_receipts_root = state / "nats" / "receipts"
     latest_nats_receipt = _latest_path(nats_receipts_root, "*.json")
     nats_log = state / "nats" / "nats-server.log"
     nats_live_receipt = a2a_root / "nats_live_receipt.json"
     nats_contact_receipts = a2a_root / "nats_contact_receipts.jsonl"
     nats_oz_receipts = a2a_root / "nats_oz_receipts.jsonl"
+    a2a_send_receipts_root = repo_root / "reports" / "a2a" / "send_receipts"
+    latest_send_hot_contact = _latest_hot_contact_send_receipt(a2a_send_receipts_root)
+    latest_send_hot_contact_path = (
+        Path(str(latest_send_hot_contact.get("_path")))
+        if latest_send_hot_contact.get("_path")
+        else None
+    )
     freshest_nats_evidence = _freshest_existing([
         latest_nats_receipt,
         nats_live_receipt,
         nats_contact_receipts,
         nats_oz_receipts,
+        latest_send_hot_contact_path,
         nats_log,
     ])
     nats_ack_state = _nats_ack_tier_state(
@@ -2008,6 +3251,7 @@ def build_live_ops_census(
         nats_contact_receipts=nats_contact_receipts,
         nats_oz_receipts=nats_oz_receipts,
         latest_nats_receipt=latest_nats_receipt,
+        latest_send_hot_contact=latest_send_hot_contact,
     )
     nats_receipts_status = "live" if freshest_nats_evidence else "unknown"
     nats_receipt_proof_gaps: list[str] = []
@@ -2027,6 +3271,17 @@ def build_live_ops_census(
         "collect fresh HANDLER_ACKED or DOMAIN_RECEIPTED NATS hot-contact receipt before claiming live contact"
         if nats_receipt_proof_gaps
         else "NATS ack tier is freshly proven for operator hot contact"
+    )
+    nats_live_contact_bound = nats_receipts_status == "live" and not nats_receipt_proof_gaps
+    a2a_mirror_proof_gaps: list[str] = []
+    if a2a_mirror_stale and not nats_live_contact_bound:
+        a2a_mirror_proof_gaps.append("a2a_mirror_evidence_stale")
+    a2a_mirror_next_action = (
+        "NATS live-contact proof is bound; filesystem mirrors are historical compatibility evidence"
+        if a2a_mirror_stale and nats_live_contact_bound
+        else "treat filesystem mirrors as historical; use NATS ack/domain receipts for live-contact proof"
+        if a2a_mirror_stale
+        else "inspect NATS ack receipts for live-contact proof"
     )
     a2a_bridge_agent_uid = "hermes-m5"
     a2a_bridge_session = "dharma_a2a_inbox_bridge_hermes_m5"
@@ -2048,9 +3303,23 @@ def build_live_ops_census(
         run_probes=run_probes,
         nats_port=ports.get("nats", {}),
     )
+    consumer_state = str(
+        (a2a_bridge_runtime_state.get("consumer_probe") or {}).get("state") or ""
+    )
+    a2a_bridge_heartbeat_live = (
+        a2a_bridge_runtime_state.get("heartbeat_fresh") is True
+        and consumer_state
+        not in {
+            "nats_not_listening",
+            "consumer_unavailable",
+            "consumer_unreadable",
+        }
+    )
     a2a_bridge_status = (
         "live"
-        if a2a_bridge_process_live or a2a_bridge_tmux_live
+        if a2a_bridge_process_live
+        or a2a_bridge_tmux_live
+        or a2a_bridge_heartbeat_live
         else "stopped"
     )
     if a2a_bridge_status != "live":
@@ -2064,16 +3333,23 @@ def build_live_ops_census(
         and a2a_bridge_runtime_state.get("heartbeat_fresh") is False
     ):
         a2a_bridge_proof_gaps.append("a2a_inbox_bridge_heartbeat_stale")
-    consumer_state = str(
-        (a2a_bridge_runtime_state.get("consumer_probe") or {}).get("state") or ""
-    )
     if consumer_state in {
         "nats_not_listening",
         "consumer_unavailable",
         "consumer_unreadable",
     }:
         a2a_bridge_proof_gaps.append("a2a_inbox_bridge_consumer_unproven")
-    runtime_receipt_head = _runtime_receipt_active_head_state(state)
+    holon_l4_state = _holon_l4_runtime_state(root, state, tmux_sessions=tmux)
+    runtime_truth_clean_epoch = _runtime_truth_clean_epoch_state(state)
+    runtime_receipt_scope_since = (
+        str(runtime_truth_clean_epoch.get("since_created_at") or "")
+        if runtime_truth_clean_epoch.get("enabled") is True
+        else ""
+    )
+    runtime_receipt_head = _runtime_receipt_active_head_state(
+        state,
+        since_created_at=runtime_receipt_scope_since,
+    )
     runtime_receipt_head_dirty = (
         runtime_receipt_head.get("active_head_side_effect_key_clean") is False
         and any(
@@ -2086,15 +3362,106 @@ def build_live_ops_census(
         runtime_receipt_head.get("latest_fresh") is False
         and int(runtime_receipt_head.get("runtime_receipts_total") or 0) > 0
     )
-    runtime_receipt_coverage = _runtime_receipt_coverage_state(state)
+    runtime_receipt_coverage = _runtime_receipt_coverage_state(
+        state,
+        clean_epoch=runtime_truth_clean_epoch,
+    )
     runtime_provider_model_unproven = (
         runtime_receipt_coverage.get("coverage_report_available") is True
         and int(runtime_receipt_coverage.get("latest_sample_size") or 0) > 0
         and runtime_receipt_coverage.get("provider_model_latest_complete") is False
     )
     dharma_launch = _dharma_launch_dispatch(root)
+    cron_launch = _cron_launch_dispatch(root)
+    dharma_status = _live_if_process_or_port("dharma_daemon", processes, ports)
+    cron_status = "live" if processes.get("dharma_cron") else "stopped"
+    dharma_observed_pids = {
+        str(row.get("pid") or "")
+        for row in processes.get("dharma_daemon", [])
+        if str(row.get("pid") or "")
+    }
+    dharma_observed_pid_sources = {
+        pid: "process_snapshot" for pid in dharma_observed_pids
+    }
+    daemon_pid_file = _daemon_pid_file_state(state)
+    if (
+        dharma_status == "live"
+        and daemon_pid_file.get("state") == "present"
+        and daemon_pid_file.get("pid")
+    ):
+        daemon_pid = str(daemon_pid_file["pid"])
+        dharma_observed_pids.add(daemon_pid)
+        dharma_observed_pid_sources.setdefault(daemon_pid, "daemon_pid_file")
+    dharma_surface_processes = {key: [dict(row) for row in rows] for key, rows in processes.items()}
+    if daemon_pid_file.get("state") == "present" and daemon_pid_file.get("pid"):
+        daemon_pid = str(daemon_pid_file["pid"])
+        rows = dharma_surface_processes.setdefault("dharma_daemon", [])
+        if daemon_pid not in {str(row.get("pid") or "") for row in rows}:
+            insert_at = next(
+                (
+                    idx
+                    for idx, row in enumerate(rows)
+                    if row.get("source") == "lsof_listen"
+                ),
+                len(rows),
+            )
+            rows.insert(insert_at, {
+                "pid": daemon_pid,
+                "command": f"daemon_pid_file:{state / 'daemon.pid'}",
+                "source": "daemon_pid_file",
+            })
+    daemon_health = (
+        daemon_health_self_report
+        if daemon_health_self_report is not None
+        else _daemon_health_self_report(
+            run_probes=run_probes,
+            observed_pids=dharma_observed_pids,
+        )
+    )
+    daemon_file_self_report = _daemon_runtime_dispatch_file_self_report(
+        state,
+        observed_pids=dharma_observed_pids,
+        observed_pid_sources=dharma_observed_pid_sources,
+        now=datetime.now(UTC),
+    )
+    daemon_health_state = str(daemon_health.get("state") or "")
+    daemon_file_state = str(daemon_file_self_report.get("state") or "")
+    if daemon_health_state in DAEMON_SPINE_RUNTIME_PROOFS:
+        dharma_running_proof = daemon_health_state
+        dharma_running_proof_source = "daemon_health_http"
+    elif daemon_file_state in DAEMON_SPINE_RUNTIME_PROOFS:
+        dharma_running_proof = daemon_file_state
+        dharma_running_proof_source = "daemon_runtime_dispatch_self_report_file"
+    else:
+        dharma_running_proof = (
+            daemon_health_state
+            or daemon_file_state
+            or "not_inspected_no_secret_env_dump"
+        )
+        dharma_running_proof_source = "unproven"
+    dharma_dispatch_runtime_proven = (
+        dharma_running_proof in DAEMON_SPINE_RUNTIME_PROOFS
+    )
+    dharma_process_source = _daemon_process_source_state(
+        root,
+        processes.get("dharma_daemon", []),
+        process_starts.get("dharma_daemon", {}),
+    )
+    runtime_receipt_since_boot = _runtime_receipt_since_boot_state(
+        state,
+        dharma_process_source,
+    )
+    runtime_receipt_since_boot_dirty = (
+        runtime_receipt_since_boot.get("since_boot_major_identity_clean") is False
+        and (
+            int(runtime_receipt_since_boot.get("missing_side_effect_key") or 0) > 0
+            or int(runtime_receipt_since_boot.get("missing_idempotency_key") or 0) > 0
+        )
+    )
     dharma_dispatch_next_action = (
-        "fix active runtime receipt producers before claiming daemon readiness"
+        "fix current-boot runtime receipt producers before claiming daemon readiness"
+        if runtime_receipt_since_boot_dirty
+        else "fix active runtime receipt producers before claiming daemon readiness"
         if runtime_receipt_head_dirty
         else "exercise a fresh daemon/default runtime receipt path before claiming daemon readiness"
         if runtime_receipt_head_stale
@@ -2102,18 +3469,22 @@ def build_live_ops_census(
         if runtime_provider_model_unproven
         else "controlled restart plus daemon/default receipt probe required"
         if dharma_launch.get("state") == "spine_enabled_launch_spec"
+        and not dharma_dispatch_runtime_proven
+        else "pin LaunchAgent to repo module before restart"
+        if dharma_launch.get("state")
+        in {"ambient_dgc_spine_launch_spec", "unblessed_spine_launch_spec"}
         else "set DHARMA_SPINE_DISPATCH=1 in LaunchAgent before restart"
-    )
-    dharma_status = _live_if_process_or_port("dharma_daemon", processes, ports)
-    dharma_running_proof = "not_inspected_no_secret_env_dump"
-    dharma_process_source = _daemon_process_source_state(
-        root,
-        processes.get("dharma_daemon", []),
-        process_starts.get("dharma_daemon", {}),
+        if dharma_launch.get("state") != "spine_enabled_launch_spec"
+        else ""
     )
     dharma_proof_gaps: list[str] = []
     if dharma_status == "live":
-        if dharma_launch.get("state") != "spine_enabled_launch_spec":
+        if dharma_launch.get("state") in {
+            "ambient_dgc_spine_launch_spec",
+            "unblessed_spine_launch_spec",
+        }:
+            dharma_proof_gaps.append("daemon_launch_not_repo_pinned")
+        elif dharma_launch.get("state") != "spine_enabled_launch_spec":
             dharma_proof_gaps.append("daemon_launch_not_spine_enabled")
         if dharma_running_proof not in DAEMON_SPINE_RUNTIME_PROOFS:
             dharma_proof_gaps.append("daemon_dispatch_runtime_unproven")
@@ -2121,17 +3492,39 @@ def build_live_ops_census(
             dharma_proof_gaps.append("daemon_process_source_stale")
         if dharma_process_source.get("state") == "process_start_probe_failed":
             dharma_proof_gaps.append("daemon_process_start_uninspected")
+        if runtime_receipt_since_boot_dirty:
+            dharma_proof_gaps.append("daemon_runtime_receipts_since_boot_dirty")
         if runtime_receipt_head_dirty:
             dharma_proof_gaps.append("daemon_runtime_receipts_active_head_dirty")
         if runtime_receipt_head_stale:
             dharma_proof_gaps.append("daemon_runtime_receipts_stale")
         if runtime_provider_model_unproven:
             dharma_proof_gaps.append("daemon_runtime_provider_model_unproven")
+        if (
+            runtime_truth_clean_epoch.get("exists") is True
+            and runtime_truth_clean_epoch.get("enabled") is not True
+        ):
+            dharma_proof_gaps.append("daemon_runtime_truth_clean_epoch_invalid")
+    cron_proof_gaps: list[str] = []
+    cron_launch_state = str(cron_launch.get("state") or "")
+    if cron_status == "live":
+        if cron_launch_state in {
+            "ambient_dgc_cron_launch_spec",
+            "unblessed_cron_launch_spec",
+        }:
+            cron_proof_gaps.append("cron_launch_not_repo_pinned")
+        elif cron_launch_state != "repo_pinned_cron_launch_spec":
+            cron_proof_gaps.append("cron_launch_unproven")
+    cron_next_action = (
+        "pin cron LaunchAgent to repo module before burn-in"
+        if "cron_launch_not_repo_pinned" in cron_proof_gaps
+        else "install or repair cron LaunchAgent before burn-in"
+        if "cron_launch_unproven" in cron_proof_gaps
+        else ""
+    )
     dashboard_proof_gaps: list[str] = []
     if dashboard_live and dashboard_probe_state not in {"ok", "not_checked"}:
         dashboard_proof_gaps.append("dashboard_control_surface_rows_unproven")
-    if dashboard_live and dashboard_rows_slow:
-        dashboard_proof_gaps.append("dashboard_control_surface_rows_slow")
     if (
         dashboard_live
         and dashboard_process_source.get("state") == "source_changed_after_process_start"
@@ -2219,7 +3612,7 @@ def build_live_ops_census(
             authority_refs=["docs/state/LIVE_OPS_DASHBOARD.md", "ACTIVE_SURFACE_MANIFEST.yaml"],
             priority="p0",
             process_key="dharma_daemon",
-            processes=processes,
+            processes=dharma_surface_processes,
             ports=ports,
             restart_command="launchctl kickstart gui/$UID/com.dharma.swarm",
             stop_policy="do-not-stop-before-travel",
@@ -2228,8 +3621,14 @@ def build_live_ops_census(
             raw={
                 "dispatch_launch": dharma_launch,
                 "running_dispatch_proof": dharma_running_proof,
+                "running_dispatch_proof_source": dharma_running_proof_source,
+                "daemon_health_self_report": daemon_health,
+                "daemon_pid_file": daemon_pid_file,
+                "daemon_runtime_dispatch_self_report": daemon_file_self_report,
                 "process_source_state": dharma_process_source,
+                "runtime_truth_clean_epoch": runtime_truth_clean_epoch,
                 "runtime_receipt_active_head": runtime_receipt_head,
+                "runtime_receipt_since_boot": runtime_receipt_since_boot,
                 "runtime_receipt_coverage": runtime_receipt_coverage,
             },
         ),
@@ -2265,7 +3664,7 @@ def build_live_ops_census(
             surface_id="substrate.dharma_cron",
             label="Dharma cron daemon",
             surface_class="substrate",
-            status="live" if processes.get("dharma_cron") else "stopped",
+            status=cron_status,
             desired_state="live",
             evidence=["dharma_swarm.dgc_cli cron daemon"],
             authority_refs=["scripts/governance/agent_onboard.py", "docs/governance/ACTIVE_TRACK.yaml"],
@@ -2275,6 +3674,9 @@ def build_live_ops_census(
             ports=ports,
             restart_command="launchctl kickstart gui/$UID/com.dharma.cron-daemon",
             stop_policy="do-not-stop-before-travel",
+            next_action=cron_next_action,
+            proof_gaps=cron_proof_gaps,
+            raw={"dispatch_launch": cron_launch},
         ),
         _surface(
             surface_id="transport.nats",
@@ -2299,7 +3701,7 @@ def build_live_ops_census(
             desired_state="delivery-handler-not-semantic-peer",
             evidence=[
                 "scripts/runtime/a2a_inbox_bridge.py",
-                "scripts/status_a2a_inbox_bridge_tmux.sh",
+                "scripts/status_a2a_inbox_bridge_fleet_launchd.sh",
                 str(a2a_bridge_heartbeat),
                 f"latest_receipt={latest_a2a_bridge_receipt}" if latest_a2a_bridge_receipt else "",
                 f"heartbeat_age_hours={a2a_bridge_runtime_state.get('heartbeat_age_hours')}"
@@ -2314,15 +3716,81 @@ def build_live_ops_census(
             process_key="a2a_inbox_bridge",
             processes=processes,
             ports=ports,
-            restart_command="bash scripts/start_a2a_inbox_bridge_tmux.sh",
+            restart_command="bash scripts/start_a2a_inbox_bridge_fleet_launchd.sh",
             stop_policy="do-not-stop-if-A2A-needed",
             next_action=(
-                "start governed inbox delivery bridge if live A2A delivery is required"
+                "start governed launchd inbox bridge fleet if live A2A delivery is required"
                 if a2a_bridge_status != "live"
                 else "require reply/domain receipt before claiming semantic collaboration"
             ),
             proof_gaps=a2a_bridge_proof_gaps,
             raw=a2a_bridge_runtime_state,
+        ),
+        _surface(
+            surface_id="holon.codex_composer_l4",
+            label="codex_composer L4 HOLON",
+            surface_class="holon",
+            status=str(holon_l4_state["status"]),
+            desired_state="l4-body-proof-bound",
+            evidence=[
+                "dharma_swarm/holon_l4_smoke.py",
+                "dharma_swarm/holon_l4_service.py",
+                "dharma_swarm/holon_l4_supervisor.py",
+                "dharma_swarm/holon_l4_activation.py",
+                "dharma_swarm/holon_orchestrate.py",
+                "scripts/holon_l4_service.py",
+                "scripts/holon_l4_supervisor.py",
+                "scripts/holon_l4_activation.py",
+                str(
+                    holon_service_heartbeat_path(
+                        HOLON_L4_AGENT_UID,
+                        state / "agents",
+                    )
+                ),
+                str(state / "a2a_bus" / "bridge_heartbeats" / f"{HOLON_L4_AGENT_UID}.json"),
+                str(
+                    holon_l4_state["persisted_l4_proof"].get("artifact_path")
+                    or holon_l4_state["persisted_l4_proof"].get("latest_artifact")
+                    or ""
+                ),
+                str(holon_l4_state["prod_verifier"].get("path") or ""),
+                str(holon_l4_state["model_responsiveness"].get("artifact_path") or ""),
+                str(holon_l4_state["model_responsiveness"].get("lease_path") or ""),
+                str(holon_l4_state["supervisor_activation"].get("plan_path") or ""),
+                str(holon_l4_state["supervisor_activation"].get("activation_path") or ""),
+                f"model_responsive={holon_l4_state['model_responsiveness'].get('model_responsive_proven')}",
+                f"tmux_session={holon_l4_state['supervisor_activation'].get('tmux_session')}"
+                if holon_l4_state["supervisor_activation"].get("tmux_session")
+                else "",
+                f"tmux_session_live={holon_l4_state['supervisor_activation'].get('tmux_session_live')}"
+                if holon_l4_state["supervisor_activation"].get("configured")
+                else "",
+            ],
+            authority_refs=[
+                "docs/sovereign_holons/STATE_OF_TRUTH.md",
+                "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md",
+                "reports/sovereign_holons/L4_HOLON_SUBSTRATE_HYGIENE_AND_SMOKE_20260618.md",
+            ],
+            priority="p0",
+            freshness=str(
+                holon_l4_state["persisted_l4_proof"].get("event_at")
+                or holon_l4_state["supervisor_activation"].get("latest_start_created_at")
+                or holon_l4_state["service_liveness"].get("latest_observed_at")
+                or ""
+            ),
+            stop_policy="do-not-stop-if-agent-contact-needed; observer surface only",
+            next_action=(
+                "run governed leased L4 model probe before claiming full HOLON L4 responsiveness"
+                if any(
+                    str(gap).startswith("holon_l4_model_responsive")
+                    for gap in holon_l4_state["proof_gaps"]
+                )
+                else "run governed L4 smoke with orchestration and transport heartbeat before claiming HOLON live"
+                if holon_l4_state["proof_gaps"]
+                else "HOLON L4 proof is bound, including governed model responsiveness"
+            ),
+            proof_gaps=list(holon_l4_state["proof_gaps"]),
+            raw=holon_l4_state,
         ),
         _surface(
             surface_id="evidence.a2a_mirrors",
@@ -2351,6 +3819,8 @@ def build_live_ops_census(
                 "latest_mirror_age_hours": a2a_mirror_age_hours,
                 "mirror_max_age_hours": A2A_MIRROR_MAX_AGE_HOURS,
                 "mirror_fresh": a2a_mirror_fresh,
+                "mirror_stale": a2a_mirror_stale,
+                "nats_live_contact_bound": nats_live_contact_bound,
             },
         ),
         _surface(
@@ -2366,6 +3836,11 @@ def build_live_ops_census(
                 str(nats_contact_receipts),
                 str(nats_oz_receipts),
                 f"latest_receipt={latest_nats_receipt}" if latest_nats_receipt else "",
+                (
+                    f"latest_send_hot_contact={latest_send_hot_contact_path}"
+                    if latest_send_hot_contact_path
+                    else ""
+                ),
             ],
             authority_refs=["docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
             priority="p0",
@@ -2379,6 +3854,7 @@ def build_live_ops_census(
                 "nats_live_receipt_exists": nats_live_receipt.exists(),
                 "nats_contact_receipts_exists": nats_contact_receipts.exists(),
                 "nats_oz_receipts_exists": nats_oz_receipts.exists(),
+                "latest_send_hot_contact_exists": bool(latest_send_hot_contact_path),
                 "ack_tier_state": nats_ack_state,
             },
         ),
@@ -2447,18 +3923,23 @@ def build_live_ops_census(
             label="Forge Reality Arena Hydra",
             surface_class="mission",
             status=forge_status,
-            desired_state="supervised",
-            evidence=[str(forge_heartbeat), str(forge_handoff)],
+            desired_state=forge_desired_state,
+            evidence=[
+                str(forge_heartbeat),
+                str(forge_handoff),
+                str(root / FORGE_REALITY_ARENA_STATUS_PACKET),
+            ],
             authority_refs=["docs/governance/ACTIVE_TRACK.yaml", "docs/ops/LIVE_OPS_COCKPIT.md"],
             priority="p1",
             freshness=forge_freshness,
             process_key="forge_hydra",
             processes=processes,
             ports=ports,
-            restart_command="scripts/start_forge_hydra_long_run.sh",
-            stop_policy="restart-only-after-reading-latest-handoff",
-            next_action="read handoff before restart",
-            raw={"heartbeat": forge_data},
+            restart_command=forge_restart_command,
+            stop_policy="external-action-lease-required" if forge_is_external_gated else "restart-only-after-reading-latest-handoff",
+            next_action=forge_next_action,
+            human_authority_required=forge_is_external_gated and not forge_live,
+            raw={"heartbeat": forge_data, "external_gate": forge_external_gate},
         ),
         _surface(
             surface_id="revenue.cashclaw_gate",

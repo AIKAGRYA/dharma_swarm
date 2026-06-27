@@ -28,6 +28,8 @@ import logging
 import os
 import signal
 import sys
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
@@ -37,9 +39,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-from dharma_swarm.config import DEFAULT_CONFIG
-from dharma_swarm.pending_proposals import append_pending_proposals
-from dharma_swarm.runtime_artifacts import (
+from dharma_swarm.config import DEFAULT_CONFIG  # noqa: E402
+from dharma_swarm.pending_proposals import append_pending_proposals  # noqa: E402
+from dharma_swarm.runtime_artifacts import (  # noqa: E402
     freshest_pulse_log_path,
     write_dgc_health_snapshot,
 )
@@ -56,10 +58,15 @@ EVOLUTION_INTERVAL = _ll.evolution_interval_seconds
 HEALTH_INTERVAL = _ll.health_interval_seconds
 LIVING_INTERVAL = _ll.living_interval_seconds
 MAX_DAILY = _ll.max_daily_tasks
+HEALTH_MONITOR_TIMEOUT_SECONDS = min(30.0, max(1.0, HEALTH_INTERVAL / 2))
+DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL = 60.0
 _RUNTIME_HEALTH_STATE: dict[str, int] = {
     "agent_count": 0,
     "task_count": 0,
 }
+DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION = (
+    "dharma.daemon.runtime_dispatch_self_report.v1"
+)
 
 
 def _update_runtime_health_state(*, agent_count: int | None = None, task_count: int | None = None) -> None:
@@ -67,6 +74,114 @@ def _update_runtime_health_state(*, agent_count: int | None = None, task_count: 
         _RUNTIME_HEALTH_STATE["agent_count"] = max(0, int(agent_count))
     if task_count is not None:
         _RUNTIME_HEALTH_STATE["task_count"] = max(0, int(task_count))
+
+
+def _runtime_dispatch_status() -> dict[str, Any]:
+    enabled = os.environ.get("DHARMA_SPINE_DISPATCH") == "1"
+    return {
+        "spine_dispatch_enabled": enabled,
+        "dispatch_mode": "spine" if enabled else "legacy",
+        "env_key_present": "DHARMA_SPINE_DISPATCH" in os.environ,
+        "source": "process_env_non_secret_boolean",
+    }
+
+
+def _write_daemon_runtime_dispatch_self_report(state_dir: Path = STATE_DIR) -> Path:
+    path = state_dir / "ops" / "daemon_runtime_dispatch_self_report.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": DAEMON_RUNTIME_DISPATCH_SELF_REPORT_SCHEMA_VERSION,
+        "updated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "pid": os.getpid(),
+        "source": "dharma_swarm.orchestrate_live",
+        "runtime_dispatch": _runtime_dispatch_status(),
+    }
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def _daemon_runtime_dispatch_self_report_thread(
+    shutdown_event: asyncio.Event,
+    *,
+    state_dir: Path = STATE_DIR,
+    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
+) -> None:
+    _log("runtime-dispatch", f"Starting self-report thread (interval={interval_seconds}s)")
+    interval = max(0.1, float(interval_seconds))
+    while not shutdown_event.is_set():
+        try:
+            _write_daemon_runtime_dispatch_self_report(state_dir)
+        except Exception as exc:
+            _log("runtime-dispatch", f"Self-report write failed: {exc}")
+
+        deadline = time.monotonic() + interval
+        while not shutdown_event.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.5, remaining))
+
+
+def start_daemon_runtime_dispatch_self_report_thread(
+    shutdown_event: asyncio.Event,
+    *,
+    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
+    state_dir: Path = STATE_DIR,
+) -> threading.Thread:
+    thread = threading.Thread(
+        target=_daemon_runtime_dispatch_self_report_thread,
+        kwargs={
+            "shutdown_event": shutdown_event,
+            "state_dir": state_dir,
+            "interval_seconds": interval_seconds,
+        },
+        name="dharma-runtime-dispatch-self-report",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
+def _pause_file_present(state_dir: Path = STATE_DIR) -> bool:
+    return (state_dir / ".PAUSE").exists()
+
+
+async def _detect_health_anomalies_bounded(
+    monitor: Any,
+    *,
+    timeout_seconds: float = HEALTH_MONITOR_TIMEOUT_SECONDS,
+) -> list[Any]:
+    try:
+        anomalies = await asyncio.wait_for(
+            monitor.detect_anomalies(),
+            timeout=timeout_seconds,
+        )
+    except TimeoutError:
+        _log("health", f"Monitor timed out after {timeout_seconds:.1f}s")
+        return []
+    return list(anomalies or [])
+
+
+async def run_daemon_runtime_dispatch_self_report_loop(
+    shutdown_event: asyncio.Event,
+    *,
+    interval_seconds: float = DAEMON_RUNTIME_DISPATCH_SELF_REPORT_INTERVAL,
+) -> None:
+    _log("runtime-dispatch", f"Starting self-report loop (interval={interval_seconds}s)")
+    while not shutdown_event.is_set():
+        try:
+            _write_daemon_runtime_dispatch_self_report(STATE_DIR)
+        except Exception as exc:
+            _log("runtime-dispatch", f"Self-report write failed: {exc}")
+        try:
+            await asyncio.wait_for(
+                shutdown_event.wait(),
+                timeout=max(0.1, float(interval_seconds)),
+            )
+        except TimeoutError:
+            continue
 
 
 def _log(system: str, msg: str) -> None:
@@ -182,6 +297,36 @@ def _enqueue_shakti_escalations(
     return append_pending_proposals(payloads, path=proposals_path)
 
 
+async def _run_pending_evolution_proposals(
+    engine: Any,
+    *,
+    limit: int = 5,
+    log_system: str = "evolution",
+) -> Any | None:
+    """Drain Darwin's pending queue into an eval-only/sandboxed cycle."""
+    pending = engine.load_pending_proposals()
+    if not pending:
+        return None
+    selected = pending[: max(0, int(limit))]
+    if not selected:
+        return None
+    _log(log_system, f"Evaluating {len(selected)} pending proposal candidate(s)")
+    return await engine.run_cycle(selected)
+
+
+def _evolution_shadow_mode_from_env(env: Any | None = None) -> tuple[bool, str]:
+    """Return whether self-evolution must run shadowed under current gates."""
+    source = env if env is not None else os.environ
+    shadow = source.get("DHARMA_EVOLUTION_SHADOW", "1") != "0"
+    try:
+        autonomy = int(source.get("DGC_AUTONOMY_LEVEL", "1"))
+    except (TypeError, ValueError):
+        autonomy = 1
+    if not shadow and autonomy < 2:
+        return True, "DGC_AUTONOMY_LEVEL < 2"
+    return shadow, "DHARMA_EVOLUTION_SHADOW"
+
+
 async def _wait_or_shutdown(shutdown_event: asyncio.Event, delay: float) -> bool:
     """Sleep for a backoff window unless shutdown is requested first."""
     if delay <= 0:
@@ -198,6 +343,7 @@ async def run_swarm_loop(
     signal_bus: "Any | None" = None,
     supervisor: "Any | None" = None,
     room_registry: "Any | None" = None,
+    ready_event: asyncio.Event | None = None,
 ) -> None:
     """Primary loop: SwarmManager.tick() -- the ONE control path.
 
@@ -212,21 +358,32 @@ async def run_swarm_loop(
     cfg.heartbeat_interval = float(SWARM_TICK)
     cfg.max_daily_contributions = MAX_DAILY
 
-    swarm = SwarmManager(state_dir=str(STATE_DIR), daemon_config=cfg)
+    paused_at_boot = _pause_file_present(STATE_DIR)
+    if paused_at_boot:
+        _log("swarm", "Pause file present at boot; startup side effects disabled")
+
+    swarm = SwarmManager(
+        state_dir=str(STATE_DIR),
+        daemon_config=cfg,
+        read_only_boot=paused_at_boot,
+    )
     await swarm.init()
     if room_registry is not None:
         swarm._room_registry = room_registry
         if swarm._orchestrator is not None:
             swarm._orchestrator._room_registry = room_registry
         _log("swarm", f"Room registry attached: {len(room_registry.active_rooms())} active rooms")
-    try:
-        from dharma_swarm.startup_crew import spawn_cybernetics_crew
+    if paused_at_boot:
+        _log("swarm", "Cybernetics crew assertion skipped during paused boot")
+    else:
+        try:
+            from dharma_swarm.startup_crew import spawn_cybernetics_crew
 
-        cyber_crew = await spawn_cybernetics_crew(swarm)
-        if cyber_crew:
-            _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
-    except Exception as exc:
-        _log("swarm", f"Cybernetics crew assertion failed: {exc}")
+            cyber_crew = await spawn_cybernetics_crew(swarm)
+            if cyber_crew:
+                _log("swarm", f"Cybernetics crew asserted: {len(cyber_crew)} seats")
+        except Exception as exc:
+            _log("swarm", f"Cybernetics crew assertion failed: {exc}")
 
     # MessageBus for instinct signal consumption
     from dharma_swarm.message_bus import MessageBus as _MBus
@@ -245,45 +402,53 @@ async def run_swarm_loop(
         ),
     )
     _log("swarm", f"Ready: {len(agents)} agents, thread={swarm.current_thread}")
+    ready_released = False
 
     # Auto-seed missions from ThinkodynamicDirector if task board is empty.
     # The director derives missions from TelosGraph + recognition_seed + ecosystem.
     # This replaces static SEED_TASKS with telos-derived, philosophically grounded work.
-    try:
-        _board = swarm._orchestrator._board
-        _board_stats = await _board.stats()
-        _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
-        if _pending == 0:
-            from dharma_swarm.mission_contract import load_latest_mission
-            from pathlib import Path
-            _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
-            _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
-            if _contract_path.exists():
-                try:
-                    mission = load_latest_mission(_contract_path)
-                    if mission and hasattr(mission, 'task_titles') and mission.task_titles:
-                        _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
-                        for title in mission.task_titles[:10]:  # cap at 10 per mission
-                            await _board.create(
-                                title=title,
-                                description=(
-                                    f"Mission: {mission.mission_title}.\n"
-                                    f"Use web_search, fetch_url, read_file, and write_file "
-                                    f"to complete this task. Write results to "
-                                    f"~/.dharma/shared/ with a descriptive filename."
-                                ),
-                                priority="high",
-                            )
-                except Exception as e:
-                    _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
-            else:
-                _log("swarm", "No director mission found — using default SEED_TASKS")
-    except Exception as e:
-        _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
+    if paused_at_boot:
+        _log("swarm", "Mission auto-seed skipped during paused boot")
+    else:
+        try:
+            _board = swarm._orchestrator._board
+            _board_stats = await _board.stats()
+            _pending = _board_stats.get("pending", 0) + _board_stats.get("running", 0)
+            if _pending == 0:
+                from dharma_swarm.mission_contract import load_latest_mission
+                _handoff = STATE_DIR / "shared" / "thinkodynamic_director_handoff.md"
+                _contract_path = STATE_DIR / "logs" / "thinkodynamic_director" / "latest.json"
+                if _contract_path.exists():
+                    try:
+                        mission = load_latest_mission(_contract_path)
+                        if mission and hasattr(mission, 'task_titles') and mission.task_titles:
+                            _log("swarm", f"Seeding {len(mission.task_titles)} tasks from director: '{mission.mission_title}'")
+                            for title in mission.task_titles[:10]:  # cap at 10 per mission
+                                await _board.create(
+                                    title=title,
+                                    description=(
+                                        f"Mission: {mission.mission_title}.\n"
+                                        f"Use web_search, fetch_url, read_file, and write_file "
+                                        f"to complete this task. Write results to "
+                                        f"~/.dharma/shared/ with a descriptive filename."
+                                    ),
+                                    priority="high",
+                                )
+                    except Exception as e:
+                        _log("swarm", f"Director mission seeding failed (non-fatal): {e}")
+                else:
+                    _log("swarm", "No director mission found — using default SEED_TASKS")
+        except Exception as e:
+            _log("swarm", f"Mission auto-seed check failed (non-fatal): {e}")
 
     try:
         while not shutdown_event.is_set():
             try:
+                if _pause_file_present(STATE_DIR):
+                    _log("swarm", "Paused (.PAUSE file)")
+                    await asyncio.sleep(30)
+                    continue
+
                 # Drain signal bus before tick -- respond to inter-loop signals
                 if signal_bus is not None:
                     anomaly_signals = signal_bus.drain(["ANOMALY_DETECTED"])
@@ -357,6 +522,12 @@ async def run_swarm_loop(
                     _log("swarm", "Circuit breaker tripped, waiting...")
                     await asyncio.sleep(60)
                     continue
+
+                if not ready_released:
+                    ready_released = True
+                    if ready_event is not None:
+                        ready_event.set()
+                    _log("swarm", "First core tick complete; ancillary loops may start")
 
                 dispatched = activity.get("dispatched", 0)
                 settled = activity.get("settled", 0)
@@ -551,6 +722,25 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             except Exception:
                 pass
 
+            if _evo_allowed:
+                try:
+                    pending_result = await _run_pending_evolution_proposals(
+                        engine,
+                        limit=5,
+                        log_system="evolution",
+                    )
+                    if pending_result is not None:
+                        meta_cycle_result = pending_result
+                        meta_cycle_source = "pending proposals"
+                        _log(
+                            "evolution",
+                            f"Pending result: fitness={pending_result.best_fitness:.3f}, "
+                            f"submitted={pending_result.proposals_submitted}, "
+                            f"archived={pending_result.proposals_archived}",
+                        )
+                except Exception as exc:
+                    _log("evolution", f"Pending proposal evaluation error: {exc}")
+
             # Feed meta-evolution with observed fitness.
             # Only submit a synthetic result on cycles where auto_evolve
             # does NOT run (every 3rd cycle calls auto_evolve which feeds
@@ -559,7 +749,11 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             # mismatch where meta-adaptation triggered within one evolution
             # cycle instead of after two separate cycles.
             _auto_evolve_will_run = (cycle_count % 3 == 0) and _evo_allowed
-            if (avg_fitness > 0 or fitness_events) and not _auto_evolve_will_run:
+            if (
+                meta_cycle_result is None
+                and (avg_fitness > 0 or fitness_events)
+                and not _auto_evolve_will_run
+            ):
                 if live_fitness_scores:
                     best_fitness = max(live_fitness_scores)
                 else:
@@ -615,10 +809,8 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                             selected = _evo_rng.sample(targets, min(2, len(targets)))
 
                             # Determine shadow mode: real mutation requires explicit opt-in
-                            _shadow = _evo_os.environ.get("DHARMA_EVOLUTION_SHADOW", "1") != "0"
-                            _autonomy = int(_evo_os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-                            if not _shadow and _autonomy < 2:
-                                _shadow = True  # Autonomy too low for real mutation
+                            _shadow, _shadow_reason = _evolution_shadow_mode_from_env(_evo_os.environ)
+                            if _shadow_reason == "DGC_AUTONOMY_LEVEL < 2":
                                 _log("evolution", "Shadow forced: DGC_AUTONOMY_LEVEL < 2")
 
                             # Eval verdict override: HOLD forces shadow mode
@@ -631,10 +823,9 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                             except Exception:
                                 pass
 
-                            # Merge any pending proposals from consolidation/skill bridge
-                            _pending = engine.load_pending_proposals()
-                            if _pending:
-                                _log("evolution", f"Loaded {len(_pending)} pending proposals from consolidation/bridge")
+                            # Pending bridge proposals are evaluated above via
+                            # _run_pending_evolution_proposals(); do not drain
+                            # the shared queue here without submitting them.
 
                             mode_label = "shadow" if _shadow else "LIVE"
                             _log("evolution", f"Auto-evolve ({mode_label}): {[s.name for s in selected]}")
@@ -768,6 +959,8 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
 
     while not shutdown_event.is_set():
         try:
+            _write_daemon_runtime_dispatch_self_report(STATE_DIR)
+
             # Drain WITNESS_AUDIT signals — close the S3* feedback loop
             witness_signals = signal_bus.drain(["WITNESS_AUDIT"])
             for ws in witness_signals:
@@ -779,7 +972,7 @@ async def run_health_loop(shutdown_event: asyncio.Event) -> None:
                 elif warnings:
                     _log("health", f"WITNESS: {warnings} warning(s), {total} total in cycle {ws.get('cycle', '?')}")
 
-            anomalies = await monitor.detect_anomalies()
+            anomalies = await _detect_health_anomalies_bounded(monitor)
             if anomalies:
                 for a in anomalies[:3]:
                     _log("health", f"ANOMALY: {a.anomaly_type} severity={a.severity} — {a.description[:80]}")
@@ -1355,12 +1548,16 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                         _llm_targets = _grng.sample(available_targets, min(2, len(available_targets)))
                         _llm_files = [_src_root / t for t in _llm_targets]
                         _model = _grng.choice(_FREE_CODING_MODELS)
-                        _log("grind", f"LLM evolve via {_model}: {_llm_targets}")
+                        _shadow, _shadow_reason = _evolution_shadow_mode_from_env(_gos.environ)
+                        mode_label = "shadow" if _shadow else "LIVE"
+                        if _shadow_reason == "DGC_AUTONOMY_LEVEL < 2":
+                            _log("grind", "Shadow forced: DGC_AUTONOMY_LEVEL < 2")
+                        _log("grind", f"LLM evolve ({mode_label}) via {_model}: {_llm_targets}")
                         llm_result = await engine.auto_evolve(
                             provider=_free_provider,
                             source_files=_llm_files,
                             model=_model,
-                            shadow=False,  # Real mode — apply diffs, run tests, roll back on failure
+                            shadow=_shadow,
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
                         )
@@ -1541,9 +1738,12 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
     # Initial delay to let other systems boot first
     await asyncio.sleep(30)
 
+    from dharma_swarm.insight_evolution_bridge import promote_insights_to_pending_proposals
+    from dharma_swarm.shakti_zeitgeist_executive import ShaktiZeitgeistExecutive
     from dharma_swarm.zeitgeist import ZeitgeistScanner
     from dharma_swarm.world_radar.go_bridge import run_world_radar_go_once
     scanner = ZeitgeistScanner(state_dir=STATE_DIR)
+    executive = ShaktiZeitgeistExecutive(state_dir=STATE_DIR)
 
     while not shutdown_event.is_set():
         try:
@@ -1564,6 +1764,17 @@ async def _run_zeitgeist_loop(shutdown_event: asyncio.Event) -> None:
             _log("zeitgeist", f"S4 scan: {len(signals)} signals, {len(threats)} threats")
         except Exception as e:
             _log("zeitgeist", f"S4 scan failed: {e}")
+
+        try:
+            executive_state = await executive.cycle()
+            promotion = promote_insights_to_pending_proposals(state_dir=STATE_DIR)
+            _log(
+                "zeitgeist",
+                f"Shakti executive: {len(executive_state.opportunities)} opportunities, "
+                f"queued={promotion.queued}, duplicates={promotion.skipped_duplicate}",
+            )
+        except Exception as e:
+            _log("zeitgeist", f"Insight promotion failed: {e}")
 
         try:
             await asyncio.wait_for(
@@ -1659,8 +1870,9 @@ async def _run_world_model_loop(shutdown_event: asyncio.Event) -> None:
     telos pressure, emit algedonic signal if any stock crosses critical threshold.
     """
     try:
-        from dharma_swarm.world_model import WorldModelAgent
-        agent = WorldModelAgent(state_dir=STATE_DIR)
+        from dharma_swarm.world_model import WorldModelAgent, WorldModelStore
+        store = WorldModelStore(base_path=STATE_DIR / "world_model")
+        agent = WorldModelAgent(store=store, search_tool=None, arxiv_tool=None)
         # Seed on first boot
         try:
             await asyncio.wait_for(agent.initialize(), timeout=60.0)
@@ -1694,7 +1906,6 @@ async def _run_gauntlet_loop(shutdown_event: asyncio.Event) -> None:
     Tier 4+5 (adversarial + emergent): every 12 hours.
     Scores written to ~/.dharma/gauntlet/ and fed back to BenchmarkRegistry.
     """
-    import random as _random
     _log("gauntlet", "Gauntlet loop starting")
     _cycle = 0
     while not shutdown_event.is_set():
@@ -1744,6 +1955,47 @@ async def _run_health_api(shutdown_event: asyncio.Event) -> None:
         await run_health_api(shutdown_event)
     except Exception as exc:
         _log("health-api", f"Health API crashed: {exc}")
+
+
+async def _run_health_api_process_watchdog(shutdown_event: asyncio.Event) -> None:
+    """Keep the health API sidecar alive for operator truth probes."""
+    from dharma_swarm.swarm_health_api import start_health_api_process
+
+    handle = None
+    restart_count = 0
+    try:
+        while not shutdown_event.is_set():
+            if handle is None or not handle.process.is_alive():
+                if handle is not None:
+                    _log(
+                        "health-api",
+                        "Process exited "
+                        f"(pid={handle.process.pid}, exitcode={handle.process.exitcode}); "
+                        "restarting",
+                    )
+                    handle.close(timeout=1.0)
+                try:
+                    handle = start_health_api_process(
+                        daemon_pid=os.getpid(),
+                        startup_timeout=20.0,
+                    )
+                    restart_count += 1
+                    _log(
+                        "health-api",
+                        "Process started "
+                        f"(pid={handle.process.pid}, port={handle.port}, "
+                        f"restart_count={restart_count})",
+                    )
+                except Exception as exc:
+                    _log("health-api", f"Process failed to start: {exc}")
+                    if await _wait_or_shutdown(shutdown_event, 15.0):
+                        break
+                    continue
+            if await _wait_or_shutdown(shutdown_event, 5.0):
+                break
+    finally:
+        if handle is not None:
+            handle.close(timeout=2.0)
 
 
 async def _run_room_health_loop(
@@ -2028,14 +2280,23 @@ async def orchestrate(background: bool = False) -> None:
     _log_dir = STATE_DIR / "logs"
     _log_dir.mkdir(parents=True, exist_ok=True)
     _root = logging.getLogger()
+    _root.setLevel(logging.INFO)
     if not _root.handlers:
-        _root.setLevel(logging.INFO)
         _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
         _ch = logging.StreamHandler()
         _ch.setFormatter(_fmt)
         _root.addHandler(_ch)
+    _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    log_path = (_log_dir / "swarm.log").resolve()
+    has_swarm_file_handler = any(
+        isinstance(handler, logging.FileHandler)
+        and Path(getattr(handler, "baseFilename", "")).resolve() == log_path
+        for handler in _root.handlers
+    )
+    if not has_swarm_file_handler:
         from logging.handlers import RotatingFileHandler as _RFH
-        _fh = _RFH(_log_dir / "swarm.log", maxBytes=10 * 1024 * 1024, backupCount=5)
+
+        _fh = _RFH(log_path, maxBytes=10 * 1024 * 1024, backupCount=5)
         _fh.setFormatter(_fmt)
         _root.addHandler(_fh)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -2048,6 +2309,7 @@ async def orchestrate(background: bool = False) -> None:
     # Write PID -- use daemon.pid for consistency with _stop_old_daemon()
     pid_file = STATE_DIR / "daemon.pid"
     pid_file.write_text(str(os.getpid()))
+    _write_daemon_runtime_dispatch_self_report(STATE_DIR)
 
     shutdown_event = asyncio.Event()
 
@@ -2057,7 +2319,10 @@ async def orchestrate(background: bool = False) -> None:
 
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
-
+    runtime_dispatch_thread = start_daemon_runtime_dispatch_self_report_thread(
+        shutdown_event,
+        state_dir=STATE_DIR,
+    )
     # Enable subscription auth for Claude when not nested inside Claude Code
     if "CLAUDECODE" not in os.environ:
         os.environ.setdefault("DHARMA_CLAUDE_AUTH_MODE", "subscription")
@@ -2099,7 +2364,7 @@ async def orchestrate(background: bool = False) -> None:
     _log("orchestrator", f"  Swarm tick: {SWARM_TICK}s")
     _log("orchestrator", f"  Pulse interval: {PULSE_INTERVAL}s")
     _log("orchestrator", f"  Max daily: {MAX_DAILY}")
-    _log("orchestrator", f"  Signal bus: active")
+    _log("orchestrator", "  Signal bus: active")
     if room_registry is not None:
         _log("orchestrator", f"  Fractal rooms: {len(room_registry.active_rooms())} active")
     else:
@@ -2133,7 +2398,8 @@ async def orchestrate(background: bool = False) -> None:
     from dharma_swarm.loop_supervisor import LoopSupervisor
     _supervisor = LoopSupervisor()
     _loop_intervals = {
-        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "health": 120,
+        "swarm": SWARM_TICK, "pulse": PULSE_INTERVAL, "evolution": EVOLUTION_INTERVAL,
+        "health": 120,
         "zeitgeist": ZEITGEIST_INTERVAL, "internal-pressure": ZEITGEIST_INTERVAL,
         "witness": WITNESS_INTERVAL,
         "consolidation": CONSOLIDATION_INTERVAL, "recognition": 7200,
@@ -2146,9 +2412,18 @@ async def orchestrate(background: bool = False) -> None:
     for loop_name, interval in _loop_intervals.items():
         _supervisor.register_loop(loop_name, expected_interval=float(interval))
 
+    swarm_ready_event = asyncio.Event()
     task_factories: dict[str, Any] = {
-        "swarm": lambda: run_swarm_loop(shutdown_event, signal_bus=bus, supervisor=_supervisor, room_registry=room_registry),
+        "swarm": lambda: run_swarm_loop(
+            shutdown_event,
+            signal_bus=bus,
+            supervisor=_supervisor,
+            room_registry=room_registry,
+            ready_event=swarm_ready_event,
+        ),
+        "health-api": lambda: _run_health_api_process_watchdog(shutdown_event),
         "pulse": lambda: run_pulse_loop(shutdown_event),
+        "evolution": lambda: run_evolution_loop(shutdown_event),
         "recognition": lambda: _run_recognition_loop(shutdown_event),
         "conductors": lambda: run_conductor_loop(shutdown_event),
         "context-agent": lambda: run_context_agent_loop(shutdown_event, signal_bus=bus),
@@ -2170,8 +2445,6 @@ async def orchestrate(background: bool = False) -> None:
         # Runs at boot + every 4 hours. Writes state-local GUARDIAN_REPORT.md.
         # Creates GitHub issues for BLOCKER-severity findings.
         "guardian": lambda: _run_guardian_loop(shutdown_event, room_registry=room_registry),
-        # ── Health API: curl http://localhost:7433/health ──
-        "health-api": lambda: _run_health_api(shutdown_event),
         # ── Gauntlet: adversarial eval pressure + DGM feedback loop ──
         "gauntlet": lambda: _run_gauntlet_loop(shutdown_event),
         # ── World Model: living Forrester-style world state updated by research ──
@@ -2186,12 +2459,17 @@ async def orchestrate(background: bool = False) -> None:
             room_bridge,
         )
     optional_clean_exit = {"pulse"}
+    core_loop_names = {"swarm", "health-api", "pulse"}
     tasks = {
-        name: asyncio.create_task(factory(), name=name)
-        for name, factory in task_factories.items()
+        name: asyncio.create_task(task_factories[name](), name=name)
+        for name in core_loop_names
     }
+    ancillary_started = False
 
-    _log("orchestrator", f"All {len(tasks)} systems launched ({len(tasks)} loops incl. free-grind)")
+    _log(
+        "orchestrator",
+        f"Core systems launched ({len(tasks)} loops); ancillary loops wait for swarm readiness",
+    )
 
     abandoned_loops: set[str] = set()
 
@@ -2227,8 +2505,24 @@ async def orchestrate(background: bool = False) -> None:
         _write_loop_liveness(restart_counts)
 
         while tasks and not shutdown_event.is_set():
+            if (
+                not ancillary_started
+                and swarm_ready_event.is_set()
+                and not shutdown_event.is_set()
+            ):
+                for name, factory in task_factories.items():
+                    if name in tasks or name in core_loop_names:
+                        continue
+                    tasks[name] = asyncio.create_task(factory(), name=name)
+                ancillary_started = True
+                _log(
+                    "orchestrator",
+                    f"Ancillary systems launched after swarm readiness ({len(tasks)} total loops)",
+                )
+                _write_loop_liveness(restart_counts)
+
             done, pending = await asyncio.wait(
-                list(tasks.values()), return_when=asyncio.FIRST_COMPLETED, timeout=60.0,
+                list(tasks.values()), return_when=asyncio.FIRST_COMPLETED, timeout=0.25,
             )
             if not done:
                 continue  # timeout, check shutdown flag
@@ -2279,6 +2573,7 @@ async def orchestrate(background: bool = False) -> None:
         for t in tasks.values():
             t.cancel()
         await asyncio.gather(*tasks.values(), return_exceptions=True)
+        runtime_dispatch_thread.join(timeout=2.0)
         pid_file.unlink(missing_ok=True)
         _log("orchestrator", "All systems stopped")
 

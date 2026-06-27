@@ -1,0 +1,67 @@
+{
+  "schema_version": "operator_coherence_admission_review.v1",
+  "generated_at": "2026-06-23T00:00:00+09:00",
+  "verdict": "KEEP_CANDIDATE_NEEDS_EXTRACTION",
+  "candidate_status": "CANDIDATE_HIGH_PRIORITY_NOT_CANONICAL",
+  "canonical_baseline": {
+    "ref": "origin/main",
+    "commit": "839fd25f43c76375f49e45012fe8f20a324aa74c",
+    "subject": "[codex] governance: refresh active track and fitness properties [impact-checked] (#647)",
+    "active_tracks": 7,
+    "max_active": 10
+  },
+  "dirty_candidate_checkout": {
+    "path": "/Users/dhyana/dharma_swarm",
+    "branch": "telos-ai-seed-v0-from-sandbox",
+    "local_projection_active_tracks": 11,
+    "local_projection_max_active": 11
+  },
+  "recommended_branch": "governance/operator-coherence-cockpit-20260623",
+  "recommended_track_identity_if_admitted": "operator-coherence-control-tower-2026-06",
+  "track_position": "successor_control_tower_track_not_runtime_truth_extension",
+  "seam": [
+    "Operator Coherence Cockpit",
+    "Agent Lane Admission Packet",
+    "Production Readiness / Candidate Promotion",
+    "Orchestration Arena v1",
+    "Forge/DGM shadow loop"
+  ],
+  "candidate_surfaces": {
+    "modified": [
+      "api/main.py",
+      "dashboard/src/app/dashboard/cockpit/page.tsx"
+    ],
+    "added_untracked": [
+      "api/routers/operator_coherence.py",
+      "dharma_swarm/operator_core/operator_coherence_cockpit.py",
+      "scripts/runtime/operator_coherence_cockpit.py",
+      "dashboard/src/lib/operatorCoherence.ts",
+      "dashboard/src/hooks/useOperatorCoherence.ts",
+      "dashboard/src/components/operator-coherence/",
+      "tests/test_operator_coherence_cockpit.py",
+      "reports/governance/operator_coherence_cockpit.json",
+      "reports/governance/operator_coherence_cockpit.md"
+    ]
+  },
+  "production_verdicts": {
+    "runtime-truth-reconciliation-2026-06": "CLOSE_READY_WITH_FOLLOWUP",
+    "runtime-truth-nats-2026-06": "KEEP_ACTIVE_PROD_HARDENING",
+    "truth-graph-platform-2026-06": "KEEP_ACTIVE_PROD_HARDENING",
+    "composer-holon-spine-longrun-2026-06": "SPLIT_BEFORE_CLOSE",
+    "provider-routing-consolidation-2026-06": "CLOSE_READY_WITH_FOLLOWUP"
+  },
+  "dependency_honesty_followup": {
+    "render_check_issue": "system python3 without PyYAML fails due fallback parser whitespace-only diff; repo .venv/bin/python passes",
+    "action": "do not re-render managed blocks as docs drift; make governance entrypoints use repo venv or fail loud with remediation"
+  },
+  "operator_approval_required_for": [
+    "create extraction worktree/branch",
+    "copy candidate files into clean branch",
+    "push branch or open PR",
+    "edit ACTIVE_TRACK.yaml",
+    "PR merge/close",
+    "git reset/clean/stash drop/branch deletion/worktree prune",
+    "raw union of dirty active tracks",
+    "Forge/DGM autonomous mutation beyond frozen receipt arena"
+  ]
+}

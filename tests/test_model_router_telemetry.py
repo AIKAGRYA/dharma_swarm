@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from dharma_swarm.models import LLMRequest, LLMResponse, ProviderType
@@ -104,9 +106,29 @@ async def test_model_router_success_writes_telemetry_records(tmp_path) -> None:
     assert any(
         item.outcome_kind == "provider_attempt"
         and item.subject_id == "openai"
+        and item.status == "started"
+        for item in outcomes
+    )
+    assert any(
+        item.outcome_kind == "provider_attempt"
+        and item.subject_id == "openai"
         and item.status == "succeeded"
         for item in outcomes
     )
+    with sqlite3.connect(tmp_path / "runtime.db") as db:
+        provider_attempts = db.execute(
+            """
+            SELECT provider, model, success, outcome
+            FROM provider_attempts
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
+    assert len(provider_attempts) == 2
+    assert all(row[0] == "openai" and row[1] for row in provider_attempts)
+    assert {row[2:] for row in provider_attempts} == {
+        (0, "started"),
+        (1, "success"),
+    }
     assert any(
         item.outcome_kind == "provider_completion"
         and item.subject_id == "openai"
@@ -114,6 +136,51 @@ async def test_model_router_success_writes_telemetry_records(tmp_path) -> None:
         and item.value == 1.0
         for item in outcomes
     )
+
+
+@pytest.mark.asyncio
+async def test_model_router_attach_telemetry_enables_provider_attempt_projection(
+    tmp_path,
+) -> None:
+    telemetry = TelemetryPlaneStore(tmp_path / "runtime.db")
+    router = ModelRouter(
+        {ProviderType.OPENAI: _DummyProvider("ok")},
+        telemetry_enabled=False,
+    )
+    router.attach_telemetry(telemetry)
+
+    await router.complete_for_task(
+        ProviderRouteRequest(
+            action_name="summarize_notes",
+            risk_score=0.12,
+            uncertainty=0.14,
+            novelty=0.12,
+            urgency=0.4,
+            expected_impact=0.2,
+            context={
+                "session_id": "sess-attached",
+                "task_id": "task-attached",
+                "run_id": "run-attached",
+            },
+        ),
+        LLMRequest(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": "Summarize these notes"}],
+        ),
+        available_provider_types=[ProviderType.OPENAI],
+    )
+
+    with sqlite3.connect(tmp_path / "runtime.db") as db:
+        provider_attempts = db.execute(
+            """
+            SELECT provider, success, outcome
+            FROM provider_attempts
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
+
+    assert ("openai", 0, "started") in provider_attempts
+    assert ("openai", 1, "success") in provider_attempts
 
 
 @pytest.mark.asyncio
@@ -169,7 +236,19 @@ async def test_model_router_fallback_success_marks_fallback_in_telemetry(tmp_pat
     assert any(
         item.outcome_kind == "provider_attempt"
         and item.subject_id == "openrouter_free"
+        and item.status == "started"
+        for item in outcomes
+    )
+    assert any(
+        item.outcome_kind == "provider_attempt"
+        and item.subject_id == "openrouter_free"
         and item.status == "failed"
+        for item in outcomes
+    )
+    assert any(
+        item.outcome_kind == "provider_attempt"
+        and item.subject_id == "anthropic"
+        and item.status == "started"
         for item in outcomes
     )
     assert any(
@@ -178,6 +257,18 @@ async def test_model_router_fallback_success_marks_fallback_in_telemetry(tmp_pat
         and item.status == "succeeded"
         for item in outcomes
     )
+    with sqlite3.connect(tmp_path / "runtime.db") as db:
+        provider_attempts = db.execute(
+            """
+            SELECT provider, success, outcome
+            FROM provider_attempts
+            ORDER BY created_at ASC
+            """
+        ).fetchall()
+    assert ("openrouter_free", 0, "started") in provider_attempts
+    assert ("openrouter_free", 0, "synthetic upstream failure") in provider_attempts
+    assert ("anthropic", 0, "started") in provider_attempts
+    assert ("anthropic", 1, "success") in provider_attempts
 
 
 @pytest.mark.asyncio

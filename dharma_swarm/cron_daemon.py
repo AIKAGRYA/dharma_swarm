@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import threading
+from pathlib import Path
 from typing import Any, Callable
 
 from dharma_swarm import cron_scheduler
@@ -34,6 +35,17 @@ def _as_positive_int_or_none(value: Any) -> int | None:
 
 def _pid_file() -> Any:
     return cron_scheduler.CRON_DIR / "daemon.pid"
+
+
+def _pause_file_present() -> bool:
+    state_root = Path(cron_scheduler.DHARMA_DIR)
+    candidates = [
+        Path.home() / ".dharma" / ".PAUSE",
+        state_root / ".PAUSE",
+    ]
+    if state_root.name == "state":
+        candidates.append(state_root.parent / ".PAUSE")
+    return any(path.exists() for path in candidates)
 
 
 def _write_pid_file() -> None:
@@ -110,13 +122,17 @@ def run_cron_daemon(
             return 0
 
         while not stop.is_set():
-            try:
-                executed_total += cron_scheduler.tick(
-                    verbose=tick_verbose,
-                    run_fn=run_fn,
-                )
-            except Exception:
-                logger.exception("Cron daemon tick failed")
+            if _pause_file_present():
+                logger.info("Cron daemon paused (.PAUSE file)")
+                print("Cron daemon paused (.PAUSE file)")
+            else:
+                try:
+                    executed_total += cron_scheduler.tick(
+                        verbose=tick_verbose,
+                        run_fn=run_fn,
+                    )
+                except Exception:
+                    logger.exception("Cron daemon tick failed")
 
             loops += 1
             if loop_limit is not None and loops >= loop_limit:

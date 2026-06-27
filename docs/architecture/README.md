@@ -68,6 +68,8 @@ Use it for:
 
 Current examples:
 
+- [AGENT_HIERARCHY_MATURITY_MAP.md](AGENT_HIERARCHY_MATURITY_MAP.md)
+- [APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md](APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md)
 - [DGC_STRESS_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/DGC_STRESS_HARNESS.md)
 - [ORCHESTRATOR_LEDGERS.md](/Users/dhyana/dharma_swarm/docs/architecture/ORCHESTRATOR_LEDGERS.md)
 - [PROVIDER_MATRIX_HARNESS.md](/Users/dhyana/dharma_swarm/docs/architecture/PROVIDER_MATRIX_HARNESS.md)

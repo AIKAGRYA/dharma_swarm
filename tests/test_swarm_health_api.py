@@ -15,6 +15,9 @@ Validates:
 from __future__ import annotations
 
 import json
+import http.client
+import os
+import threading
 
 import pytest
 
@@ -172,6 +175,149 @@ class TestRuntimeDispatchStatus:
             "env_key_present",
             "source",
         }
+
+
+class TestRuntimeTruthStatus:
+    def test_runtime_truth_endpoint_returns_200_when_closeout_passes(self, monkeypatch):
+        monkeypatch.setattr(
+            health_api,
+            "_runtime_truth_status",
+            lambda: {
+                "schema_version": "runtime_truth_closeout.v1",
+                "status": "pass",
+                "passed": True,
+            },
+        )
+
+        status, body = health_api._response_for_path("/runtime-truth")
+
+        assert status == "200 OK"
+        assert json.loads(body)["passed"] is True
+
+    def test_runtime_truth_endpoint_returns_503_when_closeout_fails(self, monkeypatch):
+        monkeypatch.setattr(
+            health_api,
+            "_runtime_truth_status",
+            lambda: {
+                "schema_version": "runtime_truth_closeout.v1",
+                "status": "fail",
+                "passed": False,
+                "checks": [
+                    {
+                        "id": "provider_model_accounted",
+                        "status": "fail",
+                        "passed": False,
+                    }
+                ],
+            },
+        )
+
+        status, body = health_api._response_for_path("/runtime-truth")
+
+        assert status == "503 Service Unavailable"
+        payload = json.loads(body)
+        assert payload["passed"] is False
+        assert payload["checks"][0]["id"] == "provider_model_accounted"
+
+    def test_metrics_include_runtime_truth(self, monkeypatch):
+        monkeypatch.setattr(
+            health_api,
+            "_runtime_truth_status",
+            lambda: {
+                "schema_version": "runtime_truth_closeout.v1",
+                "status": "pass",
+                "passed": True,
+            },
+        )
+
+        status, body = health_api._response_for_path("/metrics")
+
+        assert status == "200 OK"
+        assert json.loads(body)["runtime_truth"]["passed"] is True
+
+    def test_runtime_context_endpoint_returns_orientation_packet(self, monkeypatch):
+        monkeypatch.setattr(
+            health_api,
+            "_runtime_context_packet",
+            lambda: {
+                "schema": "dharma_swarm.runtime_context.v1",
+                "secrets_included": False,
+                "provider_routes": {
+                    "source": "telemetry_plane.provider_attempts",
+                    "recent_success_lanes": ["ollama:qwen3-coder:480b-cloud"],
+                },
+            },
+        )
+
+        status, body = health_api._response_for_path("/runtime-context")
+
+        payload = json.loads(body)
+        assert status == "200 OK"
+        assert payload["secrets_included"] is False
+        assert payload["provider_routes"]["recent_success_lanes"] == [
+            "ollama:qwen3-coder:480b-cloud"
+        ]
+
+
+class TestHealthApiThread:
+    def test_thread_server_serves_health(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
+        shutdown = threading.Event()
+        handle = health_api.start_health_api_thread(
+            shutdown,
+            host="127.0.0.1",
+            port=0,
+        )
+        try:
+            conn = http.client.HTTPConnection(handle.host, handle.port, timeout=2)
+            conn.request("GET", "/health")
+            response = conn.getresponse()
+            body = json.loads(response.read().decode("utf-8"))
+            conn.close()
+        finally:
+            shutdown.set()
+            handle.close()
+
+        assert response.status == 200
+        assert body["status"] == "ok"
+        assert body["runtime_dispatch"]["spine_dispatch_enabled"] is True
+
+
+class TestHealthApiProcess:
+    def test_process_server_serves_pid_bound_health(self, monkeypatch):
+        monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
+        handle = health_api.start_health_api_process(
+            host="127.0.0.1",
+            port=0,
+            daemon_pid=os.getpid(),
+        )
+        try:
+            conn = http.client.HTTPConnection(handle.host, handle.port, timeout=5)
+            conn.request("GET", "/health")
+            response = conn.getresponse()
+            body = json.loads(response.read().decode("utf-8"))
+            conn.close()
+        finally:
+            handle.close()
+
+        assert response.status == 200
+        assert body["status"] == "ok"
+        assert body["daemon_pid"] == os.getpid()
+        assert body["daemon_process_alive"] is True
+        assert body["health_process_pid"] != os.getpid()
+        assert body["runtime_dispatch"]["spine_dispatch_enabled"] is True
+
+    def test_process_server_exits_when_parent_pid_is_dead(self):
+        handle = health_api.start_health_api_process(
+            host="127.0.0.1",
+            port=0,
+            daemon_pid=999999999,
+        )
+        try:
+            handle.process.join(timeout=2)
+            assert not handle.process.is_alive()
+        finally:
+            handle.close()
 
 
 # ---------------------------------------------------------------------------

@@ -82,9 +82,13 @@ Agents must load context by layer:
 - L2 Active Track Packet: current intent, scope, missing artifacts, and gates.
 - L3 Reference / Deep Context: authoritative references after route selection.
 - L4 Corpus / Search: fuzzy recall, archaeology, vector search, wiki, reports.
+- L5 Seat Load: named-agent loading after identity and authority are known,
+  including the agent identity, LivingDock projection, recent receipts, policy
+  ceiling, shared swarm truth, and scoped Sanctum/Holocron context.
 
 L4 is never first. Search and broad recall happen only after L0-L2 establish
-scope and authority.
+scope and authority. L5 is a loading layer, not a promotion claim: D0-D5 remain
+the maturity/runtime authority grades, while L0-L5 are context-loading layers.
 
 ## Admission Boundary
 
@@ -100,6 +104,29 @@ unless it has:
 
 `make onboard` remains orientation. `make agent-admit` is the narrow admission
 check path.
+
+## Routing Identity
+
+Routing names are part of the same identity system. Model/provider routing,
+key liveness, A2A/NATS delivery, and agent inbox routing must resolve through
+registered objects before broad search or implementation work.
+
+Canonical routing objects include:
+
+- `ModelKeyRouting`: the one-way model/key routing doctrine in
+  `docs/ops/MODEL_KEY_ROUTING.md`.
+- `DKeysKeyStore`: the dkeys-managed provider-key home and `agent_keys.env`
+  contract.
+- `RuntimeProvider`: the resolver/factory door in `runtime_provider.py`.
+- `ModelHierarchy`: the provider/model ordering source of truth.
+- `ProviderPolicyRouter`, `ModelRouter`, and `RoutingMemory`: the policy,
+  execution, and learning layers for model routing.
+- `NATSSubstrate`, `A2AInboxRoute`, and `AgentUID`: the transport identity
+  layer for internal live contact.
+
+Do not create a second routing vocabulary for these surfaces. New routing
+terms are either aliases of these objects or new objects with an owner surface,
+source path, lifecycle, and orientation route.
 
 ## PKM Projection
 

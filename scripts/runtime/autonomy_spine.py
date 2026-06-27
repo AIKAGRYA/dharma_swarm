@@ -24,10 +24,17 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from dharma_swarm.models import ProviderType  # noqa: E402
 from dharma_swarm.operator_core.living_agent_kernel import KernelRunStore, LivingAgentKernel  # noqa: E402
+from dharma_swarm.operator_core.living_agent_kernel_promotion import KernelPromotionReceipt, KernelPromotionStore  # noqa: E402
+from dharma_swarm.operator_core.living_agent_kernel_provider_worker import (  # noqa: E402
+    KernelProviderWorkerCycleResult,
+    execute_provider_worker_cycle,
+)
 from dharma_swarm.operator_core.ds_goal_wrapper_contract import wrapper_longrun_preflight_gate  # noqa: E402
 from dharma_swarm.operator_core.runtime_truth import runtime_db_path_from_env, stable_payload_hash, utc_now  # noqa: E402
 from dharma_swarm.board.adapters.ds_goal_adapter import load_ds_goal_cards  # noqa: E402
+from dharma_swarm.runtime_provider import RuntimeProviderConfig, resolve_runtime_provider_config  # noqa: E402
 from dharma_swarm.runtime_state import (  # noqa: E402
     ArtifactRecord,
     DelegationRun,
@@ -43,6 +50,16 @@ DEFAULT_STATE_ROOT = Path.home() / ".dharma" / "ds_goals"
 DEFAULT_KERNEL_STORE = Path.home() / ".dharma" / "living_agent_kernel"
 SCHEMA_VERSION = "dharma.ds_goal_spine.v1"
 MISSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")
+LIVE_PROVIDER_ORDER: tuple[ProviderType, ...] = (
+    ProviderType.OLLAMA,
+    ProviderType.NVIDIA_NIM,
+    ProviderType.GOOGLE_AI,
+    ProviderType.OPENROUTER_FREE,
+    ProviderType.CLAUDE_CODE,
+    ProviderType.OPENROUTER,
+    ProviderType.OPENAI,
+    ProviderType.ANTHROPIC,
+)
 
 
 def _json_default(value: Any) -> str:
@@ -73,6 +90,12 @@ def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(row, sort_keys=True, default=_json_default) + "\n")
+
+
+def _write_jsonl_rows(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "".join(json.dumps(row, sort_keys=True, default=_json_default) + "\n" for row in rows)
+    path.write_text(payload, encoding="utf-8")
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -208,6 +231,25 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--duration-hours", type=float, default=0.0)
     run.add_argument("--dispatch-mode", default="bounded-kernel-tick")
     run.add_argument("--dry-run", action="store_true")
+    run.add_argument(
+        "--live-provider",
+        action="store_true",
+        help="Complete the wake through the promoted live provider worker instead of the projection tick.",
+    )
+    run.add_argument(
+        "--provider",
+        default="",
+        help="Provider for --live-provider. Defaults to the first available verified runtime lane.",
+    )
+    run.add_argument(
+        "--model",
+        default="",
+        help="Model override for --live-provider. Requires --provider.",
+    )
+    run.add_argument("--provider-worker-id", default="")
+    run.add_argument("--provider-max-tokens", type=int, default=4096)
+    run.add_argument("--provider-temperature", type=float, default=0.2)
+    run.add_argument("--provider-timeout-seconds", type=int, default=900)
 
     return parser
 
@@ -377,6 +419,216 @@ def _runtime_operation_hash_for_ds_goal(mission_id: str, task_id: str) -> str:
     )
 
 
+def _provider_type_from_arg(raw: str) -> ProviderType:
+    cleaned = str(raw or "").strip()
+    try:
+        return ProviderType(cleaned)
+    except ValueError as exc:
+        allowed = ", ".join(provider.value for provider in ProviderType)
+        raise ValueError(f"unknown provider for --live-provider: {cleaned}; allowed: {allowed}") from exc
+
+
+def _resolve_live_provider_config(args: argparse.Namespace) -> RuntimeProviderConfig:
+    if str(getattr(args, "model", "") or "").strip() and not str(getattr(args, "provider", "") or "").strip():
+        raise ValueError("--model requires --provider so the model id is not applied to the wrong lane")
+
+    providers = (
+        (_provider_type_from_arg(args.provider),)
+        if str(getattr(args, "provider", "") or "").strip()
+        else LIVE_PROVIDER_ORDER
+    )
+    unavailable: list[str] = []
+    for provider in providers:
+        try:
+            config = resolve_runtime_provider_config(
+                provider,
+                model=str(getattr(args, "model", "") or "").strip() or None,
+                working_dir=str(ROOT),
+                timeout_seconds=int(getattr(args, "provider_timeout_seconds", 900) or 900),
+            )
+        except Exception as exc:
+            unavailable.append(f"{provider.value}: {type(exc).__name__}: {exc}")
+            continue
+        if config.available:
+            return config
+        model_suffix = f"/{config.default_model}" if config.default_model else ""
+        unavailable.append(f"{provider.value}{model_suffix}: unavailable")
+    raise ValueError("no available provider for --live-provider; checked " + "; ".join(unavailable))
+
+
+def _live_provider_worker_id(args: argparse.Namespace, provider: ProviderType, model: str) -> str:
+    explicit = str(getattr(args, "provider_worker_id", "") or "").strip()
+    if explicit:
+        return explicit
+    model_slug = _slug(model)[:24]
+    return f"{args.agent_uid}-{provider.value}-{model_slug}-worker"[:128]
+
+
+def _provider_truth_metadata(
+    *,
+    config: RuntimeProviderConfig,
+    worker_id: str,
+) -> dict[str, Any]:
+    return {
+        "provider_execution": True,
+        "provider_model_applicability": "actual_served",
+        "provider_model_truth_source": "runtime_provider.actual_served",
+        "provider_execution_truth_source": "living_agent_kernel_provider_worker",
+        "actual_provider": config.provider.value,
+        "actual_model": config.default_model or "",
+        "provider": config.provider.value,
+        "model": config.default_model or "",
+        "provider_worker_id": worker_id,
+        "provider_config_source": config.source,
+        "provider_transport_mode": config.transport_mode or "",
+    }
+
+
+def _ensure_live_provider_promotion(
+    *,
+    args: argparse.Namespace,
+    task: dict[str, Any],
+    wake_id: str,
+    config: RuntimeProviderConfig,
+    worker_id: str,
+) -> KernelPromotionReceipt:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    mission_id = _validate_mission_id(str(args.mission_id))
+    return KernelPromotionStore(args.kernel_store).append_promotion(
+        agent_uid=args.agent_uid,
+        level="provider_executor",
+        allowed_sources=["ds_goal"],
+        allowed_tools=["provider_complete"],
+        allowed_work_kinds=["provider_execution"],
+        max_lease_seconds=max(int(args.lease_seconds), 1),
+        reviewer="operator",
+        reason="operator_authorized_autonomy_spine_live_provider_run",
+        evidence_refs=[
+            {
+                "kind": "operator_review",
+                "surface": "scripts/runtime/autonomy_spine.py",
+                "mission_id": mission_id,
+                "task_id": task_id,
+                "wake_id": wake_id,
+                "provider": config.provider.value,
+                "model": config.default_model or "",
+            }
+        ],
+        metadata={
+            "mission_id": mission_id,
+            "task_id": task_id,
+            "wake_id": wake_id,
+            "provider": config.provider.value,
+            "model": config.default_model or "",
+            "provider_worker_id": worker_id,
+            "source": "autonomy_spine.run --live-provider",
+        },
+    )
+
+
+async def _run_live_provider_worker_cycle(
+    *,
+    args: argparse.Namespace,
+    config: RuntimeProviderConfig,
+    worker_id: str,
+) -> KernelProviderWorkerCycleResult:
+    return await execute_provider_worker_cycle(
+        store_dir=args.kernel_store,
+        workspace_root=ROOT,
+        worker_id=worker_id,
+        agent_uid=args.agent_uid,
+        provider=config.provider,
+        model=config.default_model or "",
+        allowed_sources=["ds_goal"],
+        lease_seconds=max(int(args.lease_seconds), 1),
+        heartbeat_max_age_seconds=max(int(args.lease_seconds), 120),
+        live_provider=True,
+        max_tokens=max(1, int(args.provider_max_tokens)),
+        temperature=float(args.provider_temperature),
+    )
+
+
+def _kernel_status_from_provider_cycle_status(status: str) -> str:
+    if status == "completed":
+        return "completed"
+    if status == "failed":
+        return "failed"
+    return "blocked"
+
+
+def _provider_cycle_tick_payload(
+    *,
+    cycle: KernelProviderWorkerCycleResult,
+    store: KernelRunStore,
+    wake_id: str,
+) -> dict[str, Any]:
+    cycle_payload = cycle.model_dump(mode="json")
+    latest_wake = store.latest_wake_records().get(wake_id)
+    kernel_status = _kernel_status_from_provider_cycle_status(cycle.status)
+    if latest_wake is not None and latest_wake.result_ref:
+        result_ref = dict(latest_wake.result_ref)
+        run_id = latest_wake.run_id
+    else:
+        result_ref = dict(cycle.worker_result_ref)
+        run_id = str(result_ref.get("run_id") or cycle.lease_ref.get("run_id") or "")
+    result_ref.setdefault("kind", "kernel_provider_worker_result")
+    result_ref.setdefault("provider_execution", cycle.status in {"completed", "failed"})
+    result_ref.setdefault("wake_id", wake_id)
+    result_ref.setdefault("run_id", run_id)
+    result_ref.setdefault("status", kernel_status)
+    return {
+        "schema_version": "dharma.ds_goal_live_provider_tick.v1",
+        "status": kernel_status,
+        "closebacks": [
+            {
+                "created_at": utc_now(),
+                "kernel_closeback_via": "operator_core.living_agent_kernel.provider_worker",
+                "mutated": True,
+                "reason": "provider_worker_terminal_result",
+                "result_ref": result_ref,
+                "run_id": run_id,
+                "source": "ds_goal",
+                "status": "recorded",
+                "wake_id": wake_id,
+            }
+        ],
+        "executions": [
+            {
+                "message": cycle.message,
+                "provider_worker_cycle": cycle_payload,
+                "status": cycle.status,
+            }
+        ],
+        "latest_wake_status": store.latest_wake_status(limit=20),
+        "provider_worker_cycle": cycle_payload,
+    }
+
+
+def _record_ds_goal_task_kernel_closeback(
+    *,
+    mission_dir: Path,
+    task_id: str,
+    result_ref: dict[str, Any],
+    status: str,
+    closeback_via: str,
+) -> None:
+    path = _tasks_path(mission_dir)
+    rows = _jsonl_rows(path)
+    for index, row in enumerate(rows):
+        row_task_id = str(row.get("task_id") or row.get("id") or "")
+        if row_task_id != task_id:
+            continue
+        updated = dict(row)
+        updated["kernel_result_ref"] = dict(result_ref)
+        updated["kernel_result_status"] = status
+        updated["kernel_closeback_at"] = utc_now()
+        updated["kernel_closeback_via"] = closeback_via
+        rows[index] = updated
+        _write_jsonl_rows(path, rows)
+        return
+    raise ValueError(f"task not found for kernel closeback: {task_id}")
+
+
 def _ds_goal_longrun_preflight_for_receipt() -> dict[str, Any]:
     env_pin = str(os.environ.get("DHARMA_SWARM_REPO") or "").strip()
     repo_pin = Path(env_pin).expanduser() if env_pin else None
@@ -396,6 +648,7 @@ def _begin_runtime_truth_for_dispatch(
     task: dict[str, Any],
     wake_id: str,
     ds_goal_preflight: dict[str, Any] | None = None,
+    provider_truth: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     task_id = str(task.get("task_id") or task.get("id") or "")
@@ -413,6 +666,15 @@ def _begin_runtime_truth_for_dispatch(
         claim_id=claim_id,
         artifact_id=artifact_id,
     )
+    provider_metadata = dict(
+        provider_truth
+        or {
+            "provider_execution": False,
+            "provider_model_applicability": "not_applicable",
+            "provider_model_truth_source": "runtime_control.no_provider_execution",
+            "no_provider_model_reason": "living_agent_kernel_v1_no_provider_execution",
+        }
+    )
     metadata = {
         **identity.to_metadata(),
         "mission_id": mission_id,
@@ -427,10 +689,7 @@ def _begin_runtime_truth_for_dispatch(
         "agent_id": identity.agent_id,
         "session_id": identity.session_id,
         "operation_hash": _runtime_operation_hash_for_ds_goal(mission_id, task_id),
-        "provider_execution": False,
-        "provider_model_applicability": "not_applicable",
-        "provider_model_truth_source": "runtime_control.no_provider_execution",
-        "no_provider_model_reason": "living_agent_kernel_v1_no_provider_execution",
+        **provider_metadata,
         "ds_goal_longrun_preflight": ds_goal_preflight
         if ds_goal_preflight is not None
         else _ds_goal_longrun_preflight_for_receipt(),
@@ -791,12 +1050,27 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    live_config: RuntimeProviderConfig | None = None
+    live_worker_id = ""
+    if args.live_provider:
+        live_config = _resolve_live_provider_config(args)
+        live_worker_id = _live_provider_worker_id(
+            args,
+            live_config.provider,
+            live_config.default_model or "",
+        )
+
     wake_id = f"dsgoal-{args.mission_id}-{uuid4().hex[:8]}"
     runtime_dispatch = _begin_runtime_truth_for_dispatch(
         args=args,
         task=task,
         wake_id=wake_id,
         ds_goal_preflight=ds_goal_preflight,
+        provider_truth=(
+            _provider_truth_metadata(config=live_config, worker_id=live_worker_id)
+            if live_config is not None
+            else None
+        ),
     )
     if not runtime_dispatch["idempotency_inserted"]:
         receipt = _append_receipt(
@@ -878,23 +1152,63 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         return 2
 
+    kernel_store = KernelRunStore(args.kernel_store)
     kernel = LivingAgentKernel(
-        store=KernelRunStore(args.kernel_store),
+        store=kernel_store,
         workspace_root=ROOT,
     )
     kernel.enqueue_source_wake("ds_goal", task, agent_uid=args.agent_uid, wake_id=wake_id)
-    tick = kernel.run_control_tick(
-        lease_owner=args.agent_uid,
-        lease_seconds=args.lease_seconds,
-        max_wakes=args.max_wakes,
-        source_roots={"ds_goal": args.state_root},
-    )
-    tick_payload = tick.model_dump(mode="json")
+    live_provider_payload: dict[str, Any] = {}
+    if live_config is not None:
+        promotion = _ensure_live_provider_promotion(
+            args=args,
+            task=task,
+            wake_id=wake_id,
+            config=live_config,
+            worker_id=live_worker_id,
+        )
+        cycle = asyncio.run(
+            _run_live_provider_worker_cycle(
+                args=args,
+                config=live_config,
+                worker_id=live_worker_id,
+            )
+        )
+        tick_payload = _provider_cycle_tick_payload(cycle=cycle, store=kernel_store, wake_id=wake_id)
+        first_closeback = tick_payload["closebacks"][0]
+        _record_ds_goal_task_kernel_closeback(
+            mission_dir=mission_dir,
+            task_id=receipt_base["task_id"],
+            result_ref=first_closeback["result_ref"],
+            status=str(tick_payload["status"]),
+            closeback_via="operator_core.living_agent_kernel.provider_worker",
+        )
+        live_provider_payload = {
+            "live_provider": True,
+            "provider": live_config.provider.value,
+            "model": live_config.default_model or "",
+            "provider_worker_id": live_worker_id,
+            "promotion_ref": {
+                "kind": "kernel_promotion_receipt",
+                "path": str(Path(args.kernel_store).expanduser() / "promotion_receipts.jsonl"),
+                "record_hash": promotion.record_hash,
+            },
+            "provider_worker_status": cycle.status,
+        }
+    else:
+        tick = kernel.run_control_tick(
+            lease_owner=args.agent_uid,
+            lease_seconds=args.lease_seconds,
+            max_wakes=args.max_wakes,
+            source_roots={"ds_goal": args.state_root},
+        )
+        tick_payload = tick.model_dump(mode="json")
     receipt = _append_receipt(
         mission_dir,
         {
             **receipt_base,
-            "status": tick.status,
+            **live_provider_payload,
+            "status": str(tick_payload["status"]),
             "wake_id": wake_id,
             "tick": tick_payload,
         },
@@ -910,7 +1224,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     _print(
         {
-            "status": tick.status,
+            **live_provider_payload,
+            "status": str(tick_payload["status"]),
             "mission_id": args.mission_id,
             "task_id": receipt_base["task_id"],
             "wake_id": wake_id,
@@ -921,7 +1236,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         },
         as_json=args.json,
     )
-    return 0 if tick.status in {"idle", "completed", "review", "blocked"} else 1
+    return 0 if str(tick_payload["status"]) in {"idle", "completed", "review", "blocked"} else 1
 
 
 def main(argv: list[str] | None = None) -> int:

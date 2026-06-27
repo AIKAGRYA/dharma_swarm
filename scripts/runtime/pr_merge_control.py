@@ -36,6 +36,7 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STATE_ROOT = Path("~/.dharma/pr_review")
+AGNI_WS_CA_PATH = REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
 REQUIRED_COHERENCE_FIELDS = (
     "Organ touched",
     "Declared-vs-actual gap closed",
@@ -105,6 +106,7 @@ class NATSConfig:
     credential: str
     missing: tuple[str, ...]
     ca_pem: str = ""
+    ca_source: str = ""
     tls_hostname: str = ""
     credential_family: str = "devin"
 
@@ -1553,13 +1555,7 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         or env.get("NATS_PASSWORD")
         or ""
     )
-    ca_pem = (
-        env.get("MERGE_MASTER_MIKE_NATS_CA_PEM")
-        or env.get("DEVIN_NATS_CA_PEM")
-        or env.get("DHARMA_NATS_CA_PEM")
-        or env.get("NATS_CA_PEM")
-        or ""
-    )
+    ca_pem, ca_source = _nats_ca_pem_from_env_or_repo(env)
     tls_hostname = (
         env.get("MERGE_MASTER_MIKE_NATS_TLS_HOSTNAME")
         or env.get("DEVIN_NATS_TLS_HOSTNAME")
@@ -1578,9 +1574,39 @@ def _nats_config(env: dict[str, str], *, require_devin_secrets: bool) -> NATSCon
         credential=auth_value,
         missing=tuple(missing),
         ca_pem=_normalize_ca_pem(ca_pem),
+        ca_source=ca_source,
         tls_hostname=tls_hostname.strip(),
         credential_family=credential_family,
     )
+
+
+def _nats_ca_pem_from_env_or_repo(env: dict[str, str]) -> tuple[str, str]:
+    ca_pem = (
+        env.get("MERGE_MASTER_MIKE_NATS_CA_PEM")
+        or env.get("DEVIN_NATS_CA_PEM")
+        or env.get("DHARMA_NATS_CA_PEM")
+        or env.get("NATS_CA_PEM")
+        or ""
+    )
+    if ca_pem.strip():
+        return ca_pem, "env_pem"
+
+    ca_file = (
+        env.get("MERGE_MASTER_MIKE_NATS_CA_FILE")
+        or env.get("DEVIN_NATS_CA_FILE")
+        or env.get("DHARMA_NATS_CA_FILE")
+        or env.get("NATS_CA_FILE")
+        or ""
+    )
+    if ca_file.strip():
+        ca_path = expand(ca_file)
+        if ca_path.is_file():
+            return ca_path.read_text(encoding="utf-8"), "env_file"
+
+    if AGNI_WS_CA_PATH.is_file():
+        return AGNI_WS_CA_PATH.read_text(encoding="utf-8"), "repo_agni_ws_ca"
+
+    return "", "system_ca_store"
 
 
 def _normalize_ca_pem(value: str) -> str:
@@ -1596,6 +1622,7 @@ def _redacted_nats_config(config: NATSConfig) -> dict[str, Any]:
         "has_user": bool(config.user),
         "has_auth_credential": bool(config.credential),
         "has_ca_pem": bool(config.ca_pem),
+        "ca_source": config.ca_source or ("custom_ca_pem" if config.ca_pem else "system_ca_store"),
         "tls_hostname": config.tls_hostname,
         "tls_trust": "custom_ca_pem" if config.ca_pem else "system_ca_store",
         "credential_family": config.credential_family,

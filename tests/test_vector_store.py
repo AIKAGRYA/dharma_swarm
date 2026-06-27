@@ -11,11 +11,7 @@ Tests cover:
     - Stats reporting
 """
 
-import asyncio
-import struct
-import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -229,6 +225,64 @@ class TestVectorStoreSearch:
             assert doc["access_count"] >= 1
             assert doc["last_accessed"] is not None
 
+    def test_search_vector_skips_large_fallback_scan(self, monkeypatch, tmp_path):
+        """Without sqlite-vec, large fallback stores must not be full-scanned."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+        monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("fallback vector scan should not run")
+
+        monkeypatch.setattr(store, "_fallback_vector_search", _explode)
+
+        assert store.search_vector("heartbeat organism health", top_k=3) == []
+
+    def test_search_fts_skips_large_projection(self, monkeypatch, tmp_path):
+        """Large FTS projections must not block daemon-time retrieval."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FTS_MAX_ROWS", "1")
+
+        assert store.search_fts("organism heartbeat", top_k=3) == []
+
+    def test_search_hybrid_degrades_to_fts_when_fallback_scan_skipped(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        """Skipping fallback vectors should preserve useful FTS retrieval."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+        monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("fallback vector scan should not run")
+
+        monkeypatch.setattr(store, "_fallback_vector_search", _explode)
+
+        results = store.search_hybrid("organism heartbeat", top_k=3)
+
+        assert results
+        assert any("heartbeat" in r["content"].lower() for r in results)
+
+    def test_search_hybrid_returns_empty_when_large_projection_blocked(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        """Hybrid retrieval should degrade cleanly when both channels are unsafe."""
+        store = self._seed_store(tmp_path)
+        monkeypatch.setenv("DHARMA_VECTOR_FALLBACK_MAX_ROWS", "1")
+        monkeypatch.setenv("DHARMA_VECTOR_FTS_MAX_ROWS", "1")
+        monkeypatch.setattr(store, "_has_vec0", lambda conn: False)
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("fallback vector scan should not run")
+
+        monkeypatch.setattr(store, "_fallback_vector_search", _explode)
+
+        assert store.search_hybrid("organism heartbeat", top_k=3) == []
+
 
 # ---------------------------------------------------------------------------
 # Invalidation tests
@@ -280,7 +334,7 @@ class TestVectorStoreDecay:
         store = VectorStore(state_dir=tmp_path, dim=32)
         doc_id = store.upsert("Decaying knowledge item", source="test")
         # Force the ingestion_time to be 10 days ago
-        import sqlite3, sqlite_vec
+        import sqlite3
         conn = sqlite3.connect(str(tmp_path / "vectors.db"))
         old_time = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
         conn.execute("UPDATE vec_documents SET ingestion_time = ? WHERE id = ?", (old_time, doc_id))
@@ -365,7 +419,7 @@ class TestVectorStoreStats:
     def test_stats_reflects_invalidation(self, tmp_path):
         from dharma_swarm.vector_store import VectorStore
         store = VectorStore(state_dir=tmp_path, dim=32)
-        id1 = store.upsert("valid doc", source="a")
+        store.upsert("valid doc", source="a")
         id2 = store.upsert("invalid doc", source="b")
         store.invalidate(id2)
         s = store.stats()

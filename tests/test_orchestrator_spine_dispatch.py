@@ -39,16 +39,151 @@ def test_runner_served_route_metadata_preserves_actual_served_fields_only():
     runner = types.SimpleNamespace(
         actual_served_provider="openrouter",
         actual_served_model="qwen3-coder-live",
-        provider_model_truth_source="agent_runner.llm_response",
+        provider_model_truth_source="runtime_provider.actual_served",
     )
 
     route = Orchestrator._runner_served_route_metadata(runner)
 
     assert route["actual_served_provider"] == "openrouter"
     assert route["actual_served_model"] == "qwen3-coder-live"
-    assert route["provider_model_truth_source"] == "agent_runner.llm_response"
+    assert route["provider_model_truth_source"] == "runtime_provider.actual_served"
     assert "selected_provider" not in route
     assert "selected_model" not in route
+
+
+def test_runner_attempted_route_metadata_preserves_selected_fields_only():
+    runner = types.SimpleNamespace(
+        selected_provider="openrouter",
+        selected_model="gpt-5.5",
+        provider_model_truth_source="agent_runner.provider_chain_failure",
+    )
+
+    route = Orchestrator._runner_attempted_route_metadata(runner)
+
+    assert route["selected_provider"] == "openrouter"
+    assert route["selected_model"] == "gpt-5.5"
+    assert route["selected_model_hint"] == "gpt-5.5"
+    assert route["provider_model_truth_source"] == (
+        "agent_runner.provider_chain_failure"
+    )
+    assert route["provider_execution"] is True
+    assert route["provider_model_applicability"] == "failed_before_serve"
+    assert route["provider_model_missing_reason"] == (
+        "provider_chain_failed_before_actual_served_response"
+    )
+    assert "actual_served_provider" not in route
+    assert "actual_served_model" not in route
+
+
+def test_runner_failure_route_prefers_served_route_over_attempted_route():
+    runner = types.SimpleNamespace(
+        actual_served_provider="ollama",
+        actual_served_model="kimi-k2.5",
+        selected_provider="openrouter",
+        selected_model="gpt-5.5",
+        provider_model_truth_source="runtime_provider.actual_served",
+    )
+    task = types.SimpleNamespace(metadata={})
+    td = types.SimpleNamespace(metadata={})
+
+    route = Orchestrator._stamp_runner_failure_route(runner, task=task, td=td)
+
+    assert route["actual_served_provider"] == "ollama"
+    assert route["actual_served_model"] == "kimi-k2.5"
+    assert "selected_provider" not in route
+    assert td.metadata["actual_served_provider"] == "ollama"
+    assert task.metadata["actual_served_model"] == "kimi-k2.5"
+
+
+def test_runner_no_provider_execution_metadata_is_explicit():
+    runner = types.SimpleNamespace(
+        provider_execution=False,
+        provider_model_applicability="not_applicable",
+        provider_model_truth_source="agent_runner.no_provider_execution",
+        no_provider_model_reason="agent_runner_no_provider_attached",
+    )
+
+    route = Orchestrator._runner_no_provider_execution_metadata(runner)
+
+    assert route == {
+        "provider_execution": False,
+        "provider_model_applicability": "not_applicable",
+        "provider_model_truth_source": "agent_runner.no_provider_execution",
+        "no_provider_model_reason": "agent_runner_no_provider_attached",
+    }
+
+
+def test_runner_success_route_stamps_no_provider_execution_when_no_served_route():
+    runner = types.SimpleNamespace(
+        provider_execution=False,
+        provider_model_applicability="not_applicable",
+        provider_model_truth_source="agent_runner.no_provider_execution",
+        no_provider_model_reason="agent_runner_no_provider_attached",
+    )
+    task = types.SimpleNamespace(metadata={})
+    td = types.SimpleNamespace(metadata={})
+
+    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
+
+    assert route["provider_execution"] is False
+    assert route["provider_model_truth_source"] == "agent_runner.no_provider_execution"
+    assert td.metadata["provider_execution"] is False
+    assert task.metadata["no_provider_model_reason"] == (
+        "agent_runner_no_provider_attached"
+    )
+
+
+def test_runner_success_route_infers_no_provider_when_agent_runner_has_none():
+    runner = types.SimpleNamespace(_provider=None)
+    task = types.SimpleNamespace(metadata={})
+    td = types.SimpleNamespace(metadata={})
+
+    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
+
+    assert route == {
+        "provider_execution": False,
+        "provider_model_applicability": "not_applicable",
+        "provider_model_truth_source": "agent_runner.no_provider_execution",
+        "no_provider_model_reason": "agent_runner_no_provider_attached",
+    }
+    assert td.metadata["provider_execution"] is False
+    assert task.metadata["provider_model_truth_source"] == "agent_runner.no_provider_execution"
+
+
+def test_runner_success_route_marks_provider_execution_unproven_without_served_evidence():
+    runner = types.SimpleNamespace(_provider=object())
+    task = types.SimpleNamespace(metadata={})
+    td = types.SimpleNamespace(metadata={})
+
+    route = Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
+
+    assert route == {
+        "provider_execution": True,
+        "provider_model_applicability": "actual_served_unproven",
+        "provider_model_truth_source": "orchestrator.provider_execution_unproven",
+        "provider_model_missing_reason": (
+            "provider_execution_completed_without_actual_served_runtime_evidence"
+        ),
+    }
+    assert td.metadata["provider_execution"] is True
+    assert task.metadata["provider_model_applicability"] == "actual_served_unproven"
+
+
+def test_runner_pending_provider_execution_metadata_requires_attached_provider():
+    assert Orchestrator._runner_pending_provider_execution_metadata(
+        types.SimpleNamespace(_provider=None)
+    ) == {}
+
+    route = Orchestrator._runner_pending_provider_execution_metadata(
+        types.SimpleNamespace(_provider=object())
+    )
+
+    assert route == {
+        "provider_execution": "pending",
+        "provider_model_applicability": "pending_execution",
+        "provider_model_truth_source": "orchestrator.provider_execution_pending",
+        "provider_model_pending_reason": "agent_task_started_provider_route_pending",
+    }
 
 
 def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
@@ -93,6 +228,44 @@ def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
     assert isinstance(receipt, EvidenceReceipt)
     assert receipt.status == "failed"
     assert receipt.error_source == "internal_error"
+
+
+def test_spine_dispatch_failure_stamps_runner_served_route_before_reraising():
+    class BoomAfterModelRunner:
+        actual_served_provider = ""
+        actual_served_model = ""
+        provider_model_truth_source = ""
+
+        async def run_task(self, task):
+            self.actual_served_provider = "ollama"
+            self.actual_served_model = "kimi-k2.5"
+            self.provider_model_truth_source = "runtime_provider.actual_served"
+            raise RuntimeError("local tool loop exceeded")
+
+    me = _stub_self()
+    td = _stub_td(task_id="t-route-fail")
+    task = types.SimpleNamespace(metadata={})
+
+    try:
+        asyncio.run(
+            Orchestrator._run_task_via_spine(
+                me,
+                BoomAfterModelRunner(),
+                task,
+                td,
+                5.0,
+            )
+        )
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("exception must propagate to caller")
+
+    assert task.metadata["actual_served_provider"] == "ollama"
+    assert task.metadata["actual_served_model"] == "kimi-k2.5"
+    assert task.metadata["provider_model_truth_source"] == "runtime_provider.actual_served"
+    assert td.metadata["served_provider"] == "ollama"
+    assert td.metadata["served_model"] == "kimi-k2.5"
 
 
 def test_spine_dispatch_timeout_reraises_and_records_timeout_receipt():

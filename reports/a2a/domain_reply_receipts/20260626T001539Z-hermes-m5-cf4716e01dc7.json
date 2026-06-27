@@ -1,0 +1,68 @@
+{
+  "agent_uid": "hermes-m5",
+  "contact_evidence_tier": "DOMAIN_RECEIPTED",
+  "domain_receipt_claim": true,
+  "domain_receipt_payload": {
+    "author_kind": "hermes-m5_semantic_inbox_drain",
+    "causation_send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-hermes-m5-cf4716e01dc7.json",
+    "causation_send_receipt_sha256": "2d7d5aad44c3032ba484df818a15d1a6bc9d93389b3c73fa8faa95f8e5ef7509",
+    "domain_receipt": true,
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/cf4716e01dc7.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/cf4716e01dc7.md",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001409Z-ollama-mistral_latest-cf4716e01dc7-semantic-response.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-hermes-m5-cf4716e01dc7.json"
+    ],
+    "from_agent": "hermes-m5",
+    "operator_contact_note": "target-owned reply artifact was validated and published to the recorded reply_subject as a typed domain receipt; semantic_reply_claim follows the artifact's explicit peer/model-processing claim",
+    "packet_id": "cf4716e01dc7",
+    "peer_model_processed_claim": true,
+    "reply_subject": "dharma.agent.hermes-m5.inbox.reply.cf4716e01dc7",
+    "schema_version": "dharma.a2a.domain_receipt.v1",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/hermes-m5/cf4716e01dc7-domain-reply.json",
+    "source_artifact_schema": "dharma.a2a.domain_reply_artifact.v1",
+    "source_artifact_sha256": "8fcf89866362bf628926c9955f1ee45971eaee50a4458acade1272400699dd41",
+    "summary": "The A2A audit request for the standalone Holon Phase 1 is well-structured and provides a clear scope of inspection, questions to address, and expected deliverables. The holon package changes have been evaluated and deemed materially more standalone and independently installable. However, it's important to note that these changes do not justify a Hermes-grade verdict yet. To achieve that, there are still gaps to be addressed.",
+    "target_owned_artifact_claim": true,
+    "timestamp": "2026-06-26T00:15:39Z",
+    "to_agent": "operator",
+    "validated_semantic_receipt_refs": [
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001409Z-ollama-mistral_latest-cf4716e01dc7-semantic-response.json"
+    ],
+    "verdict": "approve"
+  },
+  "endpoint": "nats://127.0.0.1:4222",
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "typed domain receipt was published to the recorded reply_subject; run a2a_reply_capture.py to record DOMAIN_RECEIPTED from the stream",
+  "packet_id": "cf4716e01dc7",
+  "payload_schema": "dharma.a2a.domain_receipt.v1",
+  "payload_sha256": "f99c7559eb5f31febe28942c673de8e1cf67f04c21c47deb2ae37fbbf67ac5b7",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260626T001539Z-hermes-m5-cf4716e01dc7.json",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/hermes-m5/cf4716e01dc7-domain-reply.json",
+  "reply_artifact_sha256": "8fcf89866362bf628926c9955f1ee45971eaee50a4458acade1272400699dd41",
+  "reply_evidence_tier": "DOMAIN_RECEIPTED",
+  "reply_subject": "dharma.agent.hermes-m5.inbox.reply.cf4716e01dc7",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": true,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-hermes-m5-cf4716e01dc7.json",
+  "status": "DOMAIN_REPLY_PUBLISHED",
+  "stream": "DHARMA_FLEET",
+  "target_owned_artifact_claim": true,
+  "timestamp": "2026-06-26T00:15:39Z",
+  "transport_ack": {
+    "seq": 8522,
+    "stream": "DHARMA_FLEET",
+    "transport_ack": "JETSTREAM_PUB_ACK"
+  }
+}

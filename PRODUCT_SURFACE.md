@@ -15,3 +15,19 @@ Current landing mode:
 - `dashboard/src/app/dashboard/qwen35/page.tsx` remains the active surgical chat shell.
 - `api/routers/chat.py` is the backing chat surface for the chat shells.
 - `run_operator.sh` and `scripts/dashboard_ctl.sh` are the supported local control entrypoints for running the surface.
+
+Registered product surfaces:
+- **TELOS Morning Refinery** is registered as the user-facing semantic refinery
+  track for `telos-ai-morning-refinery-2026-06`. It is not yet a public product
+  claim and has no external receipt.
+- The eventual TELOS route must converge on the dashboard, preferably
+  `/dashboard/telos` or a cockpit panel. It must not introduce a parallel GUI,
+  hidden control plane, or external account action path.
+- Source docs: `docs/vision_maps/TELOS_AI_SEED_SPEC_V0.md`,
+  `docs/vision_maps/TELOS_MORNING_REFINERY_V0.md`,
+  `docs/research/telos_ai/persona_agents/CANONICAL_COUNCIL.md`, and
+  `docs/research/telos_ai/empire_agents/README.md`.
+- Product invariant: no empire, venture, market, SAB, lattice, or cross-user
+  surface may receive raw morning-page text. The Noetic / Essence pass hardens
+  source-faithful nodes first; the Empire / Idea-Portfolio pass sees only those
+  hardened nodes and user-approved corrections.

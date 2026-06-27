@@ -15,7 +15,7 @@
       "openrouter"
     ],
     "fallback_mode": "local_pulse",
-    "prompt": "You are DGC Pulse. Check the system state:\n1. Read ~/agni-workspace/WORKING.md \u2014 is AGNI stuck?\n2. Read ~/.dharma/shared/ \u2014 any developments worth noting?\n3. Check ~/trishula/inbox/ for unprocessed messages\n4. Check ~/.dharma/assurance/scans/ for any CRITICAL findings\n5. If anything needs action, take it. Otherwise, log a brief witness observation.\nBe real. No theater. Max 200 words.",
+    "prompt": "You are DGC Pulse. Check the system state:\n1. Read ~/agni-workspace/WORKING.md — is AGNI stuck?\n2. Read ~/.dharma/shared/ — any developments worth noting?\n3. Check ~/trishula/inbox/ for unprocessed messages\n4. Check ~/.dharma/assurance/scans/ for any CRITICAL findings\n5. If anything needs action, take it. Otherwise, log a brief witness observation.\nBe real. No theater. Max 200 words.",
     "enabled": true
   },
   {
@@ -332,9 +332,9 @@
     "trigger": "interval",
     "interval_seconds": 21600,
     "handler": "shell",
-    "shell_command": "python3 scripts/governance/name_drift_preflight.py --json-output ~/.dharma/logs/name_drift_preflight_latest.json --markdown-output ~/.dharma/logs/name_drift_preflight_latest.md",
+    "shell_command": ".venv/bin/python scripts/governance/name_drift_preflight.py --json-output ~/.dharma/logs/name_drift_preflight_latest.json --markdown-output ~/.dharma/logs/name_drift_preflight_latest.md --digest-output ~/.dharma/logs/name_drift_preflight_digest_latest.json",
     "enabled": true,
-    "prompt": "Scan scattered naming-drift and Corral-path findings, then route them to the root DE_BUG_CORRAL files without dirtying the repo."
+    "prompt": "Sweep naming-drift and Corral-path findings into DE_BUG_CORRAL receipts; write full JSON, Markdown, and compact digest without dirtying owner files."
   },
   {
     "id": "provider_credit_check",

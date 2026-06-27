@@ -3,8 +3,6 @@
 import time
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from dharma_swarm.models import (
     AgentRole,
     AgentState,
@@ -138,6 +136,29 @@ class TestUsageTracker:
         tracker.tokens_used_today = 123_456
         assert tracker.tokens_remaining_today == 500_000 - 123_456
 
+    def test_tokens_remaining_uses_configured_daily_budget(self):
+        tracker = UsageTracker(daily_token_budget=1_000_000)
+        tracker.tokens_used_today = 600_000
+        assert tracker.tokens_remaining_today == 400_000
+
+    def test_failed_task_refunds_dispatch_estimate(self):
+        tracker = UsageTracker()
+        tracker.record_dispatch(
+            "ag-001",
+            ProviderType.ANTHROPIC,
+            4096,
+            task_id="task-1",
+        )
+
+        tracker.record_completion(
+            "ag-001",
+            task_id="task-1",
+            refund_estimate=True,
+        )
+
+        assert tracker.tokens_used_today == 0
+        assert tracker.agent_load("ag-001") == 0
+
 
 # === YogaScheduler Tests ===
 
@@ -178,6 +199,16 @@ class TestYogaScheduler:
         checks = yoga.can_dispatch(task, agent)
         blocked = [c for c in checks if c.verdict != ConstraintVerdict.ALLOW]
         assert any(c.constraint_name == "token_budget" for c in blocked)
+
+    def test_configured_global_token_budget_is_enforced(self):
+        yoga = YogaScheduler(quiet_hours=[], global_token_budget=1_000_000)
+        yoga.usage.tokens_used_today = 600_000
+        task = _task(metadata={"yoga": {"tokens": 5000}})
+        agent = _agent()
+
+        checks = yoga.can_dispatch(task, agent)
+
+        assert all(c.constraint_name != "token_budget" for c in checks)
 
     def test_daily_task_limit(self):
         yoga = YogaScheduler(quiet_hours=[], max_daily_tasks=5)
@@ -332,10 +363,29 @@ class TestYogaSchedulerFiltering:
 class TestYogaSchedulerTracking:
     def test_record_dispatch_and_completion(self):
         yoga = YogaScheduler(quiet_hours=[])
-        yoga.record_dispatch("ag-001", ProviderType.ANTHROPIC, 5000)
+        yoga.record_dispatch(
+            "ag-001",
+            ProviderType.ANTHROPIC,
+            5000,
+            task_id="task-1",
+        )
         assert yoga.usage.tokens_used_today == 5000
         assert yoga.usage.agent_load("ag-001") == 1
-        yoga.record_completion("ag-001")
+        yoga.record_completion("ag-001", task_id="task-1")
+        assert yoga.usage.agent_load("ag-001") == 0
+
+    def test_record_failure_refunds_estimate(self):
+        yoga = YogaScheduler(quiet_hours=[])
+        yoga.record_dispatch(
+            "ag-001",
+            ProviderType.ANTHROPIC,
+            5000,
+            task_id="task-1",
+        )
+
+        yoga.record_failure("ag-001", "task-1")
+
+        assert yoga.usage.tokens_used_today == 0
         assert yoga.usage.agent_load("ag-001") == 0
 
     def test_record_dispatch_no_provider(self):

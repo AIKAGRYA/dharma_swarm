@@ -48,6 +48,38 @@ def _dedupe_keep_order(items: Iterable[ProviderType]) -> list[ProviderType]:
     return out
 
 
+def _provider_values(items: Iterable[ProviderType]) -> list[str]:
+    return [item.value for item in items]
+
+
+def _route_trace_stage(
+    stage: str,
+    *,
+    input_providers: Iterable[ProviderType] | None = None,
+    output_providers: Iterable[ProviderType] | None = None,
+    applied: bool | None = None,
+    reasons: Iterable[str] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a bounded, secret-free route trace entry."""
+    entry: dict[str, Any] = {"stage": stage}
+    if input_providers is not None:
+        entry["input_providers"] = _provider_values(input_providers)
+    if output_providers is not None:
+        entry["output_providers"] = _provider_values(output_providers)
+    if applied is not None:
+        entry["applied"] = bool(applied)
+    if reasons is not None:
+        entry["reasons"] = [str(reason)[:160] for reason in list(reasons)[:12]]
+    if metadata:
+        entry["metadata"] = {
+            str(key)[:64]: value
+            for key, value in metadata.items()
+            if isinstance(value, (str, int, float, bool)) or value is None
+        }
+    return entry
+
+
 @dataclass(frozen=True)
 class ProviderRouteRequest:
     action_name: str
@@ -118,6 +150,7 @@ class ProviderRouteDecision:
     confidence: float
     requires_human: bool
     reasons: list[str]
+    route_trace: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ProviderPolicyRouter:
@@ -177,30 +210,89 @@ class ProviderPolicyRouter:
 
         path = decision.path
         reasons = list(decision.reasons)
+        route_trace: list[dict[str, Any]] = [
+            _route_trace_stage(
+                "decision_path",
+                applied=True,
+                reasons=reasons,
+                metadata={
+                    "path": path.value,
+                    "confidence": round(float(decision.confidence), 4),
+                    "requires_human": bool(decision.requires_human),
+                },
+            )
+        ]
         if (
             request.requires_frontier_precision
             and self.config.force_escalate_when_frontier_required
             and path != RoutePath.ESCALATE
         ):
+            previous_path = path
             path = RoutePath.ESCALATE
             reasons.append("frontier_precision_requested")
+            route_trace.append(
+                _route_trace_stage(
+                    "frontier_precision",
+                    applied=True,
+                    metadata={
+                        "from_path": previous_path.value,
+                        "to_path": path.value,
+                        "reason": "frontier_precision_requested",
+                    },
+                )
+            )
 
         candidates = self._candidate_providers(
             path=path,
             prefer_low_cost=request.preferred_low_cost,
             context=request.context,
         )
+        route_trace.append(
+            _route_trace_stage(
+                "candidate_seed",
+                output_providers=candidates,
+                metadata={
+                    "path": path.value,
+                    "preferred_low_cost": bool(request.preferred_low_cost),
+                    "requires_tooling": bool(request.context.get("requires_tooling")),
+                    "prefer_japanese_quality": bool(
+                        request.context.get("prefer_japanese_quality")
+                    ),
+                    "complexity_tier": str(
+                        request.context.get("complexity_tier", "")
+                    )[:32],
+                },
+            )
+        )
         available = _dedupe_keep_order(available_providers or [])
         if available:
             filtered = [item for item in candidates if item in available]
+            fell_back_to_available = False
             if not filtered:
                 filtered = available
+                fell_back_to_available = True
         else:
             filtered = candidates
+            fell_back_to_available = False
+        route_trace.append(
+            _route_trace_stage(
+                "availability_filter",
+                input_providers=candidates,
+                output_providers=filtered,
+                applied=bool(available),
+                metadata={
+                    "available_count": len(available),
+                    "fallback_to_available": fell_back_to_available,
+                },
+            )
+        )
 
         # SmartRouter cost-aware re-ranking: promotes cheaper providers for
         # simple tasks without overriding escalation, frontier, or tooling requests.
         requires_tooling = bool(request.context.get("requires_tooling"))
+        smart_input = list(filtered)
+        smart_metadata: dict[str, Any] = {}
+        smart_applied = False
         if (
             self._smart_router is not None
             and path != RoutePath.ESCALATE
@@ -215,16 +307,60 @@ class ProviderPolicyRouter:
                     filtered, smart_decision.cost_tier,
                 )
                 reasons.append(f"smart_router_tier={smart_decision.cost_tier.value}")
+                smart_applied = filtered != smart_input
+                smart_metadata = {
+                    "cost_tier": smart_decision.cost_tier.value,
+                    "selected_count": len(smart_decision.selected_providers),
+                }
+        else:
+            smart_metadata = {
+                "skipped": True,
+                "path": path.value,
+                "requires_frontier_precision": bool(request.requires_frontier_precision),
+                "requires_tooling": requires_tooling,
+                "preferred_low_cost": bool(request.preferred_low_cost),
+            }
+        route_trace.append(
+            _route_trace_stage(
+                "smart_router",
+                input_providers=smart_input,
+                output_providers=filtered,
+                applied=smart_applied,
+                metadata=smart_metadata,
+            )
+        )
 
+        telemetry_input = list(filtered)
         filtered, telemetry_reasons = self._apply_telemetry_overlay(
             candidates=filtered,
             path=path,
             request=request,
         )
         reasons.extend(telemetry_reasons)
+        route_trace.append(
+            _route_trace_stage(
+                "telemetry_overlay",
+                input_providers=telemetry_input,
+                output_providers=filtered,
+                applied=filtered != telemetry_input,
+                reasons=telemetry_reasons,
+            )
+        )
 
         selected = filtered[0] if filtered else ProviderType.CLAUDE_CODE
         fallbacks = [item for item in filtered[1:] if item != selected]
+        route_trace.append(
+            _route_trace_stage(
+                "selection",
+                output_providers=[selected, *fallbacks],
+                reasons=reasons,
+                metadata={
+                    "selected_provider": selected.value,
+                    "selected_model_hint": self.config.default_model_hints.get(selected),
+                    "fallback_count": len(fallbacks),
+                },
+            )
+        )
         return ProviderRouteDecision(
             path=path,
             selected_provider=selected,
@@ -238,6 +374,7 @@ class ProviderPolicyRouter:
             confidence=decision.confidence,
             requires_human=decision.requires_human,
             reasons=reasons,
+            route_trace=route_trace,
         )
 
     def _resolve_telemetry_enabled(self) -> bool:

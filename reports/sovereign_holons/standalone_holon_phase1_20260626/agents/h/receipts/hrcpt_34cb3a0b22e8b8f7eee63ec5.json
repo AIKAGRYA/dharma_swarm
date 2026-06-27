@@ -1,0 +1,249 @@
+{
+  "artifact_refs": [],
+  "created_at": "2026-06-26T00:55:53.790674Z",
+  "digest": "sha256:0299f76b035a580d4fb498ac3d2cdf3681bcc38642d10be1c585c9d306efb4d6",
+  "kind": "holon_burn_in_run",
+  "payload": {
+    "completed_at": "2026-06-26T00:55:53.747473Z",
+    "config": {
+      "agents_root": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents",
+      "cap_usd": 0.0,
+      "duration_seconds": 0.0,
+      "interval_seconds": 0.0,
+      "lease_seconds": 300,
+      "min_cycles": 2,
+      "multi_hour_threshold_seconds": 7200.0,
+      "name": "h",
+      "prompt": "observe continuity",
+      "service_id": "holon-burn-in",
+      "stop_on_failure": true
+    },
+    "elapsed_seconds": 0.006,
+    "failed_sample_count": 0,
+    "multi_hour_proven": false,
+    "passed": true,
+    "sample_count": 2,
+    "sample_count_met": true,
+    "samples": [
+      {
+        "completed_at": "2026-06-26T00:55:53.744870Z",
+        "last_cycle_status": "ran",
+        "lock": {
+          "acquired": true,
+          "expires_at": "2026-06-26T01:00:53Z",
+          "holder": "holon-burn-in",
+          "lock_id": "sha256:bbcbaae4650942cdb2ddd8b0fcd562228a3e9d8ebec7a75805c163a4d8538f84",
+          "path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/supervisor.lock",
+          "reason": "",
+          "released": true
+        },
+        "receipt": {
+          "digest": "sha256:7b27fa134acc7118f05b28f8648234484224af774e66f41f1ed58906e8f68f1c",
+          "path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/receipts/hrcpt_c3d157b5cff07243c56a4f9a.json",
+          "receipt_id": "hrcpt_c3d157b5cff07243c56a4f9a"
+        },
+        "sample_index": 1,
+        "service_liveness": {
+          "age_seconds": 0.0,
+          "fresh": true,
+          "fresh_after_seconds": 300,
+          "heartbeat_path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/service_heartbeats.jsonl",
+          "heartbeat_seen": true,
+          "holon": "h",
+          "latest_observed_at": "2026-06-26T00:55:53Z",
+          "latest_record_hash": "sha256:a0656b2fc6c02089cdd410812f9de5c7819eb0013294bcd447f451bcbff3ee7d",
+          "latest_service_id": "holon-burn-in",
+          "ledger_errors": [],
+          "ledger_ok": true,
+          "schema_version": "holon.service_liveness.v1",
+          "service_alive": true,
+          "status": "idle"
+        },
+        "started_at": "2026-06-26T00:55:53.741866Z",
+        "supervisor_status": "completed"
+      },
+      {
+        "completed_at": "2026-06-26T00:55:53.747459Z",
+        "last_cycle_status": "ran",
+        "lock": {
+          "acquired": true,
+          "expires_at": "2026-06-26T01:00:53Z",
+          "holder": "holon-burn-in",
+          "lock_id": "sha256:bbcbaae4650942cdb2ddd8b0fcd562228a3e9d8ebec7a75805c163a4d8538f84",
+          "path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/supervisor.lock",
+          "reason": "",
+          "released": true
+        },
+        "receipt": {
+          "digest": "sha256:c2959af4c4a200b8ca34d8976807bdccd5281dadb79d077288e709ff6115c0da",
+          "path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/receipts/hrcpt_a544e8014df786a155709874.json",
+          "receipt_id": "hrcpt_a544e8014df786a155709874"
+        },
+        "sample_index": 2,
+        "service_liveness": {
+          "age_seconds": 0.0,
+          "fresh": true,
+          "fresh_after_seconds": 300,
+          "heartbeat_path": "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/service_heartbeats.jsonl",
+          "heartbeat_seen": true,
+          "holon": "h",
+          "latest_observed_at": "2026-06-26T00:55:53Z",
+          "latest_record_hash": "sha256:c971db7946c6f6ea16c1588ffb7caf00d430ebf84f400b9166cf0538b0197215",
+          "latest_service_id": "holon-burn-in",
+          "ledger_errors": [],
+          "ledger_ok": true,
+          "schema_version": "holon.service_liveness.v1",
+          "service_alive": true,
+          "status": "idle"
+        },
+        "started_at": "2026-06-26T00:55:53.744886Z",
+        "supervisor_status": "completed"
+      }
+    ],
+    "schema_version": "holon.burn_in.v1",
+    "source_proof": {
+      "file_count": 24,
+      "files": [
+        {
+          "bytes": 677,
+          "path": "__init__.py",
+          "sha256": "sha256:14ac65e64dc34b116b12f860170881bafa9bca1495a515b3611c741ddaa9f01a"
+        },
+        {
+          "bytes": 53,
+          "path": "__main__.py",
+          "sha256": "sha256:eac50025dac344ec131da4aa72229a43f4ce4adaa45abdb864585432c62ebae8"
+        },
+        {
+          "bytes": 4053,
+          "path": "_build_backend.py",
+          "sha256": "sha256:2367d693e41a1ada2d8ad550796d97b55af682d2bb61df086fcc321e1b2a8986"
+        },
+        {
+          "bytes": 2310,
+          "path": "a2a.py",
+          "sha256": "sha256:19a428d300569b22cc1e426eff915af5615ba61b8e9c985fa7d621126c6963b8"
+        },
+        {
+          "bytes": 4858,
+          "path": "burn_in.py",
+          "sha256": "sha256:8618bf579aef487179e8772d68cfe53b60dc329073c540f4798de43176392349"
+        },
+        {
+          "bytes": 5193,
+          "path": "cli.py",
+          "sha256": "sha256:ece0b7fba76420078452524018ab054c073b75c6be041b88abdafb6463b599db"
+        },
+        {
+          "bytes": 3742,
+          "path": "contracts.py",
+          "sha256": "sha256:244d838023c0a6426b3548b67acde5dc8b030dd9760fae969b922025baebb4b1"
+        },
+        {
+          "bytes": 4141,
+          "path": "holon_bridge.py",
+          "sha256": "sha256:b33e230746d917050c03a819e081a0408c8b3ffdb34d63a46b682a6c02884f48"
+        },
+        {
+          "bytes": 14441,
+          "path": "holon_runtime.py",
+          "sha256": "sha256:bfe13b56848d2ccf9de51a92b377240c674f9c3274200f79332f06ad51ca836b"
+        },
+        {
+          "bytes": 5122,
+          "path": "memory_kernel/__init__.py",
+          "sha256": "sha256:8d2011d550ab3dd9a408a667947395e26d0e421473cf1247036a0970b828064c"
+        },
+        {
+          "bytes": 932,
+          "path": "organs/__init__.py",
+          "sha256": "sha256:8ef5a666fb6979fd34c17d956c71415a2cc29be45b0e7dd0c4d317b1b3cb472a"
+        },
+        {
+          "bytes": 556,
+          "path": "organs/budget_guard.py",
+          "sha256": "sha256:041644215f1eb2972e4614776e4127b500d5ffbca91bc98f7aca083f6cf21cef"
+        },
+        {
+          "bytes": 1240,
+          "path": "organs/compass.py",
+          "sha256": "sha256:d0621280447ad3a0a0d90078091ccc84863dd306c68c7f3a4c40361f0dad41a3"
+        },
+        {
+          "bytes": 705,
+          "path": "organs/health.py",
+          "sha256": "sha256:480ed5b2052489b577b521652a0030d86f9b11b820ab38b3bd8e2308a6ad1085"
+        },
+        {
+          "bytes": 1193,
+          "path": "organs/killswitch.py",
+          "sha256": "sha256:ab14c460700aaec587b2ec07e927ac3244ad913299f672b26f7624b9778d4db4"
+        },
+        {
+          "bytes": 1713,
+          "path": "organs/persistence.py",
+          "sha256": "sha256:d6781223000e3c77b7d385cd71c146a6c515bc19e31f304388eaace57d3353e0"
+        },
+        {
+          "bytes": 8617,
+          "path": "organs/service.py",
+          "sha256": "sha256:fd0201ff419e8a400a0d75ef695b05181b542dfe0e5deebcb1837bd4285ebc3d"
+        },
+        {
+          "bytes": 12139,
+          "path": "providers.py",
+          "sha256": "sha256:e964acd2238579606c9ee94ceef55db83bfc04a11eb5e97dc752f4a1702ccb2e"
+        },
+        {
+          "bytes": 3220,
+          "path": "receipts.py",
+          "sha256": "sha256:22207480f5295160eef5d482df8aca8f3818c40de7a6e8fe636743f5a147abb0"
+        },
+        {
+          "bytes": 2647,
+          "path": "source_proof.py",
+          "sha256": "sha256:18c30f4574b3707d602eebb711068d98168cf54e2d2073710e4716a34a220d26"
+        },
+        {
+          "bytes": 6718,
+          "path": "supervisor.py",
+          "sha256": "sha256:10e4391c3ec7679f3650fb3facb23acb89729be94dbb6969991d415c284b4339"
+        },
+        {
+          "bytes": 17192,
+          "path": "tests/test_standalone_runtime.py",
+          "sha256": "sha256:65e29b6fa9d9bdb3743ed61fd92cd1f4a5ee77efacff3c43543e882db82046c0"
+        },
+        {
+          "bytes": 3493,
+          "path": "tools.py",
+          "sha256": "sha256:31f7dd55d564c2621afc68f70af2327fe343673d5352edda9eddb8c69af6f1f0"
+        },
+        {
+          "bytes": 5233,
+          "path": "verifier.py",
+          "sha256": "sha256:80f6d5966a435a3c1d658e50693a464958c410b85d84be0d904367b58fe580ca"
+        }
+      ],
+      "git_available": true,
+      "git_dirty": true,
+      "git_head": "01d22b94fc05bf4bb248c2f51b09102377129d25",
+      "git_root": "/Users/dhyana/dharma_swarm",
+      "git_status_short_digest": "sha256:49c4410178a0bcc22caac00e9f7e974493b9a368ae11048631cebd27850b6fca",
+      "package_root": "/Users/dhyana/dharma_swarm/holon",
+      "schema_version": "holon.source_proof.v1",
+      "source_tree_digest": "sha256:a5d1cf467830ae6efe4ab989bd41a17e09bb35e90f497790d1d0e8af9956bffe"
+    },
+    "started_at": "2026-06-26T00:55:53.741750Z",
+    "status": "pass"
+  },
+  "receipt_id": "hrcpt_34cb3a0b22e8b8f7eee63ec5",
+  "schema_version": "holon.runtime_receipt.v1",
+  "side_effect_key": "burn-in:h:2026-06-26T00:55:53.741750Z:0.0:2:observe continuity",
+  "status": "pass",
+  "subject": "h",
+  "verifier_refs": [
+    "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/receipts/hrcpt_c3d157b5cff07243c56a4f9a.json",
+    "reports/sovereign_holons/standalone_holon_phase1_20260626/agents/h/receipts/hrcpt_a544e8014df786a155709874.json"
+  ]
+}

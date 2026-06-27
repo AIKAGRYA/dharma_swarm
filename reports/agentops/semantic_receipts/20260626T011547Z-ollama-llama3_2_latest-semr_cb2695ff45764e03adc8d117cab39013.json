@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "holon-source-audit-codex-20260626",
+  "created_at": "2026-06-26T01:15:47Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_ultra/codex_composer-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "receipt_id must be a non-empty string; capability_match must be a number between 0 and 1; summary must be a non-empty string; explicit_disagreement is required when verdict is not pass/approve",
+  "failure_reason": "receipt_id must be a non-empty string; capability_match must be a number between 0 and 1; summary must be a non-empty string; explicit_disagreement is required when verdict is not pass/approve",
+  "failure_type": "schema_validation_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 17674,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "d3b88725d43f26cdf51f29d5117d63c68721384550678d5206017d0afc195a22",
+  "raw_response_sha256": "b8a5de3f49a4801d164b8459e2a40bdf97fb886dbe6cf5492cc64fcabec5d476",
+  "receipt_id": "semr_cb2695ff45764e03adc8d117cab39013",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "receipt_id must be a non-empty string; capability_match must be a number between 0 and 1; summary must be a non-empty string; explicit_disagreement is required when verdict is not pass/approve"
+    }
+  ],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.holon-source-audit-codex-20260626",
+  "review_target": "a2a:holon-source-audit-codex-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: schema_validation_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

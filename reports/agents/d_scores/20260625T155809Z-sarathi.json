@@ -1,0 +1,242 @@
+{
+  "agent_uid": "sarathi",
+  "axis_scores": {
+    "a2a_transport": 0,
+    "authority_and_policy": 5,
+    "canonical_home": 3,
+    "delegation_hierarchy": 1,
+    "evolution_loop": 1,
+    "identity_and_admission": 5,
+    "operator_surface": 1,
+    "receipts_and_lineage": 0,
+    "runtime_persistence": 0,
+    "verification": 4
+  },
+  "claimed_level": "D2",
+  "evidence_paths": [
+    "/Users/dhyana/dharma_swarm/docs/ontology/semantic_objects.yaml",
+    "/Users/dhyana/dharma_swarm/docs/ontology/semantic_aliases.yaml",
+    "/Users/dhyana/.dharma/agents/sarathi/identity.json",
+    "/Users/dhyana/.dharma/agents/sarathi",
+    "/Users/dhyana/dharma_swarm/dharma_swarm/persistent_agent.py",
+    "/Users/dhyana/dharma_swarm/dharma_swarm/operator_core/semantic_receipt.py",
+    "/Users/dhyana/dharma_swarm/scripts/runtime/model_critic_runner.py",
+    "/Users/dhyana/dharma_swarm/tests/test_semantic_receipt.py",
+    "/Users/dhyana/dharma_swarm/tests/test_model_critic_runner.py"
+  ],
+  "generated_at": "2026-06-25T15:58:09Z",
+  "hard_gate_failures": [
+    "d3_living_dock_incomplete",
+    "d3_service_heartbeat_not_fresh",
+    "d3_transport_heartbeat_not_fresh",
+    "d4_domain_receipt_missing",
+    "d4_semantic_receipt_missing",
+    "d4_dialogue_receipt_missing"
+  ],
+  "living_dock_status": {
+    "evidence_paths": [
+      "/Users/dhyana/.dharma/agents/sarathi/identity.json",
+      "/Users/dhyana/.dharma/agents/sarathi"
+    ],
+    "home": "/Users/dhyana/.dharma/agents/sarathi",
+    "missing": [
+      "living_agent",
+      "service_heartbeats",
+      "transport_heartbeats",
+      "dialogue_operator_sessions",
+      "dialogue_relationship_memory",
+      "dialogue_conversation_receipts",
+      "sanctum_codex",
+      "sanctum_vault",
+      "sanctum_dojo",
+      "sanctum_ingest_gate",
+      "sanctum_tools",
+      "sanctum_receipts",
+      "authority_passport",
+      "a2a_card"
+    ],
+    "present": {
+      "a2a_card": false,
+      "authority_passport": false,
+      "dialogue_conversation_receipts": false,
+      "dialogue_operator_sessions": false,
+      "dialogue_relationship_memory": false,
+      "identity": true,
+      "living_agent": false,
+      "sanctum_codex": false,
+      "sanctum_dojo": false,
+      "sanctum_ingest_gate": false,
+      "sanctum_receipts": false,
+      "sanctum_tools": false,
+      "sanctum_vault": false,
+      "service_heartbeats": false,
+      "transport_heartbeats": false
+    },
+    "status": "partial",
+    "strict_failures": [
+      {
+        "code": "path_missing",
+        "message": "living_agent.json missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/living_agent.json",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "dialogue/operator_sessions.jsonl missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/dialogue/operator_sessions.jsonl",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "dialogue/relationship_memory.jsonl missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/dialogue/relationship_memory.jsonl",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "dialogue/conversation_receipts missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/dialogue/conversation_receipts",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/codex missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/codex",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/vault missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/vault",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/dojo missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/dojo",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/ingest_gate missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/ingest_gate",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/tools missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/tools",
+        "severity": "fail"
+      },
+      {
+        "code": "path_missing",
+        "message": "sanctum/receipts missing",
+        "path": "/Users/dhyana/.dharma/agents/sarathi/sanctum/receipts",
+        "severity": "fail"
+      }
+    ],
+    "strict_status": "fail"
+  },
+  "notes": [
+    "Sarathi is treated as read-only APEX seed until runtime breath receipts exist."
+  ],
+  "policy_gate_status": {
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/dharma_swarm/persistent_agent.py"
+    ],
+    "status": "fail_closed",
+    "summary": "PersistentAgent gate exceptions block standing-agent wakes"
+  },
+  "protected_actions_gated": [
+    "secrets",
+    "money",
+    "external_messages",
+    "pr_approval",
+    "policy_governance_writes"
+  ],
+  "receipt_bundle_status": {
+    "dialogue_receipt": false,
+    "domain_receipt": false,
+    "evidence_paths": [],
+    "semantic_receipt": false,
+    "status": "missing"
+  },
+  "schema_version": "dharma.d_score_report.v1",
+  "semantic_object": {
+    "canonical_id": "semobj.sarathi",
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/docs/ontology/semantic_objects.yaml",
+      "/Users/dhyana/dharma_swarm/docs/ontology/semantic_aliases.yaml"
+    ],
+    "status": "present"
+  },
+  "service_heartbeat_status": {
+    "evidence_paths": [],
+    "line_count": 0,
+    "liveness": {
+      "age_seconds": null,
+      "fresh": false,
+      "fresh_after_seconds": 900,
+      "heartbeat_path": "/Users/dhyana/.dharma/agents/sarathi/service_heartbeats.jsonl",
+      "heartbeat_seen": false,
+      "holon": "sarathi",
+      "latest_observed_at": "",
+      "latest_record_hash": "",
+      "latest_service_id": "",
+      "latest_session_id": "",
+      "ledger_errors": [
+        "service_heartbeats.jsonl missing"
+      ],
+      "ledger_ok": false,
+      "observed_at": "2026-06-25T15:58:09Z",
+      "required_service_id": "",
+      "schema_version": "dharma.holon_service_liveness.v1",
+      "service_alive": false,
+      "service_paused": false,
+      "status": "unknown"
+    },
+    "max_age_minutes": 15,
+    "status": "missing",
+    "summary": "service heartbeat: 0 line(s), missing"
+  },
+  "total_score": 20,
+  "transport_heartbeat_status": {
+    "evidence_paths": [],
+    "line_count": 0,
+    "liveness": {
+      "age_seconds": null,
+      "fresh": false,
+      "fresh_after_seconds": 300,
+      "heartbeat_path": "/Users/dhyana/.dharma/agents/sarathi/transport_heartbeats.jsonl",
+      "heartbeat_seen": false,
+      "holon": "sarathi",
+      "latest_observed_at": "",
+      "latest_record_hash": "",
+      "latest_transport_id": "",
+      "ledger_errors": [
+        "transport_heartbeats.jsonl missing"
+      ],
+      "ledger_ok": false,
+      "observed_at": "2026-06-25T15:58:09Z",
+      "required_transport_id": "a2a_inbox_bridge",
+      "schema_version": "dharma.holon_transport_liveness.v1",
+      "status": "unknown",
+      "transport": "a2a_inbox_bridge",
+      "transport_reachable": false
+    },
+    "max_age_minutes": 5,
+    "status": "missing",
+    "summary": "transport heartbeat: 0 line(s), missing"
+  },
+  "verified_level": "D2",
+  "verifier_status": {
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/dharma_swarm/operator_core/semantic_receipt.py",
+      "/Users/dhyana/dharma_swarm/scripts/runtime/model_critic_runner.py",
+      "/Users/dhyana/dharma_swarm/tests/test_semantic_receipt.py",
+      "/Users/dhyana/dharma_swarm/tests/test_model_critic_runner.py"
+    ],
+    "status": "present",
+    "summary": "4/4 verifier files present"
+  }
+}

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -39,7 +40,11 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    path.chmod(0o600)
 
 
 def _safe_token(value: object, *, fallback: str = "unknown") -> str:
@@ -94,6 +99,8 @@ def build_domain_reply_artifact(
         "evidence_refs": list(evidence_refs or []),
         "peer_model_processed_claim": bool(peer_model_processed_claim),
         "semantic_reply_claim": semantic,
+        "source_audit_claim": False,
+        "authenticated_target_runtime_claim": False,
         "source_delivery_schema": str(delivery_record.get("schema_version") or ""),
         "source_delivery_envelope_sha256": str(delivery_record.get("envelope_sha256") or ""),
         "source_subject": str(delivery_record.get("source_subject") or ""),
@@ -114,7 +121,7 @@ def artifact_path_for(
     agent_uid: str,
     packet_id: str,
 ) -> Path:
-    return default_outbox_dir(agent_uid, outbox_root=outbox_root) / f"{packet_id}-domain-reply.json"
+    return default_outbox_dir(agent_uid, outbox_root=outbox_root) / f"{_safe_token(packet_id)}-domain-reply.json"
 
 
 def write_artifact_author_receipt(

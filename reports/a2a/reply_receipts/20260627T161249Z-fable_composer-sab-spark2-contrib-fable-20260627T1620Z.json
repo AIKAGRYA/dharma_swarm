@@ -1,0 +1,18 @@
+{
+  "contact_evidence_tier": "HANDLER_ACKED",
+  "domain_receipt_claim": false,
+  "endpoint": "nats://127.0.0.1:4222",
+  "operator_contact_note": "no reply payload was available on the recorded reply_subject",
+  "packet_id": "sab-spark2-contrib-fable-20260627T1620Z",
+  "reply_evidence_tier": "NO_REPLY",
+  "reply_subject": "dharma.agent.fable_composer.inbox.reply.sab-spark2-contrib-fable-20260627T1620Z",
+  "schema_version": "dharma.a2a.reply_capture_receipt.v1",
+  "semantic_reply_claim": false,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260627T161201Z-fable_composer-sab-spark2-contrib-fable-20260627T1620Z.json",
+  "send_status": "FABLE_COMPOSER_CONSUMED",
+  "status": "NO_REPLY",
+  "stream": "DHARMA_FLEET",
+  "target_uid": "fable_composer",
+  "timestamp": "2026-06-27T16:12:49Z",
+  "to": "fable_composer"
+}

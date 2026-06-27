@@ -1,0 +1,71 @@
+{
+  "agent_uid": "opus_composer",
+  "contact_evidence_tier": "DOMAIN_RECEIPTED",
+  "domain_receipt_claim": true,
+  "domain_receipt_payload": {
+    "authenticated_target_runtime_claim": false,
+    "author_kind": "opus_composer_semantic_inbox_drain",
+    "causation_send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T014034Z-opus_composer-holon-source-audit-opus-20260626.json",
+    "causation_send_receipt_sha256": "326a53ebe4e0a0e452c82db01db565126b1fd13c3c06290326875309aab105f2",
+    "domain_receipt": true,
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/a2a_bus/inboxes/opus_composer/holon-source-audit-opus-20260626.json",
+      "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/opus_composer-source-audit-prompt.md",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T014222Z-ollama-mistral_latest-holon-source-audit-opus-20260626.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T014034Z-opus_composer-holon-source-audit-opus-20260626.json"
+    ],
+    "from_agent": "opus_composer",
+    "operator_contact_note": "target-owned reply artifact was validated and published to the recorded reply_subject as a typed domain receipt; semantic_reply_claim follows the artifact's explicit peer/model-processing claim; target_owned_artifact_claim is a path and metadata ownership claim, not an authenticated target-runtime signature",
+    "packet_id": "holon-source-audit-opus-20260626",
+    "peer_model_processed_claim": true,
+    "reply_subject": "dharma.agent.opus_composer.inbox.reply.holon-source-audit-opus-20260626",
+    "schema_version": "dharma.a2a.domain_receipt.v1",
+    "semantic_audit_depth": "source_audit",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/opus_composer/holon-source-audit-opus-20260626-domain-reply.json",
+    "source_artifact_schema": "dharma.a2a.domain_reply_artifact.v1",
+    "source_artifact_sha256": "55d4e85f4eaa9ea214cd0814a3b180e5c342ef15110cab3c080c369885c90f54",
+    "source_audit_claim": true,
+    "summary": "Standalone package isolation and local gates are improved, but final Hermes-grade proof is blocked by dirty git, no completed multi-hour burn-in yet, no live key-backed provider burn-in, and one A2A source audit target failing.",
+    "target_owned_artifact_claim": true,
+    "timestamp": "2026-06-26T01:42:38Z",
+    "to_agent": "operator",
+    "validated_semantic_receipt_refs": [
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T014222Z-ollama-mistral_latest-holon-source-audit-opus-20260626.json"
+    ],
+    "verdict": "revise"
+  },
+  "endpoint": "nats://127.0.0.1:4222",
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "typed domain receipt was published to the recorded reply_subject; run a2a_reply_capture.py to record DOMAIN_RECEIPTED from the stream",
+  "packet_id": "holon-source-audit-opus-20260626",
+  "payload_schema": "dharma.a2a.domain_receipt.v1",
+  "payload_sha256": "d0d3615cebf85ea244e20cbdf370ac5b081fc5882c4e2e366a714279329f7bdb",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260626T014238Z-opus_composer-holon-source-audit-opus-20260626.json",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/opus_composer/holon-source-audit-opus-20260626-domain-reply.json",
+  "reply_artifact_sha256": "55d4e85f4eaa9ea214cd0814a3b180e5c342ef15110cab3c080c369885c90f54",
+  "reply_evidence_tier": "DOMAIN_RECEIPTED",
+  "reply_subject": "dharma.agent.opus_composer.inbox.reply.holon-source-audit-opus-20260626",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": true,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T014034Z-opus_composer-holon-source-audit-opus-20260626.json",
+  "status": "DOMAIN_REPLY_PUBLISHED",
+  "stream": "DHARMA_FLEET",
+  "target_owned_artifact_claim": true,
+  "timestamp": "2026-06-26T01:42:38Z",
+  "transport_ack": {
+    "seq": 8543,
+    "stream": "DHARMA_FLEET",
+    "transport_ack": "JETSTREAM_PUB_ACK"
+  }
+}

@@ -152,6 +152,29 @@ function sessionFeedAdvertised(data: RuntimeControlPlaneData): boolean {
   return Boolean(sessionFeedPathTemplate(data.chatStatus));
 }
 
+function runtimeTruthFailed(data: RuntimeControlPlaneData): boolean {
+  return data.health?.runtime_truth?.passed === false;
+}
+
+function runtimeTruthFailureDetail(data: RuntimeControlPlaneData): string {
+  const truth = data.health?.runtime_truth;
+  if (!truth) return "Runtime truth closeout has not reported.";
+  const failedChecks = (truth.checks ?? [])
+    .filter((check) => check.passed === false || check.status === "fail")
+    .map((check) => {
+      const id = check.id?.trim() || "unknown_check";
+      const evidence = check.evidence?.trim();
+      return evidence ? `${id}: ${evidence}` : id;
+    });
+  if (failedChecks.length > 0) {
+    return `Runtime truth closeout is red: ${failedChecks.slice(0, 3).join(" | ")}`;
+  }
+  if (truth.error) {
+    return `Runtime truth closeout failed to run: ${truth.error}`;
+  }
+  return `Runtime truth closeout is ${truth.status ?? "unproven"}.`;
+}
+
 function blockedLaneDetail(data: RuntimeControlPlaneData): string {
   const defaultProfile = resolveDefaultProfile(data.chatStatus);
   const note = defaultProfile?.status_note?.trim();
@@ -216,6 +239,7 @@ function runtimeStatusKind(data: RuntimeControlPlaneData): RuntimeControlPlaneSt
   if (hasRuntimeTransportFailure(data)) return "error";
   if (!data.chatStatus?.ready) return "error";
   if (hasAdvertisedLaneFailure(data)) return "error";
+  if (runtimeTruthFailed(data)) return "error";
   if (!data.health) return "warn";
   if (data.health?.overall_status === "degraded") return "warn";
   if (hasUnavailableDefaultProfile(data)) return "warn";
@@ -228,6 +252,7 @@ function runtimeStatusLabel(data: RuntimeControlPlaneData): string {
   if (hasRuntimeTransportFailure(data)) return "runtime unreachable";
   if (!data.chatStatus?.ready) return "chat unavailable";
   if (hasAdvertisedLaneFailure(data)) return "lanes unavailable";
+  if (runtimeTruthFailed(data)) return "runtime truth red";
   if (!data.health) return "health unavailable";
   if (data.health?.overall_status === "degraded") return "degraded";
   if (hasUnavailableDefaultProfile(data)) return "default lane unavailable";
@@ -250,6 +275,9 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
   }
   if (hasAdvertisedLaneFailure(data)) {
     return blockedLaneDetail(data);
+  }
+  if (runtimeTruthFailed(data)) {
+    return appendSessionFeedDetail(runtimeTruthFailureDetail(data), data);
   }
   if (!data.health) {
     if (data.healthError) {

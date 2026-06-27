@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from hashlib import sha256
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,22 @@ AGENTS_ROOT = Path.home() / ".dharma" / "agents"
 
 def _events_path(name: str, agents_root: Path | None = None) -> Path:
     return (agents_root or AGENTS_ROOT) / name / "holon_events.jsonl"
+
+
+def _talk_receipts_path(name: str, agents_root: Path | None = None) -> Path:
+    return (agents_root or AGENTS_ROOT) / name / "talk_receipts.jsonl"
+
+
+def _conversation_receipt_dir(name: str, agents_root: Path | None = None) -> Path:
+    return (agents_root or AGENTS_ROOT) / name / "dialogue" / "conversation_receipts"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _hash_text(value: str) -> str:
+    return sha256(value.encode("utf-8")).hexdigest()
 
 
 def save_cycle_record(
@@ -95,3 +112,91 @@ def resume_point(name: str, agents_root: Path | None = None) -> dict[str, Any] |
     if not events:
         return None
     return events[-1]
+
+
+def append_talk_receipt(
+    name: str,
+    receipt: dict[str, Any],
+    agents_root: Path | None = None,
+) -> dict[str, Any]:
+    """Append one direct-dialogue receipt under the holon's LivingDock.
+
+    The legacy ``talk_receipts.jsonl`` path stays the compact operator ledger.
+    A fuller JSON receipt is also written under ``dialogue/conversation_receipts``
+    so D-score and dashboard surfaces can inspect the dialogue proof without
+    introducing another store.
+    """
+    if not isinstance(receipt, dict):
+        raise TypeError(f"receipt must be a dict, got {type(receipt).__name__}")
+
+    at = str(receipt.get("at") or _utc_now())
+    reply = str(receipt.get("reply") or "")
+    message = str(receipt.get("you") or receipt.get("message") or "")
+    normalized = {
+        "schema_version": "dharma.holon_conversation_receipt.v1",
+        "holon": name,
+        "at": at,
+        "routing_mode": str(receipt.get("routing_mode") or "holon_route"),
+        "model": str(receipt.get("model") or ""),
+        "session_id": str(receipt.get("session_id") or f"holon-{name}"),
+        "you": message,
+        "reply": reply,
+        "reply_chars": len(reply),
+        "message_sha256": _hash_text(message),
+        "reply_sha256": _hash_text(reply),
+        "context_refs": list(receipt.get("context_refs") or []),
+        "policy_ceiling": str(receipt.get("policy_ceiling") or "read_only_dialogue_no_privileged_action"),
+        "protected_action_claim": bool(receipt.get("protected_action_claim", False)),
+        "follow_up_mission_refs": list(receipt.get("follow_up_mission_refs") or []),
+    }
+    for key, value in receipt.items():
+        normalized.setdefault(key, value)
+
+    receipt_dir = _conversation_receipt_dir(name, agents_root)
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    token = f"{at}-{name}".replace(":", "").replace("/", "-")
+    receipt_path = receipt_dir / f"{token}.json"
+    normalized["receipt_path"] = str(receipt_path)
+
+    path = _talk_receipts_path(name, agents_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(normalized, ensure_ascii=False) + "\n")
+
+    receipt_path.write_text(
+        json.dumps(normalized, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return normalized
+
+
+def load_talk_receipts(
+    name: str,
+    agents_root: Path | None = None,
+    *,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Load direct-dialogue receipts from ``talk_receipts.jsonl``."""
+    path = _talk_receipts_path(name, agents_root)
+    if not path.exists():
+        return []
+    receipts: list[dict[str, Any]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "[holon %s] skipping malformed talk receipt at line %d: %s",
+                name,
+                lineno,
+                exc,
+            )
+            continue
+        if isinstance(item, dict):
+            receipts.append(item)
+    if limit > 0:
+        return receipts[-limit:]
+    return receipts

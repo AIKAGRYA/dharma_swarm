@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "fable_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "sab-spark2-contrib-fable-20260627T1620Z",
+  "created_at": "2026-06-27T16:13:54Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/sab-spark2-contrib-fable-20260627T1620Z.md"
+  ],
+  "explicit_disagreement": "explicit_disagreement is required when verdict is not pass/approve",
+  "failure_reason": "explicit_disagreement is required when verdict is not pass/approve",
+  "failure_type": "schema_validation_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 3159,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "9815f541b89fd81edf56ec28b94a4b259222a048e80df24f8052f4f717a8a5ad",
+  "raw_response_sha256": "7e0411a982499dc61e83ac36e8b98a83b9d2a4740fefbbdbbbb0f7821a413ca9",
+  "receipt_id": "semr_bc046339b7e84a93b4d09162aa92a21b",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "explicit_disagreement is required when verdict is not pass/approve"
+    }
+  ],
+  "reply_to": "dharma.agent.fable_composer.inbox.reply.sab-spark2-contrib-fable-20260627T1620Z",
+  "review_target": "a2a:sab-spark2-contrib-fable-20260627T1620Z",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: schema_validation_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

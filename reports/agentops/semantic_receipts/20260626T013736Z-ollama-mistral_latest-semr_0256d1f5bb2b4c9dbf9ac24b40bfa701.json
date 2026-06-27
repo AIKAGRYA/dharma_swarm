@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "hermes-m5",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "holon-source-audit-hermes-20260626",
+  "created_at": "2026-06-26T01:37:36Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/hermes-m5-source-audit-prompt-pass.md"
+  ],
+  "explicit_disagreement": "Expecting property name enclosed in double quotes: line 5 column 5 (char 117)",
+  "failure_reason": "Expecting property name enclosed in double quotes: line 5 column 5 (char 117)",
+  "failure_type": "json_parse_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 20382,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "73ae9eb24f7f30042fb1540f3d49cb652715ed4b646adfe2adc587beed93fcbc",
+  "raw_response_sha256": "360c7f6d08eba695750e94a7c2b107c5e6f7216dfed3b873a34fbd5a2c9c9248",
+  "receipt_id": "semr_0256d1f5bb2b4c9dbf9ac24b40bfa701",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "Expecting property name enclosed in double quotes: line 5 column 5 (char 117)"
+    }
+  ],
+  "reply_to": "dharma.agent.hermes-m5.inbox.reply.holon-source-audit-hermes-20260626",
+  "review_target": "a2a:holon-source-audit-hermes-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: json_parse_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dharma.local/schemas/agent_lane_admission_packet.schema.json",
+  "title": "Agent Lane Admission Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "lane_id",
+    "agent_or_provider",
+    "branch",
+    "worktree",
+    "base_ref",
+    "intended_surfaces",
+    "actual_touched_surfaces",
+    "dirty_untracked_count",
+    "verification_commands",
+    "receipt_paths",
+    "status",
+    "candidate_track",
+    "depends_on",
+    "conflicts_with",
+    "promotion_recommendation",
+    "canonicality",
+    "preservation_status"
+  ],
+  "properties": {
+    "lane_id": { "type": "string", "minLength": 1 },
+    "agent_or_provider": { "type": "string", "minLength": 1 },
+    "branch": { "type": "string" },
+    "worktree": { "type": "string" },
+    "base_ref": { "type": "string" },
+    "intended_surfaces": { "type": "array", "items": { "type": "string" } },
+    "actual_touched_surfaces": { "type": "array", "items": { "type": "string" } },
+    "dirty_untracked_count": { "type": "integer", "minimum": 0 },
+    "verification_commands": { "type": "array", "items": { "type": "string" } },
+    "receipt_paths": { "type": "array", "items": { "type": "string" } },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "active",
+        "needs_preservation",
+        "needs_review",
+        "blocked",
+        "admitted",
+        "fold_into_existing_track",
+        "archive",
+        "do_not_admit"
+      ]
+    },
+    "candidate_track": { "type": "string" },
+    "depends_on": { "type": "array", "items": { "type": "string" } },
+    "conflicts_with": { "type": "array", "items": { "type": "string" } },
+    "promotion_recommendation": {
+      "type": "string",
+      "enum": [
+        "admit_as_successor_track",
+        "admit_as_runtime_truth_extension",
+        "fold_into_existing_track",
+        "preserve_then_review",
+        "archive",
+        "do_not_admit"
+      ]
+    },
+    "canonicality": {
+      "type": "string",
+      "enum": ["canonical", "candidate_high_priority_not_canonical", "dirty_local", "origin_backed", "unknown"]
+    },
+    "preservation_status": {
+      "type": "string",
+      "enum": ["preserved_off_machine", "local_only_at_risk", "receipt_only", "not_preserved", "unknown"]
+    }
+  }
+}

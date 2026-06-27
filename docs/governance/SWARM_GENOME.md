@@ -68,7 +68,14 @@ The organism has several organs. Treat each as owning a narrow truth.
    - Must distinguish sent, delivered, domain receipt, semantic reply, and
      completed.
 
-7. Value and revenue: Telic value, RevenueSpine, venture docs
+7. KaizenOps improvement membrane: `docs/governance/KAIZENOPS.md`
+   - Owns observation-to-improvement interpretation across AgentOps, daily
+     briefs, drift triage, hygiene, name drift, live ops, and Hermes pulse
+     findings.
+   - It does not own live state, active-track intent, ontology mutation, or
+     final Human YDS ratings.
+
+8. Value and revenue: Telic value, RevenueSpine, venture docs
    - May project signals.
    - Must not claim self-funding or market proof without external receipts.
 

@@ -1,0 +1,262 @@
+{
+  "capital_root": "/Users/dhyana/dharma_capital",
+  "comparison": {
+    "conclusion": "Agni is ingested, but Dharma Capital cannot compare it until at least one sister-lab packet exists.",
+    "metrics_by_lab": {
+      "agni": {
+        "pnl_30d": 24.3909,
+        "routes_observed": 155,
+        "stale_feed_alerts": 277298,
+        "total_pnl": 100.9374,
+        "trades": 1969
+      }
+    },
+    "orthogonality_status": "unproven_without_sister_labs",
+    "ranked_labs": [
+      "agni"
+    ],
+    "status": "sister_labs_missing"
+  },
+  "generated_at": "2026-06-26T00:32:34Z",
+  "iteration": 1,
+  "packet": {
+    "authority": {
+      "broker_write_authority": false,
+      "capital_approval": false,
+      "live_authority": false,
+      "mutates_live_lab_state": false,
+      "operator_approval_granted": false,
+      "order_generation_authority": false,
+      "read_only": true,
+      "route_mutation_authority": false
+    },
+    "jsonl": "/Users/dhyana/dharma_swarm/reports/capital_lab/dharma_capital_evolution/dharma-capital-evolution-smoke-20260626/iterations/0001/agni_packets.jsonl",
+    "latest_activity_ts": "2026-06-25T22:26:00Z",
+    "packet_id": "agni_pkt_6f85e1f45326f92f949f2854",
+    "routes_observed": 155,
+    "signature": "2fe983b8a3349e92b61f10b1bf654624524fc6bec87957bec4071eef7732ecfb",
+    "signature_valid": true
+  },
+  "proposal_count": 3,
+  "rating": {
+    "authority": {
+      "broker_write_authority": false,
+      "capital_approval": false,
+      "live_authority": false,
+      "mutates_live_lab_state": false,
+      "operator_approval_granted": false,
+      "order_generation_authority": false,
+      "read_only": true,
+      "route_mutation_authority": false
+    },
+    "capital_authorized_rating_out_of_100": 0,
+    "dimension_scores": [
+      {
+        "blockers": [
+          "Dharma Capital is still a field/control room, not a verified live L4 fund agent."
+        ],
+        "dimension_id": "topology_truth",
+        "evidence": [
+          "/Users/dhyana/dharma_capital/CURRENT_TRUTH.md",
+          "/Users/dhyana/dharma_capital/RELATIONSHIP_MAP.md",
+          "SHAKTI_GINKO -> Dharma Capital -> Foundry/Trading Lab/AGNI/capital_lab map is explicit."
+        ],
+        "label": "Topology, canon, and authority map",
+        "next_actions": [
+          "Keep one canonical machine-readable topology packet.",
+          "Attach rating movement to receipts instead of narrative claims."
+        ],
+        "points": 7,
+        "weight": 10
+      },
+      {
+        "blockers": [
+          "Membrane emits Universe/Insight projections, not portfolio/risk/execution readiness."
+        ],
+        "dimension_id": "capital_lab_membrane",
+        "evidence": [
+          "dharma_swarm/capital_lab/contracts.py",
+          "dharma_swarm/capital_lab/agni_bridge.py",
+          "focused_verifier_passed=True"
+        ],
+        "label": "Evidence, typed contracts, and risk membrane",
+        "next_actions": [
+          "Add candidate-level statistical validation receipts.",
+          "Keep broker-paper and live-order authority separated by tests."
+        ],
+        "points": 8,
+        "weight": 15
+      },
+      {
+        "blockers": [
+          "Only one lab packet is present; sister-lab orthogonality is not proven.",
+          "Snapshot is local and dated; it is not a live data plane."
+        ],
+        "dimension_id": "agni_bridge_data_plane",
+        "evidence": [
+          "packet_id=agni_pkt_6f85e1f45326f92f949f2854",
+          "routes_observed=155",
+          "signature_valid=True"
+        ],
+        "label": "AGNI bridge and data plane",
+        "next_actions": [
+          "Add at least one non-clone sister-lab packet.",
+          "Refresh snapshots through an approved read-only export path."
+        ],
+        "points": 5,
+        "weight": 10
+      },
+      {
+        "blockers": [
+          "Foundry is scaffold/local spec only; routes are not yet bound to first-class candidate journals."
+        ],
+        "dimension_id": "alpha_foundry_candidate_discipline",
+        "evidence": [
+          "/Users/dhyana/dharma_capital/alpha/foundry_schema.py",
+          "/Users/dhyana/dharma_capital/alpha_foundry/seed_candidates.json",
+          "/Users/dhyana/dharma_capital/alpha_foundry/dharma_alpha_foundry_conversion.json"
+        ],
+        "label": "Alpha Foundry candidate discipline",
+        "next_actions": [
+          "Convert route families into alpha candidates with source packets.",
+          "Write append-only decision journals before any promotion language."
+        ],
+        "points": 4,
+        "weight": 15
+      },
+      {
+        "blockers": [
+          "No fresh DSR/PBO/PSR-style candidate gate is proven.",
+          "Broken or stale AGNI alpha-cycle counts remain."
+        ],
+        "dimension_id": "research_validation_grade",
+        "evidence": [
+          "comparison_status=sister_labs_missing",
+          "stale_or_broken_clean=False"
+        ],
+        "label": "Research validation and statistical grade",
+        "next_actions": [
+          "Run cost-adjusted replay, perturbation, and true-trial-count checks per candidate.",
+          "Demote generic TA route farming into a negative-control lane."
+        ],
+        "points": 3,
+        "weight": 15
+      },
+      {
+        "blockers": [
+          "No portfolio optimizer, exposure budget, stress budget, or capacity model is wired to evidence."
+        ],
+        "dimension_id": "portfolio_construction",
+        "evidence": [
+          "Typed PortfolioTarget/RiskAdjustedTarget contracts exist.",
+          "No allocation optimizer or candidate risk budget is proven in this run."
+        ],
+        "label": "Portfolio construction and risk budget",
+        "next_actions": [
+          "Build paper-only portfolio target simulator from candidate Insights.",
+          "Require risk governor clamps before any target can become execution intent."
+        ],
+        "points": 1,
+        "weight": 10
+      },
+      {
+        "blockers": [
+          "No live execution authority, no broker write path, no reconciliation-grade operating loop."
+        ],
+        "dimension_id": "execution_reconciliation_ops",
+        "evidence": [
+          "live_order_authority=false",
+          "broker_write_authority=false",
+          "capital_approval=false"
+        ],
+        "label": "Execution, reconciliation, and operations",
+        "next_actions": [
+          "Keep live execution at zero until legal, tax, custody, Sarathi, and human gates pass.",
+          "Improve paper reconciliation only."
+        ],
+        "points": 0,
+        "weight": 10
+      },
+      {
+        "blockers": [
+          "No admitted persistent Dharma Capital CEO-CIO agent with durable wake loop."
+        ],
+        "dimension_id": "l4_agent_autonomy",
+        "evidence": [
+          "/Users/dhyana/dharma_capital/holon/dharma_capital_holon.py",
+          "holon is reconstructed/paper-safe and not verified as original live L4."
+        ],
+        "label": "Agentic L4 autonomy",
+        "next_actions": [
+          "Admit a read-only scout holon first.",
+          "Require harness, registration, liveness, and receipts before autonomy claims."
+        ],
+        "points": 1,
+        "weight": 10
+      },
+      {
+        "blockers": [
+          "No legal/compliance program, external capital path, or actual fund revenue is proven."
+        ],
+        "dimension_id": "legal_compliance_revenue",
+        "evidence": [
+          "/Users/dhyana/dharma_capital/SOURCE_MANIFEST.json",
+          "Sarathi gates irreversible moves.",
+          "Known revenue is $0; known paper P&L claim is +$65.74 over 88 days from one route."
+        ],
+        "label": "Legal, compliance, and revenue reality",
+        "next_actions": [
+          "Keep Kalshi/legal venue work behind a written memo and Sarathi approval.",
+          "Do not market or externalize fund claims from this score."
+        ],
+        "points": 2,
+        "weight": 5
+      }
+    ],
+    "file_presence": {
+      "agni_audit": true,
+      "conversion": true,
+      "current_truth": true,
+      "foundry_schema": true,
+      "holon": true,
+      "relationship_map": true,
+      "seed_candidates": true,
+      "source_manifest": true
+    },
+    "files_seen": {
+      "agni_audit": "/Users/dhyana/dharma_capital/alpha_foundry/agni_state_audit_2026-06-17.md",
+      "conversion": "/Users/dhyana/dharma_capital/alpha_foundry/dharma_alpha_foundry_conversion.json",
+      "current_truth": "/Users/dhyana/dharma_capital/CURRENT_TRUTH.md",
+      "foundry_schema": "/Users/dhyana/dharma_capital/alpha/foundry_schema.py",
+      "holon": "/Users/dhyana/dharma_capital/holon/dharma_capital_holon.py",
+      "relationship_map": "/Users/dhyana/dharma_capital/RELATIONSHIP_MAP.md",
+      "seed_candidates": "/Users/dhyana/dharma_capital/alpha_foundry/seed_candidates.json",
+      "source_manifest": "/Users/dhyana/dharma_capital/SOURCE_MANIFEST.json"
+    },
+    "generated_at": "2026-06-26T00:32:34Z",
+    "live_fund_rating_out_of_100": 8,
+    "plain_english": "Dharma Capital is a serious research/control-room prototype, not a fully capable research-grade agentic hedge fund and not a live fund.",
+    "rating_label": "research_grade_agentic_hedge_fund_target",
+    "rating_out_of_100": 31,
+    "schema_version": "dharma.capital.rating.v1"
+  },
+  "receipt_hash": "407ad3926ee05c89cb45578ec0157dc31d152293f3327c05e763ac9ecd3d88f7",
+  "run_dir": "/Users/dhyana/dharma_swarm/reports/capital_lab/dharma_capital_evolution/dharma-capital-evolution-smoke-20260626",
+  "schema_version": "dharma.capital.evolution.iteration.v1",
+  "snapshot_root": "/Users/dhyana/agni_ginko_trading_history_20260625",
+  "verifier": {
+    "command": [
+      "/Users/dhyana/dharma_swarm/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_capital_lab_agni_bridge.py"
+    ],
+    "completed_at": "2026-06-26T00:32:34Z",
+    "passed": true,
+    "returncode": 0,
+    "started_at": "2026-06-26T00:32:34Z",
+    "stderr_tail": "",
+    "stdout_tail": "......                                                                   [100%]\n6 passed in 0.24s\n"
+  }
+}

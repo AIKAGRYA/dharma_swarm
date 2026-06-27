@@ -32,6 +32,9 @@ SUPPORTED_WORLD_EVENT_TYPES: tuple[WorldEventType, ...] = (
     "world_scout_health",
 )
 
+_GO_WORLD_SUMMARY_CACHE_MAX_ENTRIES = 8
+_GO_WORLD_SUMMARY_CACHE: dict[tuple[str, bool, int, int, int], dict[str, Any]] = {}
+
 
 class GoWorldBridgeError(ValueError):
     """Raised when a Go world-radar receipt cannot be admitted."""
@@ -206,6 +209,11 @@ def summarize_go_world_receipts(receipts_dir: Path | None = None) -> dict[str, A
     """Return a compact control-surface summary for world-radar receipts."""
     directory = receipts_dir or world_receipts_dir()
     paths = receipt_paths(directory)
+    signature = _receipt_summary_signature(directory, paths)
+    cached = _GO_WORLD_SUMMARY_CACHE.get(signature)
+    if cached is not None:
+        return _copy_summary(cached)
+
     receipts = load_go_world_receipts(paths)
     by_source = Counter(receipt.source for receipt in receipts)
     by_status = Counter(receipt.status for receipt in receipts)
@@ -213,8 +221,12 @@ def summarize_go_world_receipts(receipts_dir: Path | None = None) -> dict[str, A
         receipt.rejected_reason for receipt in receipts if receipt.rejected_reason
     )
     freshest = max((receipt.observed_at for receipt in receipts), default="")
-    signal_rows = project_world_signal_receipts(paths)
-    return {
+    projected_world_signals = sum(
+        1
+        for receipt in receipts
+        if receipt.status == "accepted" and receipt.source == "world_signal"
+    )
+    summary = {
         "receipts_dir": str(directory),
         "exists": directory.exists(),
         "total": len(receipts),
@@ -225,8 +237,53 @@ def summarize_go_world_receipts(receipts_dir: Path | None = None) -> dict[str, A
         "world_scout_health": by_source.get("world_scout_health", 0),
         "freshest_observed_at": freshest,
         "rejected_reasons": dict(sorted(rejected_reasons.items())),
-        "projected_world_signals": len(signal_rows),
+        "projected_world_signals": projected_world_signals,
     }
+    _store_summary(signature, summary)
+    return _copy_summary(summary)
+
+
+def _receipt_summary_signature(
+    directory: Path,
+    paths: tuple[Path, ...],
+) -> tuple[str, bool, int, int, int]:
+    newest_mtime_ns = 0
+    total_size = 0
+    for path in paths:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        newest_mtime_ns = max(newest_mtime_ns, stat.st_mtime_ns)
+        total_size += int(stat.st_size)
+    return (
+        str(directory),
+        directory.exists(),
+        len(paths),
+        newest_mtime_ns,
+        total_size,
+    )
+
+
+def _store_summary(
+    signature: tuple[str, bool, int, int, int],
+    summary: dict[str, Any],
+) -> None:
+    directory_key = signature[0]
+    for key in list(_GO_WORLD_SUMMARY_CACHE):
+        if key[0] == directory_key and key != signature:
+            _GO_WORLD_SUMMARY_CACHE.pop(key, None)
+    if len(_GO_WORLD_SUMMARY_CACHE) >= _GO_WORLD_SUMMARY_CACHE_MAX_ENTRIES:
+        _GO_WORLD_SUMMARY_CACHE.pop(next(iter(_GO_WORLD_SUMMARY_CACHE)), None)
+    _GO_WORLD_SUMMARY_CACHE[signature] = _copy_summary(summary)
+
+
+def _copy_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    copied = dict(summary)
+    rejected_reasons = copied.get("rejected_reasons")
+    if isinstance(rejected_reasons, dict):
+        copied["rejected_reasons"] = dict(rejected_reasons)
+    return copied
 
 
 def _string_list(value: Any) -> list[str]:

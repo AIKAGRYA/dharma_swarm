@@ -25,7 +25,6 @@ from dharma_swarm.world_model import (
     FeedbackLoop,
     WorldFlow,
     WorldModelAgent,
-    WorldModelState,
     WorldModelStore,
     WorldStock,
     _build_initial_state,
@@ -316,3 +315,16 @@ class TestWorldModelAgent:
         await agent.boot()
         assert agent._state is not None
         assert agent._state is INITIAL_WORLD_STATE
+
+    async def test_initialize_and_run_cycle_save_snapshots(self, tmp_path):
+        store = WorldModelStore(base_path=tmp_path / "cycle_wm")
+        agent = WorldModelAgent(store=store, search_tool=None, arxiv_tool=None)
+
+        state = await agent.initialize()
+        receipt = await agent.run_cycle()
+
+        assert state is not None
+        assert receipt["stock_count"] == 15
+        assert receipt["flow_count"] == 8
+        assert receipt["feedback_loop_count"] == 6
+        assert (tmp_path / "cycle_wm" / "latest.json").exists()

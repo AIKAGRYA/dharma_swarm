@@ -1751,6 +1751,31 @@ class DarwinEngine:
                 weighted_fitness,
             )
 
+            archive_status = "applied"
+            sealed_packet_results = test_results.get("sealed_packet")
+            sealed_packet_shadow = (
+                isinstance(sealed_packet_results, dict)
+                and sealed_packet_results.get("shadow") is True
+            )
+            runtime_field_trial_results = test_results.get("runtime_field_trial")
+            runtime_field_trial_rolled_back = (
+                isinstance(runtime_field_trial_results, dict)
+                and runtime_field_trial_results.get("rolled_back") is True
+            )
+            if (
+                test_results.get("rolled_back") is True
+                or runtime_field_trial_rolled_back
+            ):
+                archive_status = "rolled_back"
+            elif (
+                not proposal.diff.strip()
+                or test_results.get("skipped") is True
+                or test_results.get("shadow") is True
+                or sealed_packet_shadow
+                or test_results.get("applied") is False
+            ):
+                archive_status = "evaluated"
+
             entry = ArchiveEntry(
                 component=proposal.component,
                 change_type=proposal.change_type,
@@ -1765,7 +1790,7 @@ class DarwinEngine:
                 execution_profile=proposal.execution_profile,
                 evidence_tier=proposal.evidence_tier,
                 promotion_state=proposal.promotion_state,
-                status="applied",
+                status=archive_status,
                 gates_passed=(
                     ["ALL"]
                     if proposal.gate_decision != GateDecision.BLOCK.value

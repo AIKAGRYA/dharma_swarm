@@ -1,0 +1,303 @@
+[
+  {
+    "agent_uid": "claude-code",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/claude-code.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "claude-flow",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/claude-flow.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "claude_code_cli_20260521t064502z",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/claude-code-cli-20260521t064502z.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex-5-5",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex-cli",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/codex-cli.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex_5_5_cli",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5-cli.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex_forgewright",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/codex-forgewright.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex_gpt5_api",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/codex-gpt5-api.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex_worker_spine",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "codex_worker_spine",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "cursor",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/cursor.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "cursor_remote_agent",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/cursor-remote-agent.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "cybernetics_codex",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "cybernetics_codex",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "devin-roaming-2987d222",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/devin-roaming-2987d222.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "dharma-swarm-mcp",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/dharma-swarm-mcp.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "fable_5_cursor",
+    "check": "forbidden_live_card_alias",
+    "detail": "'fable_5_cursor' is forbidden for semobj.sarathi: object forbidden_aliases",
+    "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+    "severity": "error"
+  },
+  {
+    "agent_uid": "fable_5_cursor",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "fable_composer",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "fable_composer",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "forge_measurement_guardian",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/forge-measurement-guardian.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/hermes.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes-m5",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes-m5",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes_m5",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/hermes-m5.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes_m5_bootstrap",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "hermes_m5_bootstrap",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "kimi-2-6-claw",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/kimi-2-6-claw.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "kimi-claw-phone",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/kimi-claw-phone.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "merge_master_mike",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/merge-master-mike.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "opencalw",
+    "check": "forbidden_live_card_alias",
+    "detail": "'opencalw' is forbidden for semobj.openclaw_integration: Typo-distance collision with OpenClaw.",
+    "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+    "severity": "error"
+  },
+  {
+    "agent_uid": "opencalw",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "openclaw-secure",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/openclaw-secure.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "opus_composer",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/opus_composer.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "opus_forge_architect",
+    "check": "duplicate_live_card_agent_uid",
+    "detail": "multiple live A2A card files resolve to the same agent_uid",
+    "path": "/Users/dhyana/.dharma/a2a/cards/opus-forge-architect.json, /Users/dhyana/.dharma/a2a/cards/opus_forge_architect.json",
+    "severity": "error"
+  },
+  {
+    "agent_uid": "perplexity-computer",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/perplexity-computer.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "qwen_code",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/qwen-code.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "sarathi",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "sarathi",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "strategy_librarian",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/strategy-librarian.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "warp_fable_weaver",
+    "check": "missing_live_a2a_card",
+    "detail": "agent has registration or LivingDock evidence but no live A2A card",
+    "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "warp_fable_weaver",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+    "severity": "warning"
+  },
+  {
+    "agent_uid": "warp_oz",
+    "check": "semantic_commons_unresolved",
+    "detail": "agent identity did not resolve to a Semantic Commons object",
+    "path": "/Users/dhyana/.dharma/a2a/cards/warp-oz.json",
+    "severity": "warning"
+  }
+]

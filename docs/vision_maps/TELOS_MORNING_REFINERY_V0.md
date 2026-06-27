@@ -21,6 +21,31 @@ The morning page is the raw ore. The product is the refinery around it:
 
 The important difference: TELOS does not "give advice." It builds a living semantic map of a user's dharma over time.
 
+## Two-Engine Order
+
+The pipeline has two engines with a hard privacy and sequencing barrier.
+
+```text
+Raw Morning Page
+-> 6-10 Essence / Noetic Agents
+-> Dense Essence Node
+-> Theme / Invariant / Koan / Tension extraction
+-> Empire / Idea-Portfolio Agents
+-> 100+ IdeaSeed candidates
+-> Screening
+-> Bull/Bear debate
+-> Scenario modeling
+-> Portfolio construction
+-> Receipt tests
+```
+
+The first council protects depth and source truth. The second council turns
+hardened essence into outward options. Empire agents never read raw morning
+pages, typo-clean transcripts, or private quote banks. They read only hardened,
+source-faithful nodes plus user corrections and gate results. If the empire
+stage needs source clarification, it routes the question back to the Essence /
+Noetic Council rather than pulling raw text across the boundary.
+
 ## Repo Anchors
 
 This is already seeded across the repo. The missing piece is the intake-to-node pipeline.
@@ -231,9 +256,31 @@ The system scans the repo map and wiki index for matching organs:
 
 Output is not "you should work on X." Output is "this morning's idea touches these organs, with these confidence scores, and these gaps."
 
-### Stage 5 - VentureCell Fanout
+### Stage 5 - Empire / Idea-Portfolio Fanout
 
-Generate up to 100 venture-cell candidates from the idea set, but keep them as seeds.
+After the Noetic / Essence pass has stabilized the signal, the Empire /
+Idea-Portfolio agents generate a broad universe of outward forms. This is not
+generic business brainstorming and it is not allowed to contaminate the source
+read. It works only from `EssenceNode`, `Theme`, `Invariant`, `Tension`,
+`Koan`, `Lineage`, user corrections, and Viveka Gate results.
+
+The detailed second-stage council lives in
+`docs/research/telos_ai/empire_agents/README.md`.
+
+Run shape:
+
+1. Generate 100-300 `IdeaSeed` candidates from the hardened node set.
+2. Screen each seed through specialist agents: pain, lead-user edge cases,
+   market, timing, discipline bridge, product wedge, pricing/business model,
+   distribution, execution, capital/moat/risk, dharma/anti-capture, and
+   quality-diversity portfolio curation.
+3. Move the top 50 into adversarial research: bull case, bear case, synthesis.
+4. Scenario-model survivors at 7 days, 30 days, 90 days, 1 year, and 3-5 years.
+5. Construct a balanced portfolio: 1-3 active receipt tests, 5-10 watchlist
+   seeds, 25+ dormant seeds, one moonshot, one research thread, one
+   content/distribution thread.
+
+Generate venture-cell candidates from the idea set, but keep them as seeds.
 
 Each seed must include:
 
@@ -251,7 +298,8 @@ venture_cell_seed:
   status: seed_only
 ```
 
-No seed becomes a VentureCell until it names a real beneficiary/customer and a receipt path. This preserves ambition without hallucinating live businesses.
+No seed becomes a VentureCell until it names a real beneficiary/customer and a
+receipt path. This preserves ambition without hallucinating live businesses.
 
 ### Stage 6 - Research Accretion
 
@@ -344,7 +392,8 @@ The first usable version is:
 3. write one private markdown node,
 4. update or create theme/idea nodes,
 5. produce 3 next-day questions,
-6. optionally generate 10-20 venture-cell seeds,
+6. optionally run the second-stage Empire / Idea-Portfolio pass to generate
+   screened venture/product/research/content seeds,
 7. optionally queue 3 research questions,
 8. record a receipt: useful, not useful, wrong, too invasive, or continue tomorrow.
 
@@ -352,13 +401,14 @@ That is enough to prove the deep thing without pretending the whole lattice exis
 
 ## Prompt Contract
 
-## Six-Agent Articulation Council
+## Essence / Noetic Council
 
 The richer `ARTICULATE_ESSENCE_EXTRACTOR_NODE` pass is seeded in:
 
 `docs/research/telos_ai/persona_agents/`
 
-The six default lenses are:
+The canonical bench currently holds eight noetic lenses, usually run as a
+standing 6 plus source-routed rotating seats:
 
 1. ecological memory and place-held mind,
 2. articulation philosophy and semiotics,
@@ -366,6 +416,8 @@ The six default lenses are:
 4. civilizational noosphere cartography,
 5. AI vector-space and worldmaking architecture,
 6. reality, venture, and receipt examination.
+7. attention ecology,
+8. machine-mind ethics under uncertainty.
 
 These agents are not meant to roleplay as decorative characters. They are
 functional reading vectors. Each reads the source independently, grounds claims
@@ -390,6 +442,26 @@ If an idea could become a project, create a seed, not a plan.
 If an idea touches the wider swarm, link likely organs, but do not claim readiness.
 If a tension appears, preserve it.
 End with questions the user can carry, not answers the user can consume.
+```
+
+## Empire / Idea-Portfolio Agents
+
+The Empire / Idea-Portfolio agents are seeded in:
+
+`docs/research/telos_ai/empire_agents/`
+
+They run only after the Essence / Noetic Council has produced a hardened node.
+They fan out many possible outward forms, screen them, adversarially attack the
+best, scenario-model survivors, and construct a quality-diverse portfolio.
+
+System role:
+
+```text
+You are the TELOS Empire / Idea-Portfolio pass. You do not read raw morning pages.
+You receive hardened EssenceNodes, Themes, Invariants, Tensions, Koans, Lineages,
+user corrections, and gate results. You fan out many possible outward forms,
+screen them with decorrelated specialist agents, and promote nothing without a
+beneficiary/customer hypothesis, dignity floor, and receipt path.
 ```
 
 ## Anti-Slop Tests

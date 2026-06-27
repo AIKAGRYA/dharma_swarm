@@ -1,0 +1,71 @@
+{
+  "agent_uid": "fable_composer",
+  "contact_evidence_tier": "DOMAIN_RECEIPTED",
+  "domain_receipt_claim": true,
+  "domain_receipt_payload": {
+    "authenticated_target_runtime_claim": false,
+    "author_kind": "fable_composer_semantic_inbox_drain",
+    "causation_send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json",
+    "causation_send_receipt_sha256": "94d4dca7436fd2a4d7a25a01cc502988729d49ff4b1772fb9f17bc8bc5ecbd89",
+    "domain_receipt": true,
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/5aa607b21b57.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T002721Z-ollama-mistral_latest-fr-5aa607b21b57-ollama-mistral-latest.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json"
+    ],
+    "from_agent": "fable_composer",
+    "operator_contact_note": "target-owned reply artifact was validated and published to the recorded reply_subject as a typed domain receipt; semantic_reply_claim follows the artifact's explicit peer/model-processing claim; target_owned_artifact_claim is a path and metadata ownership claim, not an authenticated target-runtime signature",
+    "packet_id": "5aa607b21b57",
+    "peer_model_processed_claim": true,
+    "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+    "schema_version": "dharma.a2a.domain_receipt.v1",
+    "semantic_audit_depth": "packet_only",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+    "source_artifact_schema": "dharma.a2a.domain_reply_artifact.v1",
+    "source_artifact_sha256": "b1b8d9810e38f99098aa8f008847b6f9201510f8993d1886d5e70e3babc392bb",
+    "source_audit_claim": false,
+    "summary": "Semantic packet receipt only; source audit not claimed. Model summary: The A2A packet requesting an audit of the standalone `holon/` package changes for the long-run Holon objective has been understood by the model. As there are no apparent issues, the verdict is pass.",
+    "target_owned_artifact_claim": true,
+    "timestamp": "2026-06-26T00:27:48Z",
+    "to_agent": "operator",
+    "validated_semantic_receipt_refs": [
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T002721Z-ollama-mistral_latest-fr-5aa607b21b57-ollama-mistral-latest.json"
+    ],
+    "verdict": "pass"
+  },
+  "endpoint": "nats://127.0.0.1:4222",
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "typed domain receipt was published to the recorded reply_subject; run a2a_reply_capture.py to record DOMAIN_RECEIPTED from the stream",
+  "packet_id": "5aa607b21b57",
+  "payload_schema": "dharma.a2a.domain_receipt.v1",
+  "payload_sha256": "e11dfc6be5eba4638dbea1dc47cde29957eb3ec00cf4c508b2e12953f062557e",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260626T002748Z-fable_composer-5aa607b21b57.json",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+  "reply_artifact_sha256": "b1b8d9810e38f99098aa8f008847b6f9201510f8993d1886d5e70e3babc392bb",
+  "reply_evidence_tier": "DOMAIN_RECEIPTED",
+  "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": true,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json",
+  "status": "DOMAIN_REPLY_PUBLISHED",
+  "stream": "DHARMA_FLEET",
+  "target_owned_artifact_claim": true,
+  "timestamp": "2026-06-26T00:27:48Z",
+  "transport_ack": {
+    "seq": 8525,
+    "stream": "DHARMA_FLEET",
+    "transport_ack": "JETSTREAM_PUB_ACK"
+  }
+}

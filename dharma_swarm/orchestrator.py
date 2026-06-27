@@ -281,7 +281,8 @@ class Orchestrator:
 
     async def route_next(self) -> list[TaskDispatch]:
         """Match ready tasks to idle agents, one-to-one. Returns dispatches."""
-        import time as _tt; _rn0 = _tt.monotonic()
+        import time as _tt
+        _rn0 = _tt.monotonic()
         if self._board is None or self._pool is None:
             return []
 
@@ -341,6 +342,7 @@ class Orchestrator:
                     agent_id=agent.id,
                     provider=cost.required_providers[0] if cost.required_providers else None,
                     estimated_tokens=cost.estimated_tokens,
+                    task_id=task.id,
                 )
 
             dispatches.append(td)
@@ -666,6 +668,10 @@ class Orchestrator:
         return dict(task.metadata)
 
     @staticmethod
+    def _task_result_artifact_id(task: Task) -> str:
+        return f"artifact_task_result_{task.id}"
+
+    @staticmethod
     def _first_route_text(*values: Any) -> str:
         for value in values:
             text = str(value or "").strip()
@@ -674,7 +680,7 @@ class Orchestrator:
         return ""
 
     @classmethod
-    def _runner_served_route_metadata(cls, runner: Any) -> dict[str, str]:
+    def _runner_served_route_metadata(cls, runner: Any) -> dict[str, Any]:
         provider = cls._first_route_text(
             getattr(runner, "actual_served_provider", ""),
             getattr(runner, "served_provider", ""),
@@ -703,14 +709,174 @@ class Orchestrator:
         }
 
     @classmethod
+    def _runner_attempted_route_metadata(cls, runner: Any) -> dict[str, Any]:
+        provider = cls._first_route_text(
+            getattr(runner, "selected_provider", ""),
+            getattr(runner, "provider_selected", ""),
+            getattr(runner, "attempted_provider", ""),
+        )
+        model = cls._first_route_text(
+            getattr(runner, "selected_model", ""),
+            getattr(runner, "selected_model_hint", ""),
+            getattr(runner, "model_selected", ""),
+            getattr(runner, "attempted_model", ""),
+        )
+        if not provider or not model:
+            return {}
+        source = cls._first_route_text(
+            getattr(runner, "provider_model_truth_source", ""),
+            getattr(runner, "route_truth_source", ""),
+            "orchestrator.runner_attempted_route",
+        )
+        route = {
+            "selected_provider": provider,
+            "provider_selected": provider,
+            "selected_model": model,
+            "selected_model_hint": model,
+            "model_selected": model,
+            "provider_model_truth_source": source,
+        }
+        applicability = cls._first_route_text(
+            getattr(runner, "provider_model_applicability", ""),
+            "failed_before_serve"
+            if source == "agent_runner.provider_chain_failure"
+            else "",
+        )
+        reason = cls._first_route_text(
+            getattr(runner, "provider_model_missing_reason", ""),
+            "provider_chain_failed_before_actual_served_response"
+            if applicability == "failed_before_serve"
+            else "",
+        )
+        if applicability:
+            route["provider_execution"] = True
+            route["provider_model_applicability"] = applicability
+        if reason:
+            route["provider_model_missing_reason"] = reason
+        return route
+
+    @classmethod
+    def _runner_no_provider_execution_metadata(cls, runner: Any) -> dict[str, Any]:
+        raw_execution = getattr(runner, "provider_execution", "")
+        provider_execution_false = raw_execution is False or str(raw_execution).strip().lower() in {
+            "false",
+            "0",
+            "no",
+        }
+        runner_provider_attached = True
+        if hasattr(runner, "_provider"):
+            runner_provider_attached = getattr(runner, "_provider", None) is not None
+        if not provider_execution_false and not runner_provider_attached:
+            provider_execution_false = True
+        if not provider_execution_false:
+            return {}
+        source = cls._first_route_text(
+            getattr(runner, "provider_model_truth_source", ""),
+            getattr(runner, "route_truth_source", ""),
+            "agent_runner.no_provider_execution",
+        )
+        applicability = cls._first_route_text(
+            getattr(runner, "provider_model_applicability", ""),
+            "not_applicable",
+        )
+        default_reason = (
+            "agent_runner_no_provider_attached"
+            if hasattr(runner, "_provider") and not runner_provider_attached
+            else "runner_declared_no_provider_execution"
+        )
+        reason = cls._first_route_text(
+            getattr(runner, "no_provider_model_reason", ""),
+            default_reason,
+        )
+        return {
+            "provider_execution": False,
+            "provider_model_applicability": applicability,
+            "provider_model_truth_source": source,
+            "no_provider_model_reason": reason,
+        }
+
+    @classmethod
+    def _runner_unproven_provider_execution_metadata(cls, runner: Any) -> dict[str, Any]:
+        raw_execution = getattr(runner, "provider_execution", "")
+        provider_execution_true = raw_execution is True or str(raw_execution).strip().lower() in {
+            "true",
+            "1",
+            "yes",
+        }
+        runner_provider_attached = False
+        if hasattr(runner, "_provider"):
+            runner_provider_attached = getattr(runner, "_provider", None) is not None
+        if not provider_execution_true and not runner_provider_attached:
+            return {}
+        source = cls._first_route_text(
+            getattr(runner, "provider_model_truth_source", ""),
+            getattr(runner, "route_truth_source", ""),
+            "orchestrator.provider_execution_unproven",
+        )
+        applicability = cls._first_route_text(
+            getattr(runner, "provider_model_applicability", ""),
+            "actual_served_unproven",
+        )
+        reason = cls._first_route_text(
+            getattr(runner, "provider_model_missing_reason", ""),
+            "provider_execution_completed_without_actual_served_runtime_evidence",
+        )
+        return {
+            "provider_execution": True,
+            "provider_model_applicability": applicability,
+            "provider_model_truth_source": source,
+            "provider_model_missing_reason": reason,
+        }
+
+    @classmethod
+    def _runner_pending_provider_execution_metadata(cls, runner: Any) -> dict[str, Any]:
+        runner_provider_attached = False
+        if hasattr(runner, "_provider"):
+            runner_provider_attached = getattr(runner, "_provider", None) is not None
+        if not runner_provider_attached:
+            return {}
+        return {
+            "provider_execution": "pending",
+            "provider_model_applicability": "pending_execution",
+            "provider_model_truth_source": "orchestrator.provider_execution_pending",
+            "provider_model_pending_reason": "agent_task_started_provider_route_pending",
+        }
+
+    @classmethod
+    def _stamp_runner_failure_route(
+        cls,
+        runner: Any,
+        *,
+        task: Task,
+        td: TaskDispatch,
+    ) -> dict[str, Any]:
+        route_metadata = (
+            cls._runner_served_route_metadata(runner)
+            or cls._runner_attempted_route_metadata(runner)
+            or cls._runner_no_provider_execution_metadata(runner)
+        )
+        if not route_metadata:
+            return {}
+        td.metadata.update(route_metadata)
+        task.metadata = {
+            **cls._task_meta(task),
+            **route_metadata,
+        }
+        return route_metadata
+
+    @classmethod
     def _stamp_runner_served_route(
         cls,
         runner: Any,
         *,
         task: Task,
         td: TaskDispatch,
-    ) -> dict[str, str]:
-        route_metadata = cls._runner_served_route_metadata(runner)
+    ) -> dict[str, Any]:
+        route_metadata = (
+            cls._runner_served_route_metadata(runner)
+            or cls._runner_no_provider_execution_metadata(runner)
+            or cls._runner_unproven_provider_execution_metadata(runner)
+        )
         if not route_metadata:
             return {}
         td.metadata.update(route_metadata)
@@ -1725,7 +1891,8 @@ class Orchestrator:
         return merged
 
     async def _refresh_coordination_state(self) -> dict[str, Any]:
-        import time as _t; _cs_t0 = _t.monotonic()
+        import time as _t
+        _cs_t0 = _t.monotonic()
         logger.info("_refresh_coordination: entering")
         agents = await self._list_coordination_agents()
         logger.info("_refresh_coordination: agents=%.1fs (n=%d)", _t.monotonic() - _cs_t0, len(agents))
@@ -1840,12 +2007,18 @@ class Orchestrator:
         *,
         td: TaskDispatch,
         task: Task | None,
+        runner: Any | None = None,
         error: str,
         source: str,
     ) -> None:
         # Release YogaNode capacity on failure too
         if self._yoga is not None:
-            self._yoga.record_completion(td.agent_id)
+            self._yoga.record_failure(td.agent_id, td.task_id)
+        if runner is not None and task is not None:
+            try:
+                self._stamp_runner_failure_route(runner, task=task, td=td)
+            except Exception:
+                logger.debug("Failed to stamp runner route on task failure", exc_info=True)
         failure_signature = self._failure_signature(error)
         retry_count, max_retries, backoff = self._resolve_retry_policy(task)
         meta = self._task_meta(task)
@@ -2003,7 +2176,8 @@ class Orchestrator:
 
     async def _assign_dispatch(self, td: TaskDispatch) -> None:
         """Record dispatch, update board + pool, kick off execution, notify via bus."""
-        import time as _adt; _ad0 = _adt.monotonic()
+        import time as _adt
+        _ad0 = _adt.monotonic()
         td.metadata["dispatch_started_monotonic"] = time.monotonic()
         task_for_gate = await self._safe_get_task(td.task_id)
         logger.info("_assign_dispatch(%s): get_task=%.2fs", td.task_id[:8], _adt.monotonic() - _ad0)
@@ -2239,10 +2413,14 @@ class Orchestrator:
         if runner and task:
             run_meta = self._task_meta(task)
             run_meta.pop("retry_not_before_epoch", None)
+            pending_provider_meta = self._runner_pending_provider_execution_metadata(runner)
+            run_meta.update(pending_provider_meta)
             run_meta["active_claim"] = claim_meta.get("active_claim")
+            td.metadata.update(pending_provider_meta)
             await self._safe_update_task(
                 td.task_id,
                 status=TaskStatus.RUNNING,
+                result=None,
                 metadata=run_meta,
             )
             await self._runtime_lifecycle.record_task_claim(
@@ -2397,6 +2575,10 @@ class Orchestrator:
                 td.task_id,
                 exc_info=True,
             )
+        try:
+            Orchestrator._stamp_runner_served_route(runner, task=task, td=td)
+        except Exception:
+            logger.debug("Failed to stamp runner route after spine dispatch", exc_info=True)
         if "exc" in captured:
             raise captured["exc"]
         return captured["result"]
@@ -2481,6 +2663,7 @@ class Orchestrator:
                     await self._handle_task_failure(
                         td=td,
                         task=task,
+                        runner=runner,
                         error=error,
                         source="honors_checkpoint",
                     )
@@ -2493,6 +2676,7 @@ class Orchestrator:
                 await self._handle_task_failure(
                     td=td,
                     task=task,
+                    runner=runner,
                     error=f"Honors checkpoint validation failed: {exc}",
                     source="honors_checkpoint",
                 )
@@ -2523,9 +2707,14 @@ class Orchestrator:
             self._active_dispatches.pop(td.task_id, None)
             # Release YogaNode capacity for this agent
             if self._yoga is not None:
-                self._yoga.record_completion(td.agent_id)
+                self._yoga.record_completion(td.agent_id, task_id=td.task_id)
             logger.info("Task %s completed by agent %s", td.task_id, td.agent_id)
             duration_sec = max(0.0, time.monotonic() - run_started)
+            if result and not self._task_meta(task).get("current_artifact_id"):
+                task.metadata = {
+                    **self._task_meta(task),
+                    "current_artifact_id": self._task_result_artifact_id(task),
+                }
             await self._runtime_lifecycle.record_task_claim(
                 td,
                 task=task,
@@ -2771,6 +2960,7 @@ class Orchestrator:
             await self._handle_task_failure(
                 td=td,
                 task=task,
+                runner=runner,
                 error=error,
                 source="timeout",
             )
@@ -2782,6 +2972,7 @@ class Orchestrator:
             await self._handle_task_failure(
                 td=td,
                 task=task,
+                runner=runner,
                 error=str(exc),
                 source="execution_error",
             )
@@ -2908,9 +3099,15 @@ class Orchestrator:
             logger.debug("Shared artifact write failed (non-fatal): %s", exc)
 
         if shared_artifact is not None:
+            artifact_id = self._task_result_artifact_id(task)
+            if not self._task_meta(task).get("current_artifact_id"):
+                task.metadata = {
+                    **self._task_meta(task),
+                    "current_artifact_id": artifact_id,
+                }
             await self._runtime_lifecycle.record_artifact(
                 task=task,
-                artifact_id=f"artifact_task_result_{task.id}",
+                artifact_id=artifact_id,
                 artifact_kind="task_result",
                 payload_path=shared_artifact,
                 manifest_path=provenance_path,
@@ -2957,7 +3154,7 @@ class Orchestrator:
 
             store = StigmergyStore(self._stigmergy_dir)
             # Extract first meaningful line as observation
-            lines = [l.strip() for l in result.split("\n") if l.strip()]
+            lines = [line.strip() for line in result.split("\n") if line.strip()]
             observation = lines[0][:200] if lines else f"Completed: {task.title}"
             mark = StigmergicMark(
                 agent=agent_name,

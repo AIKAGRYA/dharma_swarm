@@ -1,0 +1,63 @@
+{
+  "acceptance_gates": [],
+  "agent_uid": "fable_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 1.0,
+  "correlation_id": "5aa607b21b57",
+  "created_at": "2026-06-26T00:27:21Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 17191,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 0
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "6ae39020463d05f77278aaedcdfeed36781cdc9577e8bd5007d7b10bf3cf62da",
+  "raw_response_sha256": "3d2448334f05492c59e36a194d68575055a4e0edb7382443eb42ef0bf6a38d7f",
+  "receipt_id": "fr-5aa607b21b57-ollama-mistral-latest",
+  "recommendations": [],
+  "reply_to": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "review_target": "a2a:5aa607b21b57",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The A2A packet requesting an audit of the standalone `holon/` package changes for the long-run Holon objective has been understood by the model. As there are no apparent issues, the verdict is pass.",
+  "understood_request": true,
+  "verdict": "pass"
+}

@@ -223,6 +223,66 @@ test("buildRuntimeControlPlaneSnapshot marks health as unavailable when chat is 
   assert.equal(snapshot.meanFitnessLabel, "n/a");
 });
 
+test("buildRuntimeControlPlaneSnapshot marks failed runtime truth closeout red", () => {
+  const normalized = normalizeRuntimeControlPlaneResponses(
+    chatOk({
+      ready: true,
+      model: "openai/gpt-5.4",
+      provider: "openai",
+      tools: 9,
+      max_tool_rounds: 2,
+      max_tokens: 4096,
+      timeout_seconds: 120,
+      tool_result_max_chars: 4000,
+      history_message_limit: 120,
+      temperature: 0,
+      persistent_sessions: true,
+      chat_contract_version: "2026-03-20.control-plane",
+      chat_ws_path_template: "/api/chat/ws/{session_id}",
+      default_profile_id: "codex_operator",
+      profiles: [
+        {
+          id: "codex_operator",
+          label: "Codex Operator",
+          provider: "openai",
+          model: "gpt-5.4",
+          accent: "aozora",
+          summary: "Canonical operator lane.",
+          available: true,
+        },
+      ],
+    }),
+    healthOk({
+      overall_status: "degraded",
+      agent_health: [],
+      anomalies: [],
+      total_traces: 0,
+      traces_last_hour: 0,
+      failure_rate: 0,
+      mean_fitness: null,
+      runtime_truth: {
+        schema_version: "runtime_truth_closeout.v1",
+        status: "fail",
+        passed: false,
+        checks: [
+          {
+            id: "provider_model_accounted",
+            status: "fail",
+            passed: false,
+            evidence: "latest_accounted=98.0",
+          },
+        ],
+      },
+    }),
+  );
+
+  const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
+
+  assert.equal(snapshot.statusKind, "error");
+  assert.equal(snapshot.statusLabel, "runtime truth red");
+  assert.match(snapshot.detail, /provider_model_accounted: latest_accounted=98\.0/);
+});
+
 test("buildRuntimeControlPlaneSnapshot degrades runtime when the default lane is blocked but fallback lanes remain live", () => {
   const normalized = normalizeRuntimeControlPlaneResponses(
     chatOk({

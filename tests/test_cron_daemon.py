@@ -14,6 +14,8 @@ def test_run_cron_daemon_runs_tick_and_cleans_pid(
     capsys,
 ) -> None:
     cron_dir = tmp_path / "cron"
+    monkeypatch.setattr("dharma_swarm.cron_daemon.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr(cron_scheduler, "DHARMA_DIR", tmp_path)
     monkeypatch.setattr(cron_scheduler, "CRON_DIR", cron_dir)
 
     calls: list[tuple[bool, object]] = []
@@ -38,6 +40,8 @@ def test_run_cron_daemon_can_skip_initial_tick(
     monkeypatch,
 ) -> None:
     cron_dir = tmp_path / "cron"
+    monkeypatch.setattr("dharma_swarm.cron_daemon.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr(cron_scheduler, "DHARMA_DIR", tmp_path)
     monkeypatch.setattr(cron_scheduler, "CRON_DIR", cron_dir)
 
     class FakeStopEvent:
@@ -61,3 +65,25 @@ def test_run_cron_daemon_can_skip_initial_tick(
 
     assert executed == 0
     mock_tick.assert_not_called()
+
+
+def test_run_cron_daemon_pause_file_suppresses_tick(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    cron_dir = tmp_path / "cron"
+    state_dir = tmp_path / "state"
+    monkeypatch.setattr("dharma_swarm.cron_daemon.Path.home", lambda: tmp_path / "home")
+    monkeypatch.setattr(cron_scheduler, "DHARMA_DIR", state_dir)
+    monkeypatch.setattr(cron_scheduler, "CRON_DIR", cron_dir)
+    (tmp_path / ".PAUSE").write_text("operator pause\n", encoding="utf-8")
+
+    with patch("dharma_swarm.cron_daemon.cron_scheduler.tick") as mock_tick:
+        executed = run_cron_daemon(interval_sec=0, max_loops=2)
+
+    out = capsys.readouterr().out
+    assert executed == 0
+    mock_tick.assert_not_called()
+    assert out.count("Cron daemon paused (.PAUSE file)") == 2
+    assert not (cron_dir / "daemon.pid").exists()

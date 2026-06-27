@@ -78,6 +78,7 @@ def test_writes_receipts(tmp_path: Path, monkeypatch) -> None:
     _write(repo / "docs/governance/ACTIVE_TRACK.yaml", "NameDriftPreflight\n")
     json_out = tmp_path / "out" / "scan.json"
     md_out = tmp_path / "out" / "scan.md"
+    digest_out = tmp_path / "out" / "digest.json"
 
     monkeypatch.setattr(mod, "REPO_ROOT", repo)
     rc = mod.main(
@@ -86,6 +87,8 @@ def test_writes_receipts(tmp_path: Path, monkeypatch) -> None:
             str(json_out),
             "--markdown-output",
             str(md_out),
+            "--digest-output",
+            str(digest_out),
             "--limit",
             "1",
         ]
@@ -95,3 +98,8 @@ def test_writes_receipts(tmp_path: Path, monkeypatch) -> None:
     data = json.loads(json_out.read_text(encoding="utf-8"))
     assert data["hit_count"] == 1
     assert "Name Drift Preflight" in md_out.read_text(encoding="utf-8")
+    digest = json.loads(digest_out.read_text(encoding="utf-8"))
+    assert digest["schema_version"] == "name_drift_preflight_digest.v1"
+    assert digest["hit_count"] == 1
+    assert digest["status"] == "blocked"
+    assert "canonical_corral_dir_missing" in digest["blockers"]

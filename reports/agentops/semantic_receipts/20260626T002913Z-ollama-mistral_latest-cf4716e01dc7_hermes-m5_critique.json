@@ -1,0 +1,69 @@
+{
+  "acceptance_gates": [],
+  "agent_uid": "hermes-m5",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 1.0,
+  "correlation_id": "cf4716e01dc7",
+  "created_at": "2026-06-26T00:29:13Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "reports/sovereign_holons/standalone_holon_phase1_20260626/PHASE1_RECEIPT.md",
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/cf4716e01dc7.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 27026,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 0
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "9a6eebeb260ae8466d0cd153b4462f735792c54df97f57e61dfcf86d21ab8522",
+  "raw_response_sha256": "8f5558f12a0837bf3242438c7864e2334e78afa48b054d843a57659212200be2",
+  "receipt_id": "cf4716e01dc7_hermes-m5_critique",
+  "recommendations": [
+    {
+      "comment": "Holon Phase 1 audit completed. Please find the report in the provided link.",
+      "link": "reports/sovereign_holons/standalone_holon_phase1_20260626/PHASE1_RECEIPT.md"
+    }
+  ],
+  "reply_to": "dharma.agent.hermes-m5.inbox.reply.cf4716e01dc7",
+  "review_target": "a2a:cf4716e01dc7",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The audit request is clear and the scope of inspection is properly defined.",
+  "understood_request": true,
+  "verdict": "approve"
+}

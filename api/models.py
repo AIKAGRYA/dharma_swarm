@@ -45,6 +45,7 @@ class HealthOut(BaseModel):
     traces_last_hour: int = 0
     failure_rate: float = 0.0
     mean_fitness: float | None = None
+    runtime_truth: dict[str, Any] | None = None
 
 
 # ── Agents ────────────────────────────────────────────────────────

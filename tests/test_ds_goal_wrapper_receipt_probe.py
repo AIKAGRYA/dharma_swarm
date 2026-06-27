@@ -272,6 +272,69 @@ def test_default_wrapper_target_uses_installed_wrapper_contract(tmp_path: Path) 
     )
 
 
+def test_default_wrapper_target_accepts_converged_wrapper_order(
+    tmp_path: Path,
+) -> None:
+    mod = _load_probe_module()
+    home = tmp_path / "home"
+    audited_repo = home / "dharma_swarm"
+    main_repo = home / "dharma_swarm_main"
+    wrapper = home / ".dharma" / "bin" / "ds-goal"
+    for repo in (audited_repo, main_repo):
+        (repo / "scripts" / "runtime").mkdir(parents=True)
+        (repo / "scripts" / "runtime" / "autonomy_spine.py").write_text(
+            "# probe\n",
+            encoding="utf-8",
+        )
+    wrapper.parent.mkdir(parents=True)
+    wrapper.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "# Was: preferred dharma_swarm_main; keep it only as fallback.",
+                'if [[ -n "${DHARMA_SWARM_REPO:-}" ]]; then',
+                '  repo="$DHARMA_SWARM_REPO"',
+                'elif [[ -f "$HOME/dharma_swarm/scripts/runtime/autonomy_spine.py" ]]; then',
+                '  repo="$HOME/dharma_swarm"',
+                'elif [[ -f "$HOME/dharma_swarm_main/scripts/runtime/autonomy_spine.py" ]]; then',
+                '  repo="$HOME/dharma_swarm_main"',
+                "else",
+                '  repo="$HOME/dharma_swarm"',
+                "fi",
+                'exec python3 scripts/runtime/autonomy_spine.py "$@"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    target = mod._default_wrapper_target(
+        home=home,
+        audited_repo=audited_repo,
+        wrapper=wrapper,
+    )
+
+    assert target["target_repo"] == str(audited_repo)
+    assert target["target_resolution_source"] == (
+        "installed_wrapper_dharma_swarm_preference"
+    )
+    assert target["target_matches_audited_repo"] is True
+    contract = target["installed_wrapper_contract"]
+    assert contract["dharma_swarm_preference_declared"] is True
+    assert contract["dharma_swarm_main_preference_declared"] is False
+    assert contract["dharma_swarm_fallback_declared"] is True
+    assert contract["default_target_order"] == ["dharma_swarm", "dharma_swarm_main"]
+    assert contract["fallback_target"] == "dharma_swarm"
+    packet = mod.wrapper_convergence_decision_packet(
+        home=home,
+        audited_repo=audited_repo,
+        wrapper=wrapper,
+    )
+    assert packet["approval_state"] == "not_required_default_matches_audited_checkout"
+    assert packet["operator_approval_required"] is False
+    assert packet["default_target_repo"] == str(audited_repo)
+    assert packet["current_mitigation"] == "none_needed"
+
+
 def test_default_wrapper_target_falls_back_when_main_not_declared(tmp_path: Path) -> None:
     mod = _load_probe_module()
     home = tmp_path / "home"

@@ -1,0 +1,76 @@
+{
+  "acceptance_gates": [],
+  "agent_uid": "hermes-m5",
+  "authored_by_model": true,
+  "capability_match": 0.95,
+  "confidence": 0.98,
+  "correlation_id": "cf4716e01dc7",
+  "created_at": "2026-06-26T00:27:14Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/cf4716e01dc7.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/cf4716e01dc7.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 10045,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 0
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "9a6eebeb260ae8466d0cd153b4462f735792c54df97f57e61dfcf86d21ab8522",
+  "raw_response_sha256": "6297d8fc5c6a4a17934571667ec254da4b564ffe55c3a4358bddbb4169c72956",
+  "receipt_id": "hermes-m5_a2a_audit_request_cf4716e01dc7",
+  "recommendations": [
+    {
+      "steps": [
+        "Audit the standalone `holon/` package changes as described in the A2A request.",
+        "Assess whether the phase makes `holon/` materially more standalone and independently installable."
+      ],
+      "title": "Recommended Next Steps"
+    }
+  ],
+  "reply_to": "dharma.agent.hermes-m5.inbox.reply.cf4716e01dc7",
+  "review_target": "a2a:cf4716e01dc7",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "The A2A audit request for the standalone Holon Phase 1 is approved.",
+  "understood_request": true,
+  "verdict": "approve",
+  "verdict_elaboration": {
+    "rationale": "The A2A audit request for the standalone Holon Phase 1 is in line with the given requirements and scope. Hermes-m5 should proceed to audit the package changes as described.",
+    "verdict_type": "approve"
+  }
+}

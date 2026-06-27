@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -50,10 +51,21 @@ def _sha256_text(value: str) -> str:
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    fd = os.open(path, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
+    path.chmod(0o600)
 
 
-def _strict_prompt(*, user_prompt: str, provider: str, model: str, review_target: str) -> str:
+def _strict_prompt(
+    *,
+    user_prompt: str,
+    provider: str,
+    model: str,
+    agent_uid: str,
+    review_target: str,
+) -> str:
     schema = json.dumps(semantic_receipt_json_schema(), indent=2, sort_keys=True)
     return f"""You are an external non-Codex model critic.
 
@@ -62,7 +74,7 @@ Populate the SemanticReceipt v1 schema below.
 
 Fixed values you must use:
 - schema_version: {SCHEMA_VERSION}
-- agent_uid: codex_composer
+- agent_uid: {agent_uid}
 - critic_agent_id: {provider}:{model}
 - model_identity.provider: {provider}
 - model_identity.model: {model}
@@ -80,6 +92,62 @@ JSON Schema:
 
 Prompt to critique:
 {user_prompt}
+"""
+
+
+def _repair_prompt(
+    *,
+    user_prompt: str,
+    provider: str,
+    model: str,
+    agent_uid: str,
+    review_target: str,
+    previous_response: str,
+    validation_error: Exception,
+    attempt_number: int,
+    max_attempts: int,
+) -> str:
+    schema = json.dumps(semantic_receipt_json_schema(), indent=2, sort_keys=True)
+    clipped_response = previous_response.strip()[:12000]
+    return f"""You are repairing your previous SemanticReceipt JSON response.
+
+Return exactly one JSON object. Do not use markdown fences, prose, comments, or a JSON Schema.
+Preserve your semantic judgment from the previous response, but make every field satisfy the schema.
+This is repair attempt {attempt_number} of {max_attempts}.
+
+Fixed values the runner will verify:
+- schema_version: {SCHEMA_VERSION}
+- agent_uid: {agent_uid}
+- critic_agent_id: {provider}:{model}
+- model_identity.provider: {provider}
+- model_identity.model: {model}
+- authored_by_model: true
+- review_target: {review_target}
+- failure_type: ""
+- failure_reason: ""
+
+Common field repairs:
+- intent_ack must be a boolean, not a string.
+- understood_request must be a boolean, not a string.
+- capability_match and confidence must be numbers from 0.0 to 1.0, not labels.
+- summary must be a non-empty string.
+- missing_context, evidence_refs, and not_claimed_agents must be arrays of strings.
+- recommendations and acceptance_gates must be arrays of objects.
+- verdict must be one of: pass, approve, revise, reject, blocked, failed, insufficient_context.
+- explicit_disagreement may be empty only when verdict is pass or approve.
+- not_claimed_agents must include at least "codex", "claude", "fable", "hermes", and "devin".
+
+Validation errors from your previous response:
+{validation_error}
+
+Previous invalid response:
+{clipped_response}
+
+Original prompt being critiqued:
+{user_prompt}
+
+SemanticReceipt JSON Schema:
+{schema}
 """
 
 
@@ -233,6 +301,7 @@ def run_model_critic(
     mock_response_file: Path | None = None,
     ollama_endpoint: str = DEFAULT_OLLAMA_ENDPOINT,
     timeout_seconds: int = 180,
+    repair_attempts: int = 2,
 ) -> dict[str, Any]:
     """Run one model critique and write a success or typed failure artifact."""
     prompt_file = prompt_file.expanduser().resolve()
@@ -244,6 +313,8 @@ def run_model_critic(
 
     response_text = ""
     latency_ms = 0
+    repair_attempts = max(0, int(repair_attempts))
+    repair_attempts_used = 0
     try:
         if mock_response_file is not None:
             started = time.perf_counter()
@@ -251,7 +322,13 @@ def run_model_critic(
             latency_ms = int((time.perf_counter() - started) * 1000)
             raw_payload: dict[str, Any] = {"mock_response_file": str(mock_response_file)}
         elif provider == "ollama":
-            strict = _strict_prompt(user_prompt=user_prompt, provider=provider, model=model, review_target=review_target)
+            strict = _strict_prompt(
+                user_prompt=user_prompt,
+                provider=provider,
+                model=model,
+                agent_uid=agent_uid,
+                review_target=review_target,
+            )
             response_text, raw_payload, latency_ms = _call_ollama(
                 model=model,
                 prompt=strict,
@@ -263,62 +340,53 @@ def run_model_critic(
         else:
             raise RuntimeError(f"provider is not supported by this runner: {provider}")
 
-        try:
-            receipt = _extract_json_object(response_text)
-            receipt.setdefault("receipt_id", f"semr_{uuid4().hex}")
-            receipt = _apply_runner_provenance(
-                receipt,
-                provider=provider,
-                model=model,
-                agent_uid=agent_uid,
-                review_target=review_target,
-                reply_to=reply_to,
-                correlation_id=correlation_id,
-                latency_ms=latency_ms,
-                prompt_hash=prompt_hash,
-                response_text=response_text,
-                evidence_refs=evidence_refs,
-            )
-            validated = validate_semantic_receipt(receipt)
-        except (json.JSONDecodeError, ValueError, SemanticReceiptValidationError) as first_error:
-            if mock_response_file is not None or provider != "ollama":
-                raise
-            retry_prompt = _strict_prompt(
-                user_prompt=(
-                    f"{user_prompt}\n\nYour previous response failed SemanticReceipt validation with: "
-                    f"{first_error}. Return corrected JSON only."
-                ),
-                provider=provider,
-                model=model,
-                review_target=review_target,
-            )
+        while True:
+            try:
+                receipt = _extract_json_object(response_text)
+                receipt.setdefault("receipt_id", f"semr_{uuid4().hex}")
+                receipt = _apply_runner_provenance(
+                    receipt,
+                    provider=provider,
+                    model=model,
+                    agent_uid=agent_uid,
+                    review_target=review_target,
+                    reply_to=reply_to,
+                    correlation_id=correlation_id,
+                    latency_ms=latency_ms,
+                    prompt_hash=prompt_hash,
+                    response_text=response_text,
+                    evidence_refs=evidence_refs,
+                )
+                validated = validate_semantic_receipt(receipt)
+                break
+            except (json.JSONDecodeError, ValueError, SemanticReceiptValidationError) as repair_error:
+                if mock_response_file is not None or provider != "ollama" or repair_attempts_used >= repair_attempts:
+                    raise
+                repair_attempts_used += 1
+                repair_prompt = _repair_prompt(
+                    user_prompt=user_prompt,
+                    provider=provider,
+                    model=model,
+                    agent_uid=agent_uid,
+                    review_target=review_target,
+                    previous_response=response_text,
+                    validation_error=repair_error,
+                    attempt_number=repair_attempts_used,
+                    max_attempts=repair_attempts,
+                )
             response_text, raw_payload, latency_ms = _call_ollama(
                 model=model,
-                prompt=retry_prompt,
+                prompt=repair_prompt,
                 endpoint=ollama_endpoint,
                 timeout_seconds=timeout_seconds,
             )
-            receipt = _extract_json_object(response_text)
-            receipt.setdefault("receipt_id", f"semr_{uuid4().hex}")
-            receipt = _apply_runner_provenance(
-                receipt,
-                provider=provider,
-                model=model,
-                agent_uid=agent_uid,
-                review_target=review_target,
-                reply_to=reply_to,
-                correlation_id=correlation_id,
-                latency_ms=latency_ms,
-                prompt_hash=prompt_hash,
-                response_text=response_text,
-                evidence_refs=evidence_refs,
-            )
-            validated = validate_semantic_receipt(receipt)
 
         validated["model_runner"] = {
             "provider": provider,
             "model": model,
             "raw_payload_keys": sorted(raw_payload.keys()),
+            "repair_attempts_allowed": repair_attempts,
+            "repair_attempts_used": repair_attempts_used,
         }
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
@@ -348,6 +416,21 @@ def run_model_critic(
             latency_ms=latency_ms,
             reply_to=reply_to,
             correlation_id=correlation_id,
+            evidence_refs=evidence_refs,
+        )
+    except urllib.error.URLError as exc:
+        validated = _failure_receipt(
+            provider=provider,
+            model=model,
+            agent_uid=agent_uid,
+            review_target=review_target,
+            prompt_sha256=prompt_hash,
+            failure_type="provider_unavailable",
+            failure_reason=f"{type(exc).__name__}: {exc}",
+            latency_ms=latency_ms,
+            reply_to=reply_to,
+            correlation_id=correlation_id,
+            raw_response=response_text,
             evidence_refs=evidence_refs,
         )
     except SemanticReceiptValidationError as exc:
@@ -415,6 +498,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--mock-response-file", default="")
     parser.add_argument("--ollama-endpoint", default=DEFAULT_OLLAMA_ENDPOINT)
     parser.add_argument("--timeout-seconds", type=int, default=180)
+    parser.add_argument("--repair-attempts", type=int, default=2)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -430,6 +514,7 @@ def main(argv: list[str] | None = None) -> int:
         mock_response_file=Path(args.mock_response_file) if args.mock_response_file else None,
         ollama_endpoint=args.ollama_endpoint,
         timeout_seconds=args.timeout_seconds,
+        repair_attempts=args.repair_attempts,
     )
     payload = {
         "status": "SEMANTIC_RECEIPT_WRITTEN",

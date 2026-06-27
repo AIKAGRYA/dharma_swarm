@@ -543,10 +543,10 @@ active_tracks:
         kind: file_contains
         file: dharma_swarm/orchestrator.py
         pattern: '(?m)^\s*from dharma_swarm\.spine'
-      - id: agent_runner_calls_spine
+      - id: agent_runner_direct_paths_drained
         kind: file_contains
-        file: dharma_swarm/agent_runner.py
-        pattern: '(?m)^\s*from dharma_swarm\.spine'
+        file: tests/test_spine_dispatch_mode_report.py
+        pattern: 'assert report\["summary"\]\["agent_runner_legacy_direct"\] == 0'
       - id: dispatch_emits_evidence_receipt
         kind: file_contains
         file: tests/test_spine_adoption_dispatch.py

@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "2bbba006f775",
+  "created_at": "2026-06-26T00:14:10Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/2bbba006f775.md"
+  ],
+  "explicit_disagreement": "intent_ack must be a boolean; explicit_disagreement is required when verdict is not pass/approve",
+  "failure_reason": "intent_ack must be a boolean; explicit_disagreement is required when verdict is not pass/approve",
+  "failure_type": "schema_validation_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 3443,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "b2fb779a50c244d97685158b8aa15fe0719404a73962af8fcaee93374c1f74c1",
+  "raw_response_sha256": "4f0140c80cc882955fa880ed01887c8787240a3a7b2ba3d20b5364aad0842333",
+  "receipt_id": "semr_46db8e2f7855431caf4ab6963bd42f45",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "intent_ack must be a boolean; explicit_disagreement is required when verdict is not pass/approve"
+    }
+  ],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.2bbba006f775",
+  "review_target": "a2a:2bbba006f775",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: schema_validation_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

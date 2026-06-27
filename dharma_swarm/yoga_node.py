@@ -173,6 +173,8 @@ class UsageTracker:
     tasks_dispatched_today: int = 0
     provider_calls: dict[str, list[float]] = field(default_factory=dict)
     agent_active_tasks: dict[str, int] = field(default_factory=dict)
+    task_estimated_tokens: dict[str, int] = field(default_factory=dict)
+    daily_token_budget: int = 500_000
     _day_start: float = field(default_factory=lambda: _day_start_ts())
 
     def record_dispatch(
@@ -180,13 +182,17 @@ class UsageTracker:
         agent_id: str,
         provider: ProviderType,
         estimated_tokens: int,
+        task_id: str | None = None,
     ) -> None:
         self._maybe_reset_daily()
-        self.tokens_used_today += estimated_tokens
+        estimate = max(0, int(estimated_tokens))
+        self.tokens_used_today += estimate
         self.tasks_dispatched_today += 1
         self.agent_active_tasks[agent_id] = (
             self.agent_active_tasks.get(agent_id, 0) + 1
         )
+        if task_id:
+            self.task_estimated_tokens[str(task_id)] = estimate
         # Track provider call timestamps for rate limiting
         key = provider.value
         if key not in self.provider_calls:
@@ -198,11 +204,24 @@ class UsageTracker:
             t for t in self.provider_calls[key] if t > cutoff
         ]
 
-    def record_completion(self, agent_id: str, actual_tokens: int = 0) -> None:
+    def record_completion(
+        self,
+        agent_id: str,
+        actual_tokens: int = 0,
+        task_id: str | None = None,
+        refund_estimate: bool = False,
+    ) -> None:
         """Record task completion, free agent capacity."""
         count = self.agent_active_tasks.get(agent_id, 0)
         if count > 0:
             self.agent_active_tasks[agent_id] = count - 1
+        estimate = (
+            self.task_estimated_tokens.pop(str(task_id), 0)
+            if task_id
+            else 0
+        )
+        if refund_estimate and estimate > 0:
+            self.tokens_used_today = max(0, self.tokens_used_today - estimate)
         if actual_tokens > 0:
             # Adjust if actual differs from estimate
             self.tokens_used_today += actual_tokens
@@ -222,17 +241,15 @@ class UsageTracker:
     @property
     def tokens_remaining_today(self) -> int:
         self._maybe_reset_daily()
-        # Global daily budget (sum of all provider limits is too generous;
-        # use a conservative aggregate)
-        daily_budget = 500_000
-        return max(0, daily_budget - self.tokens_used_today)
+        return max(0, self.daily_token_budget - self.tokens_used_today)
 
     @property
     def contraction_level(self) -> ContractionLevel:
         """The R_V of scheduling — how constrained are we?"""
         if self.tokens_remaining_today <= 0:
             return ContractionLevel.CRITICAL
-        utilization = 1.0 - (self.tokens_remaining_today / 500_000)
+        daily_budget = max(1, self.daily_token_budget)
+        utilization = 1.0 - (self.tokens_remaining_today / daily_budget)
         if utilization < 0.3:
             return ContractionLevel.RELAXED
         if utilization < 0.6:
@@ -285,8 +302,8 @@ class YogaScheduler:
     ):
         self.quiet_hours = quiet_hours if quiet_hours is not None else []
         self.max_daily_tasks = max_daily_tasks
-        self.global_token_budget = global_token_budget
-        self.usage = UsageTracker()
+        self.global_token_budget = max(0, int(global_token_budget))
+        self.usage = UsageTracker(daily_token_budget=self.global_token_budget)
         self._capacities: dict[str, AgentCapacity] = {}
 
     def set_agent_capacity(
@@ -512,24 +529,49 @@ class YogaScheduler:
         agent_id: str,
         provider: ProviderType | None,
         estimated_tokens: int,
+        task_id: str | None = None,
     ) -> None:
         """Record that a dispatch happened — update usage tracking."""
         if provider is not None:
-            self.usage.record_dispatch(agent_id, provider, estimated_tokens)
+            self.usage.record_dispatch(
+                agent_id,
+                provider,
+                estimated_tokens,
+                task_id=task_id,
+            )
         else:
             # Track tokens and agent load even without a specific provider
             self.usage._maybe_reset_daily()
-            self.usage.tokens_used_today += estimated_tokens
+            estimate = max(0, int(estimated_tokens))
+            self.usage.tokens_used_today += estimate
             self.usage.tasks_dispatched_today += 1
             self.usage.agent_active_tasks[agent_id] = (
                 self.usage.agent_active_tasks.get(agent_id, 0) + 1
             )
+            if task_id:
+                self.usage.task_estimated_tokens[str(task_id)] = estimate
 
     def record_completion(
-        self, agent_id: str, actual_tokens: int = 0
+        self,
+        agent_id: str,
+        actual_tokens: int = 0,
+        task_id: str | None = None,
     ) -> None:
         """Record task completion — free agent capacity."""
-        self.usage.record_completion(agent_id, actual_tokens)
+        self.usage.record_completion(
+            agent_id,
+            actual_tokens,
+            task_id=task_id,
+            refund_estimate=False,
+        )
+
+    def record_failure(self, agent_id: str, task_id: str | None = None) -> None:
+        """Record failed/no-provider work and refund its dispatch estimate."""
+        self.usage.record_completion(
+            agent_id,
+            task_id=task_id,
+            refund_estimate=True,
+        )
 
     def status(self) -> dict[str, Any]:
         """Current constraint state — the system's R_V reading."""
@@ -537,6 +579,7 @@ class YogaScheduler:
             "contraction_level": self.usage.contraction_level.value,
             "tokens_used_today": self.usage.tokens_used_today,
             "tokens_remaining": self.usage.tokens_remaining_today,
+            "global_token_budget": self.global_token_budget,
             "tasks_dispatched_today": self.usage.tasks_dispatched_today,
             "max_daily_tasks": self.max_daily_tasks,
             "agent_loads": dict(self.usage.agent_active_tasks),

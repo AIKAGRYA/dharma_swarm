@@ -1,0 +1,20 @@
+{
+  "authority": {
+    "broker_write_authority": false,
+    "capital_approval": false,
+    "live_authority": false,
+    "mutates_live_lab_state": false,
+    "operator_approval_granted": false,
+    "order_generation_authority": false,
+    "read_only": true,
+    "route_mutation_authority": false
+  },
+  "capital_root": "/Users/dhyana/dharma_capital",
+  "duration_seconds": 7200.0,
+  "interval_seconds": 600.0,
+  "mission_id": "dharma-capital-2h-evolution-ontology-corrected-20260626T0045Z",
+  "run_dir": "/Users/dhyana/dharma_swarm/reports/capital_lab/dharma_capital_evolution/dharma-capital-2h-evolution-ontology-corrected-20260626T0045Z",
+  "schema_version": "dharma.capital.evolution.run.v1",
+  "snapshot_root": "/Users/dhyana/agni_ginko_trading_history_20260625",
+  "started_at": "2026-06-26T00:41:26Z"
+}

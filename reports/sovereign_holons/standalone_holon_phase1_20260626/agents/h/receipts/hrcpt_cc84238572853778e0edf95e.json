@@ -1,0 +1,46 @@
+{
+  "artifact_refs": [],
+  "created_at": "2026-06-26T03:12:55.590884Z",
+  "digest": "sha256:42d802c0dc11dd2004de5a85ce7b1796c24d06e52cbd219960ac42e8090e6ac7",
+  "kind": "holon_cycle",
+  "payload": {
+    "artifacts": [],
+    "cost_usd": 0.0,
+    "cycle": 108,
+    "error": "",
+    "finish_reason": "stop",
+    "metadata": {
+      "signal": {
+        "at": "2026-06-26T03:12:55.590276Z",
+        "holon": "h",
+        "schema_version": "holon.compass_signal.v1",
+        "telos_alignment": 0.5
+      }
+    },
+    "model": "holon-echo-v1",
+    "provider": "echo",
+    "provider_attempts": [
+      {
+        "cost_usd": 0.0,
+        "error": "",
+        "finish_reason": "stop",
+        "latency_ms": 0,
+        "model": "holon-echo-v1",
+        "provider": "echo",
+        "status": "success"
+      }
+    ],
+    "receipt_refs": [],
+    "reply": "[echo:holon-echo-v1] multi-hour continuity burn-in",
+    "status": "ran",
+    "task": "multi-hour continuity burn-in",
+    "tool_calls": [],
+    "verifier_refs": []
+  },
+  "receipt_id": "hrcpt_cc84238572853778e0edf95e",
+  "schema_version": "holon.runtime_receipt.v1",
+  "side_effect_key": "supervisor:h:108:multi-hour continuity burn-in",
+  "status": "ran",
+  "subject": "h",
+  "verifier_refs": []
+}

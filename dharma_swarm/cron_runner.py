@@ -43,6 +43,7 @@ _ALLOWED_SHELL_COMMAND_PREFIXES = (
     ("python3", "scripts/hermes_heartbeat_poll.py"),
     ("python3", "scripts/check_provider_credits.py"),
     ("python3", "scripts/governance/name_drift_preflight.py"),
+    (".venv/bin/python", "scripts/governance/name_drift_preflight.py"),
 )
 
 

@@ -1,20 +1,23 @@
-"""Minimal standalone holon harness surface for export (like hermes).
+"""Standalone Holon agent runtime."""
 
-This package is the "thin export" of the governed runnable shell + verification + context-bridging.
-
-See docs/sovereign_holons/EXPORT.md for usage and contract.
-"""
-
-from .holon_runtime import holon_wake_cycle, run_holon_loop, AgentRunner
-from .holon_bridge import load_holon, get_holon_provider, holon_reply
-from .memory_kernel import MemoryKernel  # facade re-export for convenience
+from holon.contracts import ArtifactRef, HolonCycleResult, LLMRequest, ProviderAttempt, ToolCallRecord
+from holon.holon_bridge import RunningHolon, get_holon_provider, holon_reply, load_holon
+from holon.holon_runtime import AgentRunner, HolonRuntime, holon_wake_cycle, run_holon_loop
+from holon.memory_kernel import MemoryKernel
 
 __all__ = [
-    "holon_wake_cycle",
-    "run_holon_loop",
     "AgentRunner",
-    "load_holon",
+    "ArtifactRef",
+    "HolonCycleResult",
+    "HolonRuntime",
+    "LLMRequest",
+    "MemoryKernel",
+    "ProviderAttempt",
+    "RunningHolon",
+    "ToolCallRecord",
     "get_holon_provider",
     "holon_reply",
-    "MemoryKernel",
+    "holon_wake_cycle",
+    "load_holon",
+    "run_holon_loop",
 ]

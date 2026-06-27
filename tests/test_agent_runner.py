@@ -15,6 +15,7 @@ from dharma_swarm.agent_runner import AgentPool, AgentRunner, _build_prompt
 from dharma_swarm.lineage import LineageGraph
 from dharma_swarm.message_bus import MessageBus
 from dharma_swarm.ontology import OntologyRegistry
+from dharma_swarm.providers import ProviderChainExecutionError
 from dharma_swarm.stigmergy import StigmergicMark, StigmergyStore
 from dharma_swarm.telic_seam import TelicSeam
 
@@ -87,8 +88,75 @@ async def test_runner_mock_task(config, fast_gate, tmp_path: Path):
     result = await runner.run_task(task)
     assert "test-agent" in result
     assert "Write tests" in result
+    assert task.metadata["provider_execution"] is False
+    assert task.metadata["provider_model_applicability"] == "not_applicable"
+    assert task.metadata["provider_model_truth_source"] == (
+        "agent_runner.no_provider_execution"
+    )
+    assert task.metadata["no_provider_model_reason"] == (
+        "agent_runner_no_provider_attached"
+    )
+    assert runner.provider_execution is False
+    assert runner.provider_model_truth_source == "agent_runner.no_provider_execution"
     assert runner.state.status == AgentStatus.IDLE
     assert runner.state.tasks_completed == 1
+
+
+@pytest.mark.asyncio
+async def test_runner_records_attempted_route_from_provider_chain_failure(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    class FailingRouter:
+        async def complete_for_task(
+            self,
+            route_request,
+            request,
+            *,
+            available_provider_types=None,
+        ):
+            raise ProviderChainExecutionError(
+                "All providers failed in chain ['openrouter'] :: openrouter:402",
+                chain=["openrouter"],
+                failure_trace=[
+                    {
+                        "provider": "openrouter",
+                        "model": "gpt-5.5",
+                        "error": "insufficient_credits",
+                    }
+                ],
+                selected_provider="openrouter",
+                selected_model="gpt-5.5",
+                planned_provider="openrouter",
+                planned_model="gpt-5.5",
+            )
+
+        def record_task_feedback(self, **kwargs):
+            return None
+
+    isolated_config = _with_state_dir(
+        config.model_copy(update={"provider": ProviderType.OPENROUTER}),
+        tmp_path,
+    )
+    runner = AgentRunner(
+        isolated_config,
+        provider=FailingRouter(),
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    with pytest.raises(ProviderChainExecutionError):
+        await runner.run_task(Task(title="Route failure receipt proof"))
+
+    assert runner.selected_provider == "openrouter"
+    assert runner.selected_model == "gpt-5.5"
+    assert runner.provider_model_truth_source == "agent_runner.provider_chain_failure"
+    assert runner.provider_execution is True
+    assert runner.provider_model_applicability == "failed_before_serve"
+    assert runner.provider_model_missing_reason == (
+        "provider_chain_failed_before_actual_served_response"
+    )
 
 
 @pytest.mark.asyncio
@@ -162,7 +230,7 @@ async def test_runner_exposes_actual_served_route_from_llm_response(
     assert result.startswith("Implemented fix")
     assert runner.actual_served_provider == "openrouter"
     assert runner.actual_served_model == "qwen3-coder-live"
-    assert runner.provider_model_truth_source == "agent_runner.llm_response"
+    assert runner.provider_model_truth_source == "runtime_provider.actual_served"
     assert runner.served_provider == "openrouter"
     assert runner.served_model == "qwen3-coder-live"
 
@@ -193,7 +261,54 @@ async def test_runner_exposes_direct_runtime_provider_label_when_response_provid
     assert result.startswith("Implemented fix")
     assert runner.actual_served_provider == "nvidia_nim"
     assert runner.actual_served_model == "llama-3.3-70b"
-    assert runner.provider_model_truth_source == "agent_runner.runtime_provider_object"
+    assert runner.provider_model_truth_source == "runtime_provider.actual_served"
+
+
+@pytest.mark.asyncio
+async def test_runner_preserves_served_route_when_local_tool_fails_after_provider(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    provider = AsyncMock()
+    provider.complete = AsyncMock(
+        return_value=LLMResponse(
+            content="",
+            model="glm-5-live",
+            provider="ollama",
+            tool_calls=[
+                {
+                    "id": "tool-call-1",
+                    "name": "write_file",
+                    "arguments": {
+                        "path": "/System/Volumes/Data/home/eval_probe_result.md",
+                        "content": "result",
+                    },
+                }
+            ],
+        )
+    )
+    runner = AgentRunner(
+        _with_state_dir(config, tmp_path),
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    async def _raise_tool_error(*args, **kwargs):
+        raise OSError("operation not supported")
+
+    runner._execute_local_tool = _raise_tool_error
+
+    request = _build_prompt(Task(title="Use local tool"), runner._config)
+    with pytest.raises(OSError):
+        await runner._complete_with_tool_loop(Task(title="Use local tool"), request)
+
+    assert runner.actual_served_provider == "ollama"
+    assert runner.actual_served_model == "glm-5-live"
+    assert runner.provider_model_truth_source == "runtime_provider.actual_served"
+    assert runner.provider_execution is True
+    assert runner.provider_model_applicability == "actual_served"
 
 
 @pytest.mark.asyncio
@@ -634,6 +749,131 @@ async def test_runner_auto_executes_tool_loop_for_api_provider_shell_task(
     assert target.read_text(encoding="utf-8") == "hello from api lane\n"
     assert runner.state.tasks_completed == 1
     assert provider.complete.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_runner_respects_no_file_edits_as_direct_answer(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    isolated_config = _with_state_dir(
+        config.model_copy(
+            update={
+                "provider": ProviderType.OPENROUTER,
+                "role": AgentRole.SURGEON,
+                "metadata": {
+                    **config.metadata,
+                    "working_dir": str(tmp_path),
+                },
+            }
+        ),
+        tmp_path,
+    )
+    provider = AsyncMock()
+    provider.capabilities = ProviderCapabilities(supports_tools=True)
+
+    async def _complete(request):
+        assert not request.tools
+        return LLMResponse(
+            content=(
+                "Findings: the daemon receipt path was exercised without file edits. "
+                "Evidence: the task requested a direct status result and no local side effects. "
+                "Next actions: keep the daemon alive and run the receipt coverage check."
+            ),
+            model="test-openrouter",
+            stop_reason="stop",
+        )
+
+    provider.complete = AsyncMock(side_effect=_complete)
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(
+        Task(
+            title="L4 daemon receipt smoke: patched retrieval guard",
+            description="Do not edit files. Return a short result stating the daemon task receipt path exercised.",
+        )
+    )
+
+    assert "receipt path was exercised" in result
+    assert provider.complete.await_count == 1
+    assert runner.state.tasks_completed == 1
+
+
+@pytest.mark.asyncio
+async def test_runner_finalizes_non_side_effect_tool_loop_after_budget(
+    config,
+    fast_gate,
+    tmp_path: Path,
+):
+    isolated_config = _with_state_dir(
+        config.model_copy(
+            update={
+                "provider": ProviderType.OPENROUTER,
+                "metadata": {
+                    **config.metadata,
+                    "working_dir": str(tmp_path),
+                },
+            }
+        ),
+        tmp_path,
+    )
+    provider = AsyncMock()
+    provider.capabilities = ProviderCapabilities(supports_tools=True)
+
+    async def _complete(request):
+        call_index = provider.complete.await_count
+        if call_index == 1:
+            assert request.tools
+            return LLMResponse(
+                content="",
+                model="test-openrouter",
+                tool_calls=[
+                    {
+                        "id": "call-glob-1",
+                        "name": "glob_files",
+                        "parameters": {"pattern": "*.nothing"},
+                    }
+                ],
+                stop_reason="tool_calls",
+            )
+
+        assert not request.tools
+        assert "Do not call more tools" in request.messages[-1]["content"]
+        return LLMResponse(
+            content=(
+                "Findings: the bounded tool loop completed with no matching files. "
+                "Evidence: the final answer was produced after the configured round budget. "
+                "Next actions: report the bounded outcome and avoid another tool call."
+            ),
+            model="test-openrouter",
+            stop_reason="stop",
+        )
+
+    provider.complete = AsyncMock(side_effect=_complete)
+    runner = AgentRunner(
+        isolated_config,
+        provider=provider,
+        ontology_path=_ontology_path(tmp_path),
+    )
+    await runner.start()
+
+    result = await runner.run_task(
+        Task(
+            title="Research status",
+            description="Use bounded local context if needed, then summarize the result.",
+            metadata={"requires_tooling": True, "max_tool_rounds": 1},
+        )
+    )
+
+    assert "bounded tool loop completed" in result
+    assert provider.complete.await_count == 2
+    assert runner.state.tasks_completed == 1
 
 
 @pytest.mark.asyncio

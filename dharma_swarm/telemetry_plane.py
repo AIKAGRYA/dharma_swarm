@@ -177,6 +177,27 @@ CREATE TABLE IF NOT EXISTS external_outcomes (
     created_at TEXT NOT NULL
 )"""
 
+_PROVIDER_ATTEMPTS_DDL = """
+CREATE TABLE IF NOT EXISTS provider_attempts (
+    decision_id TEXT NOT NULL,
+    attempt_idx INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL DEFAULT '',
+    tier TEXT NOT NULL DEFAULT 'unknown',
+    success INTEGER NOT NULL DEFAULT 0,
+    outcome TEXT NOT NULL DEFAULT 'unknown',
+    error_class TEXT NOT NULL DEFAULT '',
+    error_detail TEXT NOT NULL DEFAULT '',
+    duration_ms REAL NOT NULL DEFAULT 0.0,
+    stop_reason TEXT NOT NULL DEFAULT '',
+    usage_json TEXT NOT NULL DEFAULT '{}',
+    cost_estimate_usd REAL NOT NULL DEFAULT 0.0,
+    circuit_state TEXT NOT NULL DEFAULT 'closed',
+    schema_version TEXT NOT NULL DEFAULT 'v1',
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (decision_id, attempt_idx)
+)"""
+
 _OVERNIGHT_METRICS_DDL = """
 CREATE TABLE IF NOT EXISTS overnight_metrics (
     metric_id TEXT PRIMARY KEY,
@@ -200,6 +221,8 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_intervention_task_created ON intervention_outcomes(task_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_economic_kind_created ON economic_events(event_kind, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_external_kind_created ON external_outcomes(outcome_kind, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_provider_attempts_created ON provider_attempts(created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_provider_attempts_provider_created ON provider_attempts(provider, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_overnight_date_metric ON overnight_metrics(date, metric_name)",
 ]
 
@@ -238,6 +261,41 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
 
 
+def _provider_attempt_projection(record: ExternalOutcomeRecord) -> tuple[Any, ...] | None:
+    if record.outcome_kind != "provider_attempt":
+        return None
+    metadata = record.metadata or {}
+    provider = str(metadata.get("provider") or record.subject_id or "").strip()
+    if not provider:
+        provider = "unknown"
+    model = str(metadata.get("model") or "").strip()
+    error = str(metadata.get("error") or "").strip()
+    total_tokens = int(metadata.get("total_tokens") or 0)
+    usage = {
+        "total_tokens": total_tokens,
+    }
+    success = record.status == "succeeded" or float(record.value) > 0.0
+    outcome = "success" if success else (error or record.status or "failed")
+    return (
+        record.outcome_id,
+        1,
+        provider,
+        model,
+        str(metadata.get("tier") or "unknown"),
+        1 if success else 0,
+        outcome,
+        error,
+        error,
+        float(metadata.get("latency_ms") or 0.0),
+        str(metadata.get("stop_reason") or ""),
+        _json_dump(usage),
+        float(metadata.get("cost_estimate_usd") or 0.0),
+        str(metadata.get("circuit_state") or "closed"),
+        "v1",
+        record.created_at.isoformat(),
+    )
+
+
 def _apply_connection_pragmas_sync(db: sqlite3.Connection) -> None:
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("PRAGMA foreign_keys=ON")
@@ -263,6 +321,7 @@ def ensure_telemetry_schema_sync(db: sqlite3.Connection) -> None:
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
         _EXTERNAL_OUTCOMES_DDL,
+        _PROVIDER_ATTEMPTS_DDL,
         _OVERNIGHT_METRICS_DDL,
     ):
         db.execute(ddl)
@@ -284,6 +343,7 @@ async def ensure_telemetry_schema_async(db: aiosqlite.Connection) -> None:
         _INTERVENTION_OUTCOMES_DDL,
         _ECONOMIC_EVENTS_DDL,
         _EXTERNAL_OUTCOMES_DDL,
+        _PROVIDER_ATTEMPTS_DDL,
         _OVERNIGHT_METRICS_DDL,
     ):
         await db.execute(ddl)
@@ -1178,6 +1238,7 @@ class TelemetryPlaneStore:
         record: ExternalOutcomeRecord,
     ) -> ExternalOutcomeRecord:
         await self.init_db()
+        provider_attempt = _provider_attempt_projection(record)
         async with self._open() as db:
             await db.execute(
                 "INSERT INTO external_outcomes (outcome_id, session_id, task_id,"
@@ -1199,6 +1260,16 @@ class TelemetryPlaneStore:
                     record.created_at.isoformat(),
                 ),
             )
+            if provider_attempt is not None:
+                await db.execute(
+                    "INSERT OR REPLACE INTO provider_attempts (decision_id,"
+                    " attempt_idx, provider, model, tier, success, outcome,"
+                    " error_class, error_detail, duration_ms, stop_reason,"
+                    " usage_json, cost_estimate_usd, circuit_state,"
+                    " schema_version, created_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    provider_attempt,
+                )
             await db.commit()
         return record
 

@@ -1,0 +1,22 @@
+{
+  "agent_uid": "codex_composer",
+  "authenticated_target_runtime_claim": false,
+  "delivery_record_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/holon-source-audit-codex-20260626.json",
+  "domain_reply_artifact_author_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_artifacts/20260626T011809Z-codex_composer-holon-source-audit-codex-20260626.json",
+  "domain_reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/codex_composer/holon-source-audit-codex-20260626-domain-reply.json",
+  "handler_ack_is_semantic_cognition": false,
+  "operator_contact_note": "This records a typed semantic drain failure and target-owned artifact creation; it is not a semantic cognition proof. Publishing remains scripts/runtime/a2a_domain_reply_worker.py.",
+  "packet_id": "holon-source-audit-codex-20260626",
+  "peer_model_processed_claim": false,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_ultra/codex_composer-source-audit-prompt.md",
+  "reply_subject": "dharma.agent.codex_composer.inbox.reply.holon-source-audit-codex-20260626",
+  "schema_version": "dharma.a2a.codex_composer_semantic_inbox_drain.v1",
+  "semantic_audit_depth": "source_audit",
+  "semantic_receipt_id": "semr_274eda8a468941c896c2a2b011ce2f43",
+  "semantic_receipt_path": "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T011809Z-ollama-mistral_latest-semr_274eda8a468941c896c2a2b011ce2f43.json",
+  "semantic_reply_claim": false,
+  "source_audit_claim": false,
+  "status": "SEMANTIC_INBOX_DRAIN_TYPED_FAILURE",
+  "timestamp": "2026-06-26T01:18:09Z",
+  "typed_reply_publish_required_next": true
+}

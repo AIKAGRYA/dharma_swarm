@@ -33,14 +33,12 @@ from dharma_swarm.models import (
     AgentConfig,
     AgentRole,
     AgentState,
-    AgentStatus,
     MemoryLayer,
     ProviderType,
     SwarmState,
     Task,
     TaskPriority,
     TaskStatus,
-    TopologyType,
 )
 from dharma_swarm.providers import create_default_router
 
@@ -71,7 +69,7 @@ if TYPE_CHECKING:
     from dharma_swarm.thinkodynamic_director import ThinkodynamicDirector
     from dharma_swarm.thread_manager import ThreadManager
     from dharma_swarm.traces import TraceStore
-    from dharma_swarm.organism import OrganismRuntime, HeartbeatResult
+    from dharma_swarm.organism import OrganismRuntime
     from dharma_swarm.witness import WitnessAuditor
 
 logger = logging.getLogger(__name__)
@@ -118,6 +116,7 @@ class SwarmManager:
         self,
         state_dir: Path | str = ".dharma",
         daemon_config: DaemonConfig | None = None,
+        read_only_boot: bool | None = None,
     ):
         self.state_dir = Path(state_dir)
         self._start_time = time.monotonic()
@@ -207,7 +206,7 @@ class SwarmManager:
             "yes",
             "on",
         }
-        self._read_only_boot = str(
+        env_read_only_boot = str(
             os.environ.get("DHARMA_READ_ONLY_BOOT", "")
         ).strip().lower() in {
             "1",
@@ -215,6 +214,11 @@ class SwarmManager:
             "yes",
             "on",
         }
+        self._read_only_boot = (
+            bool(read_only_boot)
+            if read_only_boot is not None
+            else env_read_only_boot
+        )
 
         # Daemon state
         self._last_contribution: datetime | None = None
@@ -645,14 +649,27 @@ class SwarmManager:
         await self._event_memory.init_db()
         self._telemetry = TelemetryPlaneStore(state_runtime_db)
         await self._telemetry.init_db()
+        attach_telemetry = getattr(self._router, "attach_telemetry", None)
+        if callable(attach_telemetry):
+            attach_telemetry(self._telemetry)
 
         self._agent_pool = AgentPool()
         self._gatekeeper = DEFAULT_GATEKEEPER
         self._thread_mgr = ThreadManager(self._daemon, self.state_dir)
 
+        try:
+            yoga_token_budget = int(
+                os.environ.get(
+                    "DGC_YOGA_TOKEN_BUDGET",
+                    os.environ.get("DHARMA_YOGA_TOKEN_BUDGET", "500000"),
+                )
+            )
+        except (TypeError, ValueError):
+            yoga_token_budget = 500_000
         self._yoga = YogaScheduler(
             quiet_hours=self._daemon.quiet_hours,
             max_daily_tasks=self._daemon.max_daily_contributions * 5,
+            global_token_budget=max(0, yoga_token_budget),
         )
         self._orchestrator = Orchestrator(
             task_board=self._task_board,
@@ -1802,10 +1819,13 @@ class SwarmManager:
             tasks = await self._task_board.list_tasks(status=status, limit=500)
             for task in tasks:
                 agent_id = task.assigned_to or ""
-                # Orphaned: agent not in current pool AND task is stale
-                if agent_id in live_ids:
+                # Orphaned: a non-empty assigned agent ID that is absent from
+                # the current pool cannot come back after a daemon restart.
+                # Keep the age threshold only for ambiguous unassigned rows.
+                if agent_id and agent_id in live_ids:
                     continue
-                if task.updated_at > cutoff:
+                dead_agent_assignment = bool(agent_id and agent_id not in live_ids)
+                if not dead_agent_assignment and task.updated_at > cutoff:
                     continue  # recently touched, give it time
 
                 meta = dict(task.metadata or {})
@@ -1816,11 +1836,32 @@ class SwarmManager:
                 meta.pop("retry_not_before_epoch", None)
 
                 try:
-                    await self._task_board.requeue(
-                        task.id,
-                        reason=f"Orphan reaper: agent {agent_id[:12]} no longer in pool",
-                        metadata=meta,
+                    reason = f"Orphan reaper: agent {agent_id[:12]} no longer in pool"
+                    retry_count = self._coerce_int(meta.get("retry_count"), 0)
+                    max_retries = self._coerce_int(meta.get("max_retries"), 0)
+                    retry_policy_known = "retry_count" in meta or "max_retries" in meta
+                    exhausted_failure = (
+                        status == TaskStatus.RUNNING
+                        and retry_policy_known
+                        and retry_count >= max_retries
+                        and bool(str(task.result or meta.get("last_error") or "").strip())
                     )
+                    if exhausted_failure:
+                        meta["orphan_terminal_failure"] = True
+                        meta["last_failure_source"] = str(
+                            meta.get("last_failure_source") or "orphan_reaper"
+                        )
+                        await self._task_board.fail(
+                            task.id,
+                            reason,
+                            metadata=meta,
+                        )
+                    else:
+                        await self._task_board.requeue(
+                            task.id,
+                            reason=reason,
+                            metadata=meta,
+                        )
                     refreshed = await self._task_board.get(task.id)
                     if refreshed is not None:
                         reaped.append(refreshed)
@@ -2326,7 +2367,8 @@ class SwarmManager:
             except Exception:
                 pass
         if allow_autonomous_generation and not _has_real_tasks:
-            import time as _t; _t0 = _t.monotonic()
+            import time as _t
+            _t0 = _t.monotonic()
             try:
                 reopened = await asyncio.wait_for(
                     self.spawn_latent_gold_tasks(), timeout=20.0

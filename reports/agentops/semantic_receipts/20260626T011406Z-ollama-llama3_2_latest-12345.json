@@ -1,0 +1,73 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "true",
+      "path": "/holon/standalone/holon_isolation"
+    },
+    {
+      "condition": "false",
+      "path": "/holon/provider/tool/budget/artifact"
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 1.0,
+  "correlation_id": "holon-source-audit-codex-20260626",
+  "created_at": "2026-06-26T01:14:06Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "a2a_source_audit/HOLON_SOURCE_AUDIT_PACKET.md",
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_tiny/codex_composer-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": true,
+  "missing_context": [],
+  "model_call_latency_ms": 17927,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "llama3.2:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 1
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "cb25641fd8ab60cefd289561d910992e6adfd72ca49156b15bdd5a334aa683c1",
+  "raw_response_sha256": "5b675fe8f1ee31484a3e7fadfb24fe92f53f22e4df2cc488faf8a489eb6f4aa9",
+  "receipt_id": "12345",
+  "recommendations": [],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.holon-source-audit-codex-20260626",
+  "review_target": "a2a:holon-source-audit-codex-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "Pass on holon isolation with no cloud source review",
+  "understood_request": true,
+  "verdict": "pass"
+}

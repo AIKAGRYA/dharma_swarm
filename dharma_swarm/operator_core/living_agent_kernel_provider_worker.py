@@ -398,6 +398,9 @@ async def execute_provider_worker_cycle(
             request=request,
             workspace_root=workspace,
         )
+        soft_failure = _provider_soft_failure_error(response)
+        if soft_failure:
+            raise RuntimeError(soft_failure)
     except Exception as exc:
         error = f"{type(exc).__name__}: {exc}"
         receipt = provider_store.append_receipt(
@@ -621,6 +624,27 @@ def _summary(content: str) -> str:
     if not cleaned:
         return "Provider returned an empty response."
     return cleaned[:240]
+
+
+def _provider_soft_failure_error(response: LLMResponse) -> str:
+    cleaned = " ".join(str(response.content or "").split())
+    lowered = cleaned.lower()
+    if lowered.startswith("error (rc="):
+        return f"provider_soft_failure: {cleaned[:240]}"
+    patterns = (
+        "credit balance is too low",
+        "insufficient credits",
+        "insufficient_credit",
+        "insufficient_quota",
+        "quota exceeded",
+        "billing hard limit",
+        "authentication failed",
+        "invalid api key",
+    )
+    for pattern in patterns:
+        if pattern in lowered:
+            return f"provider_soft_failure: {cleaned[:240]}"
+    return ""
 
 
 def _lease_ref(path: Path, lease: KernelExternalWorkerLease) -> dict[str, Any]:

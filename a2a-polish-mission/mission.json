@@ -1,0 +1,8 @@
+
+{
+    "schema_version": "dharma.ds_goal_spine.v1",
+    "mission_id": "a2a-polish-mission",
+    "goal": "Polish the A2A system in accordance with the latest repo rules (see docs/LIVING_SPEC.md). Your work is to define and document a lean, simple, and robust A2A protocol. You will collaborate with perplexity-computer. Opus-composer is currently offline. Produce a SHARED_PICTURE.md file in a 'proposals' directory for operator review. Do not implement changes directly.",
+    "created_at": "2026-06-17T04:35:00Z",
+    "operator": "John"
+}

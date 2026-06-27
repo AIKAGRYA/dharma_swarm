@@ -19,6 +19,13 @@ from datetime import datetime
 
 HOME = Path.home()
 
+_JK_LIVE_AUTHORITY_NOTE = (
+    "Live ecological execution authority is the in-repo GAIA proof chain "
+    "(gaia_platform.py, ai_reciprocity_ledger.py, gaia_initiative.py, and the "
+    "2026-06-20 execution spine). External ~/jagat_kalyan paths are "
+    "continuity-only until restored."
+)
+
 # The complete map of Dhyana's filesystem
 ECOSYSTEM: dict[str, dict] = {
     "research": {
@@ -93,21 +100,39 @@ ECOSYSTEM: dict[str, dict] = {
         ],
     },
     "jagat_kalyan": {
-        "description": "Jagat Kalyan -- AI-coordinated ecological restoration",
+        "description": "Jagat Kalyan / GAIA ecological restoration authority and continuity references",
+        "authority_note": _JK_LIVE_AUTHORITY_NOTE,
         "paths": [
-            ("~/jagat_kalyan/", "JK project root -- FastAPI MVP"),
-            ("~/jagat_kalyan/app.py", "FastAPI application (17KB)"),
-            ("~/jagat_kalyan/matching.py", "Claude API + heuristic matching engine"),
-            ("~/jagat_kalyan/models.py", "SQLAlchemy models (Project, Funder, Match, Outcome)"),
-            ("~/jagat_kalyan/WELFARE_TONS_SPEC.md", "Mathematical spec: W = C*E*A*B*V*P (69KB)"),
-            ("~/jagat_kalyan/anthropic_grant_application.md", "$35K Anthropic Economic Futures grant app"),
-            ("~/jagat_kalyan/PARTNER_RESEARCH.md", "33 orgs across 6 categories"),
-            ("~/jagat_kalyan/CARBON_ATTRIBUTION_FEASIBILITY.md", "Per-inference carbon feasibility study"),
-            ("~/jagat_kalyan/SCOUT_LOG.md", "Autonomous intel gathering log"),
-            ("~/jagat_kalyan/EVOLUTION_LOG.md", "Codebase evolution history"),
-            ("~/jagat_kalyan/pitches/", "3 pitch variants (one-pager, Anthropic, Substack)"),
+            ("~/dharma_swarm/dharma_swarm/gaia_platform.py", "Live GAIA operator surface: intake, qualification, claim-card, and measurement packets"),
+            ("~/dharma_swarm/dharma_swarm/ai_reciprocity_ledger.py", "Live reciprocity trust kernel: activity, obligation, routing, evidence, and audit"),
+            ("~/dharma_swarm/dharma_swarm/gaia_initiative.py", "Standards-aligned initiative packet adapter into the GAIA intake lane"),
+            ("~/dharma_swarm/docs/missions/2026-06-20_jagat_kalyan_gaia_execution_spine.md", "Current ecological execution spine and authority boundary"),
+            ("~/jagat_kalyan/", "Legacy external JK root -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/app.py", "Legacy FastAPI application reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/matching.py", "Legacy matching engine reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/models.py", "Legacy SQLAlchemy model reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/WELFARE_TONS_SPEC.md", "Legacy welfare-tons spec reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/anthropic_grant_application.md", "Legacy Anthropic grant draft reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/PARTNER_RESEARCH.md", "Legacy partner-research reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/CARBON_ATTRIBUTION_FEASIBILITY.md", "Legacy carbon-attribution study reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/SCOUT_LOG.md", "Legacy scouting log reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/EVOLUTION_LOG.md", "Legacy evolution log reference -- continuity-only, currently missing locally"),
+            ("~/jagat_kalyan/pitches/", "Legacy pitch set reference -- continuity-only, currently missing locally"),
             ("~/.dharma/shared/jk_pulse.md", "JK momentum heartbeat"),
             ("~/.dharma/shared/jk_alert.md", "HIGH URGENCY alerts for morning brief"),
+        ],
+        "continuity_only_paths": [
+            "~/jagat_kalyan/",
+            "~/jagat_kalyan/app.py",
+            "~/jagat_kalyan/matching.py",
+            "~/jagat_kalyan/models.py",
+            "~/jagat_kalyan/WELFARE_TONS_SPEC.md",
+            "~/jagat_kalyan/anthropic_grant_application.md",
+            "~/jagat_kalyan/PARTNER_RESEARCH.md",
+            "~/jagat_kalyan/CARBON_ATTRIBUTION_FEASIBILITY.md",
+            "~/jagat_kalyan/SCOUT_LOG.md",
+            "~/jagat_kalyan/EVOLUTION_LOG.md",
+            "~/jagat_kalyan/pitches/",
         ],
     },
     "foundations": {
@@ -170,6 +195,9 @@ def get_context_for(domain: str) -> str:
     for d in domains:
         info = ECOSYSTEM[d]
         parts.append(f"\n## {d.upper()}: {info['description']}")
+        authority_note = info.get("authority_note")
+        if authority_note:
+            parts.append(f"  Authority: {authority_note}")
         for path_str, desc in info["paths"]:
             path = Path(path_str).expanduser()
             exists = path.exists()
@@ -185,11 +213,16 @@ def check_health() -> dict[str, int | dict[str, str]]:
 
     Returns:
         Dict with 'ok' count, 'missing' count, and 'details' of missing paths.
+        Adds 'stale_authority' and 'authority_details' for missing continuity-only
+        references that should not be treated as live execution authority.
     """
     ok = 0
     missing = 0
+    stale_authority = 0
     details: dict[str, str] = {}
+    authority_details: dict[str, str] = {}
     for _domain, info in ECOSYSTEM.items():
+        continuity_only = set(info.get("continuity_only_paths", []))
         for path_str, desc in info["paths"]:
             path = Path(path_str).expanduser()
             if path.exists():
@@ -197,7 +230,16 @@ def check_health() -> dict[str, int | dict[str, str]]:
             else:
                 missing += 1
                 details[path_str] = f"MISSING -- {desc}"
-    return {"ok": ok, "missing": missing, "details": details}
+                if path_str in continuity_only:
+                    stale_authority += 1
+                    authority_details[path_str] = f"CONTINUITY_ONLY -- {desc}"
+    return {
+        "ok": ok,
+        "missing": missing,
+        "details": details,
+        "stale_authority": stale_authority,
+        "authority_details": authority_details,
+    }
 
 
 if __name__ == "__main__":

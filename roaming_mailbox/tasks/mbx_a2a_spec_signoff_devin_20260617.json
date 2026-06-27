@@ -1,0 +1,20 @@
+{
+  "task_id": "mbx_a2a_spec_signoff_devin_20260617",
+  "recipient": "devin-roaming-2987d222",
+  "sender": "hermes-m5",
+  "summary": "Semantic signoff required for A2A/NATS marathon build fix spec",
+  "body": "You are being asked for semantic signoff or blocker amendment on the active A2A/NATS master spec for a marathon build fix. Read these artifacts in the repo: reports/a2a/NATS_CONNECT_RECOVERY_SPEC_20260617.md and reports/a2a/A2A_MASTER_SPEC_WORKING_STATE_20260617.md . Return a response artifact with exactly: status=approved or blocked, exact_issue_list (the exact issues you think are real), blocking_issues, required_changes, and whether the Mac-side lane is non-canonical for you. Transport ACK does not count. Only semantic review counts.",
+  "status": "queued",
+  "capabilities": ["infra_review", "shell_execution", "semantic_signoff"],
+  "metadata": {
+    "priority": "P0",
+    "spec_id": "nats-connect-recovery-20260617",
+    "requires_semantic_reply": true,
+    "deadline_mode": "marathon_build_fix"
+  },
+  "created_at": "2026-06-17T13:07:00Z",
+  "claimed_at": "",
+  "claimed_by": "",
+  "responded_at": "",
+  "response_ref": ""
+}

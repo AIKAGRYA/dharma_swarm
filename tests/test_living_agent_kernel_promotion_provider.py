@@ -257,6 +257,34 @@ def test_promoted_provider_worker_executes_wake_with_fixture_response(tmp_path):
     assert wake_ok, wake_errors
 
 
+def test_provider_worker_marks_soft_provider_failure_as_failed(tmp_path):
+    store_dir = tmp_path / "kernel"
+    _promote_provider_agent(store_dir)
+    kernel = LivingAgentKernel(store=KernelRunStore(store_dir), workspace_root=tmp_path)
+    kernel.enqueue_wake(_envelope("soft-failure"), wake_id="wake-soft-failure")
+
+    result = execute_provider_worker_cycle_sync(
+        store_dir=store_dir,
+        workspace_root=tmp_path,
+        worker_id="provider-worker",
+        agent_uid="promoted_agent",
+        provider="openrouter_free",
+        model="fixture-model",
+        allowed_sources=["manual"],
+        fixture_response="Credit balance is too low",
+        now="2026-06-06T00:00:01Z",
+    )
+    latest = KernelRunStore(store_dir).latest_wake_records()["wake-soft-failure"]
+    provider_receipt = KernelProviderWorkerStore(store_dir).receipts()[0]
+
+    assert result.status == "failed"
+    assert latest.status == "failed"
+    assert latest.result_ref["payload_ref"]["provider_execution"] is True
+    assert "provider_soft_failure" in latest.result_ref["payload_ref"]["error"]
+    assert provider_receipt.status == "failed"
+    assert "Credit balance is too low" in provider_receipt.error
+
+
 def test_provider_worker_accepts_injected_async_provider_client(tmp_path):
     store_dir = tmp_path / "kernel"
     _promote_provider_agent(store_dir)

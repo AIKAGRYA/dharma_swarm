@@ -10,6 +10,7 @@ All filesystem state is under tmp_path; the canonical ``~/.dharma/agents`` is ne
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -132,3 +133,42 @@ def test_blank_lines_ignored(tmp_path):
 def test_non_dict_record_rejected(tmp_path):
     with pytest.raises(TypeError):
         holon_persistence.save_cycle_record("h", ["not", "a", "dict"], agents_root=tmp_path)  # type: ignore[arg-type]
+
+
+def test_append_talk_receipt_writes_ledger_and_conversation_receipt(tmp_path):
+    receipt = holon_persistence.append_talk_receipt(
+        "h",
+        {
+            "session_id": "holon-h",
+            "model": "test-model",
+            "you": "status?",
+            "reply": "read-only status",
+            "context_refs": ["identity.json"],
+        },
+        agents_root=tmp_path,
+    )
+
+    ledger = tmp_path / "h" / "talk_receipts.jsonl"
+    strict_receipt = tmp_path / "h" / "dialogue" / "conversation_receipts"
+    assert ledger.exists()
+    assert strict_receipt.exists()
+    ledger_row = json.loads(ledger.read_text(encoding="utf-8").splitlines()[0])
+    receipt_path = tmp_path / "h" / "dialogue" / "conversation_receipts" / Path(receipt["receipt_path"]).name
+    strict_row = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert ledger_row["schema_version"] == "dharma.holon_conversation_receipt.v1"
+    assert ledger_row["receipt_path"] == str(receipt_path)
+    assert strict_row["reply_sha256"] == ledger_row["reply_sha256"]
+    assert strict_row["policy_ceiling"] == "read_only_dialogue_no_privileged_action"
+
+
+def test_load_talk_receipts_skips_malformed_lines(tmp_path):
+    holon_persistence.append_talk_receipt("h", {"you": "a", "reply": "b"}, agents_root=tmp_path)
+    ledger = tmp_path / "h" / "talk_receipts.jsonl"
+    with ledger.open("a", encoding="utf-8") as fh:
+        fh.write("{bad json\n")
+    holon_persistence.append_talk_receipt("h", {"you": "c", "reply": "d"}, agents_root=tmp_path)
+
+    receipts = holon_persistence.load_talk_receipts("h", agents_root=tmp_path)
+
+    assert len(receipts) == 2
+    assert [item["you"] for item in receipts] == ["a", "c"]

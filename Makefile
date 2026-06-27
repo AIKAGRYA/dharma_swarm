@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -42,7 +42,7 @@ help:
 	@echo "  make docker-up    Start via docker-compose (includes health + cron)"
 	@echo "  make docker-down  Stop docker-compose stack"
 	@echo "  make gh-auth      Authenticate gh CLI (needed for Guardian Crew issues)"
-	@echo "  make live         Run dgc orchestrate-live in foreground (dev mode)"
+	@echo "  make live         Run repo-pinned orchestrate-live in foreground (dev mode)"
 	@echo "  make semgrep      Run governance Semgrep rules"
 	@echo "  make gitleaks     Scan for secrets"
 	@echo "  make precommit-run Run pre-commit on all files"
@@ -56,6 +56,12 @@ help:
 	@echo "  make semantic-commons-check Validate Semantic Commons registry and orientation routes"
 	@echo "  make semantic-commons-project Generate read-only Obsidian/PKM Semantic Commons projections"
 	@echo "  make agent-admit ARGS='...' Run read-only persistent-agent admission checks"
+	@echo "  make onboard-agent AGENT_NAME=codex_composer Run read-only named-agent orientation"
+	@echo "  make codex-composer-bootstrap Create/update codex_composer wake nest"
+	@echo "  make codex-composer-once Run one read-only codex_composer wake cycle"
+	@echo "  make codex-composer-status Render codex_composer wake status"
+	@echo "  make codex-composer-start ARGS='--activation-lease <id>' Start lease-gated wake loop"
+	@echo "  make codex-composer-stop Stop codex_composer wake loop if present"
 	@echo "  make docops-integrity Run machine-verifiable documentation checks"
 	@echo "  make docops-report Generate local DocOps JSON/Markdown reports"
 	@echo "  make ci-truth ARGS='--pr 123' Evaluate GitHub checks against the CI truth contract"
@@ -80,6 +86,12 @@ help:
 	@echo "  make memory-kernel-knowledgeops-bridge-smoke Smoke KnowledgeOps to MemoryKernel promotion bridge"
 	@echo "  make memory-kernel-full-power-preflight Run M2-M5 governed live preflight"
 	@echo "  make operator-prod-smoke Run fast read-only operator production smoke"
+	@echo "  make runtime-truth-ci Run deterministic runtime truth invariant CI gates"
+	@echo "  make runtime-truth-closeout ARGS='--allow-paused' Run runtime truth closeout gate"
+	@echo "  make runtime-truth-burn-in ARGS='--duration-seconds 7200' Run strict unpaused runtime truth burn-in"
+	@echo "  make runtime-truth-burn-in-smoke Run paused runtime truth burn-in smoke"
+	@echo "  make runtime-truth-100-audit Run final live evidence audit for 100/100 readiness"
+	@echo "  make runtime-task-firebreak ARGS='--json' Dry-run task backlog firebreak"
 	@echo "  make ds-goal-longrun-preflight-check Block unpinned repo-owned ds-goal longrun workflow commands"
 	@echo "  make cybernetics-codex-audit Render read-only cybernetic loop closure ledger"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
@@ -128,7 +140,7 @@ guardian:
 	@curl -s http://localhost:7433/guardian | python3 -m json.tool | python3 -c "import sys,json; print(json.load(sys.stdin)['report'])"
 
 live:
-	TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live
+	TINY_ROUTER_BACKEND=heuristic $(REPO_PYTHON) -m dharma_swarm.dgc_cli orchestrate-live
 
 test:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
@@ -141,6 +153,24 @@ lint:
 
 syntax-check:
 	@$(VENV_PYTHON) -m compileall -q dharma_swarm api scripts && echo "syntax-check: OK (compileall clean)"
+
+# Aliases/shims for targets documented in README.md / CLAUDE.md.
+# These map to existing implementations so onboarding docs do not lie.
+xray:
+	$(PYTHON) scripts/repo_xray.py --repo-root .
+
+compile: syntax-check
+
+test-smoke: test-fast
+
+test-all:
+	$(VENV_PYTHON) -m pytest tests/ -q
+
+dashboard-lint:
+	npm --prefix dashboard run lint
+
+dashboard-build:
+	npm --prefix dashboard run build
 
 # Undefined names are guaranteed NameErrors at runtime — always blocking.
 lint-blockers:
@@ -272,6 +302,27 @@ semantic-commons-project:
 agent-admit:
 	$(PYTHON) scripts/governance/agent_admission.py $(ARGS)
 
+onboard-agent:
+	@[ -n "$(AGENT_NAME)" ] || (printf "set AGENT_NAME=codex_composer\n"; exit 2)
+	@[ "$(AGENT_NAME)" = "codex_composer" ] || (printf "unsupported AGENT_NAME=%s; supported: codex_composer\n" "$(AGENT_NAME)"; exit 2)
+	$(PYTHON) scripts/governance/agent_admission.py
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py once $${ARGS:-}
+
+codex-composer-bootstrap:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py bootstrap $${ARGS:-}
+
+codex-composer-once:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py once $${ARGS:-}
+
+codex-composer-status:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py status $${ARGS:-}
+
+codex-composer-start:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py start $${ARGS:-}
+
+codex-composer-stop:
+	$(PYTHON) scripts/runtime/codex_composer_wake_loop.py stop $${ARGS:-}
+
 docops-integrity:
 	$(PYTHON) scripts/docops/check_docops_integrity.py
 	$(PYTHON) scripts/governance/hygiene/check_hygiene_integrity.py
@@ -360,6 +411,36 @@ memory-kernel-full-power-preflight:
 
 operator-prod-smoke:
 	$(REPO_PYTHON) scripts/operator_prod_smoke.py --repo-root .
+
+runtime-truth-ci:
+	$(VENV_PYTHON) -m pytest -q --tb=line \
+		tests/test_runtime_state_invariants.py \
+		tests/test_runtime_receipt_coverage_report.py \
+		tests/test_runtime_truth_closeout.py \
+		tests/test_runtime_truth_burn_in.py \
+		tests/test_runtime_truth_100_audit.py \
+		tests/test_agent_runner.py::test_runner_records_attempted_route_from_provider_chain_failure \
+		tests/test_agent_runner.py::test_runner_exposes_actual_served_route_from_llm_response \
+		tests/test_agent_runner.py::test_runner_preserves_served_route_when_local_tool_fails_after_provider \
+		tests/test_orchestrator_spine_dispatch.py \
+		tests/test_daemon_operator_status.py \
+		tests/test_dashboard_health_route.py \
+		tests/test_swarm_health_api.py
+
+runtime-truth-closeout:
+	$(REPO_PYTHON) scripts/runtime/runtime_truth_closeout.py $${ARGS:-}
+
+runtime-truth-burn-in:
+	$(REPO_PYTHON) scripts/runtime/runtime_truth_burn_in.py $${ARGS:-}
+
+runtime-truth-burn-in-smoke:
+	$(REPO_PYTHON) scripts/runtime/runtime_truth_burn_in.py --allow-paused --duration-seconds 0 --interval-seconds 0 --min-samples 1 $${ARGS:-}
+
+runtime-truth-100-audit:
+	$(REPO_PYTHON) scripts/runtime/runtime_truth_100_audit.py $${ARGS:-}
+
+runtime-task-firebreak:
+	$(REPO_PYTHON) scripts/runtime/runtime_task_backlog_firebreak.py $${ARGS:-}
 
 ds-goal-longrun-preflight-check:
 	$(PYTHON) scripts/governance/ds_goal_longrun_preflight_report.py --strict

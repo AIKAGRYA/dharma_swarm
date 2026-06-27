@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
         source: "/api/:path*",
         destination: `${apiProxyTarget}/api/:path*`,
       },
+      {
+        source: "/holon/:path*",
+        destination: `${apiProxyTarget}/holon/:path*`,
+      },
     ];
   },
 };

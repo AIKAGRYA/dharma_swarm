@@ -38,6 +38,7 @@ from dharma_swarm.api_keys import (
     SILICONFLOW_BASE_URL_ENV,
     TOGETHER_API_KEY_ENV,
     TOGETHER_BASE_URL_ENV,
+    bootstrap_runtime_env,
     env_value,
     normalize_env_aliases,
 )
@@ -168,7 +169,7 @@ def resolve_runtime_provider_config(
     """Resolve runtime config for a provider from args + environment."""
 
     if env is None:
-        normalize_env_aliases()
+        bootstrap_runtime_env()
         env_map: Mapping[str, str] = os.environ
     else:
         copied_env = dict(env)

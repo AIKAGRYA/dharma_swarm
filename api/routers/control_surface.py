@@ -8,6 +8,7 @@ GET  /api/control-surface/agentops/cards  -> AgentOps work packets as BoardStore
 GET  /api/control-surface/a2a/cards       -> A2A receipts as BoardStore cards (envelope)
 GET  /api/control-surface/semantic-receipts/cards -> SemanticReceipt artifacts as BoardStore cards (envelope)
 GET  /api/control-surface/active-tracks   -> human cockpit active-track portfolio (envelope)
+GET  /api/control-surface/apex/command-map -> read-only APEX HOLON command map (envelope)
 POST /api/control-surface/rows/{id}/handoff-prompt -> agent handoff prompt
 GET  /api/control-surface/stream          -> SSE stream of updated rows
 
@@ -47,6 +48,7 @@ _AGENTOPS_CARD_LOADER: Any | None = None
 _A2A_SEND_CARD_LOADER: Any | None = None
 _SEMANTIC_RECEIPT_CARD_LOADER: Any | None = None
 _ACTIVE_TRACK_PORTFOLIO_BUILDER: Any | None = None
+_APEX_COMMAND_MAP_BUILDER: Any | None = None
 
 
 def _get_envelope_types() -> tuple[Any, Any, Any]:
@@ -140,6 +142,17 @@ def _get_active_track_portfolio_builder():  # noqa: ANN202
 
                 _ACTIVE_TRACK_PORTFOLIO_BUILDER = build_active_track_portfolio
     return _ACTIVE_TRACK_PORTFOLIO_BUILDER
+
+
+def _get_apex_command_map_builder():  # noqa: ANN202
+    global _APEX_COMMAND_MAP_BUILDER
+    if _APEX_COMMAND_MAP_BUILDER is None:
+        with _IMPORT_LOCK:
+            if _APEX_COMMAND_MAP_BUILDER is None:
+                from dharma_swarm.operator_core.apex_command_map import build_apex_command_map
+
+                _APEX_COMMAND_MAP_BUILDER = build_apex_command_map
+    return _APEX_COMMAND_MAP_BUILDER
 
 
 def _build_envelope(data: Any, source_errors: list[dict[str, str]] | None = None) -> dict[str, Any]:
@@ -423,6 +436,28 @@ def control_surface_active_tracks() -> dict[str, Any]:
                 "slots": [],
             },
             [{"source": "active_tracks", "error": str(e)}],
+        )
+
+
+@router.get("/apex/command-map")
+def control_surface_apex_command_map() -> dict[str, Any]:
+    """Project APEX HOLON command status from current receipts and verifiers."""
+    try:
+        build_apex_command_map = _get_apex_command_map_builder()
+        return _build_envelope(build_apex_command_map(repo_root=_REPO_ROOT))
+    except Exception as e:
+        logger.exception("control-surface/apex/command-map failed")
+        return _build_envelope(
+            {
+                "schema_version": "dharma.apex_command_map.v1",
+                "authority": {
+                    "mode": "read_only",
+                    "protected_actions_allowed": False,
+                },
+                "agents": [],
+                "blockers": ["apex_command_map_projection_failed"],
+            },
+            [{"source": "apex_command_map", "error": str(e)}],
         )
 
 

@@ -18,7 +18,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,19 @@ _AUTONOMY_MAP = {
     "low": AutonomyLevel.CAUTIOUS,
     "medium": AutonomyLevel.BALANCED,
     "high": AutonomyLevel.AGGRESSIVE,
+    "read_only_until_execution_lease": AutonomyLevel.CAUTIOUS,
+    "read-only-until-execution-lease": AutonomyLevel.CAUTIOUS,
 }
+
+
+def _normalize_autonomy(value) -> AutonomyLevel:
+    if isinstance(value, AutonomyLevel):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized:
+            return _AUTONOMY_MAP.get(normalized, AutonomyLevel.BALANCED)
+    return AutonomyLevel.BALANCED
 
 
 class AgentProfile(BaseModel):
@@ -76,6 +88,11 @@ class AgentProfile(BaseModel):
     avg_task_duration_s: float = 0.0
     specialization: str = ""  # learned focus area (e.g., "code_review", "research")
     adapted_at: Optional[str] = None  # ISO timestamp of last adaptation
+
+    @field_validator("autonomy", mode="before")
+    @classmethod
+    def _coerce_autonomy(cls, value) -> AutonomyLevel:
+        return _normalize_autonomy(value)
 
     def is_allowed(self, action: str) -> bool:
         """Check if an action is allowed by this profile's permissions."""
@@ -219,9 +236,7 @@ class ProfileManager:
         overrides: dict | None = None,
     ) -> AgentProfile:
         """Create a profile from a SkillDefinition + optional overrides."""
-        autonomy = _AUTONOMY_MAP.get(
-            skill.autonomy, AutonomyLevel.BALANCED
-        )
+        autonomy = _normalize_autonomy(skill.autonomy)
 
         profile = AgentProfile(
             name=skill.name,
@@ -238,7 +253,7 @@ class ProfileManager:
             for key, val in overrides.items():
                 if hasattr(profile, key):
                     if key == "autonomy" and isinstance(val, str):
-                        val = _AUTONOMY_MAP.get(val, AutonomyLevel.BALANCED)
+                        val = _normalize_autonomy(val)
                     setattr(profile, key, val)
 
         return profile

@@ -14,6 +14,12 @@ from dharma_swarm.verify.scorer import DiffScore, score_diff, score_diff_with_ll
 from dharma_swarm.verify.reviewer import ReviewResult, review_pr
 from dharma_swarm.verify.reporter import format_review_comment
 from dharma_swarm.verify.comprehension import ComprehensionTracker
+from dharma_swarm.verify.d_score import (
+    DScoreReport,
+    score_agent,
+    score_substrate,
+    write_d_score_report,
+)
 
 __all__ = [
     "DiffScore",
@@ -23,4 +29,8 @@ __all__ = [
     "review_pr",
     "format_review_comment",
     "ComprehensionTracker",
+    "DScoreReport",
+    "score_agent",
+    "score_substrate",
+    "write_d_score_report",
 ]

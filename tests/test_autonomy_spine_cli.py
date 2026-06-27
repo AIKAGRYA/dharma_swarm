@@ -459,6 +459,175 @@ def test_run_executes_bounded_ds_goal_tick_and_records_closeback(
     assert dispatch_evidence == []
 
 
+def test_run_live_provider_executes_promoted_worker_and_records_provider_truth(
+    tmp_path,
+    capsys,
+    monkeypatch,
+):
+    state_root = tmp_path / "goals"
+    kernel_store = tmp_path / "kernel"
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_ds_goal_longrun_preflight_for_receipt",
+        _pass_ds_goal_preflight,
+    )
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_resolve_live_provider_config",
+        lambda _args: autonomy_spine.RuntimeProviderConfig(
+            provider=autonomy_spine.ProviderType.OLLAMA,
+            default_model="glm-5:cloud",
+            available=True,
+            source="test",
+        ),
+    )
+
+    async def fake_live_worker_cycle(*, args, config, worker_id):
+        store = autonomy_spine.KernelRunStore(args.kernel_store)
+        wake = next(
+            record
+            for record in store.latest_wake_records().values()
+            if record.status == "queued"
+        )
+        result_ref = {
+            "kind": "kernel_provider_worker_result",
+            "provider_execution": True,
+            "provider": config.provider.value,
+            "model": config.default_model,
+            "wake_id": wake.wake_id,
+            "run_id": wake.run_id,
+            "request_hash": "sha256:test-request",
+            "response_hash": "sha256:test-response",
+            "provider_worker_receipt_hash": "sha256:test-provider-worker",
+        }
+        store.complete_external_wake(
+            wake,
+            status="completed",
+            result_ref=result_ref,
+            reason="test_provider_worker_terminal_result",
+        )
+        return autonomy_spine.KernelProviderWorkerCycleResult(
+            status="completed",
+            worker_id=worker_id,
+            agent_uid=args.agent_uid,
+            admission={
+                "decision": "allowed",
+                "agent_uid": args.agent_uid,
+                "requested_level": "provider_executor",
+                "requested_work_kind": "provider_execution",
+            },
+            lease_ref={
+                "kind": "kernel_external_worker_lease",
+                "wake_id": wake.wake_id,
+                "run_id": wake.run_id,
+                "record_hash": "sha256:test-lease",
+                "status": "leased",
+            },
+            provider_receipt_ref={
+                "kind": "kernel_provider_worker_receipt",
+                "path": str(args.kernel_store / "provider_worker_results.jsonl"),
+                "record_hash": "sha256:test-provider-worker",
+            },
+            worker_result_ref={
+                "kind": "kernel_external_worker_result",
+                "path": str(args.kernel_store / "worker_results.jsonl"),
+                "record_hash": "sha256:test-worker-result",
+                "wake_id": wake.wake_id,
+                "run_id": wake.run_id,
+            },
+            message="live provider worker completed under test",
+        )
+
+    monkeypatch.setattr(
+        autonomy_spine,
+        "_run_live_provider_worker_cycle",
+        fake_live_worker_cycle,
+    )
+    assert autonomy_spine.main(
+        [
+            "init",
+            "--goal",
+            "Run one live provider ds-goal wake",
+            "--mission-id",
+            "mission-live-provider",
+            "--state-root",
+            str(state_root),
+            "--kernel-store",
+            str(kernel_store),
+        ]
+    ) == 0
+    capsys.readouterr()
+
+    code = autonomy_spine.main(
+        [
+            "run",
+            "--mission-id",
+            "mission-live-provider",
+            "--state-root",
+            str(state_root),
+            "--kernel-store",
+            str(kernel_store),
+            "--live-provider",
+            "--json",
+        ]
+    )
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["status"] == "completed"
+    assert payload["live_provider"] is True
+    assert payload["provider"] == "ollama"
+    assert payload["model"] == "glm-5:cloud"
+    assert payload["tick"]["schema_version"] == "dharma.ds_goal_live_provider_tick.v1"
+    assert payload["tick"]["closebacks"][0]["result_ref"]["provider_execution"] is True
+
+    task = json.loads(
+        (state_root / "mission-live-provider" / "tasks.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()[0]
+    )
+    assert task["kernel_result_status"] == "completed"
+    assert task["kernel_result_ref"]["provider"] == "ollama"
+    assert (
+        task["kernel_closeback_via"]
+        == "operator_core.living_agent_kernel.provider_worker"
+    )
+
+    promotions = [
+        json.loads(line)
+        for line in (kernel_store / "promotion_receipts.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    promotion = promotions[-1]
+    assert promotion["level"] == "provider_executor"
+    assert promotion["allowed_sources"] == ["ds_goal"]
+    assert promotion["allowed_tools"] == ["provider_complete"]
+    assert promotion["evidence_refs"][0]["kind"] == "operator_review"
+
+    store = RuntimeStateStore(state_root / ".runtime" / "runtime.db")
+    runtime_receipts = asyncio.run(store.list_runtime_receipts(receipt_type="delegation_run"))
+    runtime_receipt = next(
+        receipt
+        for receipt in runtime_receipts
+        if receipt.receipt_id == payload["runtime_truth_ref"]["receipt_id"]
+    )
+    assert runtime_receipt.payload["provider_execution"] is True
+    assert (
+        runtime_receipt.payload["provider_model_truth_source"]
+        == "runtime_provider.actual_served"
+    )
+    assert (
+        runtime_receipt.payload["provider_execution_truth_source"]
+        == "living_agent_kernel_provider_worker"
+    )
+    assert runtime_receipt.payload["actual_provider"] == "ollama"
+    assert runtime_receipt.payload["actual_model"] == "glm-5:cloud"
+    assert runtime_receipt.payload["provider"] == "ollama"
+    assert runtime_receipt.payload["model"] == "glm-5:cloud"
+    assert "no_provider_model_reason" not in runtime_receipt.payload
+
+
 def test_run_runtime_warrant_denial_blocks_kernel_dispatch(tmp_path, capsys, monkeypatch):
     state_root = tmp_path / "goals"
     kernel_store = tmp_path / "kernel"

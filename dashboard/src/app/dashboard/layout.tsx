@@ -22,6 +22,10 @@ export default function DashboardLayout({
   const { panelOpen, togglePanel, closePanel } = useChatWorkspace();
   const cockpitRoute =
     pathname === "/dashboard/cockpit" || pathname === "/dashboard/control-surface";
+  const agentCardsRoute =
+    pathname === "/dashboard/agent-cards" ||
+    pathname.startsWith("/dashboard/agent-cards/");
+  const showMicrographics = !cockpitRoute && !agentCardsRoute;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -31,7 +35,7 @@ export default function DashboardLayout({
         <div className={`min-w-0 flex-1 overflow-x-hidden p-6 transition-all ${panelOpen ? "pr-3" : ""}`}>
           <div className="flex min-w-0 flex-col gap-6">
             <BackendStatus />
-            {!cockpitRoute && <OperatorMicrographics />}
+            {showMicrographics && <OperatorMicrographics />}
             {children}
           </div>
         </div>

@@ -1,0 +1,12 @@
+{
+  "agent_uid": "hermes-m5",
+  "artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/hermes-m5/holon-source-audit-hermes-20260626-domain-reply.json",
+  "delivery_record_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/holon-source-audit-hermes-20260626.json",
+  "operator_contact_note": "target-dock domain reply artifact was written; publishing requires scripts/runtime/a2a_domain_reply_worker.py",
+  "packet_id": "holon-source-audit-hermes-20260626",
+  "peer_model_processed_claim": false,
+  "schema_version": "dharma.a2a.domain_reply_artifact_author_receipt.v1",
+  "semantic_reply_claim": false,
+  "status": "DOMAIN_REPLY_ARTIFACT_WRITTEN",
+  "timestamp": "2026-06-26T01:23:27Z"
+}

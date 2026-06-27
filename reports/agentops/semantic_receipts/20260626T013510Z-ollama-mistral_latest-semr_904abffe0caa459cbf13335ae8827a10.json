@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "hermes-m5",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "holon-source-audit-hermes-20260626",
+  "created_at": "2026-06-26T01:35:10Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/hermes-m5-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "explicit_disagreement is required when verdict is not pass/approve",
+  "failure_reason": "explicit_disagreement is required when verdict is not pass/approve",
+  "failure_type": "schema_validation_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 25361,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "a5aa8be7c0ccc14e97c19f838d83e1ee4161de57acab56f32459f23dc2d15b4b",
+  "raw_response_sha256": "caa5a61587f5db51ab083b7f8e2679c81f7766c153d25f3eaac4ebe87b235be7",
+  "receipt_id": "semr_904abffe0caa459cbf13335ae8827a10",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "explicit_disagreement is required when verdict is not pass/approve"
+    }
+  ],
+  "reply_to": "dharma.agent.hermes-m5.inbox.reply.holon-source-audit-hermes-20260626",
+  "review_target": "a2a:holon-source-audit-hermes-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: schema_validation_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

@@ -50,6 +50,13 @@ tags:
 
 # Anthropic Economic Futures Research Award Application
 
+> **Status (2026-06-26 authority correction):** Historical submission packet. The
+> current checkout does **not** contain the external `welfare_tons.py` artifact
+> referenced below, so those mentions are continuity claims pending artifact
+> recovery rather than live execution authority. The executable ecological
+> authority in this repo is the in-repo GAIA proof chain (`dharma_swarm/gaia_platform.py`,
+> `dharma_swarm/ai_reciprocity_ledger.py`, `dharma_swarm/gaia_verification.py`).
+
 **Applicant**: John Shrader
 **Date**: March 14, 2026
 **Requested Amount**: $35,000

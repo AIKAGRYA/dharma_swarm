@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from dharma_swarm import holon_health, holon_killswitch as ks
+from dharma_swarm.holon_service_liveness import record_service_heartbeat
 
 
 def _register(agents_root: Path, name: str, model: str = "claude-opus", provider: str = "anthropic_max") -> Path:
@@ -31,6 +32,8 @@ def test_status_unregistered_holon(tmp_path):
     assert st["model"] is None
     assert st["kill_requested"] is False
     assert st["compass_signal_count"] == 0
+    assert st["service_alive"] is False
+    assert st["service_liveness"]["heartbeat_seen"] is False
 
 
 def test_status_registered_holon(tmp_path):
@@ -41,6 +44,25 @@ def test_status_registered_holon(tmp_path):
     assert st["model"] == "claude-opus"
     assert st["kill_requested"] is False
     assert st["compass_signal_count"] == 0
+    assert st["service_alive"] is False
+    assert st["service_liveness"]["heartbeat_seen"] is False
+
+
+def test_status_projects_service_liveness_read_only(tmp_path):
+    _register(tmp_path, "h")
+    record_service_heartbeat(
+        "h",
+        agents_root=tmp_path,
+        session_id="health-projection",
+        service_id="test-service",
+        status="running",
+    )
+
+    st = holon_health.holon_status("h", agents_root=tmp_path)
+
+    assert st["service_alive"] is True
+    assert st["service_liveness"]["heartbeat_seen"] is True
+    assert st["service_liveness"]["latest_session_id"] == "health-projection"
 
 
 def test_status_reflects_kill_signal(tmp_path):

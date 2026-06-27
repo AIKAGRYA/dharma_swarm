@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980">
+  <defs>
+    <style>
+      .bg { fill: #0b1020; }
+      .title { fill: #f8fafc; font: 700 34px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'; }
+      .subtitle { fill: #cbd5e1; font: 16px ui-sans-serif, system-ui; }
+      .box { fill: #111827; stroke: #334155; stroke-width: 2; rx: 18; }
+      .owner { fill: #172554; stroke: #60a5fa; stroke-width: 2; rx: 18; }
+      .kaizen { fill: #3b1d05; stroke: #f59e0b; stroke-width: 4; rx: 24; }
+      .hermes { fill: #1e1b4b; stroke: #a78bfa; stroke-width: 2; rx: 18; }
+      .organ { fill: #052e2b; stroke: #2dd4bf; stroke-width: 2; rx: 18; }
+      .weak { fill: #3f1d1d; stroke: #f87171; stroke-width: 2; rx: 18; }
+      .text { fill: #e5e7eb; font: 600 17px ui-sans-serif, system-ui; }
+      .small { fill: #cbd5e1; font: 13px ui-sans-serif, system-ui; }
+      .tiny { fill: #94a3b8; font: 12px ui-sans-serif, system-ui; }
+      .line { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .goldline { stroke: #f59e0b; stroke-width: 3; fill: none; marker-end: url(#arrowGold); }
+      .dash { stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 8 7; fill: none; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+    </marker>
+    <marker id="arrowGold" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f59e0b" />
+    </marker>
+  </defs>
+  <rect class="bg" width="1400" height="980" />
+  <text x="60" y="58" class="title">Dharma Swarm Alive Map — KaizenOps as Improvement Membrane</text>
+  <text x="60" y="88" class="subtitle">Projection only. Owner truth remains in make onboard, ACTIVE_TRACK, ACTIVE_SURFACE_MANIFEST, runtime receipts, and mapped canon.</text>
+
+  <rect x="60" y="125" width="280" height="125" class="owner" />
+  <text x="82" y="158" class="text">1. First Door</text>
+  <text x="82" y="185" class="small">make onboard</text>
+  <text x="82" y="207" class="tiny">renders owner facts</text>
+  <text x="82" y="228" class="tiny">does not own truth</text>
+
+  <rect x="385" y="125" width="280" height="125" class="owner" />
+  <text x="407" y="158" class="text">2. Lead Cognitive Map</text>
+  <text x="407" y="185" class="small">docs/governance/SWARM_GENOME.md</text>
+  <text x="407" y="207" class="tiny">first-token organism map</text>
+  <text x="407" y="228" class="tiny">projection, not live state</text>
+
+  <rect x="710" y="125" width="280" height="125" class="owner" />
+  <text x="732" y="158" class="text">3. Whole-System Why</text>
+  <text x="732" y="185" class="small">North Star v2: docs/vision_maps/NORTH_STAR.md</text>
+  <text x="732" y="207" class="tiny">Jagat Kalyan / telos</text>
+  <text x="732" y="228" class="tiny">subordinate to canon stack</text>
+
+  <rect x="1035" y="125" width="300" height="125" class="owner" />
+  <text x="1057" y="158" class="text">4. Body Plan</text>
+  <text x="1057" y="185" class="small">foundations/THE_ORGANISM.md</text>
+  <text x="1057" y="207" class="tiny">Krishna inward / Arjuna outward</text>
+  <text x="1057" y="228" class="tiny">conceptual canon</text>
+
+  <rect x="485" y="315" width="430" height="150" class="kaizen" />
+  <text x="520" y="355" class="text">KAIZENOPS — Primary Improvement Organ</text>
+  <text x="520" y="386" class="small">docs/governance/KAIZENOPS.md</text>
+  <text x="520" y="415" class="tiny">observe → classify waste → route one action → verify → prevent recurrence</text>
+  <text x="520" y="438" class="tiny">owns improvement interpretation, not runtime/live/ontology authority</text>
+
+  <rect x="70" y="555" width="255" height="110" class="organ" />
+  <text x="92" y="588" class="text">Runtime / Substrate</text>
+  <text x="92" y="614" class="small">RuntimeStateStore, A2A/NATS</text>
+  <text x="92" y="637" class="tiny">proof: receipts, liveness, tests</text>
+
+  <rect x="370" y="555" width="255" height="110" class="organ" />
+  <text x="392" y="588" class="text">Governance</text>
+  <text x="392" y="614" class="small">ACTIVE_TRACK, Manifest, Broken Register</text>
+  <text x="392" y="637" class="tiny">proof: owner files + gates</text>
+
+  <rect x="670" y="555" width="255" height="110" class="organ" />
+  <text x="692" y="588" class="text">Memory / Knowledge</text>
+  <text x="692" y="614" class="small">Wiki, MemoryKernel, KnowledgeOps</text>
+  <text x="692" y="637" class="tiny">proof: promoted context + sources</text>
+
+  <rect x="970" y="555" width="255" height="110" class="organ" />
+  <text x="992" y="588" class="text">Semantic Ontology</text>
+  <text x="992" y="614" class="small">Semantic Commons, aliases, ontology</text>
+  <text x="992" y="637" class="tiny">proof: name-drift preflight</text>
+
+  <rect x="70" y="720" width="255" height="110" class="organ" />
+  <text x="92" y="753" class="text">Research</text>
+  <text x="92" y="779" class="small">R_V / self-reference / mech interp</text>
+  <text x="92" y="802" class="tiny">proof: falsifiable experiment</text>
+
+  <rect x="370" y="720" width="255" height="110" class="organ" />
+  <text x="392" y="753" class="text">Revenue / Capital</text>
+  <text x="392" y="779" class="small">RevenueSpine, Ginko, Capital Lab</text>
+  <text x="392" y="802" class="tiny">proof: external human / cash receipt</text>
+
+  <rect x="670" y="720" width="255" height="110" class="organ" />
+  <text x="692" y="753" class="text">Media / Noosphere</text>
+  <text x="692" y="779" class="small">Darshan, Vwrite, Loomwork, SAB</text>
+  <text x="692" y="802" class="tiny">proof: public artifact + readback</text>
+
+  <rect x="970" y="720" width="255" height="110" class="hermes" />
+  <text x="992" y="753" class="text">Hermes SMRITI</text>
+  <text x="992" y="779" class="small">global pulse, cron, memory, MCP</text>
+  <text x="992" y="802" class="tiny">proof: delivered decisions + receipts</text>
+
+  <rect x="60" y="885" width="1275" height="55" class="weak" />
+  <text x="82" y="918" class="text">KaizenOps catches: observation without consequence • false-hand path fixes • map drift • repeated diagnosis • claim inflation • handler ACK ≠ semantic agreement</text>
+
+  <path class="line" d="M200 250 C240 285 380 320 485 365" />
+  <path class="line" d="M525 250 C540 290 555 310 610 315" />
+  <path class="line" d="M850 250 C830 290 800 310 765 315" />
+  <path class="line" d="M1185 250 C1120 300 1010 330 915 365" />
+
+  <path class="goldline" d="M605 465 C430 505 260 520 198 555" />
+  <path class="goldline" d="M640 465 C575 510 515 525 498 555" />
+  <path class="goldline" d="M700 465 C710 510 745 525 798 555" />
+  <path class="goldline" d="M790 465 C890 505 1040 520 1098 555" />
+  <path class="goldline" d="M585 465 C380 590 220 665 198 720" />
+  <path class="goldline" d="M650 465 C585 580 515 660 498 720" />
+  <path class="goldline" d="M730 465 C745 575 790 660 798 720" />
+  <path class="goldline" d="M815 465 C980 580 1080 665 1098 720" />
+
+  <path class="dash" d="M1098 720 C1040 610 925 460 915 390" />
+  <text x="1060" y="500" class="tiny">Hermes feeds KaizenOps pulses</text>
+</svg>

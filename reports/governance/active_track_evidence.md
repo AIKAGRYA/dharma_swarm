@@ -1,7 +1,7 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-17T01:08:48+09:00 (schema v2)
-Active tracks: **11** (warn 11, max 11) — shippable 6
+Generated: 2026-06-28T01:21:08+09:00 (schema v2)
+Active tracks: **11** (warn 11, max 11) — shippable 7
 
 ## Spine coverage
 
@@ -51,7 +51,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 6
   - ✓ `invoke_agent_defined` (file_contains) — pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py
   - ✓ `a2a_bridge_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/a2a/a2a_bridge.py
   - ✓ `orchestrator_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/orchestrator.py
-  - ✓ `agent_runner_calls_spine` (file_contains) — pattern '(?m)^\\s*from dharma_swarm\\.spine' found in dharma_swarm/agent_runner.py
+  - ✓ `agent_runner_direct_paths_drained` (file_contains) — pattern 'assert report\\["summary"\\]\\["agent_runner_legacy_direct"\\] == 0' found in tests/test_spine_dispatch_mode_report.py
   - ✓ `dispatch_emits_evidence_receipt` (file_contains) — pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py
   - ✓ `zero_dropoff_sources` (file_contains) — pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py
   - ✓ `bypass_allowlist_empty` (file_contains) — pattern '(?m)^_INTENTIONAL_BYPASS: dict\\[tuple\\[str, int\\], str\\] = \\{\\s*\\}' found in scripts/governance/spine_bypass_report.py
@@ -149,7 +149,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 6
   - ✗ `cybernetics_codex_admission_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/ADMISSION_RECEIPT.md MISSING
   - ✗ `cybernetics_codex_runtime_receipt_exists` (file_exists) — reports/loop_closure/cybernetics_codex/RUNTIME_HEARTBEAT_RECEIPT.md MISSING
 
-## `telos-ai-morning-refinery-2026-06` — 4/7
+## `telos-ai-morning-refinery-2026-06` — 6/7
 
 - serves: `revenue-external-humans-served` · complements: [] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/vision_maps/TELOS_AI_SEED_SPEC_V0.md', 'docs/vision_maps/TELOS_MORNING_REFINERY_V0.md', 'docs/research/telos_ai/**', 'PRODUCT_SURFACE.md', 'dashboard/src/app/dashboard/telos*/**', 'dashboard/src/components/telos*/**', 'tests/test_telos*.py']
@@ -161,8 +161,8 @@ Active tracks: **11** (warn 11, max 11) — shippable 6
   - ✓ `feasibility_audit_exists` (file_exists) — docs/research/telos_ai/2026-06-13_codex_feasibility_audit.md present
   - ✓ `persona_council_exists` (file_exists) — docs/research/telos_ai/persona_agents/README.md present
   - ✓ `refinery_example_exists` (file_exists) — docs/research/telos_ai/refinery_examples/2026-06-13_ARTICULATE_ESSENCE_EXTRATOR_NODE_trial_001.md present
-  - ✗ `telos_product_surface_registered` (file_contains) — pattern 'TELOS' NOT FOUND in PRODUCT_SURFACE.md
-  - ✗ `consent_boundary_test_exists` (file_exists) — tests/test_telos_morning_refinery.py MISSING
+  - ✓ `telos_product_surface_registered` (file_contains) — pattern 'TELOS' found in PRODUCT_SURFACE.md
+  - ✓ `consent_boundary_test_exists` (file_exists) — tests/test_telos_morning_refinery.py present
   - ✗ `first_external_receipt_exists` (file_exists) — reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md MISSING
 
 ## `helm-worldclass-terminal-2026-06` — 1/7
@@ -181,7 +181,7 @@ Active tracks: **11** (warn 11, max 11) — shippable 6
   - ✗ `live_tmux_receipt_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md MISSING
   - ✗ `merge_readiness_packet_exists` (file_exists) — reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md MISSING
 
-## `a2a-cloud-agent-bridge-2026-06` — 0/7
+## `a2a-cloud-agent-bridge-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['agent-admission-semantic-commons-2026-06'] · depends_on: [] · conflicts_with: []
 - owned_surfaces: ['docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml', 'docs/architecture/A2A_CLOUD_BRIDGE.md', 'dharma_swarm/a2a/a2a_cloud_contact.py', 'dharma_swarm/a2a/contact_registry.py', 'dharma_swarm/a2a/verifier.py', 'reports/state/a2a_score_denominator.md', 'tests/test_a2a_cloud_contact.py']
@@ -189,24 +189,26 @@ Active tracks: **11** (warn 11, max 11) — shippable 6
 
   - ✓ `proposed_bridge_packet_exists` (file_exists) — docs/governance/proposed_tracks/perplexity-a2a-bus-bridge-2026-06.yaml present
   - ✓ `nats_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
-  - ✗ `cloud_contact_module_exists` (file_exists) — dharma_swarm/a2a/a2a_cloud_contact.py MISSING
-  - ✗ `cloud_contact_publishes_to_nats` (file_contains) — dharma_swarm/a2a/a2a_cloud_contact.py missing
-  - ✗ `contact_registry_supports_cloud_agents` (file_contains) — dharma_swarm/a2a/contact_registry.py missing
-  - ✗ `verifier_includes_cloud_population` (file_contains) — dharma_swarm/a2a/verifier.py missing
-  - ✗ `score_denominator_doc_exists` (file_exists) — reports/state/a2a_score_denominator.md MISSING
-  - ✗ `design_doc_exists` (file_exists) — docs/architecture/A2A_CLOUD_BRIDGE.md MISSING
-  - ✗ `round_trip_test_exists` (file_contains) — tests/test_a2a_cloud_contact.py missing
+  - ✓ `cloud_contact_module_exists` (file_exists) — dharma_swarm/a2a/a2a_cloud_contact.py present
+  - ✓ `cloud_contact_publishes_to_nats` (file_contains) — pattern 'jetstream.publish' found in dharma_swarm/a2a/a2a_cloud_contact.py
+  - ✓ `contact_registry_supports_cloud_agents` (file_contains) — pattern 'cloud_agent' found in dharma_swarm/a2a/contact_registry.py
+  - ✓ `verifier_includes_cloud_population` (file_contains) — pattern 'cloud_agent_denominator' found in dharma_swarm/a2a/verifier.py
+  - ✓ `score_denominator_doc_exists` (file_exists) — reports/state/a2a_score_denominator.md present
+  - ✓ `design_doc_exists` (file_exists) — docs/architecture/A2A_CLOUD_BRIDGE.md present
+  - ✓ `round_trip_test_exists` (file_contains) — pattern 'test_round_trip_without_operator_transport' found in tests/test_a2a_cloud_contact.py
 
 ## Findings
 
+- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] all 9 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
+- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] all 16 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-in-progress:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] 10/12 completion criteria pass.
-- **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 4/7 completion criteria pass.
+- **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 6/7 completion criteria pass.
 - **INFO** `track-in-progress:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] 1/7 completion criteria pass.
-- **INFO** `track-in-progress:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] 0/7 completion criteria pass.
+- **INFO** `track-shippable:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.

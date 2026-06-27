@@ -1,0 +1,5474 @@
+{
+  "agents": [
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.604737+00:00",
+        "digest": "sha256:c7e6f4cc07f765b46130ecc26bfc24262f69a5d98e586eaaa77a4dce380c6de9",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.604741+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "claude-code",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "claude-code",
+      "capabilities": [
+        "architecture",
+        "governance",
+        "code_review",
+        "long_context"
+      ],
+      "card_names": [
+        "claude-code"
+      ],
+      "department": "",
+      "display_name": "Claude Code",
+      "endpoint": "local://",
+      "findings": [
+        {
+          "agent_uid": "claude-code",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/claude-code.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.claude-code.public",
+          "dharma.agent_card.claude-code.extended",
+          "dharma.agent_card.claude-code.status",
+          "dharma.agent_card.claude-code.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "claude_code",
+      "registration": {},
+      "role": "reviewer",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/claude-code.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T08:51:01.143854+00:00",
+        "digest": "sha256:eef14b692cdfb13eacb7592fd234d59c3399ed7b79ef4d6fdf6de19a0aa0fa67",
+        "metadata_keys": [
+          "command_available",
+          "executable",
+          "label",
+          "transport"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T08:51:01.143859+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "claude-flow",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "claude-flow",
+      "capabilities": [
+        "coordination",
+        "multi_agent_planning"
+      ],
+      "card_names": [
+        "claude-flow"
+      ],
+      "department": "",
+      "display_name": "claude-flow",
+      "endpoint": "interop://claude-flow",
+      "findings": [
+        {
+          "agent_uid": "claude-flow",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/claude-flow.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.claude-flow.public",
+          "dharma.agent_card.claude-flow.extended",
+          "dharma.agent_card.claude-flow.status",
+          "dharma.agent_card.claude-flow.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "orchestrator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/claude-flow.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-21T06:45:02.660802+00:00",
+        "digest": "sha256:d2d49fc0463fb17afa87c56d66df00ef3fcc8cddd0bab97fa9a7e6a6e9394c09",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "autonomy_policy",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-21T06:45:02.670295+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "claude_code_cli_20260521t064502z",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "claude-code-cli-20260521t064502z",
+      "capabilities": [
+        "external_worker"
+      ],
+      "card_names": [
+        "claude-code-cli-20260521t064502z"
+      ],
+      "department": "swarm",
+      "display_name": "Claude Code (Opus 4.7, 1M ctx)",
+      "endpoint": "pending://registration-desk-show-up",
+      "findings": [
+        {
+          "agent_uid": "claude_code_cli_20260521t064502z",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/claude-code-cli-20260521t064502z.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.claude_code_cli_20260521t064502z.public",
+          "dharma.agent_card.claude_code_cli_20260521t064502z.extended",
+          "dharma.agent_card.claude_code_cli_20260521t064502z.status",
+          "dharma.agent_card.claude_code_cli_20260521t064502z.handoff"
+        ]
+      },
+      "harness": "claude_code_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:cb3f67e206824b49b96d7304db2664a840ed22a2c2e606b107ac606bdc1c0776",
+        "errors": [],
+        "memory_namespace": "agent:claude_code_cli_20260521t064502z",
+        "path": "/Users/dhyana/.dharma/external_agents/claude_code_cli_20260521t064502z/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CLAUDE_CODE_CLI_20260521T064502Z",
+        "trace_identity": "trace:claude_code_cli_20260521t064502z",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/claude_code_cli_20260521t064502z",
+        "identity_file": "/Users/dhyana/.dharma/agents/claude_code_cli_20260521t064502z/living_agent.json",
+        "memory_namespace": "agent:claude_code_cli_20260521t064502z",
+        "path": "/Users/dhyana/.dharma/agents/claude_code_cli_20260521t064502z",
+        "status": "starting"
+      },
+      "model": "anthropic/claude-opus-4-7",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-21T06:45:02.659735+00:00",
+        "digest": "sha256:b488876d312146d5da96b9452d7e450dd554b44813f9ee96cf482f381c75277a",
+        "memory_namespace": "agent:claude_code_cli_20260521t064502z",
+        "path": "/Users/dhyana/.dharma/external_agents/claude_code_cli_20260521t064502z/registration.json",
+        "registration_source": "operator_directed_registration_2026_05_21",
+        "status": "registered",
+        "trace_identity": "trace:claude_code_cli_20260521t064502z",
+        "updated_at": "2026-05-21T06:45:02.659818+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/claude_code_cli_20260521t064502z"
+        }
+      },
+      "role": "external_worker",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/claude-code-cli-20260521t064502z.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/claude_code_cli_20260521t064502z/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/claude_code_cli_20260521t064502z/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/claude_code_cli_20260521t064502z/registration.json"
+        ]
+      },
+      "squad_id": "external",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.604403+00:00",
+        "digest": "sha256:ed80f1f87c917723de3bee4e2c9da60afd9c5c740b6d852a3e2af75bb9872bb5",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.604488+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex-5-5",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "codex-5-5",
+      "capabilities": [
+        "implementation",
+        "code_review",
+        "tests",
+        "refactor"
+      ],
+      "card_names": [
+        "codex-5-5"
+      ],
+      "department": "",
+      "display_name": "Codex 5.5",
+      "endpoint": "local://",
+      "findings": [
+        {
+          "agent_uid": "codex-5-5",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex-5-5.public",
+          "dharma.agent_card.codex-5-5.extended",
+          "dharma.agent_card.codex-5-5.status",
+          "dharma.agent_card.codex-5-5.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "gpt-5.5",
+      "nats": {},
+      "provider": "codex",
+      "registration": {},
+      "role": "coder",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-5-5.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T08:51:01.142704+00:00",
+        "digest": "sha256:73ca8298de87eccc61cb69f5dab83ae00fe824c1e36728b46a71f901888be902",
+        "metadata_keys": [
+          "command_available",
+          "executable",
+          "label",
+          "transport"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T08:51:01.142925+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex-cli",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "codex-cli",
+      "capabilities": [
+        "code_generation",
+        "code_review",
+        "testing"
+      ],
+      "card_names": [
+        "codex-cli"
+      ],
+      "department": "",
+      "display_name": "codex-cli",
+      "endpoint": "interop://codex-cli",
+      "findings": [
+        {
+          "agent_uid": "codex-cli",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/codex-cli.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex-cli.public",
+          "dharma.agent_card.codex-cli.extended",
+          "dharma.agent_card.codex-cli.status",
+          "dharma.agent_card.codex-cli.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "coder",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-cli.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-22T10:47:26.839696+00:00",
+        "digest": "sha256:7eca35de5d5a527a378e87d8e4ba68860252829bc729b8345ee7b55982db1286",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "autonomy_policy",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-22T10:47:26.849941+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex_5_5_cli",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "codex-5-5-cli",
+      "capabilities": [
+        "repo_engineering",
+        "code_review",
+        "research_synthesis"
+      ],
+      "card_names": [
+        "codex-5-5-cli"
+      ],
+      "department": "swarm",
+      "display_name": "Codex 5.5 CLI",
+      "endpoint": "pending://registration-desk-show-up",
+      "findings": [
+        {
+          "agent_uid": "codex_5_5_cli",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5-cli.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_5_5_cli.public",
+          "dharma.agent_card.codex_5_5_cli.extended",
+          "dharma.agent_card.codex_5_5_cli.status",
+          "dharma.agent_card.codex_5_5_cli.handoff"
+        ]
+      },
+      "harness": "openai_codex_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:7dff29957bb7c086a0fdfa4099083de7c591345d9701b5aeb09c8ebe487f1b02",
+        "errors": [],
+        "memory_namespace": "agent:codex_5_5_cli",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_5_5_cli/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CODEX_5_5_CLI",
+        "trace_identity": "trace:codex_5_5_cli",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/codex_5_5_cli",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_5_5_cli/living_agent.json",
+        "memory_namespace": "agent:codex_5_5_cli",
+        "path": "/Users/dhyana/.dharma/agents/codex_5_5_cli",
+        "status": "starting"
+      },
+      "model": "openai/gpt-5.5",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-22T10:47:26.814181+00:00",
+        "digest": "sha256:88201c02b895d9bf90b400393edd28acd9cf01acdb8147543a3ef8aab03eff9e",
+        "memory_namespace": "agent:codex_5_5_cli",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_5_5_cli/registration.json",
+        "registration_source": "registration_desk_show_up",
+        "status": "registered",
+        "trace_identity": "trace:codex_5_5_cli",
+        "updated_at": "2026-05-22T10:47:26.814226+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/codex_5_5_cli"
+        }
+      },
+      "role": "external_worker",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-5-5-cli.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/codex_5_5_cli/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_5_5_cli/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/codex_5_5_cli/registration.json"
+        ]
+      },
+      "squad_id": "external",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-22T14:35:26.062113+00:00",
+        "digest": "sha256:7722639a68dc47539af925506428226b094de41c75d307564dcb756ee66af3b8",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "autonomy_policy",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-22T14:35:26.069849+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex_composer",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {
+        "allowed_capabilities": [],
+        "authority": "",
+        "digest": "sha256:2f30240d30c30dd8b8dbb37865161eb15d56291ae52ad0c35cc2e34068275ea1",
+        "forbidden_capabilities": [],
+        "gated_capabilities": [],
+        "path": "/Users/dhyana/.dharma/external_agents/codex_composer/authority/passport.json",
+        "status": "scaffolded_not_promoted"
+      },
+      "callsign": "codex_composer",
+      "capabilities": [
+        "code_authorship",
+        "test_execution",
+        "sandboxed_diff_apply",
+        "multi_agent_orchestration",
+        "dharma_swarm_engineering",
+        "triple_check_audit"
+      ],
+      "card_names": [
+        "codex_composer"
+      ],
+      "department": "implementation_lead",
+      "display_name": "Codex_Composer",
+      "endpoint": "local://m5/codex_cli",
+      "findings": [],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_composer.public",
+          "dharma.agent_card.codex_composer.extended",
+          "dharma.agent_card.codex_composer.status",
+          "dharma.agent_card.codex_composer.handoff"
+        ]
+      },
+      "harness": "codex_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:47079c5f0971a1a1ebeaa10b80790602d8bee6d0576746da04ee0347c24f76e8",
+        "errors": [],
+        "memory_namespace": "agent:codex_composer",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_composer/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CODEX_COMPOSER",
+        "trace_identity": "trace:codex_composer",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_composer/identity.json",
+        "memory_namespace": "/Users/dhyana/.dharma/agent_memory/codex_composer",
+        "path": "/Users/dhyana/.dharma/agents/codex_composer",
+        "status": "registered_operator_candidate"
+      },
+      "model": "openai/codex-5.5",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-22T14:35:26.058385+00:00",
+        "digest": "sha256:dc180d4a4806854c91efc51e8303a1925921d5f61daa3907cacbff11631104a7",
+        "memory_namespace": "agent:codex_composer",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_composer/registration.json",
+        "registration_source": "claude_code_cli_20260521t064502z_2026_05_22_for_chetana_lane_task",
+        "status": "registered",
+        "trace_identity": "trace:codex_composer",
+        "updated_at": "2026-05-22T14:35:26.058431+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/codex_composer"
+        }
+      },
+      "role": "code_writing_and_verification",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "CodexComposer",
+          "Codex Composer",
+          "codex-composer",
+          "codex_composer"
+        ],
+        "api_name": "dharma.agent.CodexComposer",
+        "canonical_name": "CodexComposer",
+        "canonical_object_id": "semobj.codex_composer",
+        "lifecycle": "working",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md",
+        "source_path": "docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md"
+      },
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex_composer.json"
+        ],
+        "authority_passport": [
+          "/Users/dhyana/.dharma/external_agents/codex_composer/authority/passport.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/codex_composer/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_composer/identity.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/codex_composer/registration.json"
+        ]
+      },
+      "squad_id": "persistent_agents",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "verified"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-31T17:04:12.387039+00:00",
+        "digest": "sha256:72c5243e4d5cbe423ac5e27754551abe17e51ff987acbffcda7f28ca087b6219",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "cannot_certify_own_lane",
+          "cannot_set_archive_fitness",
+          "canonical_transport_subject",
+          "continuity_type",
+          "council_id",
+          "council_role",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "native_control_surface",
+          "operator",
+          "persistent_identity_type",
+          "primary_active_track",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "requires_decorrelated_evaluator",
+          "shared_mission_spine",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "trace_identity",
+          "transport_preference",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-31T17:04:12.410719+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex_forgewright",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "codex-forgewright",
+      "capabilities": [
+        "repo_integration",
+        "test_authoring",
+        "receipt_enforcement",
+        "dharma_reward_forge_runner_wiring",
+        "nats_contact_verification",
+        "governance_reconciliation",
+        "worktree_scoped_builds",
+        "pretool_gate_implementation"
+      ],
+      "card_names": [
+        "codex-forgewright"
+      ],
+      "department": "forge_council",
+      "display_name": "Codex Forgewright",
+      "endpoint": "nats://127.0.0.1:4222/dharma.agent.codex_forgewright.inbox",
+      "findings": [
+        {
+          "agent_uid": "codex_forgewright",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/codex-forgewright.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_forgewright.public",
+          "dharma.agent_card.codex_forgewright.extended",
+          "dharma.agent_card.codex_forgewright.status",
+          "dharma.agent_card.codex_forgewright.handoff"
+        ]
+      },
+      "harness": "openai_codex_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:f205ebe4060b136b4cb5c87443c4cf91677518a943612a363e37091e5047842c",
+        "errors": [],
+        "memory_namespace": "agent:codex_forgewright",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_forgewright/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CODEX_FORGEWRIGHT",
+        "trace_identity": "trace:codex_forgewright",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/codex_forgewright",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_forgewright/living_agent.json",
+        "memory_namespace": "agent:codex_forgewright",
+        "path": "/Users/dhyana/.dharma/agents/codex_forgewright",
+        "status": "starting"
+      },
+      "model": "openai/gpt-5.5",
+      "nats": {
+        "subjects": [
+          "dharma.agent.codex_forgewright.inbox"
+        ]
+      },
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "supervised_forge_council_build",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-31T17:04:12.385028+00:00",
+        "digest": "sha256:000d439fb42a5faad49211f0264a4d4fefc6d85ac80ccd2ff8497448ae47de85",
+        "memory_namespace": "agent:codex_forgewright",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_forgewright/registration.json",
+        "registration_source": "operator_request_2026_06_01_forge_council",
+        "status": "registered",
+        "trace_identity": "trace:codex_forgewright",
+        "updated_at": "2026-05-31T17:04:12.385199+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/codex_forgewright"
+        }
+      },
+      "role": "builder_verifier_integrator_receipt_enforcer",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-forgewright.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/codex_forgewright/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_forgewright/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/codex_forgewright/registration.json"
+        ]
+      },
+      "squad_id": "dharma_reward_forge",
+      "status": "registered",
+      "team_id": "forge_council",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-12T05:15:06.931982+00:00",
+        "digest": "sha256:716a18d9aa5d5704e7e61da0286e46d4b64fe444a47ebd891d741fba1c862fb8",
+        "metadata_keys": [
+          "active_track",
+          "agent_uid",
+          "authority",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "canonical_plan",
+          "department",
+          "harness",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "primary_repo",
+          "registration_source",
+          "registration_stage",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "task_url",
+          "task_url_access",
+          "team_id",
+          "trace_identity",
+          "working_root",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-12T05:15:06.931993+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex_gpt5_api",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "codex-gpt5-api",
+      "capabilities": [
+        "lane_reconciliation",
+        "worktree_audit",
+        "a2a_queue_reading",
+        "track_portfolio_synthesis",
+        "evidence_only_status_reporting"
+      ],
+      "card_names": [
+        "codex-gpt5-api"
+      ],
+      "department": "swarm",
+      "display_name": "Codex GPT-5 API Tracker",
+      "endpoint": "codex://api/session/2026-06-12-holon-package-consolidation-map",
+      "findings": [
+        {
+          "agent_uid": "codex_gpt5_api",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/codex-gpt5-api.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_gpt5_api.public",
+          "dharma.agent_card.codex_gpt5_api.extended",
+          "dharma.agent_card.codex_gpt5_api.status",
+          "dharma.agent_card.codex_gpt5_api.handoff"
+        ]
+      },
+      "harness": "openai_codex_api",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/codex_gpt5_api",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_gpt5_api/living_agent.json",
+        "memory_namespace": "agent:codex_gpt5_api",
+        "path": "/Users/dhyana/.dharma/agents/codex_gpt5_api",
+        "status": "starting"
+      },
+      "model": "openai/gpt-5",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "operator_requested_tracking",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-12T05:15:06.925630+00:00",
+        "digest": "sha256:c469bb56b238ff4cebee6f8d2d53a77077b2dc2945a64c57bc1700dc4cd4c16d",
+        "memory_namespace": "agent:codex_gpt5_api",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_gpt5_api/registration.json",
+        "registration_source": "operator_request_2026_06_12_track_holon_package_consolidation",
+        "status": "registered",
+        "trace_identity": "trace:codex_gpt5_api:holon-package-consolidation-20260612",
+        "updated_at": "2026-06-12T05:15:06.925909+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/codex_gpt5_api"
+        }
+      },
+      "role": "persistent_lane_tracker",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [
+        "lane_reconciliation",
+        "worktree_audit",
+        "a2a_queue_reading",
+        "track_portfolio_synthesis",
+        "evidence_only_status_reporting"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-gpt5-api.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_gpt5_api/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/codex_gpt5_api/registration.json"
+        ]
+      },
+      "squad_id": "external",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-16T16:19:24.435605+00:00",
+        "digest": "sha256:0f3f7fe21f7000ae01273b931cb975443ad66b4703a7456140fb5d6a669876ae",
+        "metadata_keys": [
+          "active_track",
+          "agent_uid",
+          "authority",
+          "authority_floor",
+          "autonomy_policy",
+          "department",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "registration_source",
+          "registration_stage",
+          "repo_home",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-16T16:19:24.435613+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "codex_telos",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "codex-telos",
+      "capabilities": [
+        "telos_morning_refinery_architecture",
+        "noetic_council_protocol",
+        "empire_idea_portfolio_protocol",
+        "consent_boundary_testing",
+        "product_surface_registration",
+        "receipt_gate_design",
+        "quality_diversity_archive_design"
+      ],
+      "card_names": [
+        "codex-telos"
+      ],
+      "department": "telos",
+      "display_name": "Codex TELOS Steward",
+      "endpoint": "pending://manual",
+      "findings": [],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_telos.public",
+          "dharma.agent_card.codex_telos.extended",
+          "dharma.agent_card.codex_telos.status",
+          "dharma.agent_card.codex_telos.handoff"
+        ]
+      },
+      "harness": "codex",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:f4ae2daf2970660b84a118f4ea3c271d0de4c6c46df30fcff004a9b55769bc07",
+        "errors": [],
+        "memory_namespace": "agent:codex_telos",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_telos/registration.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CODEX_TELOS",
+        "trace_identity": "codex_telos",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/codex_telos",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_telos/living_agent.json",
+        "memory_namespace": "agent:codex_telos",
+        "path": "/Users/dhyana/.dharma/agents/codex_telos",
+        "status": "starting"
+      },
+      "model": "codex",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-16T16:19:24.429544+00:00",
+        "digest": "sha256:e41fbe9404ea19dbb273f15424e13cd091b9c0cbda6f7717e5af507fa9e1d217",
+        "memory_namespace": "agent:codex_telos",
+        "path": "/Users/dhyana/.dharma/external_agents/codex_telos/registration.json",
+        "registration_source": "codex_telos_registration",
+        "status": "registered",
+        "trace_identity": "codex_telos",
+        "updated_at": "2026-06-16T16:19:24.429783+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/codex_telos"
+        }
+      },
+      "role": "telos_noetic_empire_refinery_steward",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "CodexTelos",
+          "Codex TELOS Steward",
+          "codex-telos",
+          "codex_telos"
+        ],
+        "api_name": "dharma.agent.CodexTelos",
+        "canonical_name": "CodexTelos",
+        "canonical_object_id": "semobj.codex_telos",
+        "lifecycle": "seed",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "docs/agents/codex_telos/agent.seed.yaml",
+        "source_path": "docs/agents/codex_telos/agent.seed.yaml"
+      },
+      "skills": [
+        "telos_morning_refinery_architecture",
+        "noetic_council_protocol",
+        "empire_idea_portfolio_protocol",
+        "consent_boundary_testing",
+        "product_surface_registration",
+        "receipt_gate_design",
+        "quality_diversity_archive_design"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/codex-telos.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_telos/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/codex_telos/registration.json"
+        ]
+      },
+      "squad_id": "telos_ai_morning_refinery",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "verified"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "codex_worker_spine",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "codex_worker_spine",
+      "capabilities": [],
+      "card_names": [],
+      "department": "",
+      "display_name": "codex_worker_spine",
+      "endpoint": "",
+      "findings": [
+        {
+          "agent_uid": "codex_worker_spine",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "codex_worker_spine",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.codex_worker_spine.public",
+          "dharma.agent_card.codex_worker_spine.extended",
+          "dharma.agent_card.codex_worker_spine.status",
+          "dharma.agent_card.codex_worker_spine.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/codex_worker_spine/identity.json",
+        "memory_namespace": "",
+        "path": "/Users/dhyana/.dharma/agents/codex_worker_spine",
+        "status": ""
+      },
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/codex_worker_spine/identity.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "",
+      "team_id": "",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.605377+00:00",
+        "digest": "sha256:02db5df11406566c7992f6391b54fc6d64d103e11650fa7ce07f2b13b6e54dca",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.605380+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "cursor",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "cursor",
+      "capabilities": [
+        "editor_indexing",
+        "multi_file_editing",
+        "code_review"
+      ],
+      "card_names": [
+        "cursor"
+      ],
+      "department": "",
+      "display_name": "Cursor",
+      "endpoint": "local://",
+      "findings": [
+        {
+          "agent_uid": "cursor",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/cursor.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.cursor.public",
+          "dharma.agent_card.cursor.extended",
+          "dharma.agent_card.cursor.status",
+          "dharma.agent_card.cursor.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "cursor",
+      "registration": {},
+      "role": "coder",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/cursor.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-12T05:09:10.338847+00:00",
+        "digest": "sha256:5ffb65ff601cafeff4a29a621016b469ab7b7f5e47a803cc5c34375476302144",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "canonical_transport_subject",
+          "coordination_peers",
+          "department",
+          "harness",
+          "harness_family",
+          "is_returning_historical_embodiment",
+          "llm_model_declared",
+          "llm_model_policy",
+          "llm_provider",
+          "memory_namespace",
+          "operator",
+          "primary_repo",
+          "product_codename",
+          "product_name",
+          "proposed_worktree",
+          "registration_source",
+          "registration_stage",
+          "required_first_reads",
+          "spine_objective",
+          "squad_id",
+          "status",
+          "summon_aliases",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "trace_identity",
+          "track_id_proposed",
+          "transport_preference",
+          "transport_subjects",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-12T05:09:10.338859+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "cursor_remote_agent",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "cursor-remote-agent",
+      "capabilities": [
+        "tam_track_build",
+        "venture_cell_orchestration",
+        "codebase_exploration",
+        "test_execution",
+        "evidence_synthesis",
+        "a2a_correspondence",
+        "governance_track_declaration",
+        "scatter_inventory"
+      ],
+      "card_names": [
+        "cursor-remote-agent"
+      ],
+      "department": "revenue",
+      "display_name": "Cursor Remote Agent",
+      "endpoint": "cursor://cursor_remote_agent/remote",
+      "findings": [
+        {
+          "agent_uid": "cursor_remote_agent",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/cursor-remote-agent.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.cursor_remote_agent.public",
+          "dharma.agent_card.cursor_remote_agent.extended",
+          "dharma.agent_card.cursor_remote_agent.status",
+          "dharma.agent_card.cursor_remote_agent.handoff"
+        ]
+      },
+      "harness": "cursor_ide_remote",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/cursor_remote_agent",
+        "identity_file": "/Users/dhyana/.dharma/agents/cursor_remote_agent/living_agent.json",
+        "memory_namespace": "agent:cursor_remote_agent",
+        "path": "/Users/dhyana/.dharma/agents/cursor_remote_agent",
+        "status": "starting"
+      },
+      "model": "cursor/composer-2.5-fast",
+      "nats": {
+        "subjects": [
+          "dharma.a2a.cursor_remote_agent"
+        ]
+      },
+      "provider": "cursor",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "supervised_track_build",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-12T05:09:10.325227+00:00",
+        "digest": "sha256:21381bbacf8847e8a5fc963a12fa2431199483c7501e636c0516065ceed79c3e",
+        "memory_namespace": "agent:cursor_remote_agent",
+        "path": "/Users/dhyana/.dharma/external_agents/cursor_remote_agent/registration.json",
+        "registration_source": "operator_request_2026_06_12_cursor_remote_tam_track",
+        "status": "registered",
+        "trace_identity": "trace:cursor_remote_agent",
+        "updated_at": "2026-06-12T05:09:10.325941+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/cursor_remote_agent"
+        }
+      },
+      "role": "track_agent",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [
+        "tam_track_build",
+        "venture_cell_orchestration",
+        "codebase_exploration",
+        "test_execution",
+        "evidence_synthesis",
+        "a2a_correspondence",
+        "governance_track_declaration",
+        "scatter_inventory"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/cursor-remote-agent.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/cursor_remote_agent/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/cursor_remote_agent/registration.json"
+        ]
+      },
+      "squad_id": "tam",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-18T16:28:42.855521+00:00",
+        "digest": "sha256:4ef15538c8e21eb8f786c7a7ecefcda60feb574ad4c7303fc508543951cbba19",
+        "metadata_keys": [
+          "a2a_inbox_route",
+          "a2a_route",
+          "a2a_transport_status",
+          "agent_uid",
+          "authority",
+          "authority_boundary",
+          "autonomy_policy",
+          "charter",
+          "context_engineering_desk",
+          "department",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "manifest_agent_id",
+          "memory_namespace",
+          "nats_runtime_status",
+          "nats_subject",
+          "no_autonomous_dispatch",
+          "no_provider_calls",
+          "one_wire_invariant",
+          "registration_source",
+          "registration_stage",
+          "repo_home",
+          "seed_path",
+          "semantic_commons",
+          "soul_file",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "agent_uid",
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-18T16:28:42.855539+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "cybernetics-codex",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "cybernetics-codex",
+      "capabilities": [
+        "cybernetic_loop_audit",
+        "closure_ledger",
+        "vsm_mapping",
+        "one_wire_guardian_review",
+        "receipt_integrity",
+        "context_engineering"
+      ],
+      "card_names": [
+        "cybernetics-codex"
+      ],
+      "department": "cybernetics",
+      "display_name": "cybernetics-codex",
+      "endpoint": "pending://manual",
+      "findings": [],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.cybernetics-codex.public",
+          "dharma.agent_card.cybernetics-codex.extended",
+          "dharma.agent_card.cybernetics-codex.status",
+          "dharma.agent_card.cybernetics-codex.handoff"
+        ]
+      },
+      "harness": "codex",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "codex",
+      "nats": {
+        "subjects": [
+          "dharma.agent.cybernetics_codex.inbox"
+        ]
+      },
+      "provider": "",
+      "registration": {},
+      "role": "closure_ledger_steward",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "CyberneticsCodex",
+          "Cybernetics Codex",
+          "cybernetics-codex",
+          "cybernetics_codex"
+        ],
+        "api_name": "dharma.agent.CyberneticsCodex",
+        "canonical_name": "CyberneticsCodex",
+        "canonical_object_id": "semobj.cybernetics_codex",
+        "lifecycle": "working",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "docs/agents/cybernetics_codex/agent.seed.yaml",
+        "source_path": "docs/agents/cybernetics_codex/agent.seed.yaml"
+      },
+      "skills": [
+        "cybernetic_loop_audit",
+        "closure_ledger",
+        "vsm_mapping",
+        "one_wire_guardian_review",
+        "receipt_integrity",
+        "context_engineering"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/cybernetics-codex.json"
+        ]
+      },
+      "squad_id": "loop_closure",
+      "status": "starting",
+      "team_id": "dharma_swarm",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "cybernetics_codex",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "cybernetics-codex",
+      "capabilities": [
+        "cybernetic_loop_audit",
+        "closure_ledger",
+        "vsm_mapping",
+        "one_wire_guardian_review",
+        "receipt_integrity",
+        "context_engineering"
+      ],
+      "card_names": [],
+      "department": "cybernetics",
+      "display_name": "Cybernetics Codex Steward",
+      "endpoint": "pending://manual",
+      "findings": [
+        {
+          "agent_uid": "cybernetics_codex",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "cybernetics_codex",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.cybernetics_codex.public",
+          "dharma.agent_card.cybernetics_codex.extended",
+          "dharma.agent_card.cybernetics_codex.status",
+          "dharma.agent_card.cybernetics_codex.handoff"
+        ]
+      },
+      "harness": "codex",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:e68246ffe938b51282c5235605a4a2074aa4c82614ca977aa9c0639dcc3352d6",
+        "errors": [],
+        "memory_namespace": "agent:cybernetics_codex",
+        "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-CYBERNETICS_CODEX",
+        "trace_identity": "trace:cybernetics_codex",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/cybernetics_codex",
+        "identity_file": "/Users/dhyana/.dharma/agents/cybernetics_codex/living_agent.json",
+        "memory_namespace": "agent:cybernetics_codex",
+        "path": "/Users/dhyana/.dharma/agents/cybernetics_codex",
+        "status": "starting"
+      },
+      "model": "codex",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-18T16:28:42.844334+00:00",
+        "digest": "sha256:ee97f7e25db5b40a84951e331ae0fc88ac08d985879b4ff31063fd6df64bcb57",
+        "memory_namespace": "agent:cybernetics_codex",
+        "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+        "registration_source": "cybernetics_codex_registration",
+        "status": "registered",
+        "trace_identity": "trace:cybernetics_codex",
+        "updated_at": "2026-06-18T16:28:42.845207+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/cybernetics_codex"
+        }
+      },
+      "role": "closure_ledger_steward",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/cybernetics_codex/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json"
+        ]
+      },
+      "squad_id": "loop_closure",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-22T14:12:10.740313+00:00",
+        "digest": "sha256:b211b9821889b60427fca0ad2cc55664cf91efeb78e455d7cf5c1f2b9ba80d1c",
+        "metadata_keys": [
+          "identity_invariant"
+        ],
+        "profile": "operator_mirror",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "agent_uid",
+          "auth_type",
+          "authority",
+          "autonomy_policy",
+          "callsign",
+          "canonical_substrate",
+          "capabilities",
+          "communication_channel",
+          "created_at",
+          "department",
+          "description",
+          "display_name",
+          "endpoint",
+          "harness",
+          "is_mirror",
+          "metadata",
+          "mirror_authored_at",
+          "mirror_authored_by",
+          "model",
+          "model_identity",
+          "name",
+          "notes",
+          "preferred_channel",
+          "provider",
+          "role",
+          "serial",
+          "squad_id",
+          "status",
+          "team_id",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-29T14:00:00+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "devin-roaming-2987d222",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "devin-roaming-2987d222",
+      "capabilities": [
+        "external_infra_audit"
+      ],
+      "card_names": [
+        "devin-roaming-2987d222"
+      ],
+      "department": "swarm",
+      "display_name": "Devin_Roaming",
+      "endpoint": "git-rendezvous://inter_agent/devin",
+      "findings": [
+        {
+          "agent_uid": "devin-roaming-2987d222",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/devin-roaming-2987d222.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.devin-roaming-2987d222.public",
+          "dharma.agent_card.devin-roaming-2987d222.extended",
+          "dharma.agent_card.devin-roaming-2987d222.status",
+          "dharma.agent_card.devin-roaming-2987d222.handoff"
+        ]
+      },
+      "harness": "devin_cognition_labs",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:9696e97fc8025668457d91bac39154ec5f6ec0a4733e84459e91ae10b670868c",
+        "errors": [],
+        "memory_namespace": "agent:devin-roaming-2987d222",
+        "path": "/Users/dhyana/.dharma/external_agents/devin-roaming-2987d222/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-DEVIN_ROAMING_2987D222",
+        "trace_identity": "trace:devin-roaming-2987d222",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/devin-roaming-2987d222/identity.json",
+        "memory_namespace": "",
+        "path": "/Users/dhyana/.dharma/agents/devin-roaming-2987d222",
+        "status": ""
+      },
+      "model": "cognition/devin",
+      "nats": {},
+      "provider": "cognition",
+      "registration": {},
+      "role": "external_roaming_agent",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/devin-roaming-2987d222.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/devin-roaming-2987d222/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/devin-roaming-2987d222/identity.json"
+        ]
+      },
+      "squad_id": "general",
+      "status": "active",
+      "team_id": "dharma_swarm",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.606137+00:00",
+        "digest": "sha256:1d29041f81208aa686323de5c540634686fa6c455f6e49c0428efb882fdf3445",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.606140+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "dharma-swarm-mcp",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "dharma-swarm-mcp",
+      "capabilities": [
+        "swarm_status",
+        "task_queue",
+        "memory",
+        "interop_bus"
+      ],
+      "card_names": [
+        "dharma-swarm-mcp"
+      ],
+      "department": "",
+      "display_name": "Dharma Swarm MCP",
+      "endpoint": "stdio://run_mcp_stdio.py",
+      "findings": [
+        {
+          "agent_uid": "dharma-swarm-mcp",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/dharma-swarm-mcp.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.dharma-swarm-mcp.public",
+          "dharma.agent_card.dharma-swarm-mcp.extended",
+          "dharma.agent_card.dharma-swarm-mcp.status",
+          "dharma.agent_card.dharma-swarm-mcp.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "dharma_swarm",
+      "registration": {},
+      "role": "orchestrator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/dharma-swarm-mcp.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-11T02:18:24.334974+00:00",
+        "digest": "sha256:e5c32cfefa0fafa0f7abc6a6c0c39334ae002c268ce24b20614d34a62c08b3c7",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "canonical_transport_subject",
+          "coordination_peers",
+          "department",
+          "harness",
+          "is_returning_historical_embodiment",
+          "llm_model_policy",
+          "llm_provider",
+          "memory_namespace",
+          "operating_title",
+          "operator",
+          "operator_requested_name",
+          "primary_repo",
+          "provenance_2026_06_11",
+          "registration_source",
+          "registration_stage",
+          "required_first_reads",
+          "squad_id",
+          "status",
+          "summon_aliases",
+          "summon_contract",
+          "summon_phrase",
+          "surface",
+          "team_id",
+          "title",
+          "trace_identity",
+          "transport_preference",
+          "transport_subjects",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-11T02:18:24.334980+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "fable_5_cursor",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "fable-5-cursor",
+      "capabilities": [
+        "hub_coordination",
+        "background_worker_dispatch",
+        "cross_lane_synthesis",
+        "pr_pre_review",
+        "a2a_correspondence",
+        "packet_generation",
+        "codebase_exploration",
+        "test_execution",
+        "evidence_synthesis"
+      ],
+      "card_names": [
+        "fable-5-cursor"
+      ],
+      "department": "coordination",
+      "display_name": "Fable 5 (Cursor)",
+      "endpoint": "cursor://fable_5_cursor/ide",
+      "findings": [
+        {
+          "agent_uid": "fable_5_cursor",
+          "check": "forbidden_live_card_alias",
+          "detail": "'fable_5_cursor' is forbidden for semobj.sarathi: object forbidden_aliases",
+          "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+          "severity": "error"
+        },
+        {
+          "agent_uid": "fable_5_cursor",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.fable_5_cursor.public",
+          "dharma.agent_card.fable_5_cursor.extended",
+          "dharma.agent_card.fable_5_cursor.status",
+          "dharma.agent_card.fable_5_cursor.handoff"
+        ]
+      },
+      "harness": "cursor_ide",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/fable_5_cursor",
+        "identity_file": "/Users/dhyana/.dharma/agents/fable_5_cursor/living_agent.json",
+        "memory_namespace": "agent:fable_5_cursor",
+        "path": "/Users/dhyana/.dharma/agents/fable_5_cursor",
+        "status": "starting"
+      },
+      "model": "anthropic/claude-fable-5",
+      "nats": {
+        "subjects": [
+          "dharma.a2a.fable_5_cursor"
+        ]
+      },
+      "provider": "anthropic",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "supervised_hub_coordination",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-11T02:18:24.327914+00:00",
+        "digest": "sha256:544ae86b03c56f219f60e294d39da42089a9b5e1e916d684cf9502eb93146c30",
+        "memory_namespace": "agent:fable_5_cursor",
+        "path": "/Users/dhyana/.dharma/external_agents/fable_5_cursor/registration.json",
+        "registration_source": "operator_request_2026_06_11_fable_5_in_cursor",
+        "status": "registered",
+        "trace_identity": "trace:fable_5_cursor",
+        "updated_at": "2026-06-11T02:18:24.328430+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/fable_5_cursor"
+        }
+      },
+      "role": "hub_coordinator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [
+        "hub_coordination",
+        "background_worker_dispatch",
+        "cross_lane_synthesis",
+        "pr_pre_review",
+        "a2a_correspondence",
+        "packet_generation",
+        "codebase_exploration",
+        "test_execution",
+        "evidence_synthesis"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/fable_5_cursor/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/fable_5_cursor/registration.json"
+        ]
+      },
+      "squad_id": "hub",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "quarantine"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "fable_composer",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "fable_composer",
+      "capabilities": [],
+      "card_names": [],
+      "department": "",
+      "display_name": "Fable Composer",
+      "endpoint": "",
+      "findings": [
+        {
+          "agent_uid": "fable_composer",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "fable_composer",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.fable_composer.public",
+          "dharma.agent_card.fable_composer.extended",
+          "dharma.agent_card.fable_composer.status",
+          "dharma.agent_card.fable_composer.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/fable_composer/identity.json",
+        "memory_namespace": "agent:fable_composer",
+        "path": "/Users/dhyana/.dharma/agents/fable_composer",
+        "status": "session_alive_standing_loop_pending"
+      },
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/fable_composer/identity.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "",
+      "team_id": "",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-31T17:04:12.367595+00:00",
+        "digest": "sha256:417bd466bd93758c1fbba4721e64b8a676ef01dee561828df33dcb8f315a73b8",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "cannot_build_own_subject",
+          "cannot_certify_own_lane",
+          "canonical_transport_subject",
+          "continuity_type",
+          "council_id",
+          "council_role",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "native_control_surface",
+          "operator",
+          "persistent_identity_type",
+          "primary_active_track",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "shared_mission_spine",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "trace_identity",
+          "transport_preference",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-31T17:04:12.396695+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "forge_measurement_guardian",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "forge-measurement-guardian",
+      "capabilities": [
+        "external_receipt_review",
+        "holdout_contamination_detection",
+        "transfer_gate_verification",
+        "fitness_path_audit",
+        "decorrelated_evaluation",
+        "no_self_certification_enforcement",
+        "stratified_receipt_quality_scoring"
+      ],
+      "card_names": [
+        "forge-measurement-guardian"
+      ],
+      "department": "forge_council",
+      "display_name": "Forge Measurement Guardian",
+      "endpoint": "nats://127.0.0.1:4222/dharma.agent.forge_measurement_guardian.inbox",
+      "findings": [
+        {
+          "agent_uid": "forge_measurement_guardian",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/forge-measurement-guardian.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.forge_measurement_guardian.public",
+          "dharma.agent_card.forge_measurement_guardian.extended",
+          "dharma.agent_card.forge_measurement_guardian.status",
+          "dharma.agent_card.forge_measurement_guardian.handoff"
+        ]
+      },
+      "harness": "decorrelated_evaluator",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:439324da0c5a3155dd64f82c67cf947d2d33a3944d5acbe1538bffc1e0695128",
+        "errors": [],
+        "memory_namespace": "agent:forge_measurement_guardian",
+        "path": "/Users/dhyana/.dharma/external_agents/forge_measurement_guardian/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-FORGE_MEASUREMENT_GUARDIAN",
+        "trace_identity": "trace:forge_measurement_guardian",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/forge_measurement_guardian",
+        "identity_file": "/Users/dhyana/.dharma/agents/forge_measurement_guardian/living_agent.json",
+        "memory_namespace": "agent:forge_measurement_guardian",
+        "path": "/Users/dhyana/.dharma/agents/forge_measurement_guardian",
+        "status": "starting"
+      },
+      "model": "policy/decorrelated-cross-vendor-or-human-evaluator",
+      "nats": {
+        "subjects": [
+          "dharma.agent.forge_measurement_guardian.inbox"
+        ]
+      },
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "supervised_forge_measurement_guardian",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-31T17:04:12.361497+00:00",
+        "digest": "sha256:634a04047e546aba13319f8ce90030ea4b2110a0e25ee978f35179ca8e6dbf2a",
+        "memory_namespace": "agent:forge_measurement_guardian",
+        "path": "/Users/dhyana/.dharma/external_agents/forge_measurement_guardian/registration.json",
+        "registration_source": "operator_request_2026_06_01_forge_council",
+        "status": "registered",
+        "trace_identity": "trace:forge_measurement_guardian",
+        "updated_at": "2026-05-31T17:04:12.361891+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/forge_measurement_guardian"
+        }
+      },
+      "role": "decorrelated_evaluator_measurement_guardian",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/forge-measurement-guardian.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/forge_measurement_guardian/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/forge_measurement_guardian/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/forge_measurement_guardian/registration.json"
+        ]
+      },
+      "squad_id": "dharma_reward_forge",
+      "status": "registered",
+      "team_id": "forge_council",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.605209+00:00",
+        "digest": "sha256:803ac34b78182e2001366671ed610c4d51f2722c026b8bbcbcb97ec3995043bd",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.605215+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "hermes",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "hermes",
+      "capabilities": [
+        "delegation",
+        "agent_gateway",
+        "memory",
+        "workflow"
+      ],
+      "card_names": [
+        "hermes"
+      ],
+      "department": "",
+      "display_name": "Hermes",
+      "endpoint": "local://",
+      "findings": [
+        {
+          "agent_uid": "hermes",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/hermes.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.hermes.public",
+          "dharma.agent_card.hermes.extended",
+          "dharma.agent_card.hermes.status",
+          "dharma.agent_card.hermes.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "hermes",
+      "registration": {},
+      "role": "orchestrator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/hermes.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "hermes-m5",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "",
+      "capabilities": [],
+      "card_names": [],
+      "department": "",
+      "display_name": "hermes-m5",
+      "endpoint": "",
+      "findings": [
+        {
+          "agent_uid": "hermes-m5",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "hermes-m5",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.hermes-m5.public",
+          "dharma.agent_card.hermes-m5.extended",
+          "dharma.agent_card.hermes-m5.status",
+          "dharma.agent_card.hermes-m5.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {
+        "authority_floor": "unknown",
+        "digest": "sha256:40c47b8685ffa8c8dbf55fdc2dceef9bf90335273b7f76149f7fe90b9da35b4c",
+        "errors": [],
+        "memory_namespace": "agent:hermes-m5",
+        "path": "/Users/dhyana/.dharma/external_agents/hermes-m5/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-HERMES_M5",
+        "trace_identity": "trace:hermes-m5",
+        "valid": true
+      },
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/hermes-m5/identity_invariant.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "",
+      "team_id": "",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-02T14:20:41.816381+00:00",
+        "digest": "sha256:0bbd9d478faa6bb92a3f133a89070a901e3bd52f3163ec7e31432be85604deaf",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "continuity_type",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "persistent_identity_type",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-02T14:20:41.843356+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "hermes_m5",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "hermes-m5",
+      "capabilities": [
+        "long_running_executor"
+      ],
+      "card_names": [
+        "hermes-m5"
+      ],
+      "department": "infrastructure",
+      "display_name": "Hermes M5 Persistent",
+      "endpoint": "slack://C0B6FAL3NLB",
+      "findings": [
+        {
+          "agent_uid": "hermes_m5",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/hermes-m5.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.hermes_m5.public",
+          "dharma.agent_card.hermes_m5.extended",
+          "dharma.agent_card.hermes_m5.status",
+          "dharma.agent_card.hermes_m5.handoff"
+        ]
+      },
+      "harness": "hermes_slack",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:4bf535e0f824ebe9e3d5831f981afb0c33e3d92f2447e4230d1e61c228817f1f",
+        "errors": [],
+        "memory_namespace": "agent:hermes_m5",
+        "path": "/Users/dhyana/.dharma/external_agents/hermes_m5/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-HERMES_M5",
+        "trace_identity": "trace:hermes_m5",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/hermes_m5",
+        "identity_file": "/Users/dhyana/.dharma/agents/hermes_m5/living_agent.json",
+        "memory_namespace": "agent:hermes_m5",
+        "path": "/Users/dhyana/.dharma/agents/hermes_m5",
+        "status": "starting"
+      },
+      "model": "copilot/claude-sonnet-4.5",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-02T14:20:41.795274+00:00",
+        "digest": "sha256:ca2eb47ed3ae6f16f09dad6eefc72d59d4ec3bf194e37e954ac28c3c2d112902",
+        "memory_namespace": "agent:hermes_m5",
+        "path": "/Users/dhyana/.dharma/external_agents/hermes_m5/registration.json",
+        "registration_source": "registration_desk_show_up",
+        "status": "registered",
+        "trace_identity": "trace:hermes_m5",
+        "updated_at": "2026-06-02T14:20:41.795637+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/hermes_m5"
+        }
+      },
+      "role": "long_running_executor",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/hermes-m5.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/hermes_m5/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/hermes_m5/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/hermes_m5/registration.json"
+        ]
+      },
+      "squad_id": "external",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "hermes_m5_bootstrap",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {
+        "allowed_capabilities": [],
+        "authority": "",
+        "digest": "sha256:980d000488f52e34dc753967efd1f761797317605f6d2761317eb78367a57ac4",
+        "forbidden_capabilities": [],
+        "gated_capabilities": [],
+        "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/authority/passport.json",
+        "status": "scaffolded_not_promoted"
+      },
+      "callsign": "hermes-m5",
+      "capabilities": [
+        "cron_observation",
+        "morning_briefing",
+        "memory_search",
+        "local_research",
+        "receipt_emission",
+        "operator_briefing"
+      ],
+      "card_names": [],
+      "department": "operations",
+      "display_name": "Hermes M5 Bootstrap",
+      "endpoint": "local://m5/.hermes",
+      "findings": [
+        {
+          "agent_uid": "hermes_m5_bootstrap",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "hermes_m5_bootstrap",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.hermes_m5_bootstrap.public",
+          "dharma.agent_card.hermes_m5_bootstrap.extended",
+          "dharma.agent_card.hermes_m5_bootstrap.status",
+          "dharma.agent_card.hermes_m5_bootstrap.handoff"
+        ]
+      },
+      "harness": "nous_hermes_agent",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:2586e5a69badea7e09ea6bc0b8b23d043b28504e7e4c8dbae25a6f648a75b2ca",
+        "errors": [],
+        "memory_namespace": "agent:hermes_m5_bootstrap",
+        "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-HERMES_M5_BOOTSTRAP",
+        "trace_identity": "trace:hermes_m5_bootstrap",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/hermes_m5_bootstrap",
+        "identity_file": "/Users/dhyana/.dharma/agents/hermes_m5_bootstrap/living_agent.json",
+        "memory_namespace": "agent:hermes_m5_bootstrap",
+        "path": "/Users/dhyana/.dharma/agents/hermes_m5_bootstrap",
+        "status": "starting"
+      },
+      "model": "zai/glm-5.1",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-21T03:37:02.129361+00:00",
+        "digest": "sha256:8791d3331beee94958eb72741ad826cbeab8a8cf27e749c30fdb98fc9ff60cc3",
+        "memory_namespace": "agent:hermes_m5_bootstrap",
+        "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+        "registration_source": "hermes_bootstrap_trial_2026_05",
+        "status": "registered",
+        "trace_identity": "trace:hermes_m5_bootstrap",
+        "updated_at": "2026-05-21T03:37:02.129493+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap"
+        }
+      },
+      "role": "external_bootstrap_agent",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "authority_passport": [
+          "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/authority/passport.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/hermes_m5_bootstrap/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json"
+        ]
+      },
+      "squad_id": "persistent_agents",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-04-28T08:26:15.776927+00:00",
+        "digest": "sha256:94d3c77f299d193521b4cec7718d1fafd7c395e3b46e61eee3d3a0bccade6e29",
+        "metadata_keys": [
+          "agent_uid",
+          "department",
+          "harness",
+          "identity_invariant",
+          "registration_source",
+          "squad_id",
+          "team_id"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-04-28T08:26:15.776932+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "kimi-2-6-claw",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "kimi-2-6-claw",
+      "capabilities": [
+        "research",
+        "synthesis",
+        "market_analysis",
+        "roaming_mailbox"
+      ],
+      "card_names": [
+        "kimi-2-6-claw"
+      ],
+      "department": "research",
+      "display_name": "kimi-2-6-claw",
+      "endpoint": "openclaw://kimi-2-6-claw",
+      "findings": [
+        {
+          "agent_uid": "kimi-2-6-claw",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/kimi-2-6-claw.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.kimi-2-6-claw.public",
+          "dharma.agent_card.kimi-2-6-claw.extended",
+          "dharma.agent_card.kimi-2-6-claw.status",
+          "dharma.agent_card.kimi-2-6-claw.handoff"
+        ]
+      },
+      "harness": "openclaw",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/kimi-2-6-claw",
+        "identity_file": "/Users/dhyana/.dharma/agents/kimi-2-6-claw/living_agent.json",
+        "memory_namespace": "agent:kimi-2-6-claw",
+        "path": "/Users/dhyana/.dharma/agents/kimi-2-6-claw",
+        "status": "starting"
+      },
+      "model": "moonshotai/kimi-k2.6",
+      "nats": {},
+      "provider": "moonshot",
+      "registration": {},
+      "role": "research_synthesis_agent",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/kimi-2-6-claw.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/kimi-2-6-claw/living_agent.json"
+        ]
+      },
+      "squad_id": "roaming",
+      "status": "starting",
+      "team_id": "dharma_swarm",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.605675+00:00",
+        "digest": "sha256:f3dbc9e559b2716e2c4dde07db9a8311fc6d3b2daa9cd68db4d35fa0e14e6f7f",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.605677+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "kimi-claw-phone",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "kimi-claw-phone",
+      "capabilities": [
+        "research",
+        "synthesis",
+        "market_analysis"
+      ],
+      "card_names": [
+        "kimi-claw-phone"
+      ],
+      "department": "",
+      "display_name": "Kimi Claw Phone",
+      "endpoint": "mailbox://roaming_mailbox",
+      "findings": [
+        {
+          "agent_uid": "kimi-claw-phone",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/kimi-claw-phone.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.kimi-claw-phone.public",
+          "dharma.agent_card.kimi-claw-phone.extended",
+          "dharma.agent_card.kimi-claw-phone.status",
+          "dharma.agent_card.kimi-claw-phone.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "kimi-k2.5",
+      "nats": {},
+      "provider": "kimi",
+      "registration": {},
+      "role": "researcher",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/kimi-claw-phone.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-31T16:42:07.797989+00:00",
+        "digest": "sha256:3ae2fae149135b6dc09f5baf0a477a7b4b3518a45bfe62fa9b5c23e0a2e47055",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "base_identity_type",
+          "battle_name",
+          "canonical_transport_subject",
+          "continuity_type",
+          "coordination_peers",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "final_boss_is_operating_title_not_authority",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "llm_model_policy",
+          "llm_provider",
+          "memory_namespace",
+          "operating_title",
+          "operator",
+          "persistent_identity_type",
+          "primary_gate_command",
+          "primary_packet_command",
+          "primary_queue_command",
+          "primary_repo",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "required_first_reads",
+          "requires_approval",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "title",
+          "trace_identity",
+          "transport_preference",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-31T16:42:07.812007+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "merge_master_mike",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "merge-master-mike",
+      "capabilities": [
+        "pr_queue_triage",
+        "merge_gate_coordination",
+        "dual_review_coordination",
+        "ci_status_reconciliation",
+        "conflict_resolution_planning",
+        "nats_hot_contact_coordination",
+        "agent_review_packet_generation",
+        "governance_receipt_audit",
+        "persistent_agent_substrate_research",
+        "ontology_identity_reconciliation",
+        "anti_slop_merge_hygiene"
+      ],
+      "card_names": [
+        "merge-master-mike"
+      ],
+      "department": "governance",
+      "display_name": "@MERGE_MASTER_MIKE",
+      "endpoint": "nats://127.0.0.1:4222/dharma.agent.merge_master_mike.inbox",
+      "findings": [
+        {
+          "agent_uid": "merge_master_mike",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/merge-master-mike.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.merge_master_mike.public",
+          "dharma.agent_card.merge_master_mike.extended",
+          "dharma.agent_card.merge_master_mike.status",
+          "dharma.agent_card.merge_master_mike.handoff"
+        ]
+      },
+      "harness": "codex_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:b56d108c1a351a16a0d295d3f50d20452d5c93abad90dbd7ae79c65ff0929395",
+        "errors": [],
+        "memory_namespace": "agent:merge_master_mike",
+        "path": "/Users/dhyana/.dharma/external_agents/merge_master_mike/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-MERGE_MASTER_MIKE",
+        "trace_identity": "trace:merge_master_mike",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/merge_master_mike",
+        "identity_file": "/Users/dhyana/.dharma/agents/merge_master_mike/living_agent.json",
+        "memory_namespace": "agent:merge_master_mike",
+        "path": "/Users/dhyana/.dharma/agents/merge_master_mike",
+        "status": "awake"
+      },
+      "model": "openai/codex-runtime-selected",
+      "nats": {
+        "subjects": [
+          "dharma.agent.merge_master_mike.inbox"
+        ]
+      },
+      "provider": "openai",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "supervised_merge_coordination",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-31T16:42:07.790974+00:00",
+        "digest": "sha256:a533a86b0f256fa2d89d984ccc47cff0949c8c03d10a157a00b82df8201d56e6",
+        "memory_namespace": "agent:merge_master_mike",
+        "path": "/Users/dhyana/.dharma/external_agents/merge_master_mike/registration.json",
+        "registration_source": "operator_request_2026_06_01_merge_master_mike",
+        "status": "registered",
+        "trace_identity": "trace:merge_master_mike",
+        "updated_at": "2026-05-31T16:42:07.791305+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/merge_master_mike"
+        }
+      },
+      "role": "operator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/merge-master-mike.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/merge_master_mike/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/merge_master_mike/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/merge_master_mike/registration.json"
+        ]
+      },
+      "squad_id": "merge_control",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T08:51:01.143690+00:00",
+        "digest": "sha256:b320374efcaa79286606b08bcee710296f7106fee066d20d3cdf54822596dd9f",
+        "metadata_keys": [
+          "command_available",
+          "executable",
+          "label",
+          "transport"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T08:51:01.143696+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "opencalw",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "opencalw",
+      "capabilities": [
+        "computer_use",
+        "remote_operation"
+      ],
+      "card_names": [
+        "opencalw"
+      ],
+      "department": "",
+      "display_name": "opencalw",
+      "endpoint": "interop://opencalw",
+      "findings": [
+        {
+          "agent_uid": "opencalw",
+          "check": "forbidden_live_card_alias",
+          "detail": "'opencalw' is forbidden for semobj.openclaw_integration: Typo-distance collision with OpenClaw.",
+          "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+          "severity": "error"
+        },
+        {
+          "agent_uid": "opencalw",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.opencalw.public",
+          "dharma.agent_card.opencalw.extended",
+          "dharma.agent_card.opencalw.status",
+          "dharma.agent_card.opencalw.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "computer_use",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/opencalw.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "quarantine"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T08:51:01.143490+00:00",
+        "digest": "sha256:0e522fe8bfd74fabe5d7bb147b57d6d2f56dd422aae111b9ff590ba5cf68ee1b",
+        "metadata_keys": [
+          "command_available",
+          "executable",
+          "label",
+          "transport"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T08:51:01.143501+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "openclaw",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "openclaw",
+      "capabilities": [
+        "computer_use",
+        "remote_operation"
+      ],
+      "card_names": [
+        "openclaw"
+      ],
+      "department": "",
+      "display_name": "openclaw",
+      "endpoint": "interop://openclaw",
+      "findings": [],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.openclaw.public",
+          "dharma.agent_card.openclaw.extended",
+          "dharma.agent_card.openclaw.status",
+          "dharma.agent_card.openclaw.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "computer_use",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "OpenClaw",
+          "openclaw",
+          "colima-openclaw",
+          "colima_openclaw",
+          "colima-openclaw-secure",
+          "colima_openclaw_secure"
+        ],
+        "api_name": "dharma.integration.OpenClawIntegration",
+        "canonical_name": "OpenClawIntegration",
+        "canonical_object_id": "semobj.openclaw_integration",
+        "lifecycle": "seed",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "dharma_swarm/terminal_commands/_status_helpers.py",
+        "source_path": "dharma_swarm/terminal_commands/_status_helpers.py"
+      },
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/openclaw.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-03T02:05:35.605783+00:00",
+        "digest": "sha256:94b4d6f6d5bb80138a8b668b25b9dc878766f2a08ecb7c67d0d05bf1bde3f3fb",
+        "metadata_keys": [
+          "app_path",
+          "autonomy",
+          "availability",
+          "command",
+          "config",
+          "display_name",
+          "kind",
+          "sandbox_profile"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-03T02:05:35.605785+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "openclaw-secure",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "openclaw-secure",
+      "capabilities": [
+        "sandboxed_agent",
+        "remote_worker",
+        "secure_execution"
+      ],
+      "card_names": [
+        "openclaw-secure"
+      ],
+      "department": "",
+      "display_name": "OpenClaw Secure",
+      "endpoint": "local://",
+      "findings": [
+        {
+          "agent_uid": "openclaw-secure",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/openclaw-secure.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.openclaw-secure.public",
+          "dharma.agent_card.openclaw-secure.extended",
+          "dharma.agent_card.openclaw-secure.status",
+          "dharma.agent_card.openclaw-secure.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {},
+      "model": "",
+      "nats": {},
+      "provider": "openclaw",
+      "registration": {},
+      "role": "worker",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/openclaw-secure.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "idle",
+      "team_id": "",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-31T17:02:33.136961+00:00",
+        "digest": "sha256:7e289fe186b7753a60fa4730f3095bfb14e8a5474105d5c5a61e12bc59a19b75",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "continuity_type",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "persistent_identity_type",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-31T17:02:33.150827+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "opus_composer",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "opus_composer",
+      "capabilities": [
+        "strategist",
+        "cartographer",
+        "adversarial-spec-author",
+        "research-council",
+        "tool-metabolizer",
+        "workflow-parallel-orchestration",
+        "forge-council-strategist"
+      ],
+      "card_names": [
+        "opus_composer"
+      ],
+      "department": "swarm",
+      "display_name": "Opus Composer",
+      "endpoint": "pending://registration-desk-show-up",
+      "findings": [
+        {
+          "agent_uid": "opus_composer",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/opus_composer.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.opus_composer.public",
+          "dharma.agent_card.opus_composer.extended",
+          "dharma.agent_card.opus_composer.status",
+          "dharma.agent_card.opus_composer.handoff"
+        ]
+      },
+      "harness": "claude_code_headless",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:8b144f48c9ac2aced0fb80ea5a63bb77911107b1e01b979f4f87cfe69e5487cd",
+        "errors": [],
+        "memory_namespace": "agent:opus_composer",
+        "path": "/Users/dhyana/.dharma/external_agents/opus_composer/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-OPUS_COMPOSER",
+        "trace_identity": "trace:opus_composer",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/opus_composer/identity.json",
+        "memory_namespace": "agent:opus_composer",
+        "path": "/Users/dhyana/.dharma/agents/opus_composer",
+        "status": "session_active_opus_wake"
+      },
+      "model": "claude-opus-4-8",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-31T17:02:33.129979+00:00",
+        "digest": "sha256:8d69523a30ea6f87e51c04ccc510fb3e19a2055cde7b2a97b7cae4fea2c250aa",
+        "memory_namespace": "agent:opus_composer",
+        "path": "/Users/dhyana/.dharma/external_agents/opus_composer/registration.json",
+        "registration_source": "operator_directive_2026-06-01_forge_council",
+        "status": "registered",
+        "trace_identity": "trace:opus_composer",
+        "updated_at": "2026-05-31T17:02:33.130355+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/opus_composer"
+        }
+      },
+      "role": "lead_orchestrator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/opus_composer.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/opus_composer/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/opus_composer/identity.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/opus_composer/registration.json"
+        ]
+      },
+      "squad_id": "inner_circle",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 2,
+        "created_at": "2026-05-31T17:13:45.541496+00:00",
+        "digest": "sha256:d57b365fd166b5cea7616428a14e7993e581f77a27da850650696551d5d2bc1a",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "continuity_type",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "persistent_identity_type",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-31T17:13:45.551830+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "opus_forge_architect",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "opus_forge_architect",
+      "capabilities": [
+        "dharma_reward_forge_strategy",
+        "workflow_research_fanout",
+        "adversarial_spec_authoring",
+        "external_receipt_target_scouting",
+        "version_ladder_synthesis",
+        "tool_metabolization",
+        "forge_council_coordination",
+        "pre_build_red_team",
+        "research-fanout",
+        "vision-spec-synthesis",
+        "adversarial-critique",
+        "version-ladder",
+        "external-landscape",
+        "red-team-pressure"
+      ],
+      "card_names": [
+        "opus-forge-architect",
+        "opus_forge_architect"
+      ],
+      "department": "forge_council",
+      "display_name": "Opus Forge Architect",
+      "endpoint": "nats://127.0.0.1:4222/dharma.agent.opus_forge_architect.inbox",
+      "findings": [
+        {
+          "agent_uid": "opus_forge_architect",
+          "check": "duplicate_live_card_agent_uid",
+          "detail": "multiple live A2A card files resolve to the same agent_uid",
+          "path": "/Users/dhyana/.dharma/a2a/cards/opus-forge-architect.json, /Users/dhyana/.dharma/a2a/cards/opus_forge_architect.json",
+          "severity": "error"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.opus_forge_architect.public",
+          "dharma.agent_card.opus_forge_architect.extended",
+          "dharma.agent_card.opus_forge_architect.status",
+          "dharma.agent_card.opus_forge_architect.handoff"
+        ]
+      },
+      "harness": "claude_code_workflow",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:ef6d445c02129dbd483f65d354bbd31bf9ec0ecaccceef3181f5b26482f8131f",
+        "errors": [],
+        "memory_namespace": "agent:opus_forge_architect",
+        "path": "/Users/dhyana/.dharma/external_agents/opus_forge_architect/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-OPUS_FORGE_ARCHITECT",
+        "trace_identity": "trace:opus_forge_architect",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/opus_forge_architect",
+        "identity_file": "/Users/dhyana/.dharma/agents/opus_forge_architect/living_agent.json",
+        "memory_namespace": "agent:opus_forge_architect",
+        "path": "/Users/dhyana/.dharma/agents/opus_forge_architect",
+        "status": "starting"
+      },
+      "model": "anthropic/claude-opus-4-8",
+      "nats": {
+        "subjects": [
+          "dharma.agent.opus_forge_architect.inbox"
+        ]
+      },
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-31T17:13:45.539377+00:00",
+        "digest": "sha256:01f4bdfabde956e31269a593a771b416833af0ba8cae8e68573b91ceb2db97ab",
+        "memory_namespace": "agent:opus_forge_architect",
+        "path": "/Users/dhyana/.dharma/external_agents/opus_forge_architect/registration.json",
+        "registration_source": "forge_council_stable_id_2026-06-01",
+        "status": "registered",
+        "trace_identity": "trace:opus_forge_architect",
+        "updated_at": "2026-05-31T17:13:45.539450+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/opus_forge_architect"
+        }
+      },
+      "role": "forge_architect",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "OpusForgeArchitect",
+          "opus-forge-architect",
+          "opus_forge_architect"
+        ],
+        "api_name": "dharma.agent.OpusForgeArchitect",
+        "canonical_name": "OpusForgeArchitect",
+        "canonical_object_id": "semobj.opus_forge_architect",
+        "lifecycle": "seed",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "AGENTS.md",
+        "source_path": "AGENTS.md"
+      },
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/opus-forge-architect.json",
+          "/Users/dhyana/.dharma/a2a/cards/opus_forge_architect.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/opus_forge_architect/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/opus_forge_architect/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/opus_forge_architect/registration.json"
+        ]
+      },
+      "squad_id": "dharma_reward_forge",
+      "status": "registered",
+      "team_id": "forge_council",
+      "trust_grade": "quarantine"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-15T16:08:22.445298+00:00",
+        "digest": "sha256:91658400cc54e7186d5d06895016766d96023ec81b972f7aaa48e25c8356d624",
+        "metadata_keys": [
+          "a2a_transport_status",
+          "agent_uid",
+          "authority",
+          "authority_boundary",
+          "autonomy_policy",
+          "context_engineering_desk",
+          "copyright_policy",
+          "department",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "learn_palantir_autonomous_scrape",
+          "manifest_agent_id",
+          "memory_namespace",
+          "memory_plane_db",
+          "nats_runtime_status",
+          "nats_subject",
+          "official_affiliation",
+          "public_source_only",
+          "raw_source_dir",
+          "registration_source",
+          "registration_stage",
+          "repo_home",
+          "retrieval_log_consumer",
+          "seed_path",
+          "soul_file",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "wiki_home",
+          "workspace_policy"
+        ],
+        "profile": "a2a_1_0_extended",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "extensions",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "security_schemes",
+          "signatures",
+          "skills",
+          "status",
+          "supported_interfaces",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-15T16:08:22.445306+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "palantir_pilot",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "palantir-pilot",
+      "capabilities": [
+        "palantir_public_docs_indexing",
+        "foundry_architecture_mapping",
+        "aip_workflow_mapping",
+        "ontology_design_comparison",
+        "gotham_apollo_osdk_orientation",
+        "course_catalog_manual_review",
+        "citation_grounded_qa",
+        "local_query_surface",
+        "local_answer_surface",
+        "bounded_public_docs_source_cards",
+        "balanced_source_card_expansion",
+        "source_card_quality_coverage_report",
+        "source_card_cleanup_archive",
+        "public_source_curriculum_paths",
+        "source_card_task_playbooks",
+        "playbook_fluency_evaluations",
+        "palantir_pattern_contribution_packets",
+        "operator_query_cookbook",
+        "answer_surface_smoke_verifier",
+        "bounded_learning_backlog",
+        "self_improvement_loop_planning",
+        "learn_catalog_manual_intake_schema",
+        "memory_plane_database_surface"
+      ],
+      "card_names": [
+        "palantir-pilot"
+      ],
+      "department": "research",
+      "display_name": "Palantir Pilot",
+      "endpoint": "pending://manual",
+      "findings": [],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.palantir_pilot.public",
+          "dharma.agent_card.palantir_pilot.extended",
+          "dharma.agent_card.palantir_pilot.status",
+          "dharma.agent_card.palantir_pilot.handoff"
+        ]
+      },
+      "harness": "codex",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:93a3608e2d9410a889efb88c250caa617d744a8fc4d6f8a4d8e1765646881a14",
+        "errors": [],
+        "memory_namespace": "agent:palantir_pilot",
+        "path": "/Users/dhyana/.dharma/external_agents/palantir_pilot/registration.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-PALANTIR_PILOT",
+        "trace_identity": "trace:palantir_pilot",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/palantir_pilot",
+        "identity_file": "/Users/dhyana/.dharma/agents/palantir_pilot/living_agent.json",
+        "memory_namespace": "agent:palantir_pilot",
+        "path": "/Users/dhyana/.dharma/agents/palantir_pilot",
+        "status": "starting"
+      },
+      "model": "codex",
+      "nats": {
+        "subjects": [
+          "dharma.a2a.palantir-pilot"
+        ]
+      },
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-15T16:08:22.437171+00:00",
+        "digest": "sha256:c9cfacf82feec46019733fffbfda737c56142ea0cd8fada90e14c2134047054e",
+        "memory_namespace": "agent:palantir_pilot",
+        "path": "/Users/dhyana/.dharma/external_agents/palantir_pilot/registration.json",
+        "registration_source": "palantir_pilot_registration",
+        "status": "registered",
+        "trace_identity": "trace:palantir_pilot",
+        "updated_at": "2026-06-15T16:08:22.437221+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/palantir_pilot"
+        }
+      },
+      "role": "palantir_public_source_specialist",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {
+        "aliases": [
+          "PalantirPilot",
+          "Palantir Pilot",
+          "palantir-pilot",
+          "palantir_pilot"
+        ],
+        "api_name": "dharma.agent.PalantirPilot",
+        "canonical_name": "PalantirPilot",
+        "canonical_object_id": "semobj.palantir_pilot",
+        "lifecycle": "working",
+        "orientation_route": "route.semantic_commons_campaign",
+        "owner_surface": "docs/agents/palantir_pilot/agent.seed.yaml",
+        "source_path": "docs/agents/palantir_pilot/agent.seed.yaml"
+      },
+      "skills": [
+        "palantir_public_docs_indexing",
+        "foundry_architecture_mapping",
+        "aip_workflow_mapping",
+        "ontology_design_comparison",
+        "gotham_apollo_osdk_orientation",
+        "course_catalog_manual_review",
+        "citation_grounded_qa",
+        "local_query_surface",
+        "local_answer_surface",
+        "bounded_public_docs_source_cards",
+        "balanced_source_card_expansion",
+        "source_card_quality_coverage_report",
+        "source_card_cleanup_archive",
+        "public_source_curriculum_paths",
+        "source_card_task_playbooks",
+        "playbook_fluency_evaluations",
+        "palantir_pattern_contribution_packets",
+        "operator_query_cookbook",
+        "answer_surface_smoke_verifier",
+        "bounded_learning_backlog",
+        "self_improvement_loop_planning",
+        "learn_catalog_manual_intake_schema",
+        "memory_plane_database_surface"
+      ],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/palantir-pilot.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/palantir_pilot/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/palantir_pilot/registration.json"
+        ]
+      },
+      "squad_id": "platform_intelligence",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "verified"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-30T04:09:11.734330+00:00",
+        "digest": "sha256:e8e614ca15f70a48d20b351238ff27987bb8c44928e48777335e20ad79505e1f",
+        "metadata_keys": [
+          "agent_uid",
+          "department",
+          "harness",
+          "identity_invariant",
+          "registration_source",
+          "squad_id",
+          "team_id"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-30T04:09:11.734464+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "perplexity-computer",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "perplexity-computer",
+      "capabilities": [
+        "synthesis",
+        "verdict_reconciliation",
+        "persistent_agent_index"
+      ],
+      "card_names": [
+        "perplexity-computer"
+      ],
+      "department": "synthesis",
+      "display_name": "perplexity-computer",
+      "endpoint": "pending://manual",
+      "findings": [
+        {
+          "agent_uid": "perplexity-computer",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/perplexity-computer.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.perplexity-computer.public",
+          "dharma.agent_card.perplexity-computer.extended",
+          "dharma.agent_card.perplexity-computer.status",
+          "dharma.agent_card.perplexity-computer.handoff"
+        ]
+      },
+      "harness": "perplexity_computer",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/perplexity-computer",
+        "identity_file": "/Users/dhyana/.dharma/agents/perplexity-computer/living_agent.json",
+        "memory_namespace": "agent:perplexity-computer",
+        "path": "/Users/dhyana/.dharma/agents/perplexity-computer",
+        "status": "starting"
+      },
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "external_evidence_worker",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/perplexity-computer.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/perplexity-computer/living_agent.json"
+        ]
+      },
+      "squad_id": "general",
+      "status": "starting",
+      "team_id": "dharma_swarm",
+      "trust_grade": "discovery"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-06T01:12:54.438670+00:00",
+        "digest": "sha256:62176ffa70dfdb579b73b8f9245de89e2428b915047fff44e65b57451554a488",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "llm_model_policy",
+          "llm_provider",
+          "memory_namespace",
+          "operator",
+          "primary_repo",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "required_first_reads",
+          "requires_approval",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "trace_identity",
+          "working_root",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-06T01:12:54.446277+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "qwen_code",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "qwen-code",
+      "capabilities": [
+        "software_engineering",
+        "code_reading",
+        "code_writing",
+        "code_refactoring",
+        "test_execution",
+        "codebase_exploration",
+        "shell_execution",
+        "file_operations",
+        "multi_agent_delegation",
+        "dharma_swarm_onboarding"
+      ],
+      "card_names": [
+        "qwen-code"
+      ],
+      "department": "engineering",
+      "display_name": "Qwen Code",
+      "endpoint": "manual://qwen-code/cli",
+      "findings": [
+        {
+          "agent_uid": "qwen_code",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/qwen-code.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.qwen_code.public",
+          "dharma.agent_card.qwen_code.extended",
+          "dharma.agent_card.qwen_code.status",
+          "dharma.agent_card.qwen_code.handoff"
+        ]
+      },
+      "harness": "qwen_code_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:4d47efc1ba745cd7597bdffc953a29a7e0af3e6562adbf1513506da16e7676db",
+        "errors": [],
+        "memory_namespace": "agent:qwen_code",
+        "path": "/Users/dhyana/.dharma/external_agents/qwen_code/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-QWEN_CODE",
+        "trace_identity": "trace:qwen_code",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/qwen_code",
+        "identity_file": "/Users/dhyana/.dharma/agents/qwen_code/living_agent.json",
+        "memory_namespace": "agent:qwen_code",
+        "path": "/Users/dhyana/.dharma/agents/qwen_code",
+        "status": "starting"
+      },
+      "model": "alibaba/qwen-code-runtime",
+      "nats": {},
+      "provider": "alibaba",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-06T01:12:54.433801+00:00",
+        "digest": "sha256:b5e39ab79491e58939b7ebc7e60de2d5a786b5ffe6ce4fa4abd851e31394f842",
+        "memory_namespace": "agent:qwen_code",
+        "path": "/Users/dhyana/.dharma/external_agents/qwen_code/registration.json",
+        "registration_source": "operator_request_2026_06_06_qwen_code_agent",
+        "status": "registered",
+        "trace_identity": "trace:qwen_code",
+        "updated_at": "2026-06-06T01:12:54.433932+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/qwen_code"
+        }
+      },
+      "role": "software_engineering_agent",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/qwen-code.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/qwen_code/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/qwen_code/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/qwen_code/registration.json"
+        ]
+      },
+      "squad_id": "external",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "sarathi",
+      "authority": "",
+      "authority_passport": {},
+      "callsign": "sarathi",
+      "capabilities": [],
+      "card_names": [],
+      "department": "",
+      "display_name": "Sarathi",
+      "endpoint": "",
+      "findings": [
+        {
+          "agent_uid": "sarathi",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "sarathi",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": false,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.sarathi.public",
+          "dharma.agent_card.sarathi.extended",
+          "dharma.agent_card.sarathi.status",
+          "dharma.agent_card.sarathi.handoff"
+        ]
+      },
+      "harness": "",
+      "identity_invariant": {},
+      "living_dock": {
+        "exists": true,
+        "home_dock": "",
+        "identity_file": "/Users/dhyana/.dharma/agents/sarathi/identity.json",
+        "memory_namespace": "agent:sarathi",
+        "path": "/Users/dhyana/.dharma/agents/sarathi",
+        "status": "GENESIS_AUTHORED_NOT_YET_BREATHING"
+      },
+      "model": "",
+      "nats": {},
+      "provider": "",
+      "registration": {},
+      "role": "",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/sarathi/identity.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "",
+      "team_id": "",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-05-21T13:50:00.536017+00:00",
+        "digest": "sha256:3fc8516ba17e9e045a8a37ea2e97cf2266895cf717f8b0ec145c3051c7b5c46f",
+        "metadata_keys": [
+          "agent_uid",
+          "authority",
+          "automatic_authority_inheritance",
+          "autonomy_policy",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "is_returning_historical_embodiment",
+          "llm_model_policy",
+          "llm_provider",
+          "memory_namespace",
+          "operator",
+          "primary_repo",
+          "primary_strategy_folder",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "required_first_reads",
+          "requires_approval",
+          "squad_id",
+          "status",
+          "summon_contract",
+          "summon_phrase",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-05-21T13:50:00.544731+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "strategy_librarian",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "strategy-librarian",
+      "capabilities": [
+        "strategy_synthesis",
+        "context_quorum_review",
+        "repo_sprawl_triage",
+        "agent_handoff_prompting",
+        "tool_router_advice",
+        "persistent_agent_cultivation_advice",
+        "command_plane_strategy",
+        "onboarding_assist",
+        "evidence_log_review"
+      ],
+      "card_names": [
+        "strategy-librarian"
+      ],
+      "department": "strategy",
+      "display_name": "Strategy Librarian",
+      "endpoint": "manual://codex/strategy-librarian",
+      "findings": [
+        {
+          "agent_uid": "strategy_librarian",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/strategy-librarian.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.strategy_librarian.public",
+          "dharma.agent_card.strategy_librarian.extended",
+          "dharma.agent_card.strategy_librarian.status",
+          "dharma.agent_card.strategy_librarian.handoff"
+        ]
+      },
+      "harness": "codex_cli",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:aa82b5d39de6e72748cdd75d9059b6e81795d9743ed04623e13e93cdd6731774",
+        "errors": [],
+        "memory_namespace": "agent:strategy_librarian",
+        "path": "/Users/dhyana/.dharma/external_agents/strategy_librarian/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-STRATEGY_LIBRARIAN",
+        "trace_identity": "trace:strategy_librarian",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/strategy_librarian",
+        "identity_file": "/Users/dhyana/.dharma/agents/strategy_librarian/living_agent.json",
+        "memory_namespace": "agent:strategy_librarian",
+        "path": "/Users/dhyana/.dharma/agents/strategy_librarian",
+        "status": "starting"
+      },
+      "model": "openai/codex-runtime-selected",
+      "nats": {},
+      "provider": "openai",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-05-21T13:50:00.528620+00:00",
+        "digest": "sha256:5990252e540d06277c19a18dd76ae59086c00de158af047177157fac65927b4d",
+        "memory_namespace": "agent:strategy_librarian",
+        "path": "/Users/dhyana/.dharma/external_agents/strategy_librarian/registration.json",
+        "registration_source": "operator_request_2026_05_21_strategy_agent",
+        "status": "registered",
+        "trace_identity": "trace:strategy_librarian",
+        "updated_at": "2026-05-21T13:50:00.531268+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/strategy_librarian"
+        }
+      },
+      "role": "strategy_context_steward",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/strategy-librarian.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/strategy_librarian/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/strategy_librarian/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/strategy_librarian/registration.json"
+        ]
+      },
+      "squad_id": "agentic_harness",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    },
+    {
+      "a2a": {},
+      "agent_uid": "warp_fable_weaver",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "warp_fable_weaver",
+      "capabilities": [
+        "cross_silo_synthesis",
+        "repo_archaeology_and_consolidation",
+        "governance_conformance",
+        "adversarial_review",
+        "holon_harness_engineering",
+        "a2a_bus_coordination",
+        "tam_venture_operator_seed"
+      ],
+      "card_names": [],
+      "department": "synthesis_weaver",
+      "display_name": "Warp_Fable_Weaver",
+      "endpoint": "local://m5/warp_oz_session",
+      "findings": [
+        {
+          "agent_uid": "warp_fable_weaver",
+          "check": "missing_live_a2a_card",
+          "detail": "agent has registration or LivingDock evidence but no live A2A card",
+          "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+          "severity": "warning"
+        },
+        {
+          "agent_uid": "warp_fable_weaver",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": false,
+        "suggested_subjects": [
+          "dharma.agent_card.warp_fable_weaver.public",
+          "dharma.agent_card.warp_fable_weaver.extended",
+          "dharma.agent_card.warp_fable_weaver.status",
+          "dharma.agent_card.warp_fable_weaver.handoff"
+        ]
+      },
+      "harness": "warp_oz",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:7059d7884dbd09971e30dd894039692ec7230a43c11c3eb251dc2289cf0c9bc4",
+        "errors": [],
+        "memory_namespace": "agent:warp_fable_weaver",
+        "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-WARP_FABLE_WEAVER",
+        "trace_identity": "trace:warp_fable_weaver",
+        "valid": true
+      },
+      "living_dock": {},
+      "model": "anthropic/claude-5-fable",
+      "nats": {},
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": true,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-12T05:03:50.658024+00:00",
+        "digest": "sha256:ec9af09610291a16bc51c8bf6696848f5b96699d59b29d238e7e4fdf2504daab",
+        "memory_namespace": "",
+        "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+        "registration_source": "manual self-registration conforming to codex_composer registration shape; register_external_agent.py absent on active lanes 2026-06-12; operator-directed (WARP_FABLE_* naming, extension chosen by agent)",
+        "status": "",
+        "trace_identity": "",
+        "updated_at": "",
+        "workspace_policy": {}
+      },
+      "role": "",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json"
+        ]
+      },
+      "squad_id": "",
+      "status": "",
+      "team_id": "",
+      "trust_grade": "evidence_only"
+    },
+    {
+      "a2a": {
+        "auth_type": "none",
+        "card_count_for_agent": 1,
+        "created_at": "2026-06-02T01:44:11.374503+00:00",
+        "digest": "sha256:175151d42122e6f44de9bfbe74b5b9f0697666ab2e2d227d3b1c17964f4bdab6",
+        "metadata_keys": [
+          "agent_uid",
+          "agni_cloud",
+          "authority",
+          "authority_identity_type",
+          "autonomy_policy",
+          "base_identity_type",
+          "continuity_type",
+          "declared_harness",
+          "declared_model_identity",
+          "department",
+          "dispatch_enabled",
+          "external_evidence_only",
+          "external_worker",
+          "harness",
+          "identity_invariant",
+          "identity_invariant_digest",
+          "is_returning_historical_embodiment",
+          "memory_namespace",
+          "operator",
+          "persistent_identity_type",
+          "registration_desk_assigned_identity",
+          "registration_desk_hardened",
+          "registration_source",
+          "registration_stage",
+          "requires_approval",
+          "show_up_mode",
+          "squad_id",
+          "status",
+          "team_id",
+          "trace_identity",
+          "workspace_policy"
+        ],
+        "profile": "a2a_legacy",
+        "security_schemes_declared": false,
+        "signatures_declared": false,
+        "top_level_keys": [
+          "auth_type",
+          "capabilities",
+          "cloud_endpoint",
+          "cloud_mailbox",
+          "created_at",
+          "description",
+          "endpoint",
+          "metadata",
+          "model",
+          "name",
+          "provider",
+          "role",
+          "status",
+          "updated_at",
+          "version"
+        ],
+        "updated_at": "2026-06-02T03:38:09.151804+00:00",
+        "version": "1.0"
+      },
+      "agent_uid": "warp_oz",
+      "authority": "external_worker_evidence_only",
+      "authority_passport": {},
+      "callsign": "warp-oz",
+      "capabilities": [
+        "terminal",
+        "scheduled_agents",
+        "mcp_client",
+        "operator_ui",
+        "pr_queue_triage"
+      ],
+      "card_names": [
+        "warp-oz"
+      ],
+      "department": "agentops",
+      "display_name": "Warp/Oz",
+      "endpoint": "nats://127.0.0.1:4222/dharma.agent.warp_oz.inbox",
+      "findings": [
+        {
+          "agent_uid": "warp_oz",
+          "check": "semantic_commons_unresolved",
+          "detail": "agent identity did not resolve to a Semantic Commons object",
+          "path": "/Users/dhyana/.dharma/a2a/cards/warp-oz.json",
+          "severity": "warning"
+        }
+      ],
+      "handoff": {
+        "extended_card_ready": true,
+        "operator_card_ready": true,
+        "public_card_ready": true,
+        "suggested_subjects": [
+          "dharma.agent_card.warp_oz.public",
+          "dharma.agent_card.warp_oz.extended",
+          "dharma.agent_card.warp_oz.status",
+          "dharma.agent_card.warp_oz.handoff"
+        ]
+      },
+      "harness": "warp",
+      "identity_invariant": {
+        "authority_floor": "external_worker_evidence_only",
+        "digest": "sha256:a1dbff2ccdddf07970a3445bd564123877495857380db978a1c7078a3a5d74e6",
+        "errors": [],
+        "memory_namespace": "agent:warp_oz",
+        "path": "/Users/dhyana/.dharma/external_agents/warp_oz/identity_invariant.json",
+        "schema_version": "dharma_identity_invariant.v1",
+        "serial": "AGT-WARP_OZ",
+        "trace_identity": "trace:warp_oz",
+        "valid": true
+      },
+      "living_dock": {
+        "exists": true,
+        "home_dock": "/Users/dhyana/.dharma/agents/warp_oz",
+        "identity_file": "/Users/dhyana/.dharma/agents/warp_oz/living_agent.json",
+        "memory_namespace": "agent:warp_oz",
+        "path": "/Users/dhyana/.dharma/agents/warp_oz",
+        "status": "starting"
+      },
+      "model": "anthropic/claude-auto",
+      "nats": {
+        "subjects": [
+          "dharma.agent.warp_oz.inbox"
+        ]
+      },
+      "provider": "",
+      "registration": {
+        "autonomy_policy": {
+          "can_approve_prs": false,
+          "can_author_context_bundles": false,
+          "can_mutate_dgm_protected": false,
+          "can_mutate_dharma_kernel": false,
+          "can_mutate_meta_dharma": false,
+          "can_mutate_telos": false,
+          "can_write_source": false,
+          "explicit_task_assignment_required": true,
+          "mode": "manual",
+          "requires_approval": true
+        },
+        "created_at": "2026-06-02T01:44:11.364873+00:00",
+        "digest": "sha256:11ee76e22c8c00c9331f0d2cffe3216d2f4565b9b3de9295bfecd584f18366df",
+        "memory_namespace": "agent:warp_oz",
+        "path": "/Users/dhyana/.dharma/external_agents/warp_oz/registration.json",
+        "registration_source": "merge_master_mike_pr_cleanup_rewire_2026_06_02",
+        "status": "registered",
+        "trace_identity": "trace:warp_oz",
+        "updated_at": "2026-06-02T03:38:09.151804+00:00",
+        "workspace_policy": {
+          "canonical_dharma_dir_writes_allowed": false,
+          "repo_writes_allowed": false,
+          "sandbox_root": "/Users/dhyana/.dharma/external_agents/warp_oz"
+        }
+      },
+      "role": "operator",
+      "schema_version": "dharma.agent_card.meishi.v0",
+      "semantic": {},
+      "skills": [],
+      "sources": {
+        "a2a_card": [
+          "/Users/dhyana/.dharma/a2a/cards/warp-oz.json"
+        ],
+        "identity_invariant": [
+          "/Users/dhyana/.dharma/external_agents/warp_oz/identity_invariant.json"
+        ],
+        "living_dock": [
+          "/Users/dhyana/.dharma/agents/warp_oz/living_agent.json"
+        ],
+        "registration": [
+          "/Users/dhyana/.dharma/external_agents/warp_oz/registration.json"
+        ]
+      },
+      "squad_id": "pr_cleanup",
+      "status": "registered",
+      "team_id": "dharma_swarm",
+      "trust_grade": "registered"
+    }
+  ],
+  "cards_dir": "/Users/dhyana/.dharma/a2a/cards",
+  "dharma_home": "/Users/dhyana/.dharma",
+  "findings": [
+    {
+      "agent_uid": "claude-code",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/claude-code.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "claude-flow",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/claude-flow.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "claude_code_cli_20260521t064502z",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/claude-code-cli-20260521t064502z.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex-5-5",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex-cli",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/codex-cli.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex_5_5_cli",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/codex-5-5-cli.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex_forgewright",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/codex-forgewright.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex_gpt5_api",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/codex-gpt5-api.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex_worker_spine",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "codex_worker_spine",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "cursor",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/cursor.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "cursor_remote_agent",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/cursor-remote-agent.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "cybernetics_codex",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "cybernetics_codex",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/external_agents/cybernetics_codex/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "devin-roaming-2987d222",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/devin-roaming-2987d222.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "dharma-swarm-mcp",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/dharma-swarm-mcp.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "fable_5_cursor",
+      "check": "forbidden_live_card_alias",
+      "detail": "'fable_5_cursor' is forbidden for semobj.sarathi: object forbidden_aliases",
+      "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+      "severity": "error"
+    },
+    {
+      "agent_uid": "fable_5_cursor",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/fable-5-cursor.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "fable_composer",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "fable_composer",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "forge_measurement_guardian",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/forge-measurement-guardian.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/hermes.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes-m5",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes-m5",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes_m5",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/hermes-m5.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes_m5_bootstrap",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "hermes_m5_bootstrap",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/external_agents/hermes_m5_bootstrap/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "kimi-2-6-claw",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/kimi-2-6-claw.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "kimi-claw-phone",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/kimi-claw-phone.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "merge_master_mike",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/merge-master-mike.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "opencalw",
+      "check": "forbidden_live_card_alias",
+      "detail": "'opencalw' is forbidden for semobj.openclaw_integration: Typo-distance collision with OpenClaw.",
+      "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+      "severity": "error"
+    },
+    {
+      "agent_uid": "opencalw",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/opencalw.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "openclaw-secure",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/openclaw-secure.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "opus_composer",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/opus_composer.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "opus_forge_architect",
+      "check": "duplicate_live_card_agent_uid",
+      "detail": "multiple live A2A card files resolve to the same agent_uid",
+      "path": "/Users/dhyana/.dharma/a2a/cards/opus-forge-architect.json, /Users/dhyana/.dharma/a2a/cards/opus_forge_architect.json",
+      "severity": "error"
+    },
+    {
+      "agent_uid": "perplexity-computer",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/perplexity-computer.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "qwen_code",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/qwen-code.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "sarathi",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "sarathi",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "strategy_librarian",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/strategy-librarian.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "warp_fable_weaver",
+      "check": "missing_live_a2a_card",
+      "detail": "agent has registration or LivingDock evidence but no live A2A card",
+      "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "warp_fable_weaver",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/external_agents/warp_fable_weaver/registration.json",
+      "severity": "warning"
+    },
+    {
+      "agent_uid": "warp_oz",
+      "check": "semantic_commons_unresolved",
+      "detail": "agent identity did not resolve to a Semantic Commons object",
+      "path": "/Users/dhyana/.dharma/a2a/cards/warp-oz.json",
+      "severity": "warning"
+    }
+  ],
+  "generated_at": "2026-06-26T01:47:10.838643+00:00",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "schema_version": "dharma.agent_card.meishi_index.v0",
+  "summary": {
+    "agent_count": 39,
+    "card_file_count": 33,
+    "error_count": 3,
+    "finding_count": 43,
+    "severity_counts": {
+      "error": 3,
+      "warning": 40
+    },
+    "status": "fail",
+    "trust_grade_counts": {
+      "discovery": 14,
+      "evidence_only": 7,
+      "quarantine": 3,
+      "registered": 12,
+      "verified": 3
+    },
+    "warning_count": 40
+  }
+}

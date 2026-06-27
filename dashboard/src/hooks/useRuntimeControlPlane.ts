@@ -13,7 +13,7 @@ const DEFAULT_REFRESH_INTERVAL_MS = 30_000;
 async function loadRuntimeControlPlane(): Promise<RuntimeControlPlaneData> {
   const [chatResponse, healthResponse] = await Promise.all([
     fetchChatStatus(),
-    fetchHealth(),
+    fetchHealth({ runtimeTruth: true }),
   ]);
   return normalizeRuntimeControlPlaneResponses(chatResponse, healthResponse);
 }

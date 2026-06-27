@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -54,6 +55,47 @@ def test_save_and_load_living_state_roundtrip(living_paths: Path):
     state = pulse._load_living_state()
     assert state["last_dream_density"] == 72
     assert state["last_shakti_at"] == 123
+
+
+def test_pulse_health_mode_writes_without_llm(tmp_path: Path, monkeypatch):
+    state_dir = tmp_path / ".dharma"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "daemon.pid").write_text(str(os.getpid()))
+    ops_dir = state_dir / "ops"
+    ops_dir.mkdir()
+    (ops_dir / "daemon_runtime_dispatch_self_report.json").write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "runtime_dispatch": {"dispatch_mode": "spine"},
+                "updated_at": "2026-06-25T21:31:32+00:00",
+            }
+        )
+    )
+    (state_dir / "pulse.log").write_text(
+        "\n--- PULSE @ 2026-06-24T19:53:41.601343+00:00 [scaling] ---\n"
+        "Error (rc=1): Credit balance is too low\n"
+    )
+
+    monkeypatch.setattr(pulse, "STATE_DIR", state_dir)
+    monkeypatch.setattr(pulse, "_LIVING_STATE_PATH", state_dir / "living_state.json")
+    monkeypatch.setenv("DGC_PULSE_MODE", "health")
+
+    def _fail_if_called(*args, **kwargs):
+        raise AssertionError("health-only pulse must not call the LLM")
+
+    monkeypatch.setattr(pulse, "run_claude_headless", _fail_if_called)
+
+    result = pulse.pulse(pulse.DaemonConfig(quiet_hours=[]))
+
+    assert result.startswith("HEALTH PULSE:")
+    assert "credit_status=provider_credit_exhausted" in result
+
+    for log_path in (state_dir / "pulse.log", state_dir / "logs" / "pulse.log"):
+        text = log_path.read_text()
+        assert "[health-non-llm]" in text
+        assert '"schema": "dharma_swarm.pulse.health.v1"' in text
+        assert '"likely_pool": "ANTHROPIC_API_KEY / Claude Code bare mode"' in text
 
 
 @pytest.mark.asyncio

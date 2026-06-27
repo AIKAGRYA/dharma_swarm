@@ -1,0 +1,76 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "inspected local source excerpts and source digest manifest",
+      "met": true,
+      "name": "source_audit_inspected_current_holon_source"
+    }
+  ],
+  "agent_uid": "fable_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 0.62,
+  "correlation_id": "holon-source-audit-fable-20260626",
+  "created_at": "2026-06-26T01:35:59Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "packet_id=holon-source-audit-fable-20260626",
+    "reply_to=dharma.agent.fable_composer.inbox.reply.holon-source-audit-fable-20260626",
+    "source_tree_digest=sha256:bbf1012f01acd995b3cf62d8fa98f28426acf96ce01d21b6fb47a081875631d4",
+    "git_dirty=true",
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/fable_composer-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "The final Hermes-grade claim is not proven.",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": true,
+  "missing_context": [
+    "full source tree beyond excerpts and completed multi-hour receipt"
+  ],
+  "model_call_latency_ms": 28461,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 0
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "92328aae6110d5d202c3e327183cecc113b321d244332f6db655afe9c44618a8",
+  "raw_response_sha256": "5219d12f4bd2e34745370a022c61f55a04dfbadd856e8a32af7257fe18cd79db",
+  "receipt_id": "holon-source-audit-fable-20260626",
+  "recommendations": [],
+  "reply_to": "dharma.agent.fable_composer.inbox.reply.holon-source-audit-fable-20260626",
+  "review_target": "a2a:holon-source-audit-fable-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "source_audit_claim": true,
+  "summary": "standalone package isolation and local gates are improved, but final Hermes-grade proof is blocked by dirty git, no completed multi-hour burn-in yet, no live key-backed provider burn-in, and prior A2A source audits failing.",
+  "understood_request": true,
+  "verdict": "revise"
+}

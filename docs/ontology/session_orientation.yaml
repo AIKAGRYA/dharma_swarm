@@ -12,6 +12,7 @@ routes:
       - L2
       - L3
       - L4
+      - L5
     layers:
       - id: L0
         name: Bootstrap
@@ -39,6 +40,8 @@ routes:
           - docs/governance/ACTIVE_TRACK.yaml
           - docs/governance/CANONICAL_DOC_STACK.md
           - docs/ontology/SEMANTIC_COMMONS.md
+          - docs/ops/MODEL_KEY_ROUTING.md
+          - docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
         commands:
           - python3 scripts/governance/orientation_graph.py
         required_answers:
@@ -102,3 +105,211 @@ routes:
           - what canonical target does it support
           - what authority and lifecycle does it have
         search_allowed: true
+
+      - id: L5
+        name: Seat Load
+        purpose: Load a named agent seat after identity, authority, and route are known.
+        budget_tokens: task_specific
+        source_kind: named_agent_seat_load
+        source_paths:
+          - docs/ontology/semantic_objects.yaml
+          - docs/ontology/semantic_aliases.yaml
+          - docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md
+          - docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
+          - docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md
+          - dharma_swarm/operator_core/living_agent_kernel.py
+          - dharma_swarm/operator_core/semantic_receipt.py
+        commands:
+          - make onboard-agent AGENT_NAME=codex_composer
+          - make codex-composer-status
+        required_answers:
+          - what identity is being loaded
+          - where is the LivingDock projection
+          - which recent receipts are current
+          - what policy ceiling applies
+          - what shared swarm truth outranks private context
+          - what Sanctum and Holocron context is in scope
+        search_allowed: false
+
+  - id: route.seat_sarathi
+    canonical_name: Sarathi Reserved Apex Holon Seat Load
+    active_track: agent-admission-semantic-commons-2026-06
+    canonical_object_id: semobj.sarathi
+    lifecycle: seed
+    entry_order:
+      - L0
+      - L1
+      - L2
+      - L4
+      - L5
+    layers:
+      - id: L0
+        name: Bootstrap
+        purpose: Enter safely before loading the reserved apex holon identity.
+        budget_tokens: 1000
+        source_kind: bootstrap
+        source_paths:
+          - CLAUDE.md
+          - docs/agents/sarathi/SARATHI_CONTRACT.md
+        commands:
+          - make onboard
+        required_answers:
+          - where am I
+          - that Sarathi is reserved and not the Cursor harness seat
+        search_allowed: false
+
+      - id: L1
+        name: Routing MOC
+        purpose: Confirm whether the reserved apex holon should load or defer to operator_guide_cursor.
+        budget_tokens: 1500
+        source_kind: routing_moc
+        source_paths:
+          - docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
+          - docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md
+        commands: []
+        required_answers:
+          - is Sarathi live yet
+          - should the operator use operator_guide_cursor instead
+        search_allowed: false
+
+      - id: L2
+        name: Active Track Packet
+        purpose: Load apex holon build intent and blockers only.
+        budget_tokens: 4000
+        source_kind: active_track_packet
+        source_paths:
+          - docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
+          - docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md
+        commands:
+          - python3 scripts/governance/check_track_status.py
+        required_answers:
+          - what apex proof is still missing
+          - whether operator should use operator_guide_cursor instead
+        search_allowed: false
+
+      - id: L4
+        name: Corpus Search
+        purpose: Search broader context only after bootstrap, routing, and active intent are known.
+        budget_tokens: task_specific
+        source_kind: corpus_search
+        source_paths:
+          - docs/agents/sarathi/
+          - docs/architecture/
+          - reports/governance/
+        commands: []
+        required_answers:
+          - which additional context is relevant
+          - whether the result changes the seat-load decision
+        search_allowed: true
+
+      - id: L5
+        name: Seat Load
+        purpose: Load the reserved Sarathi apex holon identity when live.
+        budget_tokens: task_specific
+        source_kind: named_agent_seat_load
+        source_paths:
+          - docs/agents/sarathi/SARATHI_CONTRACT.md
+          - docs/architecture/APEX_HOLON_LONG_RUNNING_GOAL_SPEC.md
+        commands:
+          - make onboard
+        required_answers:
+          - what identity is being loaded
+          - why this is not operator_guide_cursor
+          - what policy ceiling applies
+        search_allowed: false
+
+  - id: route.seat_operator_guide_cursor
+    canonical_name: Operator Guide Cursor Seat Load
+    active_track: agent-admission-semantic-commons-2026-06
+    canonical_object_id: semobj.operator_guide_cursor
+    lifecycle: seed
+    entry_order:
+      - L0
+      - L1
+      - L2
+      - L4
+      - L5
+    layers:
+      - id: L0
+        name: Bootstrap
+        purpose: Enter safely with the smallest required context.
+        budget_tokens: 1000
+        source_kind: bootstrap
+        source_paths:
+          - CLAUDE.md
+          - docs/ops/OPERATOR_GUIDE_CURSOR_ONBOARDING_MAP.md
+        commands:
+          - make onboard
+        required_answers:
+          - where am I
+          - what must I never touch
+          - what is the front door
+        search_allowed: false
+
+      - id: L1
+        name: Routing MOC
+        purpose: Map fleet, worktrees, and active tracks before teaching or dispatch.
+        budget_tokens: 2000
+        source_kind: routing_moc
+        source_paths:
+          - docs/governance/ACTIVE_TRACK.yaml
+          - docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md
+          - docs/ops/FABLE5_ONBOARDING_MAP.md
+          - dharma_swarm/a2a/contact_registry.py
+        commands:
+          - git worktree list
+        required_answers:
+          - which agents are live versus declared only
+          - which worktree is the operator desk
+          - which active tracks matter now
+        search_allowed: false
+
+      - id: L2
+        name: Active Track Packet
+        purpose: Load current intent, blockers, and fleet pressure for operator briefing.
+        budget_tokens: 4000
+        source_kind: active_track_packet
+        source_paths:
+          - docs/governance/ACTIVE_TRACK.yaml
+          - reports/governance/active_track_evidence.md
+          - reports/a2a/A2A_MASTER_SPEC_WORKING_STATE_20260617.md
+        commands:
+          - python3 scripts/governance/check_track_status.py
+        required_answers:
+          - what is currently being built
+          - what is blocked
+          - what the operator should focus on next
+        search_allowed: false
+
+      - id: L4
+        name: Corpus Search
+        purpose: Search broader operator-guide context only after bootstrap, routing, and active intent are known.
+        budget_tokens: task_specific
+        source_kind: corpus_search
+        source_paths:
+          - docs/agents/operator_guide_cursor/
+          - docs/ops/
+          - reports/governance/
+        commands: []
+        required_answers:
+          - which additional context is relevant
+          - whether the result changes the operator briefing
+        search_allowed: true
+
+      - id: L5
+        name: Seat Load
+        purpose: Load the persistent Operator Guide Cursor relay seat.
+        budget_tokens: task_specific
+        source_kind: named_agent_seat_load
+        source_paths:
+          - docs/agents/operator_guide_cursor/OPERATOR_GUIDE_CURSOR_CONTRACT.md
+          - examples/agents/operator_guide_cursor.registration.json
+          - docs/agents/operator_guide_cursor/HOLON_CONTEXT.md
+        commands:
+          - make onboard
+        required_answers:
+          - what identity is being loaded
+          - where is the LivingDock projection
+          - that this seat relays toward semobj.sarathi but is not Sarathi
+          - what teaching mode the operator requested
+        search_allowed: false

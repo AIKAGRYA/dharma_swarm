@@ -1,0 +1,68 @@
+{
+  "agent_uid": "fable_composer",
+  "contact_evidence_tier": "DOMAIN_RECEIPTED",
+  "domain_receipt_claim": true,
+  "domain_receipt_payload": {
+    "author_kind": "fable_composer_semantic_inbox_drain",
+    "causation_send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json",
+    "causation_send_receipt_sha256": "94d4dca7436fd2a4d7a25a01cc502988729d49ff4b1772fb9f17bc8bc5ecbd89",
+    "domain_receipt": true,
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/a2a_bus/inboxes/fable_composer/5aa607b21b57.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001515Z-ollama-mistral_latest-6aa708345c62.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json"
+    ],
+    "from_agent": "fable_composer",
+    "operator_contact_note": "target-owned reply artifact was validated and published to the recorded reply_subject as a typed domain receipt; semantic_reply_claim follows the artifact's explicit peer/model-processing claim",
+    "packet_id": "5aa607b21b57",
+    "peer_model_processed_claim": true,
+    "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+    "schema_version": "dharma.a2a.domain_receipt.v1",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+    "source_artifact_schema": "dharma.a2a.domain_reply_artifact.v1",
+    "source_artifact_sha256": "f0eda7949fa2813816bcc45904295a4d8abd78205c763bcec9795237cc418a87",
+    "summary": "The provided A2A request is understood and the requested audit of the standalone `holon/` package changes for the long-run Holon objective appears to be a standard request within scope. The Mistral model does not claim to have audited the changes but passes the request as it falls within the expected domain.",
+    "target_owned_artifact_claim": true,
+    "timestamp": "2026-06-26T00:15:39Z",
+    "to_agent": "operator",
+    "validated_semantic_receipt_refs": [
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001515Z-ollama-mistral_latest-6aa708345c62.json"
+    ],
+    "verdict": "pass"
+  },
+  "endpoint": "nats://127.0.0.1:4222",
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "typed domain receipt was published to the recorded reply_subject; run a2a_reply_capture.py to record DOMAIN_RECEIPTED from the stream",
+  "packet_id": "5aa607b21b57",
+  "payload_schema": "dharma.a2a.domain_receipt.v1",
+  "payload_sha256": "aff8ba78af86a94e73ab9b7294a15919b69d11afd50d214e120cd91eb3295d8b",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260626T001539Z-fable_composer-5aa607b21b57.json",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/fable_composer/5aa607b21b57-domain-reply.json",
+  "reply_artifact_sha256": "f0eda7949fa2813816bcc45904295a4d8abd78205c763bcec9795237cc418a87",
+  "reply_evidence_tier": "DOMAIN_RECEIPTED",
+  "reply_subject": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": true,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000840Z-fable_composer-5aa607b21b57.json",
+  "status": "DOMAIN_REPLY_PUBLISHED",
+  "stream": "DHARMA_FLEET",
+  "target_owned_artifact_claim": true,
+  "timestamp": "2026-06-26T00:15:39Z",
+  "transport_ack": {
+    "seq": 8521,
+    "stream": "DHARMA_FLEET",
+    "transport_ack": "JETSTREAM_PUB_ACK"
+  }
+}

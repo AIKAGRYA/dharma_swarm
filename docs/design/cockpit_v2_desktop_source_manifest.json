@@ -1,0 +1,1310 @@
+{
+  "generated_at": "2026-06-22T20:22:31.368999+00:00",
+  "desktop_root": "/Users/dhyana/Desktop/DharmaSwarm FrontEnd",
+  "purpose": "Cockpit V2 Grafana Board Mode source manifest; references all Desktop design/prototype/inspiration materials discovered for this build.",
+  "summary": {
+    "image_reference": 147,
+    "prototype_code": 29,
+    "other": 2,
+    "design_doc": 30,
+    "generation_or_data_json": 5,
+    "blender_asset": 1
+  },
+  "files": [
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/0_knZXKn7ylCO8tgJp.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 278443
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/1_9Q2tm85Q6huC16ftq_T0Dw.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 738229
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/33a616c1c5dacc40e0bac00f2a3444f3d3c7279b.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 163045
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/Screenshot 2026-06-14 at 23.14.08.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 839453
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/Screenshot 2026-06-14 at 23.17.32.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 6832518
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/TQeJVhUcDSzMt93sz36LlWnUTujc9H4vxLba.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 859236
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/ai-apps-students-educators-cover.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 160540
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/ai-red-teaming-landing-page.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 393759
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/best-ai-dashboard-builders.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 1194407
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/hero.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 57336
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (1).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 25670
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (2).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 48084
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (3).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 29102
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (4).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 41886
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (5).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 42150
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (6).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 42293
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (7).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 38353
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images (8).jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 17847
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/images.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 13675
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/original-14c386707f028c9cc95f789485c839e0.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 118406
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/original-1a7794b0894531700b6677120d603edd.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 27928
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/original-2dbfc916467ccaf1ade845a1475fa337.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 86416
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/DESIGN INSPIRATION/original-830756bc504027ab826fa22b66e1203d.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 231764
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Nierika inspiraed /30905547.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 992953
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Nierika inspiraed /exclusive-72x96-yarn-by-jose-benitez-sanchez-family-huichol-indians-238946_1024x1024.heic.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 468664
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Nierika inspiraed /images.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 128613
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Screenshot 2026-06-14 at 11.45.41.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 11642309
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Screenshot 2026-06-14 at 11.58.37.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2422364
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/especiallly good /il_1588xN.7290603069_np3j.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 862950
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/especiallly good /il_1588xN.7290603083_nxk7.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 690192
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/especiallly good /il_1588xN.7931088682_9xo1.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 569654
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/especiallly good /il_1588xN.7931088796_29ut.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 576620
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/il_1588xN.3604601992_ry45.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 732282
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/il_1588xN.7155786001_joea.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 371162
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/il_570xN.3942606080_r8gv.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 105572
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/il_fullxfull.5514528602_9f16.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 1783244
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/Thangka : mandala concepts/kalachakra-mandala-tibetan-thangka-painting-9016616.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 759694
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc 3.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 66096
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc 4 .jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 68782
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc 5 .jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 69537
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc 6",
+      "kind": "other",
+      "suffix": "",
+      "bytes": 58642
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc10.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 55183
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc11.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 109859
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc7.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 59641
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc8.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 179112
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abc9.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 79188
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/abstract curcuit 2.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 71486
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/images.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 69119
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /abcrg4.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 47198
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /images.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 75841
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /seamless-circuit-board-texture-abstract-background-your-design-circuit-board-electronic-computer-hardware-technology-273652347.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 143958
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /seamless-circuit-board-texture-abstract-background-your-design-circuit-board-electronic-computer-hardware-technology-273652352.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 177786
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /seamless-circuit-board-texture-abstract-background-your-design-circuit-board-electronic-computer-hardware-technology-273652364.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 384382
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /seamless-circuit-board-texture-abstract-background-your-design-generated-ai-seamless-circuit-board-tile-pattern-texture-273652374.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 132694
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/really good /seamless-circuit-board-texture-abstract-background-your-design-generated-ai-seamless-circuit-board-tile-pattern-texture-273652386.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 442874
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/abstract circuits/seamless-circuit-board-texture-abstract-background-your-design-circuit-board-electronic-computer-hardware-technology-273652347.jpg.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 143958
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/0.05764977350885814.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 183320
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/1*UQ-be4l_dFXVGewx3vXabA.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 99598
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/119722-f3ff9884165245150d324391f667c69b.data.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 244866
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/20260611101735_7r985la9.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1325384
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/AI-Quantum-Computing.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 98534
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/grafana new.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 50964
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/images.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 65504
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/moments-b09e33fb14b262bfdbd74ed14b3258ab.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 281416
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/mythosfableanthropicnationalsecurityquestion.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2421785
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/newid3.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 30743
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/newid5.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 57960
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/newimage4.jpeg",
+      "kind": "image_reference",
+      "suffix": ".jpeg",
+      "bytes": 53737
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/novo-modelo-da-anthropic-o-claude-fable-5-780x470.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 592476
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/transcoded-1781110523.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 157653
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/Hokusai depth study/great_wave_kanagawa.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 419621
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/Hokusai depth study/morning_after_snow_koishikawa.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 763091
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/Hokusai depth study/red_fuji_fine_wind_clear_morning.webp",
+      "kind": "image_reference",
+      "suffix": ".webp",
+      "bytes": 329872
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/Hokusai depth study/sea_of_kazusa.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 748884
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/motherboard ui figma /Motherboard ui figma.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 145976
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_MANDALA_PROTOTYPE_GOAL_2026-06-14.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 5867
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/CODEX_PROTOTYPE_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 5812
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/proto_1_atlas_board.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 19647
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/proto_2_recursive_mandala.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 17327
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/proto_3_network_operations_twin.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 19361
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/screenshots/proto_1_atlas_board.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 251679
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/screenshots/proto_2_recursive_mandala.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 336606
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/screenshots/proto_3_network_operations_twin.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 500509
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-15/data/portfolio_snapshot.json",
+      "kind": "generation_or_data_json",
+      "suffix": ".json",
+      "bytes": 4842
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-15/proto_4_woven_cockpit.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 27303
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/ROUND_1_RESULTS.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2169
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/_proto1_full.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 70751
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_1_zen_board.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 40945
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_1_zen_board.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 70751
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_2_temple_cockpit.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 40161
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_2_temple_cockpit.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 195483
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_3_mission_control.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 47584
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_3_mission_control.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 196298
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_4_mandala_first.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 46252
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_4_mandala_first.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 506872
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v2a_temple_synthesis.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 74590
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v2a_temple_synthesis.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 273661
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v2b_command_synthesis.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 71173
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v2b_command_synthesis.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 233418
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v3_alive_mandala.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 38826
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v3_alive_mandala.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 138887
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/POSTMORTEM_proto_v14_waste.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2312
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_build_v14.py",
+      "kind": "prototype_code",
+      "suffix": ".py",
+      "bytes": 358
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_f2_small.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 637786
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_find_hud.py",
+      "kind": "prototype_code",
+      "suffix": ".py",
+      "bytes": 1458
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_relief_template.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 5448
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_sub_small.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 599468
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_v10_template.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 23697
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_v14_template.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 7129
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_vocab_small.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 215244
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/_x_small.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 2754465
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/chrome_log.txt",
+      "kind": "design_doc",
+      "suffix": ".txt",
+      "bytes": 2040
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/01.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 755579
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/02.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 343208
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/03.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 756950
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/04.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 412693
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/05.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 277326
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/06.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 178294
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/07.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 190569
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/08.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 579245
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/09.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 360194
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_small/10.jpg",
+      "kind": "image_reference",
+      "suffix": ".jpg",
+      "bytes": 366075
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/corpus_urls.txt",
+      "kind": "design_doc",
+      "suffix": ".txt",
+      "bytes": 679
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/data/portfolio_snapshot.json",
+      "kind": "generation_or_data_json",
+      "suffix": ".json",
+      "bytes": 4315
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v10_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1150846
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v10_w0.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1150866
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v10_w100.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 790205
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v10_w50.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1031088
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v10_woven_cockpit.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 1110093
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v11_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1537920
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v11_organism_spike.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 7440
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v12_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1715977
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v12_organism.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 10548
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v13_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 1115261
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v13_living_cockpit.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 25439
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v14_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2929578
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v14_living_relief.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 857523
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v4_cybernetic_thangka.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 22643
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v4_cybernetic_thangka.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 965618
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v5_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 592665
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v5_living_lattice.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 11944
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v6_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2600131
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v6_living_thangka.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 9213
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v7_composer.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 11615
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v7_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 835612
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v8_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2715777
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v8_relief.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 3678079
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v9_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 531580
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/proto_v9_fusion.html",
+      "kind": "prototype_code",
+      "suffix": ".html",
+      "bytes": 23410
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/substrate_j.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7903885
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/substrate_u2.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 10593601
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/substrate_x.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7905780
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/PROTOTYPES/vocabulary/vocab_v1_sheet.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 5828121
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_01_Master01/MASTER_01_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2531
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_01_Master01/kalachakra_circuit_master_20260615_000213.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 6930421
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_01_Master01/kalachakra_circuit_master_20260615_000213_prompt.txt",
+      "kind": "design_doc",
+      "suffix": ".txt",
+      "bytes": 1174
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_01_Master01/kalachakra_circuit_master_20260615_000213_request.json",
+      "kind": "generation_or_data_json",
+      "suffix": ".json",
+      "bytes": 1408
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_01_Master01/kalachakra_circuit_master_20260615_000213_result.json",
+      "kind": "generation_or_data_json",
+      "suffix": ".json",
+      "bytes": 2551
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_02_Master02_functional/MASTER_02_FUNCTIONAL_COCKPIT_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2972
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_02_Master02_functional/MASTER_02_FUNCTIONAL_COCKPIT_PROMPT.txt",
+      "kind": "design_doc",
+      "suffix": ".txt",
+      "bytes": 1541
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_02_Master02_functional/master_02a_functional_hokusai_cockpit_20260615_003155_prompt.txt",
+      "kind": "design_doc",
+      "suffix": ".txt",
+      "bytes": 1502
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_02_Master02_functional/master_02a_functional_hokusai_cockpit_20260615_003155_request.json",
+      "kind": "generation_or_data_json",
+      "suffix": ".json",
+      "bytes": 1890
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/A_fluxultra_artmaster_relief.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 10129247
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/B_fluxultra_kalachakra_palace.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7145144
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/C_nanobanana_functional_cockpit.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7751205
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/D_nanobanana_overview_mandala.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8032470
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/E_flux2flex_artmaster.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 3025018
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/F_gptimage2_functional_cockpit.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 4914151
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_03_decorrelated/WAVE03_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 3158
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/G_nano_edit_FD_reskin.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8508664
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/H_nano_fresh_merge.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7187447
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/I_nano_fresh_merge_v2.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8431955
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/J_nano_D_tenorgans.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7903885
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/K_nano_CD_merge.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7033337
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/L_flux2flex_cloisonne.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 2516731
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/M_seedream_FD_1.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 9831610
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/M_seedream_FD_2.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 12294261
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/M_seedream_FD_3.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 12198104
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/N_seedream_FCD.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8453840
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/O_nano_F_reskin_saturated.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8798349
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/P_gpt_edit_FD_reskin.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 5480570
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_04_FxD_merge/WAVE04_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 3232
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/Q_nano_PD_warm.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8055453
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/R_nano_J_warm_recursive.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7871427
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/S_nano_fresh_warm_hud.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7180115
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/T_gpt_PD_warm.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 5550600
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/U_seedream_PD_warm_1.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 9342070
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/U_seedream_PD_warm_2.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 10593601
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_05_warm_correction/WAVE05_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2827
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_06_hokusai_muted/V_nano_U2_muted.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7075145
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_06_hokusai_muted/WAVE06_CRITIQUE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2175
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_06_hokusai_muted/W_nano_fresh_muted.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7039957
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_06_hokusai_muted/X_nano_recursive_muted.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 7905780
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_07_corpus_fusion/F1_nanobanana_corpus_fusion.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 27266348
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_07_corpus_fusion/F2_seedream_corpus_fusion.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 10678247
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_07_corpus_fusion/F3_seedream_corpus_fusion.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 8917698
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/04_Fal Generations/Wave_07_corpus_fusion/_codex_proto4_frame.png",
+      "kind": "image_reference",
+      "suffix": ".png",
+      "bytes": 493192
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/ART_DIRECTION_v2_2026-06-15_RUG_TO_INSTRUMENT.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 6887
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/00_INDEX.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2799
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/01_CYBERNETIC_THANGKA_ART_DIRECTION.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2702
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/02_REFERENCE_CURATION_BOARD.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2324
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/03_BLENDER_PBR_NUCLEUS_BRIEF.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 2423
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/04_FAL_MCP_MEDIA_PIPELINE.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 4085
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/05_FIGMA_RUNTIME_HANDOFF.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 1993
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/06_AGENT_BUILD_HANDOFF_PROMPT.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 1763
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/07_BLENDER_MCP_STATUS.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 1373
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/cybernetic_thangka_nucleus_scaffold.blend",
+      "kind": "blender_asset",
+      "suffix": ".blend",
+      "bytes": 513444
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/scripts/__pycache__/create_cybernetic_thangka_nucleus.cpython-313.pyc",
+      "kind": "other",
+      "suffix": ".pyc",
+      "bytes": 14040
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/CYBERNETIC_THANGKA_PIPELINE_2026-06-14/scripts/create_cybernetic_thangka_nucleus.py",
+      "kind": "prototype_code",
+      "suffix": ".py",
+      "bytes": 8531
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/FRONTEND_DESIGN_PACKET_INDEX.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 1349
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/LIVING_ONTOLOGY_v1_DESIGN_2026-06-15.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 3528
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/MANDALA_MISSION_CONTROL_CANON.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 8463
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/NEW_INSTANCE_KICKOFF_2026-06-15.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 7318
+    },
+    {
+      "path": "Desktop/DharmaSwarm FrontEnd/NEXT_SESSION_ARTICULATION_2026-06-14.md",
+      "kind": "design_doc",
+      "suffix": ".md",
+      "bytes": 5473
+    }
+  ],
+  "primary_sources": [
+    "Desktop/DharmaSwarm FrontEnd/MANDALA_MISSION_CONTROL_CANON.md",
+    "Desktop/DharmaSwarm FrontEnd/LIVING_ONTOLOGY_v1_DESIGN_2026-06-15.md",
+    "Desktop/DharmaSwarm FrontEnd/ART_DIRECTION_v2_2026-06-15_RUG_TO_INSTRUMENT.md",
+    "Desktop/LIVE_OPS_COCKPIT_V2_GOAL_SPEC.md",
+    "Desktop/LIVE_OPS_COCKPIT_V2_PR_SEQUENCE_PACKET.md",
+    "Desktop/DharmaSwarm FrontEnd/01_John's Inspiration/COCKPIT/new cockpit fusion ideas/grafana new.jpeg",
+    "Desktop/DharmaSwarm FrontEnd/02_Codex Prototypes/CODEX_PROTOTYPES_2026-06-14/screenshots/proto_1_atlas_board.png",
+    "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/Claude opus 4.8 Protoypes/proto_v2b_command_synthesis.png",
+    "Desktop/DharmaSwarm FrontEnd/03_Claude Prototypes/POSTMORTEM_proto_v14_waste.md"
+  ]
+}

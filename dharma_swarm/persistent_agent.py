@@ -410,6 +410,7 @@ class PersistentAgent:
                 self._profile.record_gate(passed=False)
                 result_info["blocked"] = True
                 result_info["gate_reason"] = gate_outcome.get("reason", "")
+                result_info["gate_status"] = gate_outcome.get("gate_status", "")
                 await self._write_witness("BLOCKED", task_text, gate_outcome.get("reason", ""))
                 return result_info
             if gate_outcome:
@@ -490,7 +491,12 @@ class PersistentAgent:
     # -- Gate check ------------------------------------------------------
 
     def _check_gate(self, task_text: str) -> dict[str, Any] | None:
-        """Run telos gate check. Returns None if gates unavailable."""
+        """Run telos gate check.
+
+        Persistent agents are standing actors. If the gate path errors, the
+        safe outcome is to block the wake instead of treating the missing gate
+        as approval.
+        """
         try:
             from dharma_swarm.telos_gates import check_with_reflective_reroute
             from dharma_swarm.models import GateDecision
@@ -504,10 +510,14 @@ class PersistentAgent:
             decision = outcome.result.decision
             if decision == GateDecision.BLOCK:
                 return {"blocked": True, "reason": outcome.result.reason}
-            return {"blocked": False}
+            return {"blocked": False, "gate_status": "passed"}
         except Exception as e:
-            logger.debug("[%s] gate check skipped: %s", self.name, e)
-            return None
+            logger.warning("[%s] gate check failed closed: %s", self.name, e)
+            return {
+                "blocked": True,
+                "reason": f"gate_check_error:{type(e).__name__}",
+                "gate_status": "fail_closed",
+            }
 
     # -- Helpers ---------------------------------------------------------
 

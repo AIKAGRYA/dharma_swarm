@@ -1,0 +1,21 @@
+{
+  "authority": {
+    "broker_write_authority": false,
+    "capital_approval": false,
+    "live_authority": false,
+    "mutates_live_lab_state": false,
+    "operator_approval_granted": false,
+    "order_generation_authority": false,
+    "read_only": true,
+    "route_mutation_authority": false
+  },
+  "completed_at": "2026-06-26T00:32:34Z",
+  "iteration_count": 1,
+  "latest_capital_authorized_rating_out_of_100": 0,
+  "latest_live_fund_rating_out_of_100": 8,
+  "latest_rating_out_of_100": 31,
+  "latest_receipt_hash": "407ad3926ee05c89cb45578ec0157dc31d152293f3327c05e763ac9ecd3d88f7",
+  "run_dir": "/Users/dhyana/dharma_swarm/reports/capital_lab/dharma_capital_evolution/dharma-capital-evolution-smoke-20260626",
+  "schema_version": "dharma.capital.evolution.summary.v1",
+  "status": "completed"
+}

@@ -1,0 +1,21 @@
+{
+  "authority": {
+    "broker_write_authority": false,
+    "capital_approval": false,
+    "live_authority": false,
+    "mutates_live_lab_state": false,
+    "operator_approval_granted": false,
+    "order_generation_authority": false,
+    "read_only": true,
+    "route_mutation_authority": false
+  },
+  "completed_at": "2026-06-26T02:41:26Z",
+  "iteration_count": 13,
+  "latest_capital_authorized_rating_out_of_100": 0,
+  "latest_live_fund_rating_out_of_100": 8,
+  "latest_rating_out_of_100": 31,
+  "latest_receipt_hash": "cade7bf8e969c22361ad9af00153bd26dc2b553a9f264522cbbacf5bdb557789",
+  "run_dir": "/Users/dhyana/dharma_swarm/reports/capital_lab/dharma_capital_evolution/dharma-capital-2h-evolution-ontology-corrected-20260626T0045Z",
+  "schema_version": "dharma.capital.evolution.summary.v1",
+  "status": "completed"
+}

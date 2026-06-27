@@ -24,6 +24,13 @@ class TestAgentProfile:
         assert p.model == "claude-code"
         assert p.context_budget == 30_000
 
+    def test_lease_gated_autonomy_alias_is_conservative(self):
+        p = AgentProfile(
+            name="composer",
+            autonomy="read_only_until_execution_lease",
+        )
+        assert p.autonomy == AutonomyLevel.CAUTIOUS
+
     def test_permissions_check(self):
         p = AgentProfile(
             name="restricted",
@@ -126,6 +133,28 @@ class TestProfileManager:
         mgr = ProfileManager(profile_dir=tmp_path)
         profiles = mgr.load_all()
         assert len(profiles) == 0
+
+    def test_loads_lease_gated_sovereign_profile(self, tmp_path: Path):
+        (tmp_path / "opus_composer.json").write_text(
+            json.dumps(
+                {
+                    "agent_uid": "opus_composer",
+                    "autonomy": "read_only_until_execution_lease",
+                    "callsign": "opus_composer",
+                    "display_name": "Opus Composer",
+                    "harness": "claude_code_headless",
+                    "l4_status": "not_l4_seed_only",
+                    "model": "claude-opus-4-8",
+                    "name": "opus_composer",
+                    "provider": "anthropic_max",
+                    "status": "seeded_inactive",
+                    "wake_loop_active": False,
+                }
+            )
+        )
+        mgr = ProfileManager(profile_dir=tmp_path)
+        profiles = mgr.load_all()
+        assert profiles["opus_composer"].autonomy == AutonomyLevel.CAUTIOUS
 
 
 # ── Additional profile tests ─────────────────────────────────────────
@@ -461,6 +490,22 @@ class TestCreateFromSkillExtended:
         mgr = ProfileManager(profile_dir=tmp_path)
         profile = mgr.create_from_skill(MockSkill())
         assert profile.autonomy == AutonomyLevel.AGGRESSIVE
+
+    def test_create_from_skill_alias_autonomy_lease_gated(self, tmp_path: Path):
+        """Lease-gated autonomy maps to CAUTIOUS."""
+
+        class MockSkill:
+            name = "lease-auto"
+            model = "x"
+            provider = "X"
+            autonomy = "read_only_until_execution_lease"
+            thread = None
+            system_prompt = ""
+            tags = []
+
+        mgr = ProfileManager(profile_dir=tmp_path)
+        profile = mgr.create_from_skill(MockSkill())
+        assert profile.autonomy == AutonomyLevel.CAUTIOUS
 
     def test_create_from_skill_unknown_autonomy_defaults(self, tmp_path: Path):
         """Unknown autonomy string falls back to BALANCED."""

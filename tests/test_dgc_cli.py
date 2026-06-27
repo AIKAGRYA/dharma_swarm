@@ -511,6 +511,166 @@ def test_cmd_orchestrate_live_checks_existing_process_without_pid(
     assert called is False
 
 
+def test_cmd_orchestrate_live_self_heal_keeps_healthy_daemon_blocking(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """Launchd self-heal must not spawn duplicates when health proves the PID."""
+    from dharma_swarm.terminal_commands import lifecycle
+
+    (tmp_path / "daemon.pid").write_text("12345", encoding="utf-8")
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+    monkeypatch.setenv("DHARMA_DAEMON_SELF_HEAL_STALE_PID", "1")
+    monkeypatch.setattr(lifecycle, "_pid_alive", lambda pid: pid == 12345)
+    monkeypatch.setattr(
+        lifecycle,
+        "_daemon_health_matches_pid",
+        lambda pid: (pid == 12345, "health_ok"),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "_terminate_daemon_pid",
+        lambda pid: (_ for _ in ()).throw(AssertionError("should not reap")),
+    )
+
+    called = False
+
+    def fake_popen(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("Popen should not be called for healthy daemon")
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    lifecycle.cmd_orchestrate_live(background=True)
+
+    out = capsys.readouterr().out
+    assert "Orchestrator already running (PID 12345)" in out
+    assert (tmp_path / "daemon.pid").exists()
+    assert called is False
+
+
+def test_cmd_orchestrate_live_self_heal_reaps_unhealthy_daemon_pid(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """Launchd self-heal reaps alive but health-unproven daemon PID before start."""
+    from dharma_swarm.terminal_commands import lifecycle
+
+    (tmp_path / "daemon.pid").write_text("12345", encoding="utf-8")
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+    monkeypatch.setenv("DHARMA_DAEMON_SELF_HEAL_STALE_PID", "1")
+    monkeypatch.setattr(lifecycle, "_pid_alive", lambda pid: False if pid == 54321 else True)
+    monkeypatch.setattr(
+        lifecycle,
+        "_daemon_health_matches_pid",
+        lambda pid: (False, "health_unreachable:URLError"),
+    )
+    reaped: list[int] = []
+    monkeypatch.setattr(
+        lifecycle,
+        "_terminate_daemon_pid",
+        lambda pid: reaped.append(pid) is None or True,
+    )
+    monkeypatch.setattr(lifecycle, "_first_daemon_like_process", lambda: None)
+
+    popen_calls: list[list[str]] = []
+
+    class FakeProcess:
+        pid = 54321
+
+    def fake_popen(args, **kwargs):
+        popen_calls.append(list(args))
+        return FakeProcess()
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+
+    lifecycle.cmd_orchestrate_live(background=True)
+
+    out = capsys.readouterr().out
+    assert "failed health proof" in out
+    assert "Orchestrator started in background (PID 54321)" in out
+    assert reaped == [12345]
+    assert not (tmp_path / "daemon.pid").exists()
+    assert popen_calls == [[sys.executable, "-m", "dharma_swarm.orchestrate_live", "--background"]]
+
+
+def test_terminate_daemon_pid_permission_denied_is_not_success(monkeypatch):
+    """A failed signal must not be treated as successful daemon reaping."""
+    from dharma_swarm.terminal_commands import lifecycle
+
+    def _raise_permission_error(pid: int, sig: int) -> None:
+        raise PermissionError("operation not permitted")
+
+    monkeypatch.setattr(lifecycle.os, "kill", _raise_permission_error)
+
+    assert lifecycle._terminate_daemon_pid(12345) is False
+
+
+def test_cmd_down_preserves_pid_file_on_permission_denied(monkeypatch, tmp_path, capsys):
+    """dgc down should keep PID evidence when the signal is permission-denied."""
+    from dharma_swarm.terminal_commands import lifecycle
+
+    pid_file = tmp_path / "daemon.pid"
+    pid_file.write_text("12345", encoding="utf-8")
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+
+    def _raise_permission_error(pid: int, sig: int) -> None:
+        raise PermissionError("operation not permitted")
+
+    monkeypatch.setattr(lifecycle.os, "kill", _raise_permission_error)
+
+    lifecycle.cmd_down()
+
+    out = capsys.readouterr().out
+    assert "Could not signal daemon (PID 12345): permission denied" in out
+    assert pid_file.exists()
+
+
+def test_cmd_down_uses_live_process_when_pid_file_missing(monkeypatch, tmp_path, capsys):
+    """dgc down should still stop a detected live daemon without daemon.pid."""
+    from dharma_swarm.terminal_commands import lifecycle
+
+    monkeypatch.setattr(lifecycle, "DHARMA_STATE", tmp_path)
+    monkeypatch.setattr(
+        lifecycle,
+        "_first_daemon_like_process",
+        lambda: (12345, "/opt/homebrew/bin/dgc orchestrate-live"),
+    )
+    signals: list[tuple[int, int]] = []
+    monkeypatch.setattr(lifecycle.os, "kill", lambda pid, sig: signals.append((pid, sig)))
+
+    lifecycle.cmd_down()
+
+    out = capsys.readouterr().out
+    assert "Sent SIGTERM to daemon (PID 12345)" in out
+    assert signals == [(12345, lifecycle.signal.SIGTERM)]
+
+
+def test_daemon_process_scan_detects_dgc_orchestrate_live(monkeypatch):
+    """Launchd runs the daemon as `dgc orchestrate-live`, not only module paths."""
+    from dharma_swarm.terminal_commands import _helpers
+
+    monkeypatch.setattr(_helpers.os, "getpid", lambda: 1)
+    monkeypatch.setattr(
+        _helpers.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            "12345 /opt/homebrew/bin/dgc orchestrate-live\n",
+            "",
+        ),
+    )
+
+    assert _helpers._first_daemon_like_process() == (
+        12345,
+        "/opt/homebrew/bin/dgc orchestrate-live",
+    )
+
+
 def test_cmd_up_checks_existing_process_without_pid(monkeypatch, tmp_path, capsys):
     """The daemon launcher should refuse a duplicate start on live process evidence alone."""
     from dharma_swarm import dgc_cli
@@ -1311,6 +1471,40 @@ def test_cmd_daemon_status_prefers_fresher_pulse_source(monkeypatch, tmp_path, c
     out = capsys.readouterr().out
     assert "2026-03-26T12:51:00+00:00" in out
     assert "logs/pulse.log" in out
+
+
+def test_pid_alive_treats_permission_error_as_live(monkeypatch):
+    """Sandboxed process probes may get EPERM for live PIDs."""
+    from dharma_swarm.terminal_commands import _helpers
+
+    def _raise_permission_error(pid: int, sig: int) -> None:
+        raise PermissionError("operation not permitted")
+
+    monkeypatch.setattr(_helpers.os, "kill", _raise_permission_error)
+
+    assert _helpers._pid_alive(12345) is True
+
+
+def test_cmd_daemon_status_reports_running_when_pid_probe_is_permission_denied(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    """daemon-status should not label a valid PID stale only because signal probing is denied."""
+    from dharma_swarm.terminal_commands import diagnostics
+
+    dharma_state = tmp_path / ".dharma"
+    dharma_state.mkdir(parents=True)
+    (dharma_state / "daemon.pid").write_text("12345", encoding="utf-8")
+
+    monkeypatch.setattr(diagnostics, "DHARMA_STATE", dharma_state)
+    monkeypatch.setattr(diagnostics, "_canonical_pulse_summary", lambda: (0, None, None))
+    monkeypatch.setattr(diagnostics, "_pid_alive", lambda pid: True)
+
+    diagnostics.cmd_daemon_status()
+
+    out = capsys.readouterr().out
+    assert "status: running (PID 12345)" in out
 
 
 def test_cmd_reciprocity_summary_prints_ledger_summary(capsys, monkeypatch):

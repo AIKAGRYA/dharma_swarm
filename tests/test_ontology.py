@@ -35,7 +35,7 @@ class TestOntologyRegistry:
     def test_known_entities_exist(self):
         expected = {
             "rv_paper", "ura_paper", "grant_app", "welfare_calc",
-            "dharma_swarm", "mech_interp_lab", "prompt_bank",
+            "gaia_kernel", "dharma_swarm", "mech_interp_lab", "prompt_bank",
             "psmv", "kailash_vault", "agni_vps", "jagat_kalyan",
         }
         assert expected.issubset(set(ONTOLOGY.keys()))
@@ -135,11 +135,16 @@ class TestEntityContext:
         assert "Deadline" not in ctx
         assert "psmv" in ctx
 
+    def test_missing_external_entity_context_surfaces_path_state(self):
+        ctx = entity_context("welfare_calc")
+        assert "Path exists: no" in ctx
+        assert "blocked" in ctx
+
 
 class TestBlockedEntities:
     def test_returns_list(self):
         blocked = blocked_entities()
         assert isinstance(blocked, list)
-        # Currently nothing should be blocked
+        assert any(e.id == "welfare_calc" for e in blocked)
         for e in blocked:
             assert e.status == "blocked"

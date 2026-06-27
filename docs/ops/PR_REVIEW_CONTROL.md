@@ -113,6 +113,32 @@ and acceptable. The default quorum is `codex,claude`. The special
 `required_reviewers=none` policy is reserved for docs-low automation where the
 dispatcher has already limited the diff to documentation/report projections.
 
+## Greptile Review Intake
+
+Greptile comments are an external automated review signal that must be captured
+into one local system instead of living only as scattered GitHub threads.
+
+Current intake artifacts:
+
+```text
+reports/governance/greptile_review_intake_2026-06-18.md
+reports/governance/greptile_review_intake_2026-06-18.json
+```
+
+Ownership split:
+
+- `docs/ops/PR_REVIEW_CONTROL.md` owns the operational intake shape.
+- `docs/governance/MMM_CHARTER.md` owns Merge Master Mike's authority boundary.
+- `docs/governance/KAIZENOPS.md` owns the improvement interpretation: recurring
+  Greptile findings become waste classes and one-action repair packets.
+
+Merge Master Mike should read Greptile intake when building PR packets/gates.
+Greptile findings do not approve, reject, or merge PRs. They are advisory review
+inputs. P1 findings are merge blockers unless resolved or explicitly waived by
+the operator. P2 findings are advisory for docs-low/report-only PRs, but become
+repair-needed for runtime, governance, security, CI, ontology, or merge-control
+surfaces.
+
 ## Merge Hygiene Quorum
 
 Merge Master Mike is the final repo-hygiene arbiter, but Mike should not turn

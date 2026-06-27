@@ -70,7 +70,7 @@ def test_shell_handler_allows_name_drift_preflight(tmp_path):
                 "id": "de_bug_corral_scan",
                 "handler": "shell",
                 "shell_command": (
-                    "python3 scripts/governance/name_drift_preflight.py "
+                    ".venv/bin/python scripts/governance/name_drift_preflight.py "
                     "--json-output ~/.dharma/logs/name_drift_preflight_latest.json"
                 ),
             }
@@ -79,7 +79,7 @@ def test_shell_handler_allows_name_drift_preflight(tmp_path):
     assert result.status == CronJobRunStatus.COMPLETED
     assert result.output == "scan ok"
     args, kwargs = calls[0]
-    assert args[:2] == ["python3", "scripts/governance/name_drift_preflight.py"]
+    assert args[:2] == [".venv/bin/python", "scripts/governance/name_drift_preflight.py"]
     assert kwargs["cwd"] == repo_root
     assert "shell" not in kwargs
 

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import plistlib
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -20,6 +21,10 @@ def _load_report_module():
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def _fresh_generated_at() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def test_dispatch_mode_report_marks_orchestrator_legacy_default_without_env():
@@ -107,7 +112,7 @@ def test_dispatch_mode_report_rejects_live_census_without_surface_list(
         json.dumps(
             {
                 "schema_version": "live_ops_census.v1",
-                "generated_at": "2026-06-14T02:00:00Z",
+                "generated_at": _fresh_generated_at(),
                 "surfaces": {},
             }
         ),
@@ -156,11 +161,12 @@ def test_dispatch_mode_report_flags_stale_live_census_receipt(
 def test_dispatch_mode_report_includes_live_census_source_gaps(tmp_path, monkeypatch):
     mod = _load_report_module()
     receipt = tmp_path / "live_process_census.json"
+    generated_at = _fresh_generated_at()
     receipt.write_text(
         json.dumps(
             {
                 "schema_version": "live_ops_census.v1",
-                "generated_at": "2026-06-13T21:25:05Z",
+                "generated_at": generated_at,
                 "surfaces": [
                     {
                         "id": "substrate.dharma_daemon",
@@ -271,7 +277,7 @@ def test_dispatch_mode_report_includes_live_census_source_gaps(tmp_path, monkeyp
     assert report["summary"]["live_census_proof_gap_surfaces"] == 1
     assert report["summary"]["live_census_source_stale_surfaces"] == 1
     assert report["summary"]["score_gate_65_to_70"] is True
-    assert report["live_census"]["generated_at"] == "2026-06-13T21:25:05Z"
+    assert report["live_census"]["generated_at"] == generated_at
     assert report["live_census"]["source_stale_surfaces"][0]["id"] == "substrate.dharma_daemon"
     daemon_surface = report["live_census"]["proof_gap_surfaces"][0]
     assert daemon_surface["runtime_receipt_active_head"] == {
@@ -382,7 +388,7 @@ def test_dispatch_mode_report_includes_ds_goal_wrapper_contract(
         json.dumps(
             {
                 "schema_version": "live_ops_census.v1",
-                "generated_at": "2026-06-13T21:25:05Z",
+                "generated_at": _fresh_generated_at(),
                 "surfaces": [
                     {
                         "id": "cli.ds_goal",
@@ -643,7 +649,7 @@ def test_dispatch_mode_report_marks_persistent_daemon_spine_launch_spec(tmp_path
             "ProgramArguments": [
                 "/bin/bash",
                 "-c",
-                "cd /Users/dhyana/dharma_swarm && source .env && dgc orchestrate-live",
+                "cd /Users/dhyana/dharma_swarm && source .env && exec env PYTHONPATH=/Users/dhyana/dharma_swarm TINY_ROUTER_BACKEND=heuristic ./.venv/bin/python -m dharma_swarm.dgc_cli orchestrate-live",
             ],
             "EnvironmentVariables": {
                 "DHARMA_SPINE_DISPATCH": "1",
@@ -666,7 +672,45 @@ def test_dispatch_mode_report_marks_persistent_daemon_spine_launch_spec(tmp_path
         if entry["surface"] == "orchestrator.persistent-daemon"
     )
     assert launch_entry["risk"] == "low"
-    assert "DHARMA_SPINE_DISPATCH=1" in launch_entry["evidence"]
+    assert "repo-pinned" in launch_entry["evidence"]
+
+
+def test_dispatch_mode_report_marks_ambient_dgc_spine_launch_unblessed(
+    tmp_path, monkeypatch
+):
+    mod = _load_report_module()
+    user_plist = tmp_path / "user.plist"
+    repo_plist = tmp_path / "repo.plist"
+    user_plist.write_bytes(
+        plistlib.dumps({
+            "ProgramArguments": [
+                "/bin/bash",
+                "-c",
+                "cd /Users/dhyana/dharma_swarm && source .env && dgc orchestrate-live",
+            ],
+            "EnvironmentVariables": {
+                "DHARMA_SPINE_DISPATCH": "1",
+                "PATH": "/usr/bin:/bin",
+            },
+        })
+    )
+    monkeypatch.setattr(mod, "_USER_LAUNCH_PLIST", user_plist)
+    monkeypatch.setattr(mod, "_REPO_LAUNCH_PLIST", repo_plist)
+
+    report = mod.build_report(env={})
+
+    assert (
+        report["summary"]["orchestrator_persistent_daemon"]
+        == "ambient_dgc_spine_launch_spec"
+    )
+    assert report["summary"]["score_gate_65_to_70"] is False
+    launch_entry = next(
+        entry
+        for entry in report["entries"]
+        if entry["surface"] == "orchestrator.persistent-daemon"
+    )
+    assert launch_entry["risk"] == "medium"
+    assert "ambient dgc console script" in launch_entry["evidence"]
 
 
 def test_dispatch_mode_report_exposes_direct_agent_runner_callers():

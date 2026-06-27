@@ -1,0 +1,168 @@
+{
+  "agent_uid": "sarathi",
+  "axis_scores": {
+    "a2a_transport": 5,
+    "authority_and_policy": 5,
+    "canonical_home": 3,
+    "delegation_hierarchy": 1,
+    "evolution_loop": 1,
+    "identity_and_admission": 5,
+    "operator_surface": 1,
+    "receipts_and_lineage": 5,
+    "runtime_persistence": 0,
+    "verification": 4
+  },
+  "claimed_level": "D3",
+  "evidence_paths": [
+    "/Users/dhyana/dharma_swarm/docs/ontology/semantic_objects.yaml",
+    "/Users/dhyana/dharma_swarm/docs/ontology/semantic_aliases.yaml",
+    "/Users/dhyana/.dharma/agents/sarathi/identity.json",
+    "/Users/dhyana/dharma_swarm/dharma_swarm/persistent_agent.py",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T084959Z-hermes-m5-35b2bfe0cd9a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T085443Z-hermes-m5-3a0e3081da8a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152854Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152918Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152938Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T153835Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T083232Z-hermes-35b2bfe0cd9a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T085445Z-hermes-3a0e3081da8a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093026Z-hermes-38f66a7e393b.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-devin-cd12cf637177.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-fable_5_cursor-0a53b307f889.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-fable_composer-4263af62684b.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-devin-cf8618dc738c.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-fable_5_cursor-eb84b96dd201.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-fable_composer-a73376e259af.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-hermes-bb9b7e2470f8.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260625T153928Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260625T154002Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json",
+    "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json",
+    "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260625T152820Z-ollama-llama3_2_latest-semr_e1a4bffea2e04571935d2169d7e0a7ed.json",
+    "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260625T153813Z-ollama-llama3_2_latest-semr_d6db8da2c99d437389e7977e22d90d88.json",
+    "/Users/dhyana/dharma_swarm/dharma_swarm/operator_core/semantic_receipt.py",
+    "/Users/dhyana/dharma_swarm/scripts/runtime/model_critic_runner.py",
+    "/Users/dhyana/dharma_swarm/tests/test_semantic_receipt.py",
+    "/Users/dhyana/dharma_swarm/tests/test_model_critic_runner.py"
+  ],
+  "generated_at": "2026-06-25T15:40:07Z",
+  "hard_gate_failures": [
+    "d3_living_dock_incomplete",
+    "d3_service_heartbeat_not_fresh",
+    "d3_transport_heartbeat_not_fresh",
+    "d4_domain_receipt_missing",
+    "d4_dialogue_receipt_missing"
+  ],
+  "living_dock_status": {
+    "evidence_paths": [
+      "/Users/dhyana/.dharma/agents/sarathi/identity.json"
+    ],
+    "home": "/Users/dhyana/.dharma/agents/sarathi",
+    "missing": [
+      "living_agent",
+      "service_heartbeats",
+      "transport_heartbeats",
+      "dialogue",
+      "sanctum",
+      "authority_passport",
+      "a2a_card"
+    ],
+    "present": {
+      "a2a_card": false,
+      "authority_passport": false,
+      "dialogue": false,
+      "identity": true,
+      "living_agent": false,
+      "sanctum": false,
+      "service_heartbeats": false,
+      "transport_heartbeats": false
+    },
+    "status": "partial"
+  },
+  "notes": [
+    "Sarathi is treated as read-only APEX seed until runtime breath receipts exist."
+  ],
+  "policy_gate_status": {
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/dharma_swarm/persistent_agent.py"
+    ],
+    "status": "fail_closed",
+    "summary": "PersistentAgent gate exceptions block standing-agent wakes"
+  },
+  "protected_actions_gated": [
+    "secrets",
+    "money",
+    "external_messages",
+    "pr_approval",
+    "policy_governance_writes"
+  ],
+  "receipt_bundle_status": {
+    "dialogue_receipt": false,
+    "domain_receipt": false,
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T084959Z-hermes-m5-35b2bfe0cd9a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T085443Z-hermes-m5-3a0e3081da8a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260611T091559Z-hermes-m5-3a0e3081da8a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152854Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152918Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T152938Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260625T153835Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T083232Z-hermes-35b2bfe0cd9a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T085445Z-hermes-3a0e3081da8a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T091604Z-hermes-3a0e3081da8a.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093026Z-hermes-38f66a7e393b.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-devin-cd12cf637177.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-fable_5_cursor-0a53b307f889.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T093053Z-fable_composer-4263af62684b.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-devin-cf8618dc738c.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-fable_5_cursor-eb84b96dd201.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-fable_composer-a73376e259af.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260611T102954Z-hermes-bb9b7e2470f8.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260625T153928Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/reply_receipts/20260625T154002Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260611T162352Z-ollama-glm-5_cloud-receipt_ollama_glm5_8291_v1.json",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260611T162543Z-unavailable-missing-model-semr_f2db898f66a8421cb0b8705a539c340a.json",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260625T152820Z-ollama-llama3_2_latest-semr_e1a4bffea2e04571935d2169d7e0a7ed.json",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260625T153813Z-ollama-llama3_2_latest-semr_d6db8da2c99d437389e7977e22d90d88.json"
+    ],
+    "semantic_receipt": true,
+    "status": "semantic"
+  },
+  "schema_version": "dharma.d_score_report.v1",
+  "semantic_object": {
+    "canonical_id": "semobj.sarathi",
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/docs/ontology/semantic_objects.yaml",
+      "/Users/dhyana/dharma_swarm/docs/ontology/semantic_aliases.yaml"
+    ],
+    "status": "present"
+  },
+  "service_heartbeat_status": {
+    "evidence_paths": [],
+    "line_count": 0,
+    "max_age_minutes": 15,
+    "status": "missing",
+    "summary": "service heartbeat: 0 line(s), missing"
+  },
+  "total_score": 30,
+  "transport_heartbeat_status": {
+    "evidence_paths": [],
+    "line_count": 0,
+    "max_age_minutes": 5,
+    "status": "missing",
+    "summary": "transport heartbeat: 0 line(s), missing"
+  },
+  "verified_level": "D2",
+  "verifier_status": {
+    "evidence_paths": [
+      "/Users/dhyana/dharma_swarm/dharma_swarm/operator_core/semantic_receipt.py",
+      "/Users/dhyana/dharma_swarm/scripts/runtime/model_critic_runner.py",
+      "/Users/dhyana/dharma_swarm/tests/test_semantic_receipt.py",
+      "/Users/dhyana/dharma_swarm/tests/test_model_critic_runner.py"
+    ],
+    "status": "present",
+    "summary": "4/4 verifier files present"
+  }
+}

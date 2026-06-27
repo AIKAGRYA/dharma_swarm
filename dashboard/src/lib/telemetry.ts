@@ -61,6 +61,15 @@ export interface TelemetryRouteDecision {
   created_at: string;
 }
 
+export interface TelemetryRouteTraceStage {
+  stage: string;
+  input_providers?: string[];
+  output_providers?: string[];
+  applied?: boolean;
+  reasons?: string[];
+  metadata?: Record<string, string | number | boolean | null>;
+}
+
 export interface TelemetryPolicyDecision {
   decision_id: string;
   policy_name: string;

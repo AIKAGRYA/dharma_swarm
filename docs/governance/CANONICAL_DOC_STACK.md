@@ -64,6 +64,7 @@ is no longer a forced first-read surface.
 | Reality debt / guarded overclaim language | `docs/governance/REALITY_DEBT_LEDGER.md` | Defers to source owners for claim upgrades |
 | Runtime truth command cutover matrix | `docs/governance/RUNTIME_TRUTH_COMMAND_CUTOVER.md` | Defers to RuntimeStateStore, spine modules, and tests for proof |
 | Architecture / invariants / axioms | `docs/governance/SOVEREIGN_MANIFEST.md`, `docs/doctrine/` | — |
+| Whole-system why / canonical North Star v2 | `docs/vision_maps/NORTH_STAR.md` | Vision maps, organ maps, venture-cell framing, architecture-fitness reviews |
 | Doc ownership | `docs/governance/CANONICAL_DOC_STACK.md` (this file) | — |
 | Anti-slop / repo-rule discipline | `docs/governance/ANTI_SLOP_RULES.md` + `.semgrep/dharma-anti-slop.yml` | — |
 | Vibe-code and AI-agent hygiene lifecycle | `docs/governance/hygiene/README.md` + `docs/governance/hygiene/AI_AGENT_GOVERNANCE.md` + `docs/governance/hygiene/patterns/*.yaml` | `ANTI_SLOP_RULES.md` and `docs/ops/PR_REVIEW_CONTROL.md` when a pattern is promoted to a hard gate |
@@ -73,7 +74,7 @@ is no longer a forced first-read surface.
 | Terminal persistence substrate | `docs/ops/TMUX_AGENT_SUBSTRATE.md` | tmux launchers, VPS recovery plans, onboarding output, Live Ops Cockpit |
 | Live ops cockpit workflow | `docs/ops/LIVE_OPS_COCKPIT.md` | dashboard cockpit route, control-surface rows, operator travel/restart triage |
 | PR coherence gate | `docs/governance/COHERENCE_DELTA.md` | PR template |
-| PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook |
+| PR review / merge-control operations | `docs/ops/PR_REVIEW_CONTROL.md` | Merge Master Mike workflows, PR janitor playbook, Greptile review intake artifacts |
 | Merge authority charter (Merge Master Mike) | `docs/governance/MMM_CHARTER.md` | Defers to `docs/ops/PR_REVIEW_CONTROL.md` for operations and to `examples/agents/merge_master_mike.registration.json` for capabilities |
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
@@ -82,6 +83,7 @@ is no longer a forced first-read surface.
 | VentureCell portfolio (which cells exist, status, instrument, separation) | `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` | per-cell `VENTURE_CELL_*.md` declarations defer to it |
 | Model / provider routing | `docs/architecture/MODEL_ROUTING_CANON.md` | root `MODEL_ROUTING_MAP.md` (archive pointer) |
 | Memory Kernel production bar | `docs/architecture/MEMORY_KERNEL_PROD_BAR.md` | MemoryLattice, MemoryPalace, projection stores, canon/promotion claims |
+| Dharma Forge Proving Ground benchmark/evolution contract | `reports/forge/FORGE_CANONICAL_INDEX.md` | Highest Forge Proving Ground-specific doc; defers to global governance, Semantic Commons, runtime truth, and source code for live facts |
 | Perplexity Computer autonomous loop mode | `docs/agents/perplexity-computer/AUTONOMOUS_LOOP.md` | Perplexity Computer agent card loop-mode metadata and deployment notes |
 | BoardStore facade / agent participation | `docs/architecture/SWARM_BOARDSTORE_SPEC.md` | — |
 | Terminal protocol | `specs/DGC_TERMINAL_ARCHITECTURE_v1.1.md` | v1.0 is archived |
@@ -91,7 +93,7 @@ is no longer a forced first-read surface.
 | Lodestone index | `lodestones/README.md` | Lodestone seed discoverability |
 | Onboarding megafile slots | `docs/MEGAFILE_INDEX.md` | individual slot files |
 | Audit trail | `docs/governance/REPO_GOVERNANCE_AUDIT.md` | — |
-| Work loops | `docs/governance/AGENTOPS.md`, `KAIZENOPS.md`, `DAILY_OPERATING_BRIEF.md`, `METABOLIC_CLOCK.md`, `HUMAN_YDS_LEDGER.md` | — |
+| Work loops / continuous improvement | `docs/governance/KAIZENOPS.md` | Primary improvement umbrella. AgentOps, Daily Operating Brief, Metabolic Clock, Human YDS Ledger, drift triage, hygiene scans, name-drift scans, and Hermes pulse findings defer to KaizenOps for observation-to-improvement interpretation; their owner files still own their raw facts. |
 | Cross-agent coordination | `docs/state/CROSS_AGENT_INVENTORY.md` | — |
 
 If any file claims to own a fact already owned above, the rule is: **the file

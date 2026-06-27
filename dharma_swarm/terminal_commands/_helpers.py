@@ -7,12 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 import asyncio
-import inspect
 import json
 import os
-import re
 import subprocess
-import time
 
 HOME = Path.home()
 DHARMA_STATE = dharma_state_dir()
@@ -171,6 +168,8 @@ def _pid_alive(pid: int) -> bool:
             return False
         os.kill(pid, 0)
         return True
+    except PermissionError:
+        return True
     except Exception:
         return False
 
@@ -245,7 +244,12 @@ def _list_daemon_like_processes() -> list[tuple[int, str]]:
 
     current_pid = os.getpid()
     matches: list[tuple[int, str]] = []
-    needles = ("dharma_swarm.orchestrate_live", "orchestrate_live.py", "run_daemon.sh")
+    needles = (
+        "dgc orchestrate-live",
+        "dharma_swarm.orchestrate_live",
+        "orchestrate_live.py",
+        "run_daemon.sh",
+    )
     skip_markers = ("dgc doctor", "ps -axo", "rg ", "pytest")
 
     for raw in proc.stdout.splitlines():

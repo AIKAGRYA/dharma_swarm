@@ -261,6 +261,7 @@ app.add_middleware(
 def _register_routers(api_app: FastAPI) -> None:
     from api.routers.health import router as health_router
     from api.routers.agents import router as agents_router
+    from api.routers.agent_cards import router as agent_cards_router
     from api.routers.evolution import router as evolution_router
     from api.routers.ontology import router as ontology_router
     from api.routers.lineage import router as lineage_router
@@ -275,11 +276,13 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.manifest import router as manifest_router
     from api.routers.revenue import router as revenue_router
     from api.routers.control_surface import router as control_surface_router
+    from api.routers.operator_coherence import router as operator_coherence_router
     from api.routers.holon import router as holon_router
 
     api_app.include_router(holon_router)
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
+    api_app.include_router(agent_cards_router)
     api_app.include_router(evolution_router)
     api_app.include_router(ontology_router)
     api_app.include_router(lineage_router)
@@ -294,6 +297,7 @@ def _register_routers(api_app: FastAPI) -> None:
     api_app.include_router(manifest_router)
     api_app.include_router(revenue_router)
     api_app.include_router(control_surface_router)
+    api_app.include_router(operator_coherence_router)
 
     from api.routers.chat import router as chat_router, ws_router as chat_ws_router
     from api.routers.fleet import router as fleet_router

@@ -1,0 +1,68 @@
+{
+  "agent_uid": "codex_composer",
+  "contact_evidence_tier": "DOMAIN_RECEIPTED",
+  "domain_receipt_claim": true,
+  "domain_receipt_payload": {
+    "author_kind": "codex_composer_semantic_inbox_drain",
+    "causation_send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000839Z-codex_composer-2bbba006f775.json",
+    "causation_send_receipt_sha256": "1ea85ea5a08177a195633735e7158786268fef708fb5aee8acd6762b39ff69d0",
+    "domain_receipt": true,
+    "evidence_refs": [
+      "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/2bbba006f775.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/2bbba006f775.md",
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001502Z-ollama-mistral_latest-receipt_2bbba006f775.json",
+      "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000839Z-codex_composer-2bbba006f775.json"
+    ],
+    "from_agent": "codex_composer",
+    "operator_contact_note": "target-owned reply artifact was validated and published to the recorded reply_subject as a typed domain receipt; semantic_reply_claim follows the artifact's explicit peer/model-processing claim",
+    "packet_id": "2bbba006f775",
+    "peer_model_processed_claim": true,
+    "reply_subject": "dharma.agent.codex_composer.inbox.reply.2bbba006f775",
+    "schema_version": "dharma.a2a.domain_receipt.v1",
+    "semantic_reply_claim": true,
+    "source_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/codex_composer/2bbba006f775-domain-reply.json",
+    "source_artifact_schema": "dharma.a2a.domain_reply_artifact.v1",
+    "source_artifact_sha256": "42fee279b1000bb75c4f8549e7e234c64880829a8480ed1c81a03cb41debc310",
+    "summary": "The audit request is for the standalone `holon/` package changes for the long-run Holon objective. The agent understands the scope of inspection and the questions to be answered.",
+    "target_owned_artifact_claim": true,
+    "timestamp": "2026-06-26T00:15:37Z",
+    "to_agent": "operator",
+    "validated_semantic_receipt_refs": [
+      "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260626T001502Z-ollama-mistral_latest-receipt_2bbba006f775.json"
+    ],
+    "verdict": "approve"
+  },
+  "endpoint": "nats://127.0.0.1:4222",
+  "nats": {
+    "ca_source": "repo_agni_ws_ca",
+    "credential_family": "devin",
+    "endpoint": "nats://127.0.0.1:4222",
+    "has_auth_credential": false,
+    "has_ca_pem": true,
+    "has_user": false,
+    "missing": [],
+    "tls_hostname": "",
+    "tls_trust": "custom_ca_pem"
+  },
+  "operator_contact_note": "typed domain receipt was published to the recorded reply_subject; run a2a_reply_capture.py to record DOMAIN_RECEIPTED from the stream",
+  "packet_id": "2bbba006f775",
+  "payload_schema": "dharma.a2a.domain_receipt.v1",
+  "payload_sha256": "37df04357e3956350fbe425e46a34095c6573a7af7cc85650570c590907eb9a4",
+  "receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_receipts/20260626T001537Z-codex_composer-2bbba006f775.json",
+  "reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/codex_composer/2bbba006f775-domain-reply.json",
+  "reply_artifact_sha256": "42fee279b1000bb75c4f8549e7e234c64880829a8480ed1c81a03cb41debc310",
+  "reply_evidence_tier": "DOMAIN_RECEIPTED",
+  "reply_subject": "dharma.agent.codex_composer.inbox.reply.2bbba006f775",
+  "schema_version": "dharma.a2a.domain_reply_publish_receipt.v1",
+  "semantic_reply_claim": true,
+  "send_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/send_receipts/20260626T000839Z-codex_composer-2bbba006f775.json",
+  "status": "DOMAIN_REPLY_PUBLISHED",
+  "stream": "DHARMA_FLEET",
+  "target_owned_artifact_claim": true,
+  "timestamp": "2026-06-26T00:15:37Z",
+  "transport_ack": {
+    "seq": 8520,
+    "stream": "DHARMA_FLEET",
+    "transport_ack": "JETSTREAM_PUB_ACK"
+  }
+}

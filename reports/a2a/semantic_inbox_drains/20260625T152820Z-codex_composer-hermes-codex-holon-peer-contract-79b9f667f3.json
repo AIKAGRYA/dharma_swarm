@@ -1,0 +1,19 @@
+{
+  "agent_uid": "codex_composer",
+  "delivery_record_path": "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/hermes-codex-holon-peer-contract-79b9f667f3.json",
+  "domain_reply_artifact_author_receipt_path": "/Users/dhyana/dharma_swarm/reports/a2a/domain_reply_artifacts/20260625T152820Z-codex_composer-hermes-codex-holon-peer-contract-79b9f667f3.json",
+  "domain_reply_artifact_path": "/Users/dhyana/.dharma/a2a_bus/outboxes/codex_composer/hermes-codex-holon-peer-contract-79b9f667f3-domain-reply.json",
+  "handler_ack_is_semantic_cognition": false,
+  "operator_contact_note": "This records a typed semantic drain failure and target-owned artifact creation; it is not a semantic cognition proof. Publishing remains scripts/runtime/a2a_domain_reply_worker.py.",
+  "packet_id": "hermes-codex-holon-peer-contract-79b9f667f3",
+  "peer_model_processed_claim": false,
+  "prompt_file": "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/hermes-codex-holon-peer-contract-79b9f667f3.md",
+  "reply_subject": "dharma.agent.codex_composer.inbox.reply.hermes-codex-holon-peer-contract-79b9f667f3",
+  "schema_version": "dharma.a2a.codex_composer_semantic_inbox_drain.v1",
+  "semantic_receipt_id": "semr_e1a4bffea2e04571935d2169d7e0a7ed",
+  "semantic_receipt_path": "/Users/dhyana/dharma_swarm/reports/agentops/semantic_receipts/20260625T152820Z-ollama-llama3_2_latest-semr_e1a4bffea2e04571935d2169d7e0a7ed.json",
+  "semantic_reply_claim": false,
+  "status": "SEMANTIC_INBOX_DRAIN_TYPED_FAILURE",
+  "timestamp": "2026-06-25T15:28:20Z",
+  "typed_reply_publish_required_next": true
+}

@@ -462,13 +462,13 @@ These are the ground-truth metrics. All other documents citing different numbers
 |--------|-------|-------------|
 | Total Python modules | **746** | git ls-files dharma_swarm \| rg '\.py$' \| wc -l |
 | Top-level (flat) modules | **402 (53.9%)** | git ls-files dharma_swarm \| rg '^dharma_swarm/[^/]+\.py$' \| wc -l |
-| Total Python LOC | **311,485** | wc -l across dharma_swarm Python modules |
+| Total Python LOC | **311,257** | wc -l across dharma_swarm Python modules |
 | Test files | **717** | git ls-files tests \| rg '\.py$' \| wc -l |
-| Test functions | **11,751 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
+| Test functions | **11,814 `def test_` occurrences under tests/** | git ls-files tests \| rg '\.py$' \| xargs rg 'def test_' \| wc -l |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1,053** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| wc -l |
-| Markdown total lines | **254,294** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
+| Markdown total lines | **254,574** | git ls-files \| rg '\.md$' \| rg -v '(^AGENTS\.md$\|^reports/docops/)' \| xargs wc -l |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f \| wc -l |
 | Adapter files | **25 across 8 locations** | find dharma_swarm -type f \| rg -i "adapter" \| wc -l |
 | Orchestrator files | **5** | find dharma_swarm -name "*orchestrat*" \| wc -l |

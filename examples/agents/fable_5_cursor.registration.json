@@ -54,6 +54,7 @@
     "surface": "Cursor IDE (multitask coordinator)",
     "primary_repo": "/Users/dhyana/dharma_swarm",
     "coordination_peers": [
+      "operator_guide_cursor",
       "devin-roaming-2987d222",
       "merge_master_mike",
       "hermes-m5",
@@ -75,6 +76,8 @@
       "docs/governance/ANTI_SLOP_RULES.md"
     ],
     "operational_route": "docs/ops/FABLE5_ONBOARDING_MAP.md",
+    "reports_to": "operator_guide_cursor",
+    "succession_note": "Subordinate hub lane. Persistent Cursor operator relay is operator_guide_cursor; Sarathi remains reserved for the higher apex holon.",
     "summon_phrase": "@FABLE_5_IN_CURSOR",
     "summon_aliases": [
       "@fable_5_cursor",

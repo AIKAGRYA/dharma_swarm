@@ -16,6 +16,8 @@ the worktree, for example:
 from __future__ import annotations
 
 import argparse
+from collections import Counter, defaultdict
+import hashlib
 import json
 import re
 import subprocess
@@ -48,6 +50,7 @@ SKIP_DIRS = {
 }
 SKIP_PATH_PREFIXES = (
     "tests/",
+    "DE_BUG_CORRAL/",
     "docs/governance/hygiene/baselines/",
     "reports/governance/name_drift_preflight_",
 )
@@ -321,6 +324,84 @@ def build_payload(repo_root: Path = REPO_ROOT) -> dict[str, object]:
     }
 
 
+
+def _normalized_hit_key(hit: dict[str, object]) -> str:
+    text = re.sub(r"\s+", " ", str(hit.get("text") or "").strip().lower())
+    path = str(hit.get("path") or "")
+    route = str(hit.get("route") or "")
+    return hashlib.sha256(f"{route}\n{path}\n{text}".encode("utf-8")).hexdigest()[:16]
+
+
+def build_digest(payload: dict[str, object], *, samples_per_route: int = 8) -> dict[str, object]:
+    """Build a compact route delta for dashboards/cron.
+
+    The full payload preserves every hit. The digest is the loop artifact: small
+    enough for the cockpit and useful enough for KaizenOps to pick one action
+    without reading hundreds of repeated generated-report hits.
+    """
+    hits = payload.get("hits", [])
+    assert isinstance(hits, list)
+    route_hits: dict[str, list[dict[str, object]]] = defaultdict(list)
+    source_counts: Counter[str] = Counter()
+    source_kind_counts: Counter[str] = Counter()
+    unique_keys: set[str] = set()
+    for item in hits:
+        assert isinstance(item, dict)
+        route = str(item.get("route") or "DE_BUG_CORRAL/03.md")
+        route_hits[route].append(item)
+        source_counts[str(item.get("path") or "unknown")] += 1
+        source_kind_counts[str(item.get("source_kind") or "unknown")] += 1
+        unique_keys.add(_normalized_hit_key(item))
+
+    route_deltas = []
+    for route, items in sorted(route_hits.items()):
+        top_sources = Counter(str(item.get("path") or "unknown") for item in items).most_common(5)
+        route_deltas.append(
+            {
+                "route": route,
+                "hit_count": len(items),
+                "top_sources": [{"path": path, "count": count} for path, count in top_sources],
+                "samples": items[:samples_per_route],
+            }
+        )
+
+    corral = payload.get("corral_state", {})
+    assert isinstance(corral, dict)
+    semantic = payload.get("semantic_commons", {})
+    assert isinstance(semantic, dict)
+    blockers = []
+    if not corral.get("canonical_dir_present"):
+        blockers.append("canonical_corral_dir_missing")
+    if not corral.get("canonical_index_present"):
+        blockers.append("canonical_corral_index_missing")
+    if corral.get("noncanonical_paths"):
+        blockers.append("noncanonical_corral_paths_present")
+    if int(semantic.get("error_count") or 0) > 0:
+        blockers.append("semantic_commons_errors_present")
+
+    return {
+        "schema_version": "name_drift_preflight_digest.v1",
+        "generated_at": payload.get("generated_at"),
+        "repo_root": payload.get("repo_root"),
+        "canonical_corral": payload.get("canonical_corral"),
+        "status": "blocked" if blockers else "swept",
+        "blockers": blockers,
+        "hit_count": payload.get("hit_count", 0),
+        "unique_hit_count": len(unique_keys),
+        "by_route": payload.get("by_route", {}),
+        "top_sources": [{"path": path, "count": count} for path, count in source_counts.most_common(10)],
+        "source_kinds": dict(sorted(source_kind_counts.items())),
+        "route_deltas": route_deltas,
+        "next_action": (
+            "Create DE_BUG_CORRAL/00.md and route files before treating the sweep as healthy."
+            if blockers
+            else "KaizenOps should select one routed item for action; do not count raw hit volume as progress."
+        ),
+        "corral_state": corral,
+        "semantic_commons": semantic,
+    }
+
+
 def render_markdown(payload: dict[str, object], limit: int | None = None) -> str:
     corral = payload["corral_state"]
     assert isinstance(corral, dict)
@@ -411,6 +492,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=60, help="max hits in text output")
     parser.add_argument("--json-output", help="write JSON receipt to this path")
     parser.add_argument("--markdown-output", help="write Markdown receipt to this path")
+    parser.add_argument("--digest-output", help="write compact routed digest JSON to this path")
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -428,6 +510,8 @@ def main(argv: list[str] | None = None) -> int:
         _write_text(args.json_output, json.dumps(payload, indent=2, sort_keys=True) + "\n")
     if args.markdown_output:
         _write_text(args.markdown_output, render_markdown(payload, limit=None))
+    if args.digest_output:
+        _write_text(args.digest_output, json.dumps(build_digest(payload), indent=2, sort_keys=True) + "\n")
 
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
@@ -450,3 +534,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

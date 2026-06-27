@@ -1,0 +1,61 @@
+{
+  "schema_version": "holon.phase1.isolated_install_proof.v1",
+  "generated_at": "2026-06-26T00:25:00Z",
+  "status": "pass",
+  "wheel": {
+    "path": "/private/tmp/holon-dist-isolated/holon_runtime-0.1.0-py3-none-any.whl",
+    "sha256": "4ef3846f70d29499fdbd2f653f1ffd41fb9ca259421ed92447324ffd44ed5263",
+    "build_command": ".venv/bin/python -m pip wheel --no-deps /Users/dhyana/dharma_swarm/holon -w /private/tmp/holon-dist-isolated",
+    "build_isolation": "pip default isolated PEP 517 build",
+    "build_status": "pass"
+  },
+  "install_probe": {
+    "install_command": "/private/tmp/holon-standalone-venv2/bin/python -m pip install --force-reinstall /private/tmp/holon-dist-isolated/holon_runtime-0.1.0-py3-none-any.whl",
+    "install_status": "pass",
+    "python": "3.13.12",
+    "sys_prefix": "/private/tmp/holon-standalone-venv2",
+    "holon_file": "/private/tmp/holon-standalone-venv2/lib/python3.13/site-packages/holon/__init__.py",
+    "dharma_swarm_spec": "None",
+    "dist_name": "holon-runtime",
+    "dist_version": "0.1.0",
+    "metadata_version": "2.4",
+    "provides_extra": [
+      "dev"
+    ],
+    "requires_dist": [
+      "pytest>=7.0; extra == \"dev\"",
+      "pytest-asyncio>=0.21; extra == \"dev\""
+    ],
+    "record_present": true,
+    "record_file": "holon_runtime-0.1.0.dist-info/RECORD",
+    "console_scripts": [
+      "EntryPoint(name='holon', value='holon.cli:main', group='console_scripts')"
+    ],
+    "installed_verifier_status": "pass"
+  },
+  "source_binding": {
+    "git_worktree_state": "dirty",
+    "note": "Source hashes bind this proof to the tested files in the dirty workspace. A commit hash is still required for final immutable release proof.",
+    "sha256": {
+      "holon/pyproject.toml": "3a93ca4f40b0af18d557c1553161106babfab4c38e14b497c789fb187c32e73f",
+      "holon/_build_backend.py": "2367d693e41a1ada2d8ad550796d97b55af682d2bb61df086fcc321e1b2a8986",
+      "holon/verifier.py": "80f6d5966a435a3c1d658e50693a464958c410b85d84be0d904367b58fe580ca",
+      "holon/holon_runtime.py": "7d6d64237aa9627e14183b0f1647c17b952e627e9f9a6a0a02c6faa64c30dc7c",
+      "holon/holon_bridge.py": "b33e230746d917050c03a819e081a0408c8b3ffdb34d63a46b682a6c02884f48",
+      "holon/providers.py": "c107fb58a16f31b81daf5073d2d060facce3ffffb6242170975946860f3476cc",
+      "holon/receipts.py": "22207480f5295160eef5d482df8aca8f3818c40de7a6e8fe636743f5a147abb0",
+      "holon/tools.py": "31f7dd55d564c2621afc68f70af2327fe343673d5352edda9eddb8c69af6f1f0",
+      "holon/organs/persistence.py": "d6781223000e3c77b7d385cd71c146a6c515bc19e31f304388eaace57d3353e0",
+      "holon/supervisor.py": "0f78443a65bb44cec3137d56ebcfae41f16f439eb760759fc670eac1c38b460d",
+      "holon/tests/test_standalone_runtime.py": "10d0661757141a2f96ebe3bb7fb2ac5af3d5425378c42932b378051f565083a1",
+      "scripts/runtime/model_critic_runner.py": "61d147757beeec0f958b96c7e5e9e456d05f9bc1c2fbee880ac3811d6ebaf043",
+      "scripts/runtime/codex_composer_semantic_inbox_drain.py": "a80f6a8853a434f76c43944e50bbd52e6ee98ac6cba72d87c46535648125102a",
+      "scripts/runtime/a2a_domain_reply_artifact.py": "2e540d3e7ee1b77fd7209d0d14df80a8045cf337f55515b60f4bd59a7aef6f5b",
+      "scripts/runtime/a2a_domain_reply_worker.py": "a4f9d2b0741b3e8746ec1b85fd33fe51a706859dd8ef8e30da176237d3007cfa",
+      "tests/test_model_critic_runner.py": "58b0b74b25c1ba44af9af960afbd447e5639d9912b49a1f7719ebc7ae04606d7",
+      "tests/test_codex_composer_semantic_inbox_drain.py": "31d8ce0e64aa37fcdd5fe9903e7edd95f07546ccbabe2770a8900cc3dc51568d",
+      "tests/test_a2a_domain_reply_artifact.py": "d2981b947d6c527889f95aea24b1954946ca84debbc69f894b7661aefa483e3f",
+      "tests/test_a2a_domain_reply_worker.py": "68b42aaef7407d3a3272bc16e9d1faf893a04a2e3e25c967ed3815bfd24ffe38"
+    }
+  }
+}

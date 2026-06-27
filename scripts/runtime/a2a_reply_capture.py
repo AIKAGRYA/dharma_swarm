@@ -111,6 +111,15 @@ def _is_domain_receipt(payload: dict[str, Any]) -> bool:
     return schema in DOMAIN_REPLY_SCHEMAS
 
 
+def normalize_deliver_policy(value: str) -> str:
+    normalized = str(value or "all").strip().casefold().replace("-", "_")
+    if normalized in {"all", "replay_all"}:
+        return "all"
+    if normalized in {"latest", "last", "last_per_subject"}:
+        return "latest"
+    raise ValueError("--deliver-policy must be 'all' or 'latest'")
+
+
 def pending_reply_targets(
     send_receipt_root: Path | str,
     *,
@@ -277,10 +286,12 @@ async def capture_target_once(
     endpoint: str,
     stream: str,
     timeout_s: float,
+    deliver_policy: str = "all",
 ) -> dict[str, Any]:
     try:
         import nats
         from nats.errors import TimeoutError as NatsTimeoutError
+        from nats.js.api import ConsumerConfig, DeliverPolicy
     except ModuleNotFoundError as exc:
         if getattr(exc, "name", "") != "nats":
             raise
@@ -307,7 +318,13 @@ async def capture_target_once(
     nc = await nats.connect(servers=[endpoint], allow_reconnect=False, max_reconnect_attempts=0)
     try:
         js = nc.jetstream()
-        sub = await js.pull_subscribe(target.reply_subject, stream=stream)
+        normalized_deliver_policy = normalize_deliver_policy(deliver_policy)
+        consumer_config = (
+            ConsumerConfig(deliver_policy=DeliverPolicy.LAST_PER_SUBJECT)
+            if normalized_deliver_policy == "latest"
+            else None
+        )
+        sub = await js.pull_subscribe(target.reply_subject, stream=stream, config=consumer_config)
         try:
             messages = await sub.fetch(1, timeout=timeout_s)
         except NatsTimeoutError:
@@ -369,6 +386,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stream", default="DHARMA_FLEET")
     parser.add_argument("--timeout", type=float, default=1.0)
     parser.add_argument("--limit", type=int, default=1)
+    parser.add_argument(
+        "--deliver-policy",
+        choices=("all", "latest"),
+        default="all",
+        help="'all' replays from the start; 'latest' captures the latest message for the reply subject",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -395,6 +418,7 @@ def main(argv: list[str] | None = None) -> int:
                     endpoint=args.endpoint,
                     stream=args.stream,
                     timeout_s=max(args.timeout, 0.1),
+                    deliver_policy=args.deliver_policy,
                 )
             )
         )

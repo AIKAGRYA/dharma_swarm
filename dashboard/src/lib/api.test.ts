@@ -63,6 +63,39 @@ test("typed dashboard fetch unwraps backend ApiResponse envelopes", async () => 
   }
 });
 
+test("fetchHealth can request runtime truth closeout", async () => {
+  const stub = installFetchStub({
+    status: "ok",
+    data: {
+      overall_status: "ok",
+      agent_health: [],
+      anomalies: [],
+      total_traces: 0,
+      traces_last_hour: 0,
+      failure_rate: 0.0,
+      mean_fitness: null,
+      runtime_truth: {
+        schema_version: "runtime_truth_closeout.v1",
+        status: "pass",
+        passed: true,
+      },
+    },
+    error: "",
+    timestamp: "2026-03-26T00:00:00.000Z",
+  });
+
+  try {
+    const result = await fetchHealth({ runtimeTruth: true });
+    assert.equal(result.data.runtime_truth?.passed, true);
+    assert.equal(
+      String(stub.calls[0]?.input),
+      "http://127.0.0.1:8420/api/health?runtime_truth=true",
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
 test("backend connectivity banner uses lightweight liveness route", () => {
   assert.equal(
     backendLivenessPath(),

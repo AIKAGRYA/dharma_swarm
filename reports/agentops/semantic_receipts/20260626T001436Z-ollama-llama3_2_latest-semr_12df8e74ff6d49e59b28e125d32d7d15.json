@@ -1,0 +1,55 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "SemanticReceipt failure artifact records provider/model/failure_type",
+      "met": true,
+      "name": "typed_failure_recorded"
+    }
+  ],
+  "agent_uid": "fable_composer",
+  "authored_by_model": false,
+  "capability_match": 0.0,
+  "confidence": 0.0,
+  "correlation_id": "5aa607b21b57",
+  "created_at": "2026-06-26T00:14:36Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/5aa607b21b57.md"
+  ],
+  "explicit_disagreement": "Expecting ',' delimiter: line 28 column 4 (char 659)",
+  "failure_reason": "Expecting ',' delimiter: line 28 column 4 (char 659)",
+  "failure_type": "json_parse_failed",
+  "intent_ack": false,
+  "missing_context": [],
+  "model_call_latency_ms": 3264,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": false,
+  "prompt_sha256": "6ae39020463d05f77278aaedcdfeed36781cdc9577e8bd5007d7b10bf3cf62da",
+  "raw_response_sha256": "6d8db86834b37a2da7fc9e21f5bd960361e4552f8aecc8375b6604871313ccad",
+  "receipt_id": "semr_12df8e74ff6d49e59b28e125d32d7d15",
+  "recommendations": [
+    {
+      "action": "Inspect typed failure and retry with a reachable provider or fixture.",
+      "priority": "p0",
+      "rationale": "Expecting ',' delimiter: line 28 column 4 (char 659)"
+    }
+  ],
+  "reply_to": "dharma.agent.fable_composer.inbox.reply.5aa607b21b57",
+  "review_target": "a2a:5aa607b21b57",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "typed_failure_or_non_model_artifact",
+  "semantic_reply_claim": false,
+  "summary": "Model critic runner could not produce a validated semantic receipt: json_parse_failed",
+  "understood_request": false,
+  "verdict": "blocked"
+}

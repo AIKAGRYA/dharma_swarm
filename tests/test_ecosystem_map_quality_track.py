@@ -53,6 +53,13 @@ def test_get_context_for_all_emits_all_domain_headers():
         assert f"## {key.upper()}:" in out
 
 
+def test_jagat_kalyan_context_promotes_live_gaia_authority():
+    out = em.get_context_for("jagat_kalyan")
+    assert "Authority:" in out
+    assert "gaia_platform.py" in out
+    assert "continuity-only" in out
+
+
 def test_get_context_for_marker_output_is_ok_when_exists(monkeypatch):
     monkeypatch.setattr(Path, "exists", lambda self: True)
     out = em.get_context_for("identity")
@@ -78,12 +85,26 @@ def test_check_health_all_missing(monkeypatch):
     monkeypatch.setattr(Path, "exists", lambda self: False)
     h = em.check_health()
     total_paths = sum(len(v["paths"]) for v in em.ECOSYSTEM.values())
+    continuity_paths = sum(
+        len(v.get("continuity_only_paths", [])) for v in em.ECOSYSTEM.values()
+    )
     assert h["ok"] == 0
     assert h["missing"] == total_paths
     assert len(h["details"]) == total_paths
+    assert h["stale_authority"] == continuity_paths
+    assert len(h["authority_details"]) == continuity_paths
 
 
 def test_check_health_details_include_missing_prefix(monkeypatch):
     monkeypatch.setattr(Path, "exists", lambda self: False)
     h = em.check_health()
     assert all(str(v).startswith("MISSING --") for v in h["details"].values())
+
+
+def test_check_health_tracks_continuity_only_authority(monkeypatch):
+    monkeypatch.setattr(Path, "exists", lambda self: False)
+    h = em.check_health()
+    assert all(
+        str(v).startswith("CONTINUITY_ONLY --")
+        for v in h["authority_details"].values()
+    )

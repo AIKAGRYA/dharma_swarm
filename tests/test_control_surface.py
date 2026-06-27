@@ -810,6 +810,37 @@ class TestControlSurfaceAPI:
                 assert "make hygiene" in layer["handoff_prompt"]
                 assert "/dashboard/cockpit is John's human command front door" in layer["handoff_prompt"]
 
+    def test_apex_command_map_returns_read_only_envelope(self, monkeypatch) -> None:
+        import api.routers.control_surface as control_surface_router
+
+        def _fake_builder(*, repo_root=None):
+            return {
+                "schema_version": "dharma.apex_command_map.v1",
+                "authority": {
+                    "mode": "read_only",
+                    "protected_actions_allowed": False,
+                },
+                "apex": {"agent_uid": "sarathi"},
+                "agents": [{"agent_uid": "codex_composer", "chat_href": "/holon/codex_composer/chat"}],
+                "substrate": {},
+                "active_missions": {},
+                "receipt_roots": {},
+                "blockers": ["d4_semantic_receipt_missing"],
+            }
+
+        monkeypatch.setattr(control_surface_router, "_get_apex_command_map_builder", lambda: _fake_builder)
+        client = _control_surface_client()
+
+        resp = client.get("/api/control-surface/apex/command-map")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["schema_version"] == "0.2.0"
+        assert body["source_errors"] == []
+        assert body["data"]["schema_version"] == "dharma.apex_command_map.v1"
+        assert body["data"]["authority"]["protected_actions_allowed"] is False
+        assert body["data"]["agents"][0]["chat_href"] == "/holon/codex_composer/chat"
+
     def test_row_by_id_returns_envelope(self) -> None:
         client = _control_surface_client()
         rows_resp = client.get("/api/control-surface/rows")

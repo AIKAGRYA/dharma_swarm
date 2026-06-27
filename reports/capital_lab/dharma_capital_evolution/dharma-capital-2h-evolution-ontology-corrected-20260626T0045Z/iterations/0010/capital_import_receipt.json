@@ -1,0 +1,2639 @@
+{
+  "authority": {
+    "broker_write_authority": false,
+    "capital_approval": false,
+    "live_authority": false,
+    "mutates_live_lab_state": false,
+    "operator_approval_granted": false,
+    "order_generation_authority": false,
+    "read_only": true,
+    "route_mutation_authority": false
+  },
+  "comparison": {
+    "conclusion": "Agni is ingested, but Dharma Capital cannot compare it until at least one sister-lab packet exists.",
+    "metrics_by_lab": {
+      "agni": {
+        "pnl_30d": 24.3909,
+        "routes_observed": 155,
+        "stale_feed_alerts": 277298,
+        "total_pnl": 100.9374,
+        "trades": 1969
+      }
+    },
+    "orthogonality_status": "unproven_without_sister_labs",
+    "ranked_labs": [
+      "agni"
+    ],
+    "status": "sister_labs_missing"
+  },
+  "evidence": [
+    {
+      "custody_label": "RECEIPT_BACKED_PROJECTION",
+      "evidence_id": "cap_evd_76784af7c7ed158bcdc07f6e",
+      "generated_at": "2026-06-26T02:11:37Z",
+      "insights": [
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0074,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01_vwap_btc",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1818,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.039,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v01_vwap_btc_3m",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1818,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.045,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v02_vwap_btc_5m",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1818,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.045,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v03_vwap_btc_10m",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1813,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0532,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v04_vwap_btc_15m",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1809,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0435,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v05_vwap_eth_3m",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1809,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0427,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v06_vwap_eth_5m",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1809,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0427,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v07_vwap_eth_10m",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1801,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.067,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v08_vwap_eth_15m",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1647,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0904,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v09_vwap_sol_3m",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1647,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0897,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v10_vwap_sol_5m",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1647,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0897,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v11_vwap_sol_10m",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1641,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1097,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v12_vwap_sol_15m",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0307,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v13_vwap_avax_3m",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0239,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v14_vwap_avax_5m",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0239,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v15_vwap_avax_10m",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0128,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v16_vwap_avax_15m",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.1737,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v17_vwap_matic_3m",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1737,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v18_vwap_matic_5m",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1737,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v19_vwap_matic_10m",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1737,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R01v20_vwap_matic_15m",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.203,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.2947,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R02_funding_rate",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1444,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R02b",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1444,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R02c",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.5416,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03_ewmac_trend",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1842,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0247,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v01_ewmac_btc_lb8",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0309,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v02_ewmac_btc_lb12",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0564,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v03_ewmac_btc_lb20",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0053,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v04_ewmac_btc_lb30",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0097,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v05_ewmac_btc_lb50",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0201,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v06_ewmac_btc_lb100",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0319,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v07_ewmac_eth_lb8",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1842,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0369,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v08_ewmac_eth_lb12",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1842,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0465,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v09_ewmac_eth_lb20",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1843,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.032,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v10_ewmac_eth_lb30",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1864,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.017,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v11_ewmac_eth_lb50",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1864,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.017,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v12_ewmac_eth_lb100",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.185,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0153,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v13_ewmac_sol_lb8",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1849,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0187,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v14_ewmac_sol_lb12",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1849,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0599,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v15_ewmac_sol_lb20",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1842,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1143,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v16_ewmac_sol_lb30",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1846,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0171,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v17_ewmac_sol_lb50",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1844,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.077,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v18_ewmac_sol_lb100",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1846,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1185,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v19_ewmac_avax_lb20",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.185,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0008,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R03v20_ewmac_matic_lb20",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1984,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0251,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R04_mean_reversion",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.2051,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.036,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R05_bollinger_squeeze",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1862,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.2552,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R06_momentum_breakout",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.202,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1002,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R07_fear_greed",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.202,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.2387,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R08_dca_baseline",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R09_sector_rotation",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1153,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R10_macro_regime",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.0742,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R11_polymarket",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.5922,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0495,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R12_llm_agentic",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.6897,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 1.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R13_multi_timeframe",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.2032,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0897,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R14",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.8777,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R15",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.6748,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0002,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R16",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1626,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R17",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.207,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1503,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1839,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0212,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v01_order_flow_btc_0p5x",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0535,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v02_order_flow_btc_1p0x",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1887,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v03_order_flow_btc_1p5x",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0343,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v04_order_flow_btc_2p0x",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1156,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v05_order_flow_eth_0p5x",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0293,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v06_order_flow_eth_1p0x",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0241,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v07_order_flow_eth_1p5x",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0422,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v08_order_flow_eth_2p0x",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1825,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1024,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v09_order_flow_sol_0p5x",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1843,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0958,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v10_order_flow_sol_1p0x",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0694,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v11_order_flow_sol_1p5x",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0658,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v12_order_flow_sol_2p0x",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1836,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0609,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v13_order_flow_avax_0p5x",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.1845,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1004,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v14_order_flow_avax_1p0x",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.1845,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1004,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v15_order_flow_avax_1p5x",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.1847,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1082,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v16_order_flow_avax_2p0x",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0543,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v17_order_flow_pol_0p5x",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1848,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0186,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v18_order_flow_pol_1p0x",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0335,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v19_order_flow_pol_1p5x",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0335,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R18v20_order_flow_pol_2p0x",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.2047,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1129,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0582,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v01_grid_btc_0p3pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1954,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0023,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v02_grid_btc_0p5pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0142,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v03_grid_btc_0p8pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0481,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v04_grid_btc_1p0pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1848,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.045,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v05_grid_btc_1p5pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.185,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0614,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v06_grid_btc_2p0pct",
+          "symbol": "BTC"
+        },
+        {
+          "confidence": 0.1955,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0055,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v07_grid_eth_0p3pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.196,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0068,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v08_grid_eth_0p5pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0295,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v09_grid_eth_0p8pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1846,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0109,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v10_grid_eth_1p0pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.185,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0443,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v11_grid_eth_1p5pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1849,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.057,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v12_grid_eth_2p0pct",
+          "symbol": "ETH"
+        },
+        {
+          "confidence": 0.1839,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0487,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v13_grid_sol_0p3pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1848,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0193,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v14_grid_sol_0p5pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1848,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0266,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v15_grid_sol_0p8pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0502,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v16_grid_sol_1p0pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1845,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0392,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v17_grid_sol_1p5pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1849,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0356,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v18_grid_sol_2p0pct",
+          "symbol": "SOL"
+        },
+        {
+          "confidence": 0.1849,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0078,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v19_grid_avax_1p0pct",
+          "symbol": "AVAX"
+        },
+        {
+          "confidence": 0.1737,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R19v20_grid_matic_1p0pct",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.151,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1031,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R20",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.207,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.1548,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R21",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1625,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R22",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1817,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 1.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R23",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "down",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 1.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R24",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.69,
+          "direction": "up",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 1.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R25",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.192,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.2758,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R26_onchain_signals",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R30",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R31",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R32",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R33",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R34",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R35",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R36",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R37",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R38",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R39",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R40",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R41",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R42",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R43",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R44",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R45",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R46",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R47",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1449,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R48",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R49",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1449,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R50",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R51",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1449,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R52",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1449,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R53",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R54",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1449,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R55",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R56",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R57",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R58",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R59",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R60",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R61",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R62",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R63",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.145,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R64",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R65",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R66",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R67",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.045,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R68",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1451,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R69",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1396,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R70",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1396,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R71",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.146,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R72",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.1458,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R73",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.3578,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R74",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.3489,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R75",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "confidence": 0.3489,
+          "direction": "flat",
+          "generated_at": "2026-06-26T02:11:37Z",
+          "horizon_days": 7,
+          "knowledge_ts": "2026-06-26T02:11:37Z",
+          "magnitude": 0.0,
+          "source_agent": "dharma_capital_packet_importer_v0:agni:R76",
+          "symbol": "AGNI_LAB"
+        }
+      ],
+      "lab_id": "agni",
+      "packet_id": "agni_pkt_8489d5773f1a8629dedc2c40",
+      "performance": {
+        "days": 77,
+        "first_date": "2026-04-10",
+        "last_date": "2026-06-25",
+        "latest_nav": 13225.03,
+        "latest_routes": 153,
+        "losses": 971,
+        "pnl_30d": 24.3909,
+        "pnl_7d": 11.8927,
+        "total_pnl": 100.9374,
+        "trades": 1969,
+        "vraj_applied": 504,
+        "vraj_proposed": 3794,
+        "wins": 978
+      },
+      "route_evidence_refs": [
+        {
+          "evidence_hash": "374862d28f7aae00c004fc3758a650836007b1ad437e3131947b2dc6927301cc",
+          "route_id": "R01_vwap_btc",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "4b6cefc79dfda3bd45da6b49aebe637a7a60bcba6b930da7189c20503c21bd17",
+          "route_id": "R01v01_vwap_btc_3m",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "3091898ae17b5663b9a311d76d8cbdeef45e1d74cf627cd1d46bae5f7297dd93",
+          "route_id": "R01v02_vwap_btc_5m",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "5da0e91c20976bf3086c350d75f6e93ccf6ae8639ba5d382f17c1c9b1dcf9450",
+          "route_id": "R01v03_vwap_btc_10m",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "4723c366de553126bd76fb4b97a8eeae52416b8f192a33e8161c7624a818be15",
+          "route_id": "R01v04_vwap_btc_15m",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "6eb3f69986319e318b7e904aac34caaf1aa7a31f7fac229110afe7ed4e68b55e",
+          "route_id": "R01v05_vwap_eth_3m",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "47eafc1779057d27fa3ebfd4ef26190008aa21a65fa310f44accfed006158d79",
+          "route_id": "R01v06_vwap_eth_5m",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "dfcf5f1b19a93ed9d57790fd9e91f204b826a5f12b97dee205f77b3a7cc5941f",
+          "route_id": "R01v07_vwap_eth_10m",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "d139b7a342291efaef8ac34b4f074d09c9b2b265b1b3bc5ee550690a1e283b0d",
+          "route_id": "R01v08_vwap_eth_15m",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "7a7cac9194015fab63fd23f5472e2618e7dd34f00f97e72cdc6b9c11c52cb68e",
+          "route_id": "R01v09_vwap_sol_3m",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "c1a34fc75ac864d8bcfc6b6396a699c39a47aaebe8b6e8df8c9665e1299cc00b",
+          "route_id": "R01v10_vwap_sol_5m",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "5bd340ea2315925c592ea311cc5612b6ed344a2b8609f78207350cd145da8e9d",
+          "route_id": "R01v11_vwap_sol_10m",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "10084bbc0683e5a6ccfd2c8af7c570c707a1adfcb36c478f5e5b2d1ea8ae55a6",
+          "route_id": "R01v12_vwap_sol_15m",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "822be0506ef7d52900453c12a27b8f2fefd8763f18d650df24b893f38fbee267",
+          "route_id": "R01v13_vwap_avax_3m",
+          "status": "positive_pnl",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "ea984dc5170aad4398200360c8201b35a2a72d023f4806ea8bd86b2ee113935c",
+          "route_id": "R01v14_vwap_avax_5m",
+          "status": "positive_pnl",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "c15116eb37d8a91b8514103d151f3c31e7bb3d1603f0a7341dd8c942f1d4ebf4",
+          "route_id": "R01v15_vwap_avax_10m",
+          "status": "positive_pnl",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "57c32166cd6cf1055917eee5d4744c898b3cf1feb4b6bfd824af158b9ebb92de",
+          "route_id": "R01v16_vwap_avax_15m",
+          "status": "positive_pnl",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "d0738d7aeb8a0873c47a3a39f0b4e13de7f139bc5bda1999b31878cfbd7d0a88",
+          "route_id": "R01v17_vwap_matic_3m",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "39d46128df9023caac3a75ebac9ee4b79b879e71290aa2237fb402e7fed2e99b",
+          "route_id": "R01v18_vwap_matic_5m",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "040b02a8e7aa8d9a53991ec5c78ab0f5cd2a9b2273b422c7ea7cd27ca4c0810c",
+          "route_id": "R01v19_vwap_matic_10m",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "c72162f2f8e52c8a6f8cc0087f06a5376006352b5546e7d0fa39844458ae232f",
+          "route_id": "R01v20_vwap_matic_15m",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "5ef378c237028aca69bf3715e8c4c90deaa47976faa3c0b2dddb63519235f4be",
+          "route_id": "R02_funding_rate",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "fb3b6ef7c152b3b1427f1ec90c3d3e0258a54bf6095e97ba4178d86b6662fb65",
+          "route_id": "R02b",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "1f33fd26d7c4f459047754439df4f109e5941e91914da1fde72dc1d91c6b799d",
+          "route_id": "R02c",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "67911ebcedfc6302fc37133fb3cd97c716ad9cfbccfaed49e106709b8ee7196f",
+          "route_id": "R03_ewmac_trend",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "01dcabda0250f71b93ba727a0e87eb97fe655ceb2df1448b29a21235992b9692",
+          "route_id": "R03v01_ewmac_btc_lb8",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "6a6077dc6af51177de48e48b2e471b128a922df287e83623431a64bf6c90e828",
+          "route_id": "R03v02_ewmac_btc_lb12",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "d9bdc1fe380f64ed4c9f3a550cf74310915dc5a34fa6179bd7f1222078ad79de",
+          "route_id": "R03v03_ewmac_btc_lb20",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "1d7ac066e5f0757228de2d31d6752e6191fc7235e5f1efc98d500327be7b9915",
+          "route_id": "R03v04_ewmac_btc_lb30",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "8069cf8a70473300a15e478629038a7506dd048739b9f31865b64fab16c8297d",
+          "route_id": "R03v05_ewmac_btc_lb50",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "c4d143c4c0c32dca1b645ec8e6eb3c590d4b5634cfe7f447628747813ccd4626",
+          "route_id": "R03v06_ewmac_btc_lb100",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "b02376786eebe8eea59078b2e6d6ec8bd87ea8fa9ddd4474ecfdfda5046718df",
+          "route_id": "R03v07_ewmac_eth_lb8",
+          "status": "positive_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "54a1a8431b9e5e95907065f85dde58a077524efd5c0302260217a7ddd7ac2216",
+          "route_id": "R03v08_ewmac_eth_lb12",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "bacf907d7035fec366d8c8001910d2152167ce61d98034bbf0b72564e59f1361",
+          "route_id": "R03v09_ewmac_eth_lb20",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "2e71f8e53acad4b86a04fa2fb580428e3b0af193ccff1922f30329dfff4aeea0",
+          "route_id": "R03v10_ewmac_eth_lb30",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "1b8723b8ac86446b01587d7a9195445424151babf6f0d02db22d2d8502b08447",
+          "route_id": "R03v11_ewmac_eth_lb50",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "d743c9bf51ae750596cebb8785001fea807a2de21bb01a4e5fbf94b2687d460c",
+          "route_id": "R03v12_ewmac_eth_lb100",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "a9e203c61b3a0a5e2876b46416c9ec30cb15afa40974cff0cd73b9301dd11555",
+          "route_id": "R03v13_ewmac_sol_lb8",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "e600b7588007cdabf654b7b24be621e865a29d5fb00ba97f7821cce7266947fa",
+          "route_id": "R03v14_ewmac_sol_lb12",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "45dc0b589cce4c12b391b2fb5805c5a0495064994b0d1ed37bb5788268a223be",
+          "route_id": "R03v15_ewmac_sol_lb20",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "6f088b8790af34b214e9dfdba987275d8f7ae9aa4ff7802eec25e585ef903784",
+          "route_id": "R03v16_ewmac_sol_lb30",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "e1c9e68004a42e7732cd33249db2d7baa65d846d28dcaa97680a8e97867b0124",
+          "route_id": "R03v17_ewmac_sol_lb50",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "ee486bdd35e520a307d4de0f4d65d3d09b0aed976f1b9fb3c69ea7757d26baf1",
+          "route_id": "R03v18_ewmac_sol_lb100",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "d24eacc43e9e5a2daf399db7aaa9b7c39f656fd672bb98b0084fd18274b5ea6e",
+          "route_id": "R03v19_ewmac_avax_lb20",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "e4353771eab3939130e682348b61db87b3e136a80639b17a7eb7875a144b34b6",
+          "route_id": "R03v20_ewmac_matic_lb20",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "870c64cf8444c9e673bd67e49f3a17ba4fccf71ab4f148c85312b3c4c8f5e5f4",
+          "route_id": "R04_mean_reversion",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "b660325c3848b78dbed48c58a4be015c3fcf94e540cf4e2ec5b3b0d736f81d82",
+          "route_id": "R05_bollinger_squeeze",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "79409ccc660e01b60ac3f7724a972d059e945cf83ab34186ef779389dfebb26e",
+          "route_id": "R06_momentum_breakout",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "45fe9c6f85e5158e8e36da53cb57085c09a6afe3f78904da063e394ded3ea4eb",
+          "route_id": "R07_fear_greed",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "81f78b199e45067bdf29c23b1beb475b50e3e64a273504676aa14e8a5732a7ec",
+          "route_id": "R08_dca_baseline",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "c851195c4a2ed13a53e6e87379ccfe4e1658185764532201a54f1ca85096396b",
+          "route_id": "R09_sector_rotation",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "99b7bc9def54c9b4dedff2bf3f02edf6206941120b102497c4725b788f07f867",
+          "route_id": "R10_macro_regime",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "5cf9763a7883337049a6a85b375dcf6f83c13bab84b2a9c1b8fa25f262fdc0b2",
+          "route_id": "R11_polymarket",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "98e85e60b3b903a83a0d7b00e01254cdb13c54714524eceb7795ebbf34f7910e",
+          "route_id": "R12_llm_agentic",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "f3f92d5d9e616bce0000deef0a0e169dab10533d4da4e2faf9ebc8a2efe51b60",
+          "route_id": "R13_multi_timeframe",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "b577d5b2fb5616078ff5ed3573cb1112f0139aab09a50f77769531a0289914d6",
+          "route_id": "R14",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "e7c502264c759775601d97b23d1c66684e1f23029f9f43fd112cb58c3357b829",
+          "route_id": "R15",
+          "status": "negative_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "eed04700168b8b03c3f2de9a14259347d051f69d494e3e8fc490632abdfb1c08",
+          "route_id": "R16",
+          "status": "negative_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "def3f6875a9e9fd76fa0b31d31894e15b339afe23e2d5730265509d95673f169",
+          "route_id": "R17",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "80b34c053eb7ab5a76f96d5de5836dd4bbbe7606dff1adda352cbde33ed57e5c",
+          "route_id": "R18",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "040c224b40f05689a3195ebdbc3ece7f5d8c5eb4ebfa1dbe3ceb5e5574a431b7",
+          "route_id": "R18v01_order_flow_btc_0p5x",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "823bc1add5e3fd0c1d8c1f0e3667e87e13642002ca0b2ccf34b3f0a791d385e5",
+          "route_id": "R18v02_order_flow_btc_1p0x",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "7c2da25ca1f915e0ac635481689113dc5c15c20417bf69c5e0cbefd42bc52a94",
+          "route_id": "R18v03_order_flow_btc_1p5x",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "37ced7a777e0539807ea8bd7d4864c54c2457c6e09242205edd8edc12db83f7d",
+          "route_id": "R18v04_order_flow_btc_2p0x",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "27d8a96d57e801f45c369601479405110418abe234bab605c6720c71fc91cf39",
+          "route_id": "R18v05_order_flow_eth_0p5x",
+          "status": "negative_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "560f9db52bc4f3a630b1858bf39d581e0f922fece2d9ab36a634ab51b0c3ed21",
+          "route_id": "R18v06_order_flow_eth_1p0x",
+          "status": "positive_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "0a3e7c2333aa32258e13e3ee7d5403a3e8675d8cf4b721c86f11919ce781d896",
+          "route_id": "R18v07_order_flow_eth_1p5x",
+          "status": "negative_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "f4c8aa4805b130ecfff0ccce509cc49497968fa3c3bf1c59db2c285ff8809e5b",
+          "route_id": "R18v08_order_flow_eth_2p0x",
+          "status": "positive_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "47c47d46c14abe09f0a8c0babe8616db1f9651f27dae9f700559194c34b4bbf0",
+          "route_id": "R18v09_order_flow_sol_0p5x",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "e68d9602b0a45c092db7deb5723c850de5b000816493e1642e3b3bca954b019d",
+          "route_id": "R18v10_order_flow_sol_1p0x",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "f1d1ed529af32c47056fd8a5f6aafb622395266a2a6650ef40f649d52b8b3472",
+          "route_id": "R18v11_order_flow_sol_1p5x",
+          "status": "negative_pnl",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "33248a19cec94590f730a559219229a1f131c780816f7e504d7d4f5b00f97d43",
+          "route_id": "R18v12_order_flow_sol_2p0x",
+          "status": "negative_pnl",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "2875afa50ae72de8ae9423716c92ca5205b1fff22ffa2c51ec5411ae33048553",
+          "route_id": "R18v13_order_flow_avax_0p5x",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "4405e33c9c75268c49bec4969f807a6d0133719c58e37ade72654e13d56bc12e",
+          "route_id": "R18v14_order_flow_avax_1p0x",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "545ae055064536b87947ad5fe61074333ae195fbc2b32bb6c60696974b10b377",
+          "route_id": "R18v15_order_flow_avax_1p5x",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "278da53713f1d3432a0327c4ac880b799b740601ff8860f33ab392a3155018f4",
+          "route_id": "R18v16_order_flow_avax_2p0x",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "1b53a578dae7eb27e029d1c416259f80da7a53336fe5667254feca8e2a86b312",
+          "route_id": "R18v17_order_flow_pol_0p5x",
+          "status": "negative_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "07105c1e2ffcb9fc27f7a3963fcbd76aef74d263736358b48cd72a2b36e03b42",
+          "route_id": "R18v18_order_flow_pol_1p0x",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "9838d09604ff7e5b1c991a724879d12737c01e57fa9e8239ac6ca1bdba2c8e16",
+          "route_id": "R18v19_order_flow_pol_1p5x",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "8d7aa579daa33896f5587df3c1deee27537fe8dd1c729588e2ba929500fef786",
+          "route_id": "R18v20_order_flow_pol_2p0x",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "8fc2b83037c94d1bb5b0c34172c596b419972c126ffc4630ed49025d82fe9f41",
+          "route_id": "R19",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "1efb0bcc51e118578a38c1b508d1217093476168bee292c600adc7497dc4087b",
+          "route_id": "R19v01_grid_btc_0p3pct",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "285bb460dff6c0b774fa58f1a4c6ac49119f7050c357af0b1474f1354c32b576",
+          "route_id": "R19v02_grid_btc_0p5pct",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "89c76fd04de561f0cee4778595594a3f0a27a1e42548488f33ce566cb800329c",
+          "route_id": "R19v03_grid_btc_0p8pct",
+          "status": "negative_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "ba92e14f69d0d9fcaeb639ab5a74fa80e7ead1b245ef041bb72231247a41e402",
+          "route_id": "R19v04_grid_btc_1p0pct",
+          "status": "positive_pnl",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "efaf0f130933ff9fefdcec74d4d223a92d067753a29ce6fd9c27b08e49ba6e7a",
+          "route_id": "R19v05_grid_btc_1p5pct",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "69526e2ab6ca59a7e042ebc19d08e6565fbff61156fb91d15d43f8bc4f7d511c",
+          "route_id": "R19v06_grid_btc_2p0pct",
+          "status": "stale",
+          "symbol": "BTC"
+        },
+        {
+          "evidence_hash": "934cedd5015f3f6fbf776a37b9e1f742694c2a748afcaf4a041db563c7f5bf2d",
+          "route_id": "R19v07_grid_eth_0p3pct",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "58a1327b82f8c154f7a8e42a60290c1fb46032837da18be81c3ad1414f28bfd5",
+          "route_id": "R19v08_grid_eth_0p5pct",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "d433ac6a53e729ebeb75a76ccbe85b14b6b2a092328ea8b14b6d40e96e971bb9",
+          "route_id": "R19v09_grid_eth_0p8pct",
+          "status": "negative_pnl",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "c52bfc0917f40bb0c4424e95aec25e8efab21af3e000b725c794a15af000c736",
+          "route_id": "R19v10_grid_eth_1p0pct",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "087177ef9bc11d6dfadf38436f3ff1027787cac7292b865ee9a360731f034dd1",
+          "route_id": "R19v11_grid_eth_1p5pct",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "af50a613b117868d7cecd6677476e98379e02ac96d88eac94c94cbe3255bc718",
+          "route_id": "R19v12_grid_eth_2p0pct",
+          "status": "stale",
+          "symbol": "ETH"
+        },
+        {
+          "evidence_hash": "f4011f8572f1ce4adf72ca80199284877631b51ad2f8be1ebc2d08d3e9aa2232",
+          "route_id": "R19v13_grid_sol_0p3pct",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "193ede2fdd623acdbdfe15d2a023553ec62de3125d7f73014e3f1e072c97a2d2",
+          "route_id": "R19v14_grid_sol_0p5pct",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "a35499efecc635b2f4baa3f26fe4573947a8fbf3021dde2d63b86caf809fd4cc",
+          "route_id": "R19v15_grid_sol_0p8pct",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "05826c54f3330609adb326d003086deda5e43dd01a64ae532439cb3cc2172ab2",
+          "route_id": "R19v16_grid_sol_1p0pct",
+          "status": "negative_pnl",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "b8e79843417a72f26e5253855373a4fda7f6c5cfacbab04c7634385d35576124",
+          "route_id": "R19v17_grid_sol_1p5pct",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "e7aa3556852a8fa7dea13063d010c057044fbe0d48f1a1a685827fba6ad1a393",
+          "route_id": "R19v18_grid_sol_2p0pct",
+          "status": "stale",
+          "symbol": "SOL"
+        },
+        {
+          "evidence_hash": "12f0b2604ecf95834ed47cb2f3a7ac97414fc9d7f57bff045ff651499e209d7c",
+          "route_id": "R19v19_grid_avax_1p0pct",
+          "status": "stale",
+          "symbol": "AVAX"
+        },
+        {
+          "evidence_hash": "054e702c8ab40cfade403200a07e022ec0cb187be83fe092a99c57f8abe65c36",
+          "route_id": "R19v20_grid_matic_1p0pct",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "cf84649ea2f6de5365a981e4afed0c969c1260af05df5a8e043c70f32347b355",
+          "route_id": "R20",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "2c049acbba2e6e5c29685812c6bef6135adf20ad36523f4ce6f5eb37aa5964b6",
+          "route_id": "R21",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "4db253b06f3c4994fa25ed3c7dc3370d764b806c9674acd1fc54742058540b55",
+          "route_id": "R22",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "2a4ea1c2351e9ca0f7542cb3ffc39ffd0c076600bb1c3558c1872c36be101a7b",
+          "route_id": "R23",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "042d8a714fbd994049fe31aee6b2ea68890bc5886c0ce29ec9abdbac59af5583",
+          "route_id": "R24",
+          "status": "negative_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "e4cdebc4895c552b1a67d68c6d2a9b1b7dad6c8004c2eba023b8859150c4c88f",
+          "route_id": "R25",
+          "status": "positive_pnl",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "57c4de9ea661915283d328e6fd79af75417ae19681c554bab411d5bda3f2a9b4",
+          "route_id": "R26_onchain_signals",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "41dcf8d58cc67490dd2b1c1d861158289f8e4f79e7453d3194aded5776ef5737",
+          "route_id": "R30",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "64c31d6fa1dab2f0726a153f8301c5bd511c8e1b7e6409fda8c759a224bba7c0",
+          "route_id": "R31",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "6ecdcb386ffa60b0d89962a47264f183dedc41eec809abb972e4c5bb1df80301",
+          "route_id": "R32",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "94cd7a8aaced46b5feccd761e57b2445e33156c3ecc7a25238407b3ad7f6f75a",
+          "route_id": "R33",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "3d3284aa068c022adb97e53c098051c00b67bc807cb16bcfb844607734e17c5c",
+          "route_id": "R34",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "4c29218f6fbc020527751acd34211f297da366778f4f95d75adbe5248a2dcb17",
+          "route_id": "R35",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "9d377a64f55de02a68a9580d0babdf5e314399eebc93d4d6f32188797b73ac4c",
+          "route_id": "R36",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "5827a44ade728fcc7624826336d0384fefa55ccd5336f6ec1755ddc7ba5dc74c",
+          "route_id": "R37",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "d03d471ea568bfc6e65c8c03ad1610043ae5daa15a7b89e5bd4980c0a5eb61ed",
+          "route_id": "R38",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "ee00e5c9584c700d0cf442787c99dbed82951d367a5a4494381f36a3df2b173d",
+          "route_id": "R39",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "74b0665454e53b18209382f83672e3ac0a842b489e2d9395117f561c4f912993",
+          "route_id": "R40",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "690647b377ec705218f6c69241d55198f029ffadcc9b60e45c7f053c4c1715e8",
+          "route_id": "R41",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "88d4e16141e7f7efb3264f87002c584ccdde25d1417a2d26a3a0b1fcfb059428",
+          "route_id": "R42",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "a31994f4268ab5dce81b5f0ae06f3739d0648dcc678082a54ca9faafd054d84c",
+          "route_id": "R43",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "ac409cbe8ca192cc9c83f62850f7af0929eb41fe7db6bfd0a08e426e06ea94f1",
+          "route_id": "R44",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "7853cf46f55f4f9ae6fa96f9845ada2c11c00b7829497e6beea884fa88aa1d2c",
+          "route_id": "R45",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "cdc94aba61ef700975b34c75efbf9099f36809b12149b06f09ef41559543248b",
+          "route_id": "R46",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "84eaf9b4daa57885e9f0b464a2f58ee538a5e6d961f281bf5f386b41242608f2",
+          "route_id": "R47",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "1cdd5057f8589c0eecd005258ad3a4785cc409a9150ca4d833fe811354eb2214",
+          "route_id": "R48",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "232fb6283936e3a532068dbdcb3644afd4a6715e5080b123d1eb09709598a987",
+          "route_id": "R49",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "0abae336d24a3fb839f56fb90e12c9e0d51ac51c6374f0b5a5067eb2fb364f43",
+          "route_id": "R50",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "3e40a5c328e2e9a3cf822cca1707a05a42c018d3f41d794b58f04d0762a56b37",
+          "route_id": "R51",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "a86319885771d4c6ac63a7a2f11ef1b2718c03ce8368f1b04ff243e9d9902830",
+          "route_id": "R52",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "e1f59e41f20dd11dac0750bb88223e9d4f2a574c45721f6cdb1b6e4ccbd0567a",
+          "route_id": "R53",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "8a6174f0a69fb9d3945af9e185f01195c2a62bb87dc6053dfa97ab7222005fb1",
+          "route_id": "R54",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "7ad51737365072c8ef3c92873b1a8a3e10bedacb5434ce4a5b03a180a3e1b11d",
+          "route_id": "R55",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "40ec4d813afd8dfcd41ed28388e6b24191191b0419a083fb5ac9d4048ab831b9",
+          "route_id": "R56",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "98b8111ffed62407e569549c3196e3563d8bc4ef0f012eb69a801d9c35020ee7",
+          "route_id": "R57",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "ee8392b11f92ef6b9037964bf31d88910f35b4ac55eec8b649539dfb3feb9883",
+          "route_id": "R58",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "9a1be5a51eaf3ea984f5b799e3270f14e2e22acc8149f8ebbd2b7bf747fd120f",
+          "route_id": "R59",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "3db53192c99cb2160a193aa07de19bd221323da61e4ae7bd231d2a0c32df4b44",
+          "route_id": "R60",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "76e9033dc4ba4b77007f93fa75704ea4f75a921e1245157cf3979bca2fa44561",
+          "route_id": "R61",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "430c4c0161a8bdf3c5bc43638b5995e25dfac3a16eecc45af5124c62f5c3e988",
+          "route_id": "R62",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "8f009bcb58294987eb585ff7864187aa35bcd4644cc4a6669f42fb715b7f7ef6",
+          "route_id": "R63",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "7b1e7b2f013bf5356ec9fae2227163ceb50d671668438de7576e99473b40a704",
+          "route_id": "R64",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "fe741081f81c2df69b420b07f7c64a3f002720cf62a23ad6f73b78109bb4d684",
+          "route_id": "R65",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "ab5e25cbcdb43092de226db45328763c25b003e55e1f500cac6f278e2654e07c",
+          "route_id": "R66",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "b824a2de6f1d2330d18194a0630d8faf74ea818921c24118330a5967a1259312",
+          "route_id": "R67",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "793ba6d4394cb455493404c8d53100634d4cdd1ae17fb323a5ef4f95023423ce",
+          "route_id": "R68",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "f4b3e683fb073acab3f87fef6aa1654c560c999f443cff2eac969641e145f2f3",
+          "route_id": "R69",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "faa3bb3a566ff8a4cb40adb3a01e3e97d5ebb3ecf0cce4d6cb1fca12fd6a4842",
+          "route_id": "R70",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "bdfe443866dc0c996931d7d6bdeb814618b66776c4915249cf50e1cb18cd444a",
+          "route_id": "R71",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "1a6ef142686bb6a25daffc9af21a9000ec59d7ddf3074b64f8c4e9898081e621",
+          "route_id": "R72",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "05824debc289e1d737df99393073bd76d873533d603c2864a7c4b1d66c936a97",
+          "route_id": "R73",
+          "status": "stale",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "e37992fe9ee6753d54027f3bcdbad7590c7fbfcfcd7b433367695dc53c726bc1",
+          "route_id": "R74",
+          "status": "flat",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "720ed21242d3e0ede633babc8a710958bcf9b0fa12b89b7912764d2048741e17",
+          "route_id": "R75",
+          "status": "flat",
+          "symbol": "AGNI_LAB"
+        },
+        {
+          "evidence_hash": "3172b50121d8ee9d4e8b38393d35fedd413ec97ec18056fc1d6a0dd0bfc81b37",
+          "route_id": "R76",
+          "status": "flat",
+          "symbol": "AGNI_LAB"
+        }
+      ],
+      "source_signature": "ad3275144a523afba1a38d2e3ab85b002344ac22651d24dedf6893e87cb086a4",
+      "stale_or_broken": {
+        "alpha_rows": 4601,
+        "alpha_status_counts_7d": {
+          "A1_alpha_scout:llm_failed": 82,
+          "A2_loser_autopsy:llm_failed": 82,
+          "A3_regime_gate:observed": 85,
+          "A4_winner_sizeup:no_sizeup_candidates": 85,
+          "A5_market_intel:observed": 334,
+          "llm_failed": 164,
+          "no_sizeup_candidates": 85,
+          "observed": 419
+        },
+        "broken_counts_7d": {
+          "llm_failed": 164,
+          "no_regime_data": 0,
+          "no_sizeup_candidates": 85,
+          "placeholder": 0,
+          "stale_feed_alerts": 277298
+        },
+        "is_clean": false,
+        "latest_alpha_day": "2026-06-25",
+        "stale_feed_counts_7d": {
+          "alpaca_1m": 24004,
+          "alpaca_etfs": 28,
+          "alpaca_stocks": 28,
+          "btc_onchain": 447,
+          "congressional_trades": 40060,
+          "crypto_history": 22931,
+          "defi_overview": 9190,
+          "defi_tvl": 18903,
+          "defi_yields": 26992,
+          "etf_prices": 40410,
+          "insider_trades": 40024,
+          "oanda_forex": 5321,
+          "onchain": 6,
+          "sentiment": 8545,
+          "yield_curve": 40409
+        }
+      }
+    }
+  ],
+  "proposals": [
+    {
+      "approval_state": "requires_human_review",
+      "arjuna_weight": 0.85,
+      "auto_approved": false,
+      "body": "Agni packets have been normalized into capital_lab evidence and Insight objects. This proposal is for human review only and carries no capital, route, or order authority.",
+      "capital_authority_change": false,
+      "order_generation": false,
+      "proposal_id": "cap_prop_b7b8d9822931df845429",
+      "reason": "receipt_backed_projection_ready",
+      "route_mutation": false,
+      "suggested_actions": [
+        "Review packet signatures and route evidence hashes.",
+        "Decide whether the evidence warrants a separate human-approved capital review."
+      ],
+      "title": "Review Agni evidence under Dharma Capital without granting authority"
+    },
+    {
+      "approval_state": "requires_human_review",
+      "arjuna_weight": 0.72,
+      "auto_approved": false,
+      "body": "Dharma Capital needs at least one sister VPS/lab packet with a distinct strategy scope before comparing Agni at portfolio level.",
+      "capital_authority_change": false,
+      "order_generation": false,
+      "proposal_id": "cap_prop_35ddb7e1345e1e0ce2b9",
+      "reason": "missing_sister_lab_packet",
+      "route_mutation": false,
+      "suggested_actions": [
+        "Export a read-only packet from rushabdev or another non-clone lab.",
+        "Reject Agni clone packets as comparison evidence unless strategy_scope differs."
+      ],
+      "title": "Request orthogonal sister-lab evidence before allocation comparison"
+    },
+    {
+      "approval_state": "requires_human_review",
+      "arjuna_weight": 0.8,
+      "auto_approved": false,
+      "body": "Agni evidence contains stale feed or broken alpha-cycle signals. This blocks any clean capital escalation claim until fixed and re-exported.",
+      "capital_authority_change": false,
+      "order_generation": false,
+      "proposal_id": "cap_prop_8a94c9cc4b48b8f9cc05",
+      "reason": "stale_or_broken_evidence",
+      "route_mutation": false,
+      "suggested_actions": [
+        "Fix stale feeds and LLM failure lanes.",
+        "Re-run the exporter after repair and compare packet signatures."
+      ],
+      "title": "Repair stale or broken Agni evidence before capital escalation"
+    }
+  ],
+  "universe": {
+    "as_of": "2026-06-26T02:11:37Z",
+    "content_hash": "eb1d6d118b350067f276b0d9c82d865c9e1ea81c5c60003b2cc3b056969aea9e",
+    "security_ids": [
+      "AGNI_LAB",
+      "AVAX",
+      "BTC",
+      "ETH",
+      "SOL"
+    ],
+    "source": "dharma_capital_agni_bridge_v0"
+  }
+}

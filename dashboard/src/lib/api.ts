@@ -3,6 +3,10 @@
  */
 
 import type {
+  AgentCardIndexPayload,
+  AgentCardExportFormat,
+  AgentCardOut,
+  AgentCardPublicOut,
   AgentOut,
   AnomalyOut,
   ApiResponse,
@@ -155,6 +159,45 @@ export function fetchAgent(id: string): Promise<ApiResponse<AgentOut>> {
   return apiGet<AgentOut>(`/api/agents/${encodeURIComponent(id)}`);
 }
 
+// -- Agent Cards ------------------------------------------------------------
+
+export function fetchAgentCards(): Promise<ApiResponse<AgentCardIndexPayload>> {
+  return apiGet<AgentCardIndexPayload>("/api/agent-cards");
+}
+
+export function fetchAgentCard(id: string): Promise<ApiResponse<AgentCardOut>> {
+  return apiGet<AgentCardOut>(`/api/agent-cards/${encodeURIComponent(id)}`);
+}
+
+export function fetchPublicAgentCard(
+  id: string,
+): Promise<ApiResponse<AgentCardPublicOut>> {
+  return apiGet<AgentCardPublicOut>(
+    `/api/agent-cards/${encodeURIComponent(id)}/public`,
+  );
+}
+
+export async function fetchAgentCardExportText(
+  id: string,
+  format: AgentCardExportFormat,
+): Promise<string> {
+  const res = await fetch(
+    apiPath(
+      `/api/agent-cards/${encodeURIComponent(id)}/exports/${encodeURIComponent(format)}`,
+    ),
+    {
+      headers: {
+        Accept: "text/plain, text/markdown, text/vcard, application/json",
+      },
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(`API ${res.status}: ${res.statusText}`, res.status, body);
+  }
+  return res.text();
+}
+
 // -- Tasks ------------------------------------------------------------------
 
 export function fetchTasks(params?: {
@@ -183,8 +226,15 @@ export function createTask(body: {
 
 // -- Health -----------------------------------------------------------------
 
-export function fetchHealth(): Promise<ApiResponse<HealthOut>> {
-  return apiGet<HealthOut>("/api/health");
+export function fetchHealth(options?: {
+  deep?: boolean;
+  runtimeTruth?: boolean;
+}): Promise<ApiResponse<HealthOut>> {
+  const sp = new URLSearchParams();
+  if (options?.deep) sp.set("deep", "true");
+  if (options?.runtimeTruth) sp.set("runtime_truth", "true");
+  const qs = sp.toString();
+  return apiGet<HealthOut>(`/api/health${qs ? `?${qs}` : ""}`);
 }
 
 export function backendLivenessPath(): string {

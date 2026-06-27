@@ -647,6 +647,93 @@ class RuntimeReceipt:
     created_at: datetime = field(default_factory=_utc_now)
 
 
+_IDENTITY_REQUIRED_RECEIPT_TYPES = {"task_claim", "delegation_run"}
+_PROVIDER_ACCOUNTED_RECEIPT_TYPES = {"task_claim", "delegation_run"}
+_RUNTIME_PROVIDER_ACTUAL_SERVED_TRUTH_SOURCE = "runtime_provider.actual_served"
+
+
+def _payload_text(payload: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = payload.get(key)
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _payload_falseish(value: Any) -> bool:
+    return value is False or str(value or "").strip().lower() in {"false", "0", "no"}
+
+
+def _payload_trueish(value: Any) -> bool:
+    return value is True or str(value or "").strip().lower() in {"true", "1", "yes"}
+
+
+def _runtime_receipt_provider_model_accounted(receipt: RuntimeReceipt) -> bool:
+    payload = dict(receipt.payload or {})
+    truth_source = _payload_text(
+        payload,
+        "provider_model_truth_source",
+        "route_truth_source",
+    )
+    if not truth_source:
+        return False
+
+    served_provider = _payload_text(
+        payload,
+        "actual_served_provider",
+        "served_provider",
+        "actual_provider",
+        "provider_served",
+    )
+    served_model = _payload_text(
+        payload,
+        "actual_served_model",
+        "served_model",
+        "actual_model",
+        "model_served",
+    )
+    if served_provider and served_model:
+        return truth_source == _RUNTIME_PROVIDER_ACTUAL_SERVED_TRUTH_SOURCE
+
+    provider_execution = payload.get("provider_execution")
+    applicability = _payload_text(payload, "provider_model_applicability")
+    if _payload_falseish(provider_execution):
+        return bool(
+            applicability == "not_applicable"
+            and _payload_text(payload, "no_provider_model_reason")
+        )
+    if str(provider_execution or "").strip().lower() == "pending":
+        return applicability == "pending_execution"
+    if _payload_trueish(provider_execution):
+        return bool(
+            applicability
+            and _payload_text(payload, "provider_model_missing_reason")
+        )
+    return False
+
+
+def _validate_runtime_receipt_identity(receipt: RuntimeReceipt) -> None:
+    if receipt.receipt_type not in _IDENTITY_REQUIRED_RECEIPT_TYPES:
+        return
+    if not str(receipt.idempotency_key or "").strip():
+        raise ValueError(
+            f"{receipt.receipt_type} runtime receipts require a non-empty idempotency_key"
+        )
+    if not str(receipt.side_effect_key or "").strip():
+        raise ValueError(
+            f"{receipt.receipt_type} runtime receipts require a non-empty side_effect_key"
+        )
+    if (
+        receipt.receipt_type in _PROVIDER_ACCOUNTED_RECEIPT_TYPES
+        and not _runtime_receipt_provider_model_accounted(receipt)
+    ):
+        raise ValueError(
+            f"{receipt.receipt_type} runtime receipts require provider/model truth "
+            "or explicit no-provider/pending applicability"
+        )
+
+
 @dataclass(frozen=True)
 class IdempotencyRecord:
     idempotency_key: str
@@ -948,6 +1035,8 @@ _PROVIDER_MODEL_RECEIPT_METADATA_KEYS = (
     "provider_execution",
     "provider_model_applicability",
     "no_provider_model_reason",
+    "provider_model_missing_reason",
+    "provider_model_pending_reason",
 )
 _PROVIDER_MODEL_RECEIPT_CONTEXT_KEYS = (
     "actual_served_provider",
@@ -963,6 +1052,8 @@ _PROVIDER_MODEL_RECEIPT_CONTEXT_KEYS = (
     "provider_execution",
     "provider_model_applicability",
     "no_provider_model_reason",
+    "provider_model_missing_reason",
+    "provider_model_pending_reason",
 )
 
 
@@ -3269,6 +3360,7 @@ class RuntimeStateStore:
         return receipts[0].run_id if receipts else None
 
     async def record_runtime_receipt(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_runtime_receipt_identity(receipt)
         await self.init_db()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -3298,6 +3390,7 @@ class RuntimeStateStore:
         return receipt
 
     def record_runtime_receipt_sync(self, receipt: RuntimeReceipt) -> RuntimeReceipt:
+        _validate_runtime_receipt_identity(receipt)
         self.init_db_sync()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)

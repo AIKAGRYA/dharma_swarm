@@ -63,7 +63,27 @@ def _runtime_receipt_head_evidence_source(head: dict[str, Any]) -> str:
     )
 
 
+def _runtime_receipt_since_boot_evidence_source(since_boot: dict[str, Any]) -> str:
+    clean = since_boot.get("since_boot_major_identity_clean")
+    clean_text = "unknown" if clean is None else str(bool(clean)).lower()
+    started_at = str(since_boot.get("process_started_at") or "unknown")
+    total = str(since_boot.get("major_since_boot_total") or 0)
+    missing_side = str(since_boot.get("missing_side_effect_key") or 0)
+    missing_idem = str(since_boot.get("missing_idempotency_key") or 0)
+    evidence = str(since_boot.get("evidence") or "no evidence")
+    return (
+        "runtime_receipt_since_boot "
+        f"clean={clean_text}; started_at={started_at}; total={total}; "
+        f"missing_side_effect_key={missing_side}; "
+        f"missing_idempotency_key={missing_idem}; evidence={evidence}"
+    )
+
+
 def _runtime_receipt_coverage_evidence_source(coverage: dict[str, Any]) -> str:
+    scope_mode = str(coverage.get("scope_mode") or "all")
+    scope_since = str(coverage.get("scope_since_created_at") or "")
+    active_epoch_enabled = str(bool(coverage.get("active_epoch_enabled"))).lower()
+    active_epoch_receipt = str(coverage.get("active_epoch_receipt_id") or "")
     percent = coverage.get("latest_major_task_receipts_provider_model_percent")
     percent_text = "unknown" if percent is None else str(percent)
     proof_percent = coverage.get(
@@ -160,7 +180,11 @@ def _runtime_receipt_coverage_evidence_source(coverage: dict[str, Any]) -> str:
         provider_model_gap_text = "; provider_model_gap_producers=" + "|".join(parts)
     return (
         "runtime_receipt_provider_model "
-        f"available={available}; latest={provider_model}/{latest_sample}; "
+        f"available={available}; scope={scope_mode}; "
+        f"scope_since={scope_since or 'none'}; "
+        f"active_epoch={active_epoch_enabled}; "
+        f"epoch_receipt={active_epoch_receipt or 'none'}; "
+        f"latest={provider_model}/{latest_sample}; "
         f"proof={provider_model_proof}/{latest_sample}; "
         f"accounted={provider_model_accounted}/{latest_sample}; "
         f"provider={provider}/{latest_sample}; model={model}/{latest_sample}; "
@@ -695,6 +719,24 @@ def _rows_from_live_ops_census(
                         "live_ops_census",
                         sid,
                         "runtime_receipt_active_head",
+                    ],
+                )
+            receipt_since_boot = (
+                raw.get("runtime_receipt_since_boot")
+                if isinstance(raw.get("runtime_receipt_since_boot"), dict)
+                else {}
+            )
+            if receipt_since_boot:
+                clean = receipt_since_boot.get("since_boot_major_identity_clean")
+                row.add_evidence(
+                    "db_probe",
+                    _runtime_receipt_since_boot_evidence_source(receipt_since_boot),
+                    status="present" if clean is True else "unproven",
+                    raw_content=json.dumps(receipt_since_boot, sort_keys=True),
+                    provenance_chain=[
+                        "live_ops_census",
+                        sid,
+                        "runtime_receipt_since_boot",
                     ],
                 )
             receipt_coverage = (

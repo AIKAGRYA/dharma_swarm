@@ -110,10 +110,12 @@ async def test_process_message_naks_missing_ack_subject(tmp_path: Path) -> None:
         config=config,
     )
 
-    assert receipt["status"] == "DELIVERY_FAILED"
+    assert receipt["status"] == "INVALID_ENVELOPE_ACKED"
     assert "ack_subject" in receipt["error"]
-    assert message.acked == 0
-    assert message.nacked == 1
+    assert receipt["poison_message_quarantined"] is True
+    assert receipt["contact_evidence_tier"] == "NO_CONTACT"
+    assert message.acked == 1
+    assert message.nacked == 0
     assert publisher.published == []
 
 

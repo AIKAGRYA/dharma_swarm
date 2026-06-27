@@ -194,9 +194,10 @@ async def test_loop_zero_max_cycles_is_noop(tmp_path):
 # --- SOTA context-bridging overbuild (memory_kernel injection) ----------------------------
 
 class _FakePackItem:
-    def __init__(self, surface_id: str, content: str):
+    def __init__(self, surface_id: str, content: str | None = None, content_snippet: str | None = None):
         self.surface_id = surface_id
         self.content = content
+        self.content_snippet = content_snippet
 
 class _FakeMemoryPack:
     def __init__(self, items):
@@ -213,8 +214,8 @@ class _FakeMemoryKernel:
 async def test_memory_kernel_injects_trust_tagged_context_into_runner(tmp_path):
     """When a memory_kernel is supplied, the runner task contains trust-tagged context and the result records injection."""
     mk = _FakeMemoryKernel([
-        _FakePackItem("wiki/alpha", "The first principle is constraint enables emergence."),
-        _FakePackItem("episodes/42", "Yesterday the holon observed its own recursion."),
+        _FakePackItem("wiki/alpha", content_snippet="The first principle is constraint enables emergence."),
+        _FakePackItem("episodes/42", content_snippet="Yesterday the holon observed its own recursion."),
     ])
     runner = make_runner(task="reflect on continuity", reply="observed the observing")
 

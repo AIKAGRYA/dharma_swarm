@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 import argparse
-import asyncio
 import json
 import os
-import re
 import signal
 import subprocess
 import sys
+import time
+import urllib.request
 
 
 from dharma_swarm.terminal_commands._helpers import (
@@ -19,9 +19,86 @@ from dharma_swarm.terminal_commands._helpers import (
     DHARMA_SWARM,
     _first_daemon_like_process,
     _pid_alive,
-    _run,
     _tail,
 )
+
+_SELF_HEAL_STALE_PID_ENV = "DHARMA_DAEMON_SELF_HEAL_STALE_PID"
+_DAEMON_HEALTH_URL_ENV = "DHARMA_DAEMON_HEALTH_URL"
+_DEFAULT_DAEMON_HEALTH_URL = "http://127.0.0.1:7433/health"
+
+
+def _env_truthy(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _daemon_health_matches_pid(pid: int) -> tuple[bool, str]:
+    url = os.environ.get(_DAEMON_HEALTH_URL_ENV, _DEFAULT_DAEMON_HEALTH_URL)
+    try:
+        with urllib.request.urlopen(url, timeout=1.5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        return False, f"health_unreachable:{exc.__class__.__name__}"
+
+    if not isinstance(payload, dict):
+        return False, "health_payload_not_object"
+    if str(payload.get("status") or "").lower() != "ok":
+        return False, "health_status_not_ok"
+    if str(payload.get("daemon_pid") or "") != str(pid):
+        return False, "health_pid_mismatch"
+    if payload.get("daemon_process_alive") is False:
+        return False, "health_parent_dead"
+    return True, "health_ok"
+
+
+def _terminate_daemon_pid(pid: int) -> bool:
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            return True
+        except PermissionError:
+            return False
+        except OSError:
+            return False
+        for _ in range(10):
+            if not _pid_alive(pid):
+                return True
+            time.sleep(0.2)
+    return not _pid_alive(pid)
+
+
+def _signal_daemon_down(pid: int, *, pid_file: Path | None = None) -> None:
+    try:
+        os.kill(pid, signal.SIGTERM)
+        print(f"Sent SIGTERM to daemon (PID {pid})")
+    except ProcessLookupError:
+        print(f"Daemon PID {pid} not found (stale)")
+        if pid_file is not None:
+            pid_file.unlink(missing_ok=True)
+    except PermissionError:
+        print(f"Could not signal daemon (PID {pid}): permission denied")
+    except OSError as exc:
+        print(f"Could not signal daemon (PID {pid}): {exc}")
+
+
+def _daemon_pid_blocks_start(pid: int, *, label: str, pid_file: Path | None = None) -> bool:
+    if not _env_truthy(_SELF_HEAL_STALE_PID_ENV):
+        print(f"{label} already running (PID {pid})")
+        return True
+
+    health_ok, evidence = _daemon_health_matches_pid(pid)
+    if health_ok:
+        print(f"{label} already running (PID {pid})")
+        return True
+
+    print(f"{label} PID {pid} failed health proof ({evidence}); reaping for restart")
+    if not _terminate_daemon_pid(pid):
+        print(f"{label} PID {pid} could not be reaped; refusing duplicate start")
+        return True
+    if pid_file is not None:
+        pid_file.unlink(missing_ok=True)
+    return False
+
 
 def cmd_up(background: bool = False) -> None:
     """Start the dharma_swarm daemon (pulse heartbeat loop)."""
@@ -29,17 +106,23 @@ def cmd_up(background: bool = False) -> None:
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
-            os.kill(pid, 0)  # Check if running
-            print(f"Daemon already running (PID {pid})")
-            return
-        except (ValueError, OSError):
+        except ValueError:
             pid_file.unlink(missing_ok=True)
+        else:
+            if _pid_alive(pid) and _daemon_pid_blocks_start(
+                pid,
+                label="Daemon",
+                pid_file=pid_file,
+            ):
+                return
+            if not _pid_alive(pid):
+                pid_file.unlink(missing_ok=True)
 
     live_process = _first_daemon_like_process()
     if live_process is not None:
         pid, _command = live_process
-        print(f"Daemon already running (PID {pid})")
-        return
+        if _daemon_pid_blocks_start(pid, label="Daemon"):
+            return
 
     repo_root = Path(__file__).resolve().parent.parent
     daemon_script = repo_root / "run_daemon.sh"
@@ -71,14 +154,14 @@ def cmd_down() -> None:
             print("Corrupted PID file, removing")
             pid_file.unlink()
             return
-        try:
-            os.kill(pid, signal.SIGTERM)
-            print(f"Sent SIGTERM to daemon (PID {pid})")
-        except OSError:
-            print(f"Daemon PID {pid} not found (stale)")
-            pid_file.unlink()
+        _signal_daemon_down(pid, pid_file=pid_file)
     else:
-        print("Daemon not running (no PID file)")
+        live_process = _first_daemon_like_process()
+        if live_process is None:
+            print("Daemon not running (no PID file)")
+            return
+        pid, _command = live_process
+        _signal_daemon_down(pid)
 
 
 def cmd_orchestrate_live(background: bool = False) -> None:
@@ -92,17 +175,23 @@ def cmd_orchestrate_live(background: bool = False) -> None:
             continue
         try:
             pid = int(candidate.read_text().strip())
-            os.kill(pid, 0)
-            print(f"Orchestrator already running (PID {pid})")
+        except ValueError:
+            candidate.unlink(missing_ok=True)
+            continue
+        if _pid_alive(pid) and _daemon_pid_blocks_start(
+            pid,
+            label="Orchestrator",
+            pid_file=candidate,
+        ):
             return
-        except (ValueError, OSError):
+        if not _pid_alive(pid):
             candidate.unlink(missing_ok=True)
 
     live_process = _first_daemon_like_process()
     if live_process is not None:
         pid, _command = live_process
-        print(f"Orchestrator already running (PID {pid})")
-        return
+        if _daemon_pid_blocks_start(pid, label="Orchestrator"):
+            return
 
     if background:
         import subprocess as sp

@@ -926,6 +926,39 @@ async def test_archive_result_stores_entry(engine):
     assert stored.experiment_id is not None
 
 
+async def test_archive_result_does_not_mark_no_apply_as_applied(engine):
+    p = _safe_proposal(diff="")
+    await engine.gate_check(p)
+    await engine.evaluate(p, test_results={"pass_rate": 1.0, "skipped": True})
+    entry_id = await engine.archive_result(p)
+
+    stored = await engine.archive.get_entry(entry_id)
+    assert stored is not None
+    assert stored.status == "evaluated"
+    assert stored.test_results["skipped"] is True
+
+
+async def test_archive_result_marks_nested_runtime_trial_rollback(engine):
+    p = _safe_proposal(
+        diff="diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@\n+print('x')\n"
+    )
+    await engine.gate_check(p)
+    await engine.evaluate(
+        p,
+        test_results={
+            "pass_rate": 0.0,
+            "applied": False,
+            "runtime_field_trial": {"rolled_back": True},
+        },
+    )
+    entry_id = await engine.archive_result(p)
+
+    stored = await engine.archive.get_entry(entry_id)
+    assert stored is not None
+    assert stored.status == "rolled_back"
+    assert stored.test_results["runtime_field_trial"]["rolled_back"] is True
+
+
 async def test_archive_result_records_experiment_metadata(engine_paths):
     eng = DarwinEngine(**engine_paths)
     await eng.init()
@@ -1980,6 +2013,7 @@ async def test_apply_sealed_packet_shadow_archives_without_apply(
     stored = await engine.archive.get_entry(result.archive_entry_id)
     assert stored is not None
     assert stored.component == "dharma_swarm/safe_leaf.py"
+    assert stored.status == "evaluated"
     assert stored.test_results["sealed_packet"]["shadow"] is True
     assert stored.test_results["sealed_packet"]["files_changed"] == [
         "dharma_swarm/safe_leaf.py"

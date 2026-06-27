@@ -29,6 +29,7 @@ import {
   Globe,
   Grid3X3,
   HeartPulse,
+  IdCard,
   LayoutDashboard,
   ListTodo,
   MessageSquare,
@@ -66,6 +67,7 @@ const iconMap: Record<string, ComponentType<{ className?: string; size?: number 
   MessageSquare,
   ClipboardCheck,
   HeartPulse,
+  IdCard,
   Settings2,
 };
 

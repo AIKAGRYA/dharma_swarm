@@ -9,8 +9,8 @@ import { stagger } from "@/components/agent-workspace/shared";
 import { colors } from "@/lib/theme";
 
 export default function AgentChatPage() {
-  const { agent, config } = useAgentWorkspace();
-  const agentId = agent?.agent_slug || agent?.name || "";
+  const { agent, config, holon } = useAgentWorkspace();
+  const agentId = holon?.agent_uid || agent?.agent_slug || agent?.name || "";
   const displayName = config?.display_name || agent?.name || "Agent";
 
   const {
@@ -20,7 +20,16 @@ export default function AgentChatPage() {
     sendMessage,
     stopStreaming,
     clearMessages,
-  } = useAgentChat(agentId);
+  } = useAgentChat(
+    agentId,
+    holon?.chat?.href
+      ? {
+          mode: "holon",
+          chatHref: holon.chat.href,
+          historyHref: holon.chat.history_href,
+        }
+      : undefined,
+  );
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -40,12 +49,19 @@ export default function AgentChatPage() {
     setInput("");
   };
 
-  const suggestions = [
-    "What are you working on?",
-    "Show me your recent traces",
-    "What\u2019s your current task?",
-    "Describe your role",
-  ];
+  const suggestions = holon
+    ? [
+        "Who are you?",
+        "What receipts back your state?",
+        "What is blocked?",
+        "What should I inspect next?",
+      ]
+    : [
+        "What are you working on?",
+        "Show me your recent traces",
+        "What's your current task?",
+        "Describe your role",
+      ];
 
   return (
     <motion.div
@@ -70,7 +86,7 @@ export default function AgentChatPage() {
                 Chat with {displayName}
               </h3>
               <p className="mt-1 text-xs text-sumi-600">
-                Ask about tasks, inspect state, or give direct instructions
+                {holon ? "Review state, receipts, and blockers" : "Ask about tasks, inspect state, or give direct instructions"}
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2 mt-2">

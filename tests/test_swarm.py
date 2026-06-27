@@ -149,6 +149,42 @@ async def test_init_fast_boot_defers_default_crew_and_optional_subsystems(
 
 
 @pytest.mark.asyncio
+async def test_init_read_only_boot_skips_startup_side_effects(
+    tmp_path,
+    monkeypatch,
+):
+    import dharma_swarm.ecosystem_bridge as ecosystem_bridge
+    import dharma_swarm.startup_crew as startup_crew
+
+    state_dir = tmp_path / ".dharma"
+    calls: list[str] = []
+
+    async def _unexpected_async(*_args, **_kwargs):
+        calls.append("unexpected_async")
+        return []
+
+    def _unexpected_sync(*_args, **_kwargs):
+        calls.append("unexpected_sync")
+        return {}
+
+    monkeypatch.setattr(ecosystem_bridge, "update_manifest", _unexpected_sync)
+    monkeypatch.setattr(startup_crew, "spawn_cybernetics_crew", _unexpected_async)
+    monkeypatch.setattr(startup_crew, "create_seed_tasks", _unexpected_async)
+    monkeypatch.setattr(startup_crew, "spawn_default_crew", _unexpected_async)
+    monkeypatch.setattr(SwarmManager, "_reap_stale_running_tasks", _unexpected_async)
+    monkeypatch.setattr(SwarmManager, "_init_optional_subsystems", _unexpected_async)
+
+    swarm = SwarmManager(state_dir=state_dir, read_only_boot=True)
+    await swarm.init()
+    try:
+        assert swarm._running is True
+        assert swarm._startup_background_task is None
+        assert calls == []
+    finally:
+        await swarm.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_spawn_agent(swarm):
     agent = await swarm.spawn_agent("worker-1", role=AgentRole.CODER)
     assert agent.name == "worker-1"
@@ -491,6 +527,48 @@ async def test_spawn_latent_gold_tasks_reopens_orphaned_branches(swarm):
         min_salience=0.0,
     )
     assert second == []
+
+
+@pytest.mark.asyncio
+async def test_reap_orphaned_tasks_requeues_dead_agent_without_stale_wait(swarm):
+    task = await swarm.create_task("Fresh orphan", priority=TaskPriority.NORMAL)
+    await swarm._task_board.assign(task.id, "dead-agent")
+    await swarm._task_board.start(task.id)
+
+    reaped = await swarm.reap_orphaned_tasks(stale_minutes=30)
+    refreshed = await swarm.get_task(task.id)
+
+    assert [item.id for item in reaped] == [task.id]
+    assert refreshed is not None
+    assert refreshed.status == TaskStatus.PENDING
+    assert refreshed.assigned_to is None
+    assert refreshed.metadata["orphan_original_agent"] == "dead-agent"
+
+
+@pytest.mark.asyncio
+async def test_reap_orphaned_tasks_keeps_exhausted_failure_terminal(swarm):
+    task = await swarm.create_task("Exhausted orphan", priority=TaskPriority.NORMAL)
+    await swarm._task_board.assign(task.id, "dead-agent")
+    await swarm._task_board.start(
+        task.id,
+        metadata={
+            "retry_count": 1,
+            "max_retries": 1,
+            "last_error": "Task execution timed out after 300.0s",
+        },
+    )
+    await swarm._task_board.update_task(
+        task.id,
+        result="Task execution timed out after 300.0s",
+    )
+
+    reaped = await swarm.reap_orphaned_tasks(stale_minutes=30)
+    refreshed = await swarm.get_task(task.id)
+
+    assert [item.id for item in reaped] == [task.id]
+    assert refreshed is not None
+    assert refreshed.status == TaskStatus.FAILED
+    assert refreshed.metadata["orphan_terminal_failure"] is True
 
 
 @pytest.mark.asyncio

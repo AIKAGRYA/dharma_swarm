@@ -124,7 +124,7 @@ async def test_run_task_records_routed_response_served_route(fast_gate) -> None:
     assert result == "Implemented routed fix."
     assert runner.actual_served_provider == "openrouter"
     assert runner.actual_served_model == "qwen3-coder-live"
-    assert runner.provider_model_truth_source == "agent_runner.llm_response"
+    assert runner.provider_model_truth_source == "runtime_provider.actual_served"
 
 
 @pytest.mark.asyncio

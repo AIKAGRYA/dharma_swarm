@@ -794,6 +794,13 @@ class TerminalBridge:
         self._active_session_id = session_id
         self._active_provider_id = provider_id
         self._active_model_id = str(request.get("model", "") or adapter.get_profile(None).model_id)
+        self._ensure_session_store_entry(
+            session_id=session_id,
+            provider_id=provider_id,
+            model_id=self._active_model_id,
+            prompt=prompt,
+            request=request,
+        )
         self._emit(
             {
                 "type": "session.ack",
@@ -822,6 +829,43 @@ class TerminalBridge:
                 self._emit(payload)
         finally:
             self._active_session_id = None
+
+    def _ensure_session_store_entry(
+        self,
+        *,
+        session_id: str,
+        provider_id: str,
+        model_id: str,
+        prompt: str,
+        request: dict[str, Any],
+    ) -> None:
+        if self._session_store_has_session(session_id):
+            self._ensure_session_store_files(session_id)
+            return
+
+        title = " ".join(prompt.split())[:96]
+        parent_session_id = str(request.get("resume_session_id", "") or "").strip() or None
+        self._session_store.create_session(
+            session_id=session_id,
+            provider_id=provider_id,
+            model_id=model_id,
+            cwd=str(self._repo_root),
+            title=title,
+            parent_session_id=parent_session_id,
+        )
+
+    def _session_store_has_session(self, session_id: str) -> bool:
+        try:
+            self._session_store.load_meta(session_id)
+            return True
+        except Exception:
+            return False
+
+    def _ensure_session_store_files(self, session_id: str) -> None:
+        session_path = self._session_store.root / session_id
+        session_path.mkdir(parents=True, exist_ok=True)
+        for name in ("transcript.jsonl", "audit.jsonl", "runtime.jsonl", "snapshots.jsonl"):
+            (session_path / name).touch(exist_ok=True)
 
     async def _handle_session_catalog(self, request_id: str, request: dict[str, Any]) -> None:
         cwd = str(request.get("cwd", "") or "").strip() or None
@@ -930,7 +974,7 @@ class TerminalBridge:
         created_at = str(payload.get("resolved_at", "") or datetime.now(timezone.utc).isoformat())
         domain = str(payload.get("domain", "") or "")
         if domain == "permission_decision":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionDecisionEvent(
                     session_id=session_id,
@@ -948,7 +992,7 @@ class TerminalBridge:
             )
             return
         if domain == "permission_resolution":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionResolutionEvent(
                     session_id=session_id,
@@ -965,7 +1009,7 @@ class TerminalBridge:
             )
             return
         if domain == "permission_outcome":
-            self._session_store.append_event(
+            self._append_permission_event(
                 session_id,
                 PermissionOutcomeEvent(
                     session_id=session_id,
@@ -978,6 +1022,12 @@ class TerminalBridge:
                     metadata=dict(metadata_record),
                 ),
             )
+            return
+
+    def _append_permission_event(self, session_id: str, event: Any) -> None:
+        try:
+            self._session_store.append_event(session_id, event)
+        except FileNotFoundError:
             return
 
     def _build_workspace_snapshot(self) -> str:

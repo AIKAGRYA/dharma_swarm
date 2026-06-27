@@ -1,9 +1,10 @@
 """Holon health/observability surface (U9) — a PURE read-only projection.
 
 Given a holon name, project its current status from files/state ONLY: whether it is
-registered (identity.json exists), its model, whether a kill is pending, and how many
-non-binding compass signals it has logged. No live model calls, no animation, no
-side effects — it just reads what U7/U3a/the registry already wrote.
+registered (identity.json exists), its model, whether a kill is pending, how many
+non-binding compass signals it has logged, and whether a fresh service heartbeat
+exists. No live model calls, no animation, no side effects — it just reads what
+U7/U3a/the registry/service heartbeat ledger already wrote.
 
 Reuses the canonical owners rather than re-deriving paths:
   - ``holon_killswitch.is_kill_requested`` for the kill state (U7),
@@ -18,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dharma_swarm import holon_bridge, holon_killswitch
+from dharma_swarm.holon_service_liveness import assess_service_liveness
 
 AGENTS_ROOT = holon_bridge.AGENTS_ROOT
 
@@ -50,15 +52,19 @@ def holon_status(name: str, agents_root: Path | None = None) -> dict:
     """Project one holon's health as a plain dict (pure read; no side effects, never raises).
 
     Keys: ``name``, ``registered`` (identity.json exists), ``model`` (None if unregistered
-    or unreadable), ``kill_requested`` (via holon_killswitch), ``compass_signal_count``.
+    or unreadable), ``kill_requested`` (via holon_killswitch), ``compass_signal_count``,
+    ``service_alive``, and ``service_liveness``.
     """
     registered = (_agent_dir(name, agents_root) / "identity.json").exists()
+    service_liveness = assess_service_liveness(name, agents_root=agents_root)
     return {
         "name": name,
         "registered": registered,
         "model": _read_model(name, agents_root) if registered else None,
         "kill_requested": holon_killswitch.is_kill_requested(name, agents_root=agents_root),
         "compass_signal_count": _compass_signal_count(name, agents_root),
+        "service_alive": bool(service_liveness["service_alive"]),
+        "service_liveness": service_liveness,
     }
 
 

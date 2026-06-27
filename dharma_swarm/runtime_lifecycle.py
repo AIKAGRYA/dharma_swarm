@@ -46,6 +46,41 @@ class RuntimeLifecycle:
             return True
         return str(value or "").strip().lower() in {"false", "0", "no"}
 
+    @staticmethod
+    def _trueish(value: Any) -> bool:
+        if value is True:
+            return True
+        return str(value or "").strip().lower() in {"true", "1", "yes"}
+
+    def _mission_payload(
+        self,
+        task_metadata: dict[str, Any],
+        dispatch_metadata: dict[str, Any],
+        identity_metadata: dict[str, Any],
+        *,
+        task_id: str,
+    ) -> dict[str, str]:
+        mission_id = self._first_text(
+            task_metadata.get("mission_id"),
+            task_metadata.get("missionId"),
+            dispatch_metadata.get("mission_id"),
+            dispatch_metadata.get("missionId"),
+            identity_metadata.get("mission_id"),
+            identity_metadata.get("missionId"),
+        )
+        mission = self._first_text(
+            task_metadata.get("mission"),
+            dispatch_metadata.get("mission"),
+            identity_metadata.get("mission"),
+            mission_id,
+            self._ledger.session_id,
+            task_id,
+        )
+        return {
+            "mission_id": mission_id,
+            "mission": mission,
+        }
+
     @classmethod
     def _explicit_no_provider_execution(
         cls,
@@ -89,6 +124,48 @@ class RuntimeLifecycle:
             truth["no_provider_model_reason"] = reason
         return truth
 
+    @classmethod
+    def _explicit_unproven_provider_execution(
+        cls,
+        task_metadata: dict[str, Any],
+        dispatch_metadata: dict[str, Any],
+        identity_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        provider_execution_true = any(
+            cls._trueish(payload.get("provider_execution"))
+            for payload in (task_metadata, dispatch_metadata, identity_metadata)
+        )
+        if not provider_execution_true:
+            return {}
+        truth_source = cls._first_text(
+            task_metadata.get("provider_model_truth_source"),
+            dispatch_metadata.get("provider_model_truth_source"),
+            identity_metadata.get("provider_model_truth_source"),
+            task_metadata.get("route_truth_source"),
+            dispatch_metadata.get("route_truth_source"),
+            identity_metadata.get("route_truth_source"),
+        )
+        if not truth_source:
+            return {}
+        applicability = cls._first_text(
+            task_metadata.get("provider_model_applicability"),
+            dispatch_metadata.get("provider_model_applicability"),
+            identity_metadata.get("provider_model_applicability"),
+            "actual_served_unproven",
+        )
+        reason = cls._first_text(
+            task_metadata.get("provider_model_missing_reason"),
+            dispatch_metadata.get("provider_model_missing_reason"),
+            identity_metadata.get("provider_model_missing_reason"),
+            "provider_execution_completed_without_actual_served_runtime_evidence",
+        )
+        return {
+            "provider_execution": True,
+            "provider_model_applicability": applicability,
+            "provider_model_truth_source": truth_source,
+            "provider_model_missing_reason": reason,
+        }
+
     @staticmethod
     def _failure_no_provider_execution(failure_code: str) -> dict[str, Any]:
         normalized = str(failure_code or "").strip()
@@ -106,6 +183,54 @@ class RuntimeLifecycle:
                 f"runtime_lifecycle.{normalized}_no_provider_execution"
             ),
             "no_provider_model_reason": reason,
+        }
+
+    @staticmethod
+    def _is_terminal_status(status: str) -> bool:
+        normalized = str(status or "").strip().lower()
+        return bool(normalized) and normalized not in {
+            "accepted",
+            "assigned",
+            "claimed",
+            "created",
+            "in_progress",
+            "pending",
+            "queued",
+            "running",
+            "started",
+            "submitted",
+        }
+
+    @classmethod
+    def _terminal_unproven_provider_execution(
+        cls,
+        *,
+        status: str,
+    ) -> dict[str, Any]:
+        if not cls._is_terminal_status(status):
+            return {}
+        return {
+            "provider_execution": True,
+            "provider_model_applicability": "actual_served_unproven",
+            "provider_model_truth_source": "runtime_lifecycle.provider_execution_unproven",
+            "provider_model_missing_reason": (
+                "terminal_receipt_missing_actual_served_or_no_provider_evidence"
+            ),
+        }
+
+    @classmethod
+    def _pending_provider_execution(
+        cls,
+        *,
+        status: str,
+    ) -> dict[str, Any]:
+        if cls._is_terminal_status(status):
+            return {}
+        return {
+            "provider_execution": "pending",
+            "provider_model_applicability": "pending_execution",
+            "provider_model_truth_source": "runtime_lifecycle.provider_execution_pending",
+            "provider_model_pending_reason": "worker_execution_not_terminal",
         }
 
     @staticmethod
@@ -138,6 +263,7 @@ class RuntimeLifecycle:
         identity_metadata: dict[str, Any],
         *,
         failure_code: str = "",
+        status: str = "",
     ) -> dict[str, Any]:
         served_provider = cls._first_text(
             task_metadata.get("actual_served_provider"),
@@ -225,6 +351,16 @@ class RuntimeLifecycle:
         )
         if route and source:
             route["provider_model_truth_source"] = source
+        explicit_applicability = cls._first_text(
+            task_metadata.get("provider_model_applicability"),
+            dispatch_metadata.get("provider_model_applicability"),
+            identity_metadata.get("provider_model_applicability"),
+        )
+        explicit_missing_reason = cls._first_text(
+            task_metadata.get("provider_model_missing_reason"),
+            dispatch_metadata.get("provider_model_missing_reason"),
+            identity_metadata.get("provider_model_missing_reason"),
+        )
         explicit_no_provider = cls._explicit_no_provider_execution(
             task_metadata,
             dispatch_metadata,
@@ -235,6 +371,45 @@ class RuntimeLifecycle:
         failure_no_provider = cls._failure_no_provider_execution(failure_code)
         if failure_no_provider and not cls._has_served_provider_model(route):
             return failure_no_provider
+        if route and source and not cls._has_served_provider_model(route):
+            if cls._is_terminal_status(status):
+                route["provider_execution"] = True
+                if explicit_applicability:
+                    applicability = explicit_applicability
+                elif source == "agent_runner.provider_chain_failure":
+                    applicability = "failed_before_serve"
+                else:
+                    applicability = "actual_served_unproven"
+                route["provider_model_applicability"] = applicability
+                route["provider_model_truth_source"] = source
+                if explicit_missing_reason:
+                    reason = explicit_missing_reason
+                elif applicability == "failed_before_serve":
+                    reason = "provider_chain_failed_before_actual_served_response"
+                else:
+                    reason = "attempted_route_selected_without_actual_served_runtime_evidence"
+                route["provider_model_missing_reason"] = reason
+                return route
+            route["provider_execution"] = "pending"
+            route["provider_model_applicability"] = "pending_execution"
+            route["provider_model_truth_source"] = source
+            route["provider_model_pending_reason"] = "worker_execution_not_terminal"
+            return route
+        explicit_unproven_provider = cls._explicit_unproven_provider_execution(
+            task_metadata,
+            dispatch_metadata,
+            identity_metadata,
+        )
+        if explicit_unproven_provider and not cls._has_served_provider_model(route):
+            return explicit_unproven_provider
+        pending_provider = cls._pending_provider_execution(status=status)
+        if pending_provider and not route:
+            return pending_provider
+        terminal_unproven_provider = cls._terminal_unproven_provider_execution(
+            status=status,
+        )
+        if terminal_unproven_provider and not route:
+            return terminal_unproven_provider
         return route
 
     @staticmethod
@@ -435,11 +610,13 @@ class RuntimeLifecycle:
             td.metadata,
             identity.metadata,
             failure_code=failure_code,
+            status=status,
         )
-        mission_id = self._first_text(
-            task_meta.get("mission_id"),
-            td.metadata.get("mission_id"),
-            identity.metadata.get("mission_id"),
+        mission_payload = self._mission_payload(
+            task_meta,
+            td.metadata,
+            identity.metadata,
+            task_id=td.task_id,
         )
         active_claim = task_meta.get("active_claim")
         if not isinstance(active_claim, dict):
@@ -468,6 +645,7 @@ class RuntimeLifecycle:
                 error=error,
             )
             | route_truth
+            | mission_payload
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
@@ -482,7 +660,7 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "claim_id": identity.claim_id,
                 "failure_code": failure_code,
-                "mission_id": mission_id,
+                **mission_payload,
                 "receipt_status": status,
                 **route_truth,
             }
@@ -554,15 +732,17 @@ class RuntimeLifecycle:
             td.metadata,
             identity.metadata,
             failure_code=failure_code,
+            status=status,
         )
         requested_output = task_meta.get("requested_output", [])
         if not isinstance(requested_output, list):
             requested_output = []
         current_artifact_id = str(task_meta.get("current_artifact_id", "") or "")
-        mission_id = self._first_text(
-            task_meta.get("mission_id"),
-            td.metadata.get("mission_id"),
-            identity.metadata.get("mission_id"),
+        mission_payload = self._mission_payload(
+            task_meta,
+            td.metadata,
+            identity.metadata,
+            task_id=td.task_id,
         )
         artifact_refs = (
             [f"artifact_records:{current_artifact_id}"]
@@ -592,6 +772,7 @@ class RuntimeLifecycle:
                 result=result,
             )
             | route_truth
+            | mission_payload
             | identity.to_metadata()
             | {
                 "trace_id": identity.trace_id,
@@ -605,7 +786,7 @@ class RuntimeLifecycle:
             receipt_payload = {
                 "failure_code": failure_code,
                 "result_chars": len(result or ""),
-                "mission_id": mission_id,
+                **mission_payload,
                 "artifact_refs": artifact_refs,
                 "no_artifact_refs_reason": ""
                 if artifact_refs

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Dharma Swarm Council Synthesis Output",
+  "type": "object",
+  "required": ["council_id", "run_id", "inputs", "verdict", "top_risks", "downgraded_findings"],
+  "properties": {
+    "council_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "inputs": {"type": "array", "items": {"type": "string"}},
+    "verdict": {"enum": ["pass", "warn", "fail", "inconclusive"]},
+    "top_risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "severity", "evidence_level", "supporting_prompt_ids", "action"],
+        "properties": {
+          "title": {"type": "string"},
+          "severity": {"enum": ["low", "medium", "high", "critical"]},
+          "evidence_level": {"enum": ["E0_none", "E1_static", "E2_tested", "E3_cross_checked", "E4_regression_proven"]},
+          "supporting_prompt_ids": {"type": "array", "items": {"type": "string"}},
+          "files": {"type": "array", "items": {"type": "string"}},
+          "action": {"type": "string"}
+        }
+      }
+    },
+    "dissent": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issue", "conflicting_prompt_ids"],
+        "properties": {
+          "issue": {"type": "string"},
+          "conflicting_prompt_ids": {"type": "array", "items": {"type": "string"}},
+          "operator_resolution": {"type": "string"}
+        }
+      }
+    },
+    "downgraded_findings": {"type": "array", "items": {"type": "string"}},
+    "recommended_issues": {"type": "array", "items": {"type": "string"}},
+    "recommended_pr_actions": {"type": "array", "items": {"type": "string"}},
+    "blocked_or_inconclusive": {"type": "array", "items": {"type": "string"}}
+  }
+}

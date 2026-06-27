@@ -357,14 +357,54 @@ def test_nats_config_records_ca_pem_without_leaking_secret_material():
     redacted = prc._redacted_nats_config(config)
 
     assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n"
+    assert config.ca_source == "env_pem"
     assert config.tls_hostname == "nats.agni.example"
     assert config.credential_family == "devin"
     assert redacted["has_ca_pem"] is True
+    assert redacted["ca_source"] == "env_pem"
     assert redacted["tls_hostname"] == "nats.agni.example"
     assert redacted["tls_trust"] == "custom_ca_pem"
     assert redacted["credential_family"] == "devin"
     assert "BEGIN CERTIFICATE" not in str(redacted)
     assert "super-secret" not in str(redacted)
+
+
+def test_nats_config_loads_ca_from_env_file(tmp_path):
+    ca_path = tmp_path / "agni-ca.pem"
+    ca_path.write_text("-----BEGIN CERTIFICATE-----\nfile\n-----END CERTIFICATE-----\n", encoding="utf-8")
+
+    config = prc._nats_config(
+        {
+            "DEVIN_NATS_URL": "wss://nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "super-secret",
+            "DEVIN_NATS_CA_FILE": str(ca_path),
+        },
+        require_devin_secrets=True,
+    )
+
+    assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nfile\n-----END CERTIFICATE-----\n"
+    assert config.ca_source == "env_file"
+    assert prc._redacted_nats_config(config)["ca_source"] == "env_file"
+
+
+def test_nats_config_falls_back_to_repo_agni_ca(tmp_path, monkeypatch):
+    repo_ca_path = tmp_path / "agni-ws-ca.pem"
+    repo_ca_path.write_text("-----BEGIN CERTIFICATE-----\nrepo\n-----END CERTIFICATE-----\n", encoding="utf-8")
+    monkeypatch.setattr(prc, "AGNI_WS_CA_PATH", repo_ca_path)
+
+    config = prc._nats_config(
+        {
+            "DEVIN_NATS_URL": "wss://nats.example.test:8443",
+            "DEVIN_NATS_USER": "devin",
+            "DEVIN_NATS_PW": "super-secret",
+        },
+        require_devin_secrets=True,
+    )
+
+    assert config.ca_pem == "-----BEGIN CERTIFICATE-----\nrepo\n-----END CERTIFICATE-----\n"
+    assert config.ca_source == "repo_agni_ws_ca"
+    assert prc._redacted_nats_config(config)["ca_source"] == "repo_agni_ws_ca"
 
 
 def test_nats_config_prefers_merge_master_mike_credentials():

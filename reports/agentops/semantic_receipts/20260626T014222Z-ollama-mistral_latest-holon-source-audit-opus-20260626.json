@@ -1,0 +1,74 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "inspected local source excerpts and source digest manifest",
+      "met": true,
+      "name": "source_audit_inspected_current_holon_source"
+    }
+  ],
+  "agent_uid": "opus_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 0.62,
+  "correlation_id": "holon-source-audit-opus-20260626",
+  "created_at": "2026-06-26T01:42:22Z",
+  "critic_agent_id": "ollama:mistral:latest",
+  "evidence_refs": [
+    "packet_id=holon-source-audit-opus-20260626",
+    "/Users/dhyana/dharma_swarm/reports/sovereign_holons/standalone_holon_phase1_20260626/a2a_source_audit/prompts_micro/opus_composer-source-audit-prompt.md"
+  ],
+  "explicit_disagreement": "Final Hermes-grade claim is not proven.",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": true,
+  "missing_context": [
+    "full source tree beyond excerpts",
+    "completed multi-hour burn-in"
+  ],
+  "model_call_latency_ms": 25389,
+  "model_identity": {
+    "model": "mistral:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "mistral:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 2
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "7527496067384017290cfc17cb2e81097375c6aed5075c936eeabefdec013f9f",
+  "raw_response_sha256": "564e826d350192785af5eabb7863a96780d2647360e62cfdc59b1b7bac0c6a3d",
+  "receipt_id": "holon-source-audit-opus-20260626",
+  "recommendations": [],
+  "reply_to": "dharma.agent.opus_composer.inbox.reply.holon-source-audit-opus-20260626",
+  "review_target": "a2a:holon-source-audit-opus-20260626",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "source_audit_claim": true,
+  "summary": "Standalone package isolation and local gates are improved, but final Hermes-grade proof is blocked by dirty git, no completed multi-hour burn-in yet, no live key-backed provider burn-in, and one A2A source audit target failing.",
+  "understood_request": true,
+  "verdict": "revise"
+}

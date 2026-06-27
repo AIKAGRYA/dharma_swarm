@@ -12,6 +12,35 @@ import type {
   TaskLogEntry,
 } from "@/lib/types";
 
+export interface HolonAgentDetail {
+  schema_version: string;
+  agent_uid: string;
+  is_holon: boolean;
+  living_dock_status: string;
+  living_dock_path: string;
+  living_dock: Record<string, unknown>;
+  dialogue_status: Record<string, unknown>;
+  sanctum_status: Record<string, unknown>;
+  receipt_paths: string[];
+  chat: {
+    href: string;
+    history_href: string;
+    routing_mode: string;
+    protected_action_claim: boolean;
+  };
+  d_score: {
+    schema_version?: string;
+    generated_at?: string;
+    total_score?: number;
+    claimed_level?: string;
+    verified_level?: string;
+    hard_gate_failures?: string[];
+    evidence_paths?: string[];
+    status?: string;
+    error?: string;
+  };
+}
+
 export interface AgentDetailData {
   agent: AgentOut;
   config: AgentConfigOut;
@@ -43,6 +72,7 @@ export interface AgentDetailData {
   available_roles: string[];
   provider_status: { provider: string; available: boolean }[];
   task_history: TaskLogEntry[];
+  holon?: HolonAgentDetail | null;
 }
 
 export function useAgent(id: string) {
@@ -113,6 +143,7 @@ export function useAgent(id: string) {
     availableRoles: data?.available_roles ?? [],
     providerStatus: data?.provider_status ?? [],
     taskHistory: data?.task_history ?? [],
+    holon: data?.holon ?? null,
     isLoading,
     error,
     updateConfig,

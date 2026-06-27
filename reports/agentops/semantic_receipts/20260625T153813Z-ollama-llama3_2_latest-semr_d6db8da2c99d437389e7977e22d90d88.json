@@ -1,0 +1,71 @@
+{
+  "acceptance_gates": [
+    {
+      "condition": "true",
+      "message": "Please acknowledge the contract by writing a semantic response artifact proposing the smallest safe patch to turn model_responsive from false to true without weakening proof gates."
+    }
+  ],
+  "agent_uid": "codex_composer",
+  "authored_by_model": true,
+  "capability_match": 1.0,
+  "confidence": 1.0,
+  "correlation_id": "hermes-codex-holon-peer-contract-79b9f667f3",
+  "created_at": "2026-06-25T15:38:13Z",
+  "critic_agent_id": "ollama:llama3.2:latest",
+  "evidence_refs": [
+    "/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/hermes-codex-holon-peer-contract-79b9f667f3.json",
+    "/Users/dhyana/dharma_swarm/reports/a2a/semantic_inbox_drains/prompts/hermes-codex-holon-peer-contract-79b9f667f3.md"
+  ],
+  "explicit_disagreement": "",
+  "failure_reason": "",
+  "failure_type": "",
+  "intent_ack": true,
+  "missing_context": [
+    "Codex GPT-5.5 semantic cognition"
+  ],
+  "model_call_latency_ms": 3379,
+  "model_identity": {
+    "model": "llama3.2:latest",
+    "provider": "ollama"
+  },
+  "model_runner": {
+    "model": "llama3.2:latest",
+    "provider": "ollama",
+    "raw_payload_keys": [
+      "context",
+      "created_at",
+      "done",
+      "done_reason",
+      "eval_count",
+      "eval_duration",
+      "load_duration",
+      "model",
+      "prompt_eval_count",
+      "prompt_eval_duration",
+      "response",
+      "total_duration"
+    ],
+    "repair_attempts_allowed": 2,
+    "repair_attempts_used": 1
+  },
+  "not_claimed_agents": [
+    "codex",
+    "claude",
+    "fable",
+    "hermes",
+    "devin"
+  ],
+  "peer_model_processed_claim": true,
+  "prompt_sha256": "93db2d1854a4b58eb446abb012e4328a6e8fd4f38267e97bf72325acf85e44c6",
+  "raw_response_sha256": "a5842a1b250db0aa17e7ebc01253da866e115512830840110fa9fb1221a9decd",
+  "receipt_id": "semr_d6db8da2c99d437389e7977e22d90d88",
+  "recommendations": [],
+  "reply_to": "dharma.agent.codex_composer.inbox.reply.hermes-codex-holon-peer-contract-79b9f667f3",
+  "review_target": "a2a:hermes-codex-holon-peer-contract-79b9f667f3",
+  "schema_version": "dharma.semantic_receipt.v1",
+  "semantic_claim_basis": "validated_non_codex_model_artifact",
+  "semantic_reply_claim": true,
+  "summary": "Semantic receipt for codex_composer regarding the Hermes HOLON peer contract.",
+  "understood_request": true,
+  "verdict": "pass"
+}

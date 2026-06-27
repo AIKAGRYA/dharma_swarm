@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
 import asyncio
 import json
-import os
-import re
-import subprocess
 import time
 
 
@@ -22,6 +17,7 @@ from dharma_swarm.terminal_commands._helpers import (
     DHARMA_STATE,
     HOME,
     _get_swarm,
+    _pid_alive,
     _run,
     _tail,
 )
@@ -60,7 +56,7 @@ def cmd_loops() -> None:
     # Cascade history
     history_path = meta_dir / "cascade_history.jsonl"
     if history_path.exists():
-        lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
+        lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
         print(f"\nCascade history: {len(lines)} runs")
         for line in lines[-5:]:
             try:
@@ -77,16 +73,19 @@ def cmd_loops() -> None:
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
-            os.kill(pid, 0)
-            print(f"\nDaemon: running (PID {pid})")
-        except (ValueError, OSError):
+        except ValueError:
             print("\nDaemon: dead (stale PID file)")
+        else:
+            if _pid_alive(pid):
+                print(f"\nDaemon: running (PID {pid})")
+            else:
+                print("\nDaemon: dead (stale PID file)")
     else:
         print("\nDaemon: not running")
 
     # Domain summary (latest scores per domain)
     if history_path.exists():
-        all_lines = [l for l in history_path.read_text().strip().split("\n") if l.strip()]
+        all_lines = [line for line in history_path.read_text().strip().split("\n") if line.strip()]
         latest_by_domain: dict[str, dict] = {}
         for line in all_lines:
             try:
@@ -140,7 +139,6 @@ def cmd_invariants() -> None:
     """
     from dharma_swarm.invariants import snapshot
     import numpy as np
-    from pathlib import Path
     import json
 
     state_dir = dharma_state_dir()
@@ -173,7 +171,11 @@ def cmd_invariants() -> None:
     try:
         archive_path = state_dir / "evolution" / "archive.jsonl"
         if archive_path.exists():
-            entries = [json.loads(l) for l in archive_path.read_text().strip().split("\n") if l.strip()]
+            entries = [
+                json.loads(line)
+                for line in archive_path.read_text().strip().split("\n")
+                if line.strip()
+            ]
             if entries:
                 genome_length = max(len(entries), 9)
                 # Estimate mutation rate from recent entries
@@ -195,10 +197,10 @@ def cmd_invariants() -> None:
         if marks_path.exists():
             lines = marks_path.read_text().strip().split("\n")[-100:]  # last 100 marks
             agents = set()
-            for l in lines:
-                if l.strip():
+            for line in lines:
+                if line.strip():
                     try:
-                        m = json.loads(l)
+                        m = json.loads(line)
                         agents.add(m.get("agent", ""))
                     except json.JSONDecodeError:
                         pass
@@ -261,7 +263,7 @@ def cmd_transcendence() -> None:
             print(f"  Aggregation Lift:     {report.get('aggregation_lift', 'N/A')}")
             print(f"  Transcended:          {report.get('transcended', 'N/A')}")
         if report.get("individual_briers"):
-            print(f"\n  Individual Brier Scores:")
+            print("\n  Individual Brier Scores:")
             for src, score in sorted(report["individual_briers"].items()):
                 print(f"    {src}: {score}")
     except Exception as e:
@@ -392,8 +394,8 @@ def cmd_ui(surface: str = "list") -> None:
         lines.extend(
             [
                 "TUI",
-                f"- primary operator cockpit: dgc dashboard",
-                f"- direct module: python3 -m dharma_swarm.tui",
+                "- primary operator cockpit: dgc dashboard",
+                "- direct module: python3 -m dharma_swarm.tui",
                 f"- code: {root / 'dharma_swarm' / 'tui' / 'app.py'}",
             ]
         )
@@ -458,7 +460,6 @@ def cmd_pulse() -> None:
 
 def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
     """Run one canonical organism pulse (9 stages)."""
-    import asyncio
 
     async def _run():
         from dharma_swarm.organism_pulse import run_pulse
@@ -474,7 +475,7 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
         print(f"  Agents:   {result.agent_count}")
         if result.invariants:
             inv = result.invariants
-            print(f"  Invariants:")
+            print("  Invariants:")
             print(f"    Criticality:  {inv.criticality:.4f} ({inv.criticality_status})")
             print(f"    Closure:      {inv.closure_ratio:.4f} ({inv.closure_status})")
             print(f"    Info Retain:   {inv.info_retention:.6f} ({inv.info_retention_status})")
@@ -482,17 +483,17 @@ def cmd_organism_pulse(task: str | None = None, dry_run: bool = False) -> None:
             print(f"    Overall:      {inv.overall}")
         if result.transcendence_metrics:
             tm = result.transcendence_metrics
-            print(f"  Transcendence:")
+            print("  Transcendence:")
             print(f"    Margin:    {tm.transcendence_margin:.4f}")
             print(f"    Diversity: {tm.behavioral_div:.4f}")
             print(f"    Families:  {tm.n_model_families}")
         if result.prediction:
-            print(f"  Self-Prediction:")
+            print("  Self-Prediction:")
             print(f"    Predicted: {result.prediction.predicted_duration_ms:.0f}ms")
             if result.prediction.duration_error is not None:
                 print(f"    Error:     {result.prediction.duration_error:.0f}ms")
             if result.prediction.surprise:
-                print(f"    SURPRISE detected!")
+                print("    SURPRISE detected!")
         print(f"  Stages: {result.stage_timings}")
 
     asyncio.run(_run())
@@ -504,10 +505,13 @@ def cmd_daemon_status() -> None:
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
-            os.kill(pid, 0)
-            print(f"  status: running (PID {pid})")
-        except (ValueError, OSError):
+        except ValueError:
             print("  status: stale PID file")
+        else:
+            if _pid_alive(pid):
+                print(f"  status: running (PID {pid})")
+            else:
+                print("  status: stale PID file")
     else:
         print("  status: not running")
     pulse_count, last_pulse, pulse_source = _canonical_pulse_summary()

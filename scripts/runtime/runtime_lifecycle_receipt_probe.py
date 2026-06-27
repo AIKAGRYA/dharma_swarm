@@ -19,12 +19,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dharma_swarm.models import Task, TaskDispatch, TopologyType
-from dharma_swarm.orchestrator import Orchestrator
-from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
-from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeStateStore, TaskClaim
-from dharma_swarm.session_ledger import SessionLedger
-from dharma_swarm.spine.identity import ExecutionIdentity
+from dharma_swarm.models import Task, TaskDispatch, TopologyType  # noqa: E402
+from dharma_swarm.orchestrator import Orchestrator  # noqa: E402
+from dharma_swarm.runtime_lifecycle import RuntimeLifecycle  # noqa: E402
+from dharma_swarm.runtime_state import (  # noqa: E402
+    ArtifactRecord,
+    DelegationRun,
+    RuntimeStateStore,
+    TaskClaim,
+)
+from dharma_swarm.session_ledger import SessionLedger  # noqa: E402
+from dharma_swarm.spine.identity import ExecutionIdentity  # noqa: E402
 
 
 DEFAULT_DB = Path(os.environ.get("DHARMA_RUNTIME_DB", "/Users/dhyana/.dharma/state/runtime.db"))
@@ -48,8 +53,21 @@ def _route_metadata(
     actual_served_provider: str = "",
     actual_served_model: str = "",
     provider_model_truth_source: str = "",
-) -> dict[str, str]:
-    metadata: dict[str, str] = {}
+    no_provider_execution: bool = False,
+    no_provider_model_reason: str = "",
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    if no_provider_execution:
+        metadata.update(
+            provider_execution=False,
+            provider_model_applicability="not_applicable",
+            provider_model_truth_source="runtime_control.no_provider_execution",
+            no_provider_model_reason=(
+                str(no_provider_model_reason or "").strip()
+                or "runtime_lifecycle_receipt_probe_no_provider_execution"
+            ),
+        )
+        return metadata
     selected_provider_text = str(selected_provider or "").strip()
     selected_model_text = str(selected_model or "").strip()
     served_provider_text = str(actual_served_provider or "").strip()
@@ -161,6 +179,8 @@ async def run_probe(
     actual_served_provider: str = "",
     actual_served_model: str = "",
     provider_model_truth_source: str = "",
+    no_provider_execution: bool = False,
+    no_provider_model_reason: str = "",
     latest_limit: int = 50,
 ) -> dict[str, Any]:
     now = _utc_now()
@@ -179,6 +199,8 @@ async def run_probe(
         actual_served_provider,
         actual_served_model,
         provider_model_truth_source,
+        no_provider_execution=no_provider_execution,
+        no_provider_model_reason=no_provider_model_reason,
     )
 
     payload_path, manifest_path, checksum = _write_probe_artifact(
@@ -282,6 +304,8 @@ async def run_probe(
         "actual_served_provider": route_metadata.get("actual_served_provider", ""),
         "actual_served_model": route_metadata.get("actual_served_model", ""),
         "provider_model_truth_source": route_metadata.get("provider_model_truth_source", ""),
+        "provider_execution": route_metadata.get("provider_execution", ""),
+        "no_provider_model_reason": route_metadata.get("no_provider_model_reason", ""),
         "payload_path": str(payload_path),
         "manifest_path": str(manifest_path),
         "checksum_sha256": checksum,
@@ -325,6 +349,15 @@ async def run_sync_store_probe(
         actual_served_model,
         provider_model_truth_source,
     )
+    if not route_metadata:
+        route_metadata = {
+            "provider_execution": False,
+            "provider_model_applicability": "not_applicable",
+            "provider_model_truth_source": "runtime_control.no_provider_execution",
+            "no_provider_model_reason": (
+                "runtime_state_sync_receipt_probe_no_provider_execution"
+            ),
+        }
     identity = ExecutionIdentity.new(
         task_id=clean_task_id,
         run_id=clean_run_id,
@@ -478,13 +511,26 @@ class _ProbeRunner:
         actual_served_provider: str = "",
         actual_served_model: str = "",
         provider_model_truth_source: str = "",
+        no_provider_execution: bool = False,
+        no_provider_model_reason: str = "",
         runner_error: str = "",
     ) -> None:
         self.actual_served_provider = str(actual_served_provider or "").strip()
         self.actual_served_model = str(actual_served_model or "").strip()
-        self.provider_model_truth_source = str(
-            provider_model_truth_source or "runtime_lifecycle_receipt_probe.runner_actual_served"
-        ).strip()
+        if no_provider_execution:
+            self.provider_execution = False
+            self.provider_model_applicability = "not_applicable"
+            self.provider_model_truth_source = str(
+                provider_model_truth_source or "runtime_control.no_provider_execution"
+            ).strip()
+            self.no_provider_model_reason = str(
+                no_provider_model_reason
+                or "runtime_lifecycle_receipt_probe_no_provider_execution"
+            ).strip()
+        else:
+            self.provider_model_truth_source = str(
+                provider_model_truth_source or "runtime_lifecycle_receipt_probe.runner_actual_served"
+            ).strip()
         self.runner_error = str(runner_error or "").strip()
         self.served_provider = self.actual_served_provider
         self.served_model = self.actual_served_model
@@ -515,8 +561,11 @@ async def run_orchestrator_spine_probe(
     actual_served_provider: str = "",
     actual_served_model: str = "",
     provider_model_truth_source: str = "",
+    no_provider_execution: bool = False,
+    no_provider_model_reason: str = "runtime_lifecycle_receipt_probe_no_provider_execution",
     topology: str = "pipeline",
     runner_error: str = "",
+    preseed_artifact: bool = True,
     latest_limit: int = 50,
 ) -> dict[str, Any]:
     now = _utc_now()
@@ -539,11 +588,15 @@ async def run_orchestrator_spine_probe(
         "",
         "",
         "",
+        no_provider_execution=no_provider_execution,
+        no_provider_model_reason=no_provider_model_reason,
     )
     runner = _ProbeRunner(
         actual_served_provider=actual_served_provider,
         actual_served_model=actual_served_model,
         provider_model_truth_source=provider_model_truth_source,
+        no_provider_execution=no_provider_execution,
+        no_provider_model_reason=no_provider_model_reason,
         runner_error=runner_error,
     )
     probe_max_retries = 1 if runner.runner_error else 0
@@ -584,9 +637,9 @@ async def run_orchestrator_spine_probe(
                 "claim_expires_at_epoch": int(now.timestamp()) + 3600,
             },
             "requested_output": ["orchestrator_spine_dispatch_probe"],
-            "current_artifact_id": artifact_id,
             "retry_count": 0,
             "max_retries": probe_max_retries,
+            **({"current_artifact_id": artifact_id} if preseed_artifact else {}),
         },
     )
     dispatch = TaskDispatch(
@@ -618,20 +671,21 @@ async def run_orchestrator_spine_probe(
         task=task,
         require=True,
     )
-    await orchestrator._runtime_lifecycle.record_artifact(
-        task=task,
-        artifact_id=artifact_id,
-        artifact_kind="orchestrator_spine_dispatch_probe",
-        payload_path=payload_path,
-        manifest_path=manifest_path,
-        checksum=checksum,
-        run_id=clean_run_id,
-        metadata={
-            "mission_id": mission_id,
-            "probe": "orchestrator_spine_dispatch_probe",
-        },
-        require_identity=True,
-    )
+    if preseed_artifact:
+        await orchestrator._runtime_lifecycle.record_artifact(
+            task=task,
+            artifact_id=artifact_id,
+            artifact_kind="orchestrator_spine_dispatch_probe",
+            payload_path=payload_path,
+            manifest_path=manifest_path,
+            checksum=checksum,
+            run_id=clean_run_id,
+            metadata={
+                "mission_id": mission_id,
+                "probe": "orchestrator_spine_dispatch_probe",
+            },
+            require_identity=True,
+        )
 
     previous = os.environ.get("DHARMA_SPINE_DISPATCH")
     os.environ["DHARMA_SPINE_DISPATCH"] = "1"
@@ -658,6 +712,8 @@ async def run_orchestrator_spine_probe(
         "session_id": clean_session_id,
         "mission_id": mission_id,
         "artifact_id": artifact_id,
+        "task_result_artifact_id": f"artifact_task_result_{clean_task_id}",
+        "preseed_artifact": preseed_artifact,
         "topology": probe_topology.value,
         "selected_provider": route_metadata.get("selected_provider", ""),
         "selected_model": route_metadata.get("selected_model", ""),
@@ -666,9 +722,14 @@ async def run_orchestrator_spine_probe(
         "runner_error": runner.runner_error,
         "provider_model_truth_source": (
             runner.provider_model_truth_source
-            if runner.actual_served_provider and runner.actual_served_model
+            if (
+                (runner.actual_served_provider and runner.actual_served_model)
+                or no_provider_execution
+            )
             else route_metadata.get("provider_model_truth_source", "")
         ),
+        "provider_execution": route_metadata.get("provider_execution", ""),
+        "no_provider_model_reason": route_metadata.get("no_provider_model_reason", ""),
         "payload_path": str(payload_path),
         "manifest_path": str(manifest_path),
         "checksum_sha256": checksum,
@@ -696,6 +757,8 @@ async def run_runtime_lifecycle_dropoff_probe(
     actual_served_provider: str = "",
     actual_served_model: str = "",
     provider_model_truth_source: str = "",
+    no_provider_execution: bool = False,
+    no_provider_model_reason: str = "runtime_lifecycle_receipt_probe_no_provider_execution",
     latest_limit: int = 50,
 ) -> dict[str, Any]:
     """Exercise the runtime-lifecycle dispatch-dropoff path with no artifact."""
@@ -1143,6 +1206,15 @@ def main() -> int:
     parser.add_argument("--actual-served-model", default="")
     parser.add_argument("--provider-model-truth-source", default="")
     parser.add_argument(
+        "--no-provider-execution",
+        action="store_true",
+        help="stamp explicit no-provider execution truth for a zero-cost control probe",
+    )
+    parser.add_argument(
+        "--no-provider-model-reason",
+        default="runtime_lifecycle_receipt_probe_no_provider_execution",
+    )
+    parser.add_argument(
         "--topology",
         choices=("pipeline", "fan-out", "fan_out"),
         default="pipeline",
@@ -1152,6 +1224,11 @@ def main() -> int:
         "--runner-error",
         default="",
         help="orchestrator-spine probe error to raise from the local runner",
+    )
+    parser.add_argument(
+        "--no-preseed-artifact",
+        action="store_true",
+        help="orchestrator-spine probe should rely on the real success artifact path",
     )
     parser.add_argument("--latest-limit", type=int, default=50)
     parser.add_argument(
@@ -1209,6 +1286,8 @@ def main() -> int:
                 actual_served_provider=args.actual_served_provider,
                 actual_served_model=args.actual_served_model,
                 provider_model_truth_source=args.provider_model_truth_source,
+                no_provider_execution=args.no_provider_execution,
+                no_provider_model_reason=args.no_provider_model_reason,
                 latest_limit=args.latest_limit,
             )
         )
@@ -1273,8 +1352,11 @@ def main() -> int:
                 actual_served_provider=args.actual_served_provider,
                 actual_served_model=args.actual_served_model,
                 provider_model_truth_source=args.provider_model_truth_source,
+                no_provider_execution=args.no_provider_execution,
+                no_provider_model_reason=args.no_provider_model_reason,
                 topology=args.topology,
                 runner_error=args.runner_error,
+                preseed_artifact=not args.no_preseed_artifact,
                 latest_limit=args.latest_limit,
             )
         )
@@ -1297,6 +1379,8 @@ def main() -> int:
                 actual_served_provider=args.actual_served_provider,
                 actual_served_model=args.actual_served_model,
                 provider_model_truth_source=args.provider_model_truth_source,
+                no_provider_execution=args.no_provider_execution,
+                no_provider_model_reason=args.no_provider_model_reason,
                 latest_limit=args.latest_limit,
             )
         )

@@ -87,6 +87,32 @@ from dharma_swarm.telemetry_plane import (
 logger = logging.getLogger(__name__)
 
 
+class ProviderChainExecutionError(RuntimeError):
+    """Raised when a routed provider chain exhausts all candidate lanes."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        chain: list[str],
+        failure_trace: list[dict[str, Any]],
+        selected_provider: str,
+        selected_model: str,
+        planned_provider: str,
+        planned_model: str,
+    ) -> None:
+        super().__init__(message)
+        self.chain = list(chain)
+        self.failure_trace = [dict(item) for item in failure_trace]
+        self.selected_provider = selected_provider
+        self.selected_model = selected_model
+        self.planned_provider = planned_provider
+        self.planned_model = planned_model
+        last_attempt = self.failure_trace[-1] if self.failure_trace else {}
+        self.last_attempt_provider = str(last_attempt.get("provider") or "").strip()
+        self.last_attempt_model = str(last_attempt.get("model") or "").strip()
+
+
 class LLMProvider(BaseProvider):
     """Abstract base for all LLM providers.
 
@@ -1967,6 +1993,16 @@ class ModelRouter:
             else:
                 self._telemetry = None
 
+    def attach_telemetry(
+        self,
+        telemetry: TelemetryPlaneStore,
+        *,
+        enabled: bool = True,
+    ) -> None:
+        """Attach the canonical runtime telemetry store after router creation."""
+        self._telemetry = telemetry
+        self._telemetry_enabled = bool(enabled)
+
     @staticmethod
     def _parse_provider_type(raw: str) -> ProviderType | None:
         if not raw:
@@ -2177,6 +2213,7 @@ class ModelRouter:
                 "planned_provider": planned_provider.value,
                 "planned_model": planned_model,
                 "candidate_chain": [provider.value for provider in chain],
+                "route_trace": list(decision.route_trace),
             },
         )
         try:
@@ -2220,6 +2257,45 @@ class ModelRouter:
                 "latency_ms": round(float(latency_ms), 3),
                 "total_tokens": int(total_tokens),
                 "error": error or "",
+            },
+        )
+        try:
+            await self._telemetry.record_external_outcome(record)
+        except Exception:
+            return
+
+    async def _record_provider_attempt_started(
+        self,
+        *,
+        route_request: ProviderRouteRequest,
+        provider: ProviderType,
+        model: str,
+        route_path: str,
+        task_signature: str,
+    ) -> None:
+        if self._telemetry is None:
+            return
+        scope = self._telemetry_scope(route_request)
+        record = ExternalOutcomeRecord(
+            outcome_id=self._telemetry_id("outcome"),
+            outcome_kind="provider_attempt",
+            value=0.0,
+            unit="success_ratio",
+            confidence=1.0,
+            status="started",
+            subject_id=provider.value,
+            summary=f"{route_request.action_name} via {provider.value} started",
+            session_id=scope["session_id"],
+            task_id=scope["task_id"],
+            run_id=scope["run_id"],
+            metadata={
+                "provider": provider.value,
+                "model": model,
+                "route_path": route_path,
+                "task_signature": task_signature,
+                "latency_ms": 0.0,
+                "total_tokens": 0,
+                "error": "",
             },
         )
         try:
@@ -2276,6 +2352,7 @@ class ModelRouter:
                 "estimated_cost_usd": estimated_cost_usd,
                 "response_model": response_model or "",
                 "failure_trace": list(failure_trace),
+                "route_trace": list(decision.route_trace),
             },
         )
         completion_outcome = ExternalOutcomeRecord(
@@ -2798,6 +2875,13 @@ class ModelRouter:
 
             try:
                 attempt_started = time.monotonic()
+                await self._record_provider_attempt_started(
+                    route_request=enriched_request,
+                    provider=provider_type,
+                    model=reward_model,
+                    route_path=decision.path.value,
+                    task_signature=task_signature,
+                )
                 response = await run_with_retry(
                     lambda: self.complete(provider_type, request_for_provider),
                     policy=self._retry_policy,
@@ -3040,8 +3124,16 @@ class ModelRouter:
         trace_preview = "; ".join(
             f"{item.get('provider')}:{item.get('error')}" for item in failure_trace[-6:]
         )
-        raise RuntimeError(
-            f"All providers failed in chain {[item.value for item in chain]} :: {trace_preview}"
+        chain_values = [item.value for item in chain]
+        last_attempt = failure_trace[-1] if failure_trace else {}
+        raise ProviderChainExecutionError(
+            f"All providers failed in chain {chain_values} :: {trace_preview}",
+            chain=chain_values,
+            failure_trace=failure_trace,
+            selected_provider=str(last_attempt.get("provider") or planned_provider.value),
+            selected_model=str(last_attempt.get("model") or planned_model),
+            planned_provider=planned_provider.value,
+            planned_model=planned_model,
         )
 
 

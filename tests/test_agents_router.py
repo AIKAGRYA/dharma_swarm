@@ -58,6 +58,20 @@ class _DummySwarm:
         ]
 
 
+class _HolonSwarm:
+    async def list_agents(self) -> list[AgentState]:
+        return [
+            AgentState(
+                id="codex_composer",
+                name="codex_composer",
+                role=AgentRole.ORCHESTRATOR,
+                status=AgentStatus.IDLE,
+                provider="anthropic",
+                model="claude-opus-4-8",
+            )
+        ]
+
+
 class _EmptyTraceStore:
     async def get_recent(self, limit: int = 200) -> list[object]:
         return []
@@ -184,3 +198,38 @@ def test_agent_detail_restores_dashboard_contract(
     assert body["health_stats"]["total_actions"] == 0
     assert body["assigned_tasks"] == []
     assert body["fitness_history"] == []
+
+
+def test_agent_detail_includes_living_dock_holon_metadata(
+    tmp_path,
+    monkeypatch,
+    isolated_shared_ontology,
+) -> None:
+    from dharma_swarm import holon_bridge
+
+    agents_root = tmp_path / "agents"
+    home = agents_root / "codex_composer"
+    (home / "dialogue" / "conversation_receipts").mkdir(parents=True)
+    (home / "sanctum" / "receipts").mkdir(parents=True)
+    (home / "identity.json").write_text('{"agent_uid":"codex_composer"}\n', encoding="utf-8")
+    (home / "living_agent.json").write_text('{"agent_uid":"codex_composer"}\n', encoding="utf-8")
+    (home / "talk_receipts.jsonl").write_text(
+        '{"schema_version":"dharma.holon_conversation_receipt.v1"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(holon_bridge, "AGENTS_ROOT", agents_root)
+    monkeypatch.setattr(agents_router, "_get_swarm", lambda: _HolonSwarm())
+    monkeypatch.setattr(agents_router, "_get_trace_store", lambda: _EmptyTraceStore())
+    monkeypatch.setattr(agents_router, "_get_agent_registry", lambda: _EmptyAgentRegistry())
+    client = _client()
+
+    resp = client.get("/api/agents/codex_composer/detail")
+
+    assert resp.status_code == 200
+    holon = resp.json()["data"]["holon"]
+    assert holon["schema_version"] == "dharma.agent_detail_holon.v1"
+    assert holon["agent_uid"] == "codex_composer"
+    assert holon["chat"]["href"] == "/holon/codex_composer/chat"
+    assert holon["chat"]["history_href"] == "/holon/codex_composer/chat/history"
+    assert holon["chat"]["protected_action_claim"] is False
+    assert holon["living_dock_path"] == str(home)

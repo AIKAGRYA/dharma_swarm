@@ -1,0 +1,397 @@
+{
+  "schema_version": "latent_gold_registry.v1",
+  "generated_at": "2026-06-23Tlocal",
+  "baseline": {
+    "origin_main": "4137e83c3d0e6fb18a9182d3842c6a34b77a585c",
+    "origin_main_label": "Arena v1 + Council + zero-weight orchestrator landed",
+    "local_checkout": "/Users/dhyana/dharma_swarm",
+    "local_branch": "telos-ai-seed-v0-from-sandbox",
+    "gh_auth": "available_in_current_probe; earlier checkpoint said DOWN",
+    "active_tracks_on_origin_main": 7,
+    "max_active_on_origin_main": 10,
+    "objective_coverage": 0.33,
+    "active_track_serves": [
+      "substrate-nativeness"
+    ]
+  },
+  "census": {
+    "local_branches": 208,
+    "origin_refs_observed": 261,
+    "open_prs_observed": 9,
+    "stashes": 70,
+    "worktrees": 13,
+    "dirty_porcelain_entries_primary_checkout": 211,
+    "dharma_total": "344G",
+    "dharma_lancedb": "243G",
+    "dharma_vectors_db": "~49G",
+    "dharma_conversation_log": "31G",
+    "stop_build_sentinel": "present"
+  },
+  "branch_category_counts": {
+    "already_on_main": 21,
+    "local_only_valuable": 21,
+    "unpushed_ahead": 9,
+    "stale_duplicate": 62,
+    "orphaned_upstream_gone": 38,
+    "needs_operator_decision": 57
+  },
+  "canonicality_labels": [
+    "on-main",
+    "open-pr",
+    "local-only",
+    "dirty",
+    "stash",
+    "off-repo",
+    "uncertain",
+    "candidate"
+  ],
+  "records": [
+    {
+      "id": "operator-coherence-cockpit-control-tower-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "Operator Coherence Cockpit/Backplane",
+      "canonicality": "dirty",
+      "status": "candidate_high_priority_not_canonical",
+      "risk": "dirty_checkout_truth_may_be_mistaken_for_canonical",
+      "evidence": [
+        "/Users/dhyana/dharma_swarm/api/routers/operator_coherence.py",
+        "/Users/dhyana/dharma_swarm/dashboard/src/components/operator-coherence/",
+        "/Users/dhyana/dharma_swarm/reports/governance/operator_coherence_cockpit.json",
+        "/Users/dhyana/worktrees/dharma_swarm_reconcile_20260622/reports/governance/lane_admission/OPERATOR_COHERENCE_COCKPIT_LANE_PACKET_2026-06-23.md"
+      ],
+      "proposal": "Extract to a dedicated review branch, rerun verification, then admit as a successor/control-tower track rather than hiding it inside runtime truth.",
+      "next_action": "Create clean extraction branch governance/operator-coherence-cockpit-20260623 after operator approval.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "orchestration-arena-v1-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "Arena/Orchestration/Forge",
+      "canonicality": "on-main",
+      "status": "landed_not_governance_admitted",
+      "risk": "dgm_substrate_exists_without_explicit_active_track",
+      "evidence": [
+        "origin/main@4137e83c3d0e6fb18a9182d3842c6a34b77a585c",
+        "#670 coordination/council/arena substrate on-main",
+        "docs/architecture/LEARNED_AUDITABLE_ORCHESTRATOR_SPEC.md"
+      ],
+      "proposal": "Admit the landed Arena v1 / Council / zero-weight orchestrator substrate as an explicit active successor track.",
+      "next_action": "Draft active-track admission entry anchored to origin/main and frozen arena receipts.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "revenue-external-human-receipt-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "Revenue",
+      "canonicality": "candidate",
+      "status": "objective_gap_candidate",
+      "risk": "portfolio_objective_coverage_0_33_revenue_uncovered",
+      "evidence": [
+        "canonical ACTIVE_TRACK.yaml serves only substrate-nativeness",
+        "/Users/dhyana/dharma_swarm_cashclaw",
+        "cashclaw/revenue-hydra-v1",
+        "devin/1778426210-ship-revenue-wedge-report"
+      ],
+      "proposal": "Admit only a narrow revenue lane gated by an external-human action or cash receipt, not a broad infrastructure lane.",
+      "next_action": "Preserve CashClaw overlay, then create a tiny leased revenue pilot with real receipt criteria.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "research-depth-verified-sensemaking-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "Research-depth",
+      "canonicality": "candidate",
+      "status": "objective_gap_candidate",
+      "risk": "portfolio_objective_coverage_0_33_research_depth_uncovered",
+      "evidence": [
+        "#663 Chetana MarkItDown on-main",
+        "lane/palantir-pilot",
+        "research/persistent-agents-2026-05",
+        "research/moltbook-investigation",
+        "docs/adr-008-ontology-api-grammar"
+      ],
+      "proposal": "Promote verified sensemaking: ingest, claim extraction, decorrelated verification, and paper-grade claim packets.",
+      "next_action": "Pick one corpus and one verifier path; do not count mere ingestion as research-depth.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "bronze-boundary-ledger-throat-consumer-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "Bronze/Ingest/Chetana/MarkItDown",
+      "canonicality": "candidate",
+      "status": "bridge_enabler",
+      "risk": "bronze_sources_without_durable_throat_consumer",
+      "evidence": [
+        "/Users/dhyana/ds_supplychain_slice",
+        "loop-closure/supplychain-bronze-20260620",
+        "#648 mostly landed; local tip 11de04f not on origin/main"
+      ],
+      "proposal": "Build a read-only ledger drain to safety/council/warrant receipts; no dispatch authority.",
+      "next_action": "Diff the single local unmerged commit and port only unique consumer/test/receipt value.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "a2a-nats-live-readiness-2026-06",
+      "kind": "successor_track_proposal",
+      "theme": "A2A/NATS",
+      "canonicality": "dirty",
+      "status": "prod_hardening_candidate",
+      "risk": "static_specs_can_mask_missing_live_ack_proof",
+      "evidence": [
+        "/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618",
+        "runtime-truth-nats-2026-06 active track"
+      ],
+      "proposal": "Keep NATS active and add a live ack-bearing readiness lane with stale-proof suppression.",
+      "next_action": "Preserve dirty NATS preflight, then extract topology/probe pieces into fresh receipts.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "cashclaw/revenue-hydra-v1",
+      "kind": "branch_worktree",
+      "theme": "Revenue",
+      "canonicality": "dirty",
+      "status": "highest_revenue_candidate_but_not_canonical",
+      "risk": "current_proof_reports_zero_cash_and_dirty_overlay",
+      "evidence": [
+        "/Users/dhyana/dharma_swarm_cashclaw",
+        "branch c487d2725",
+        "dirty worktree with large receipt overlay"
+      ],
+      "proposal": "Preserve and mine as the primary revenue candidate, but require a real external-human/cash receipt before active admission.",
+      "next_action": "Operator grants a small revenue lease and decides which receipt is sufficient.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "forge-v1/tokenbroker-scoreboard-20260620",
+      "kind": "branch_worktree",
+      "theme": "Arena/Orchestration/Forge",
+      "canonicality": "local-only",
+      "status": "clean_noncanonical",
+      "risk": "valuable_arena_arm_not_origin_backed",
+      "evidence": [
+        "/Users/dhyana/ds_forge_v1_scoreboard",
+        "/Users/dhyana/.dharma/preservation/dgm_reconciliation_20260622/git/forge_v1_tokenbroker_branch.bundle"
+      ],
+      "proposal": "Preserve, then port as an experimental Arena arm with best-single-model controls.",
+      "next_action": "Rebase/port only after off-machine preservation is confirmed.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "ds_supplychain_slice",
+      "kind": "worktree",
+      "theme": "Bronze/Ingest/Chetana/MarkItDown",
+      "canonicality": "local-only",
+      "status": "one_commit_residue_after_partial_landing",
+      "risk": "frontier_council_throat_value_may_be_lost_or_double_counted",
+      "evidence": [
+        "/Users/dhyana/ds_supplychain_slice",
+        "local tip 11de04f",
+        "#648 mostly landed at older head"
+      ],
+      "proposal": "Fold the unique local commit if it still adds unsuperseded frontier-council/receipt value.",
+      "next_action": "Diff 11de04f against origin/main; port only unique value.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "fix/provider-discoverability",
+      "kind": "open_pr_plus_dirty_overlay",
+      "theme": "Cybernetic Closure & Routing",
+      "canonicality": "open-pr",
+      "status": "open_pr_675_with_local_dirty_overlay",
+      "risk": "clean_pr_truth_and_dirty_overlay_must_not_be_mixed",
+      "evidence": [
+        "PR #675",
+        "branch fix/provider-discoverability",
+        "dirty overlay reported by branch scout"
+      ],
+      "proposal": "Review PR head separately; preserve and compare local overlay before taking any promotion action.",
+      "next_action": "Run PR checks after operator approval; do not bundle local overlay into the PR blindly.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "helm/worldclass-20260612",
+      "kind": "branch_worktree",
+      "theme": "Operator UX / Terminal / Helm",
+      "canonicality": "dirty",
+      "status": "large_unpushed_lane",
+      "risk": "broad_visual_runtime_lane_can_conflict_with_cockpit_ui_lane",
+      "evidence": [
+        "/Users/dhyana/dharma_helm_build",
+        "ahead of upstream; dirty files",
+        "reports/terminal/HELM_CLOSEOUT_2026-06-16.md"
+      ],
+      "proposal": "Preserve, then split visual/UX material from runtime/provider material if revived.",
+      "next_action": "Operator decides whether Helm/terminal UX is current priority after cockpit V2.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "telos-ai-seed-v0-from-sandbox",
+      "kind": "dirty_checkout",
+      "theme": "Telos/Holon/Cockpit",
+      "canonicality": "dirty",
+      "status": "primary_dirty_candidate_checkout",
+      "risk": "211_dirty_entries_and_dirty_ACTIVE_TRACK_can_pollute_canonical_truth",
+      "evidence": [
+        "/Users/dhyana/dharma_swarm",
+        "branch telos-ai-seed-v0-from-sandbox",
+        "211 porcelain entries"
+      ],
+      "proposal": "Use as candidate source only. Extract cockpit, holon, A2A, research, and runtime slices into separate review branches.",
+      "next_action": "Start with cockpit extraction; preserve all overlays first.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "lane/palantir-pilot",
+      "kind": "branch",
+      "theme": "Research-depth",
+      "canonicality": "local-only",
+      "status": "high_value_research_candidate",
+      "risk": "research_value_not_yet_receipted_as_verified_claims",
+      "evidence": [
+        "branch lane/palantir-pilot",
+        "Palantir pilot agent + research toolchain"
+      ],
+      "proposal": "Use as research-depth candidate if it can produce verified source cards and claim packets.",
+      "next_action": "Run a small claim-verification pilot after preservation.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "research/persistent-agents-2026-05",
+      "kind": "branch_and_stash_cluster",
+      "theme": "Research-depth",
+      "canonicality": "local-only",
+      "status": "unpushed_research_candidate",
+      "risk": "survey_value_without_current_verifier_gate",
+      "evidence": [
+        "branch research/persistent-agents-2026-05",
+        "stash@{31}",
+        "stash@{32}"
+      ],
+      "proposal": "Mine only if it feeds verified sensemaking or Arena task design.",
+      "next_action": "Preserve and index stashes; promote source-card subset only.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "docs/adr-008-ontology-api-grammar",
+      "kind": "branch",
+      "theme": "Research-depth / Ontology",
+      "canonicality": "local-only",
+      "status": "orphaned_upstream_gone_high_signal",
+      "risk": "valuable_ontology_design_can_be_lost_in_ref_hygiene",
+      "evidence": [
+        "branch docs/adr-008-ontology-api-grammar"
+      ],
+      "proposal": "Fold ADR if not superseded by current semantic commons and ontology docs.",
+      "next_action": "Compare to on-main ontology docs and preserve as source-card evidence.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "stash_cluster_telos_cockpit",
+      "kind": "stash_cluster",
+      "theme": "Operator Coherence Cockpit/Backplane",
+      "canonicality": "stash",
+      "status": "preserved_local_stash_candidate",
+      "risk": "stashed_design_work_can_conflict_with_current_cockpit_v2",
+      "evidence": [
+        "stash@{8}: codex-telos-ontology-wip",
+        "stash@{9}: what-not-to-do mandala cockpit attempt 2026-06-16"
+      ],
+      "proposal": "Mine concepts only after current cockpit V2 remains authoritative for UI.",
+      "next_action": "Index patches and mark as design background, not implementation authority.",
+      "operator_decision_needed": false
+    },
+    {
+      "id": "stash_cluster_command_plane_nav",
+      "kind": "stash_cluster",
+      "theme": "Operator UX / Terminal / Helm",
+      "canonicality": "stash",
+      "status": "multi_round_ui_experiment_cluster",
+      "risk": "old UI experiments can create competing front doors",
+      "evidence": [
+        "stash@{22} through stash@{30} on chore/command-plane-nav-trim"
+      ],
+      "proposal": "Keep as preserved history; mine only if cockpit V2 has an explicit UX gap.",
+      "next_action": "Do not revive until after cockpit/backplane canonicalization.",
+      "operator_decision_needed": false
+    },
+    {
+      "id": ".dharma/preservation/dgm_reconciliation_20260622",
+      "kind": "preservation_packet",
+      "theme": "Preservation / Safety",
+      "canonicality": "off-repo",
+      "status": "local_preservation_exists_off_machine_uncertain",
+      "risk": "local_packet_is_not_equivalent_to_off_machine_safety",
+      "evidence": [
+        "/Users/dhyana/.dharma/preservation/dgm_reconciliation_20260622",
+        "70 stash patches",
+        "all_local_branches_and_stash_refs.bundle"
+      ],
+      "proposal": "Treat as the local safety floor. Confirm off-machine copy before any archive-after-preserve decisions.",
+      "next_action": "Operator verifies Agni/GitHub/off-machine copy path.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": ".dharma/storage_objects",
+      "kind": "storage_policy_subject",
+      "theme": "Storage / Preservation",
+      "canonicality": "off-repo",
+      "status": "large_storage_objects_do_not_modify",
+      "risk": "lancedb_vectors_conversation_log_are_large_hot_storage",
+      "evidence": [
+        "/Users/dhyana/.dharma/lancedb 243G",
+        "/Users/dhyana/.dharma/vectors.db ~49G",
+        "/Users/dhyana/.dharma/conversation_log 31G"
+      ],
+      "proposal": "Create storage policy and off-machine plan; do not compact or mutate during reconciliation.",
+      "next_action": "Metadata-only storage policy; no storage-object manipulation in cleanup swarm.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": ".dharma/STOP_BUILD",
+      "kind": "sentinel",
+      "theme": "Safety / Test Regression",
+      "canonicality": "off-repo",
+      "status": "present_unresolved",
+      "risk": "dgm_should_not_learn_from_regression_uncleared_state",
+      "evidence": [
+        "/Users/dhyana/.dharma/STOP_BUILD: Test regression at 2026-05-30T22:40:52.959006"
+      ],
+      "proposal": "Treat as unresolved until an operator-controlled verification clears the regression.",
+      "next_action": "Add sentinel status to cockpit and Arena admission gate.",
+      "operator_decision_needed": true
+    },
+    {
+      "id": "open_pr_queue_2026-06-23",
+      "kind": "pr_queue",
+      "theme": "PR/CI Triage",
+      "canonicality": "open-pr",
+      "status": "9_open_prs_auth_available",
+      "risk": "draft_ops_reports_and_closure_gates_can_overlap_or_go_stale",
+      "evidence": [
+        "#676 draft ops report",
+        "#675 provider discoverability",
+        "#674 closure gate",
+        "#669/#668/#642 ops reports",
+        "#661 e2e gauntlet",
+        "#660 dashboard testing skill",
+        "#643 module diet census"
+      ],
+      "proposal": "Triage in order: #675, #674, #660, then draft evidence PRs. Keep cockpit extraction separate.",
+      "next_action": "Run read-only checks and CI review before merge decisions; operator approval required for promotion.",
+      "operator_decision_needed": true
+    }
+  ],
+  "uncertainties": [
+    "Dirty+Stash Miner final scout result was originally unavailable; it has since been reconstructed read-only from the full 70-stash list and dirty porcelain clusters in DIRTY_STASH_MINER_2026-06-23.md. Per-stash value is by subject line + branch context, not expanded diffs.",
+    "Remote state was checked with gh after the checkpoint and auth is currently available, contrary to the earlier bottleneck note.",
+    "No write promotion, branch ref retirement, stash operation, worktree pruning, merge, rebase, or storage mutation was performed.",
+    "Off-machine preservation remains unproven from local evidence alone."
+  ],
+  "companion_artifacts": [
+    "ORGANISM_SCAN_2026-06-23.md",
+    "PROMOTION_PROPOSALS_2026-06-23.md",
+    "CLEANUP_DEFERRED_2026-06-23.md",
+    "OPERATOR_DECISIONS_2026-06-23.md",
+    "DIRTY_STASH_MINER_2026-06-23.md"
+  ]
+}

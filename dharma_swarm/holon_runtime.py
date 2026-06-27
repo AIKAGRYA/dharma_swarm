@@ -107,7 +107,11 @@ async def holon_wake_cycle(
                 summary_lines = []
                 for item in list(pack.items)[:6]:
                     src = getattr(item, "surface_id", "memory")
-                    txt = getattr(item, "content", "") or ""
+                    txt = (
+                        getattr(item, "content_snippet", None)
+                        or getattr(item, "content", None)
+                        or ""
+                    )
                     if txt:
                         summary_lines.append(f"<source:memory:{src}> {txt[:280]}")
                 if summary_lines:
