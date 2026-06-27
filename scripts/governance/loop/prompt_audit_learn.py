@@ -43,7 +43,6 @@ from pathlib import Path
 
 from scripts.governance.loop.oracle import CIOracle, GateResult
 from scripts.governance.loop.runs import Run, RunManager
-from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
 from scripts.governance.loop.warrant import Warrant, WarrantError
 
 DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
@@ -513,6 +512,8 @@ def _process_finding(
 
     ci_wire_ref = ""
     if wire_ci:
+        from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
+
         workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
         gate_name = f"{finding_id}: {failure_class}"
         try:
