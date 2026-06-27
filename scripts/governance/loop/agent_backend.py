@@ -274,6 +274,7 @@ class DroidBackend(AgentBackend):
         primary_model: str | None = None,
         verifier_model: str | None = None,
         timeout_seconds: int = 600,
+        auto_level: str | None = None,
     ) -> None:
         self.droid_path = Path(droid_path or os.environ.get("LOOP_DROID_PATH", DEFAULT_DROID_PATH))
         self.cwd = Path(cwd or os.getcwd())
@@ -284,6 +285,10 @@ class DroidBackend(AgentBackend):
             "LOOP_DROID_VERIFIER_MODEL", DEFAULT_DROID_VERIFIER_MODEL
         )
         self.timeout_seconds = timeout_seconds
+        # The real droid CLI needs `--auto high` to proceed autonomously (medium
+        # bails out with "insufficient permission to proceed"). Configurable via
+        # the LOOP_DROID_AUTO_LEVEL env var; default `high` for live runs.
+        self.auto_level = auto_level or os.environ.get("LOOP_DROID_AUTO_LEVEL", "high")
 
     def _resolve_droid(self) -> str:
         if self.droid_path.is_file():
@@ -324,7 +329,7 @@ class DroidBackend(AgentBackend):
                 "--cwd",
                 str(self.cwd),
                 "--auto",
-                "medium",
+                self.auto_level,
                 "--model",
                 model,
                 "--output-format",
@@ -332,12 +337,36 @@ class DroidBackend(AgentBackend):
                 "-f",
                 fh.name,
             ]
-            proc = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-            )
+            try:
+                proc = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    timeout=self.timeout_seconds,
+                )
+            except subprocess.TimeoutExpired as exc:
+                timed_out = AgentInvocationResult(
+                    invocation_id=invocation_id,
+                    role=role,
+                    model=model,
+                    model_family=_model_family(model),
+                    command=command,
+                    cwd=str(self.cwd),
+                    return_code=-1,
+                    stdout=exc.stdout or "",
+                    stderr=exc.stderr or "",
+                    prompt_sha256=_prompt_hash(prompt),
+                    context_keys=context_keys,
+                    started_utc=started,
+                    ended_utc=_utc_now_iso(),
+                    model_independence=model_independence,
+                    degraded=True,
+                )
+                raise BackendInvocationError(
+                    f"droid CLI invocation timed out for role {role!r} "
+                    f"after {self.timeout_seconds}s",
+                    result=timed_out,
+                ) from exc
 
         result = AgentInvocationResult(
             invocation_id=invocation_id,
