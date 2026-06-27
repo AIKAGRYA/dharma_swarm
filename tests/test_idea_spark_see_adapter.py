@@ -89,3 +89,32 @@ def test_elevate_to_graph_persists_isolated_receipt():
     # reload proves the elevated node persisted to its own isolated graph
     reloaded = asyncio.run(ConceptGraph.load(path))
     assert reloaded.get_node(result.node_id) is not None
+
+
+def test_live_research_attaches_grounded_annotations(monkeypatch):
+    """Deterministic (mocked) proof that live_research wires real external
+    sources into the elevated graph as ResearchAnnotations."""
+    import dharma_swarm.web_search as ws
+
+    class _FakeResult:
+        title = "Gap detection over concept graphs"
+        url = "http://arxiv.org/abs/2406.00001"
+        snippet = "A method for validating reference counts before declaring gaps."
+        source = "arxiv"
+        score = 0.91
+
+    async def _fake_search_web(query, max_results=5, backend=None, domain=None, format_output=True):
+        assert query  # the spark text is passed through to research
+        return [_FakeResult(), _FakeResult()]
+
+    monkeypatch.setattr(ws, "search_web", _fake_search_web)
+
+    path = Path(tempfile.mkdtemp()) / "elevated" / "live.json"
+    result = elevate_to_graph(
+        REAL_SPARK, CORR, path, authority_level="proposal", live_research=True
+    )
+    assert result.research_is_live is True
+    assert result.annotation_count >= 2  # canned + 2 live
+    # the grounded annotations persist into the isolated receipt
+    reloaded = asyncio.run(ConceptGraph.load(path))
+    assert reloaded.annotation_count >= 2

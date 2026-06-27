@@ -29,7 +29,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dharma_swarm.semantic_digester import SemanticDigester
-from dharma_swarm.semantic_gravity import ConceptGraph, ConceptNode
+from dharma_swarm.semantic_gravity import (
+    ConceptGraph,
+    ConceptNode,
+    ResearchAnnotation,
+    ResearchConnectionType,
+)
 from dharma_swarm.semantic_researcher import SemanticResearcher
 
 # SemanticResearcher's default salience gate (semantic_researcher.py:265).
@@ -115,20 +120,76 @@ class ElevationResult:
     research_is_live: bool = False
 
 
+def live_research_annotations(
+    concept_id: str,
+    query: str,
+    *,
+    max_results: int = 4,
+    backend: str = "arxiv",
+) -> list[ResearchAnnotation]:
+    """LIVE research: real external sources -> ResearchAnnotations, replacing the
+    canned RESEARCH_CONNECTIONS table with grounded citations.
+
+    Opt-in: it transmits ``query`` (the spark text) to an external search
+    backend, so callers gate it behind explicit operator consent. Returns ``[]``
+    on any failure so elevation still succeeds with the canned annotations.
+    ``arxiv`` is the verified key-free backend in the current environment.
+    """
+    from dharma_swarm.web_search import search_web  # lazy: only when opted in
+
+    try:
+        results = asyncio.run(
+            search_web(query, max_results=max_results, backend=backend, format_output=False)
+        )
+    except Exception:
+        return []
+    annotations: list[ResearchAnnotation] = []
+    for r in results or []:
+        annotations.append(
+            ResearchAnnotation(
+                concept_id=concept_id,
+                connection_type=ResearchConnectionType.VALIDATION,
+                external_source=r.source or backend,
+                citation=r.url,
+                summary=f"{r.title}: {r.snippet}"[:400],
+                confidence=float(r.score or 0.5),
+                field=backend,
+                metadata={"matched_via": "live_web_search", "backend": backend, "title": r.title},
+            )
+        )
+    return annotations
+
+
 def elevate_to_graph(
     text: str,
     correlation_id: str,
     graph_path: str | Path,
     *,
     authority_level: str = "observation",
+    live_research: bool = False,
+    research_backend: str = "arxiv",
 ) -> ElevationResult:
     """Elevate a spark and persist it as an ISOLATED, idea_spark-scoped concept
     graph receipt — NOT the shared 26MB semantic canon (governance: the
     elevated writer never mutates owned canon). Idempotent per correlation_id.
+
+    With ``live_research=True`` the deepen-leg is REAL: external sources are
+    retrieved and attached as grounded ResearchAnnotations (opt-in, transmits
+    the spark text). Otherwise the canned researcher is used and
+    ``research_is_live`` stays False.
     """
     node, annotations = elevate_spark(text, correlation_id, authority_level=authority_level)
+    annotations = list(annotations)
+    research_is_live = False
+    if live_research:
+        live = live_research_annotations(node.id, text, backend=research_backend)
+        if live:
+            annotations.extend(live)
+            research_is_live = True
     graph = ConceptGraph()
     inject_spark(graph, node)
+    for ann in annotations:
+        graph.add_annotation(ann)
     path = Path(graph_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     asyncio.run(graph.save(path))
@@ -139,5 +200,5 @@ def elevate_to_graph(
         annotation_count=len(annotations),
         body_redacted=bool(node.metadata.get("body_redacted", False)),
         graph_path=str(path),
-        research_is_live=False,
+        research_is_live=research_is_live,
     )

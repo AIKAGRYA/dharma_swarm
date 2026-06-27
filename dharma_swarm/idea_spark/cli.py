@@ -213,6 +213,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
             result.correlation_id,
             graph_path,
             authority_level=args.authority_level or "observation",
+            live_research=args.live_research,
         )
         summary["elevation"] = {
             "node_id": elevation.node_id,
@@ -317,6 +318,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="also run the spark through the Semantic Evolution Engine "
         "(digest->provenance-floor->research) into an isolated idea_spark graph "
         "receipt; never mutates the shared semantic canon",
+    )
+    ingest.add_argument(
+        "--live-research",
+        action="store_true",
+        help="with --elevate, use LIVE external research (real citations) instead "
+        "of the canned table; transmits the spark text to a search backend (opt-in)",
     )
     ingest.add_argument("--json", action="store_true")
     ingest.set_defaults(func=_cmd_ingest)
