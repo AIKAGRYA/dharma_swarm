@@ -30,7 +30,11 @@ telos hierarchy. The geometry is a torus. The throat is *earned*, never decreed.
 of compute: **energy, water, chips, minerals, fabs, labor, land, emissions,
 e-waste** (`REPO_GOVERNANCE_AUDIT.md` C3; defined in the Telos Hierarchy). **GAIA**
 (the welfare-ton ecological-restoration loop) is already the child of SIS that pays
-that material debt. **Loomwork** is the noosphere/media organ. The circle the
+that material debt. **Loomwork** is SIS's media organ (status DESIGN_ONLY per
+`NORTH_STAR §7`). Note the owner boundary: **noosphere propagation itself is
+assigned to Darshan / SAB** (`NORTH_STAR §6`), *not* to Loomwork — node (4) below
+credits Darshan/SAB as the propagation owner, with Loomwork as the adjacent
+design-only media surface, to stay coherent with the identity owner. The circle the
 operator is reaching for is the union of (a) this existing hierarchy, (b) the
 welfare-ton carbon-attribution loop already specified in `08_SATTVA_ECONOMICS.md`,
 (c) the verification bridge mapped in `05_INVARIANTS_AND_BRIDGE.md`, and (d) the
@@ -76,11 +80,13 @@ telos gate (`telos_gates.py`). The bridge from the field map *is* the throat.
                │        ┌───────────────────────────────┘
                ▼        ▼
         ┌──────────────────────────────────────────────┐
-        │ (4) NOOSPHERE propagation — Loomwork          │
-        │ verified beneficial outcomes propagate as     │
-        │ high-integrity signal in an AI-flooded world  │
-        │ where verified truth is the scarce asset.     │
-        │ This is what makes the AI *worth powering*.   │
+        │ (4) NOOSPHERE propagation — Darshan / SAB     │
+        │ (NORTH_STAR §6; Loomwork = adjacent media     │
+        │ organ, DESIGN_ONLY). verified outcomes        │
+        │ propagate as high-integrity signal in an      │
+        │ AI-flooded world where verified truth is the  │
+        │ scarce asset — what makes the AI worth        │
+        │ powering.                                     │
         └───────────────────────────────────────────────┘
             (and back to 1: verifiable alignment earns
              the trust to run more compute → more energy)
