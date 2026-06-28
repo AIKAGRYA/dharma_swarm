@@ -110,9 +110,36 @@ Full breakdown: `03_MATURITY_AND_ROADMAP.md`.
   tokens/cost). Real seed numbers (Haiku 0.22 → Opus 4.05 Wh; 1B queries/day ≈
   $1.24M/yr), declared ±40–50% uncertainty, the "verifiable compute offsets"
   fundable surface, and the recursive n=1 (the swarm meters its own compute-debit).
-- **`08_LOOP_TRACE.md`** *(owned by a parallel instance — see the master prompt)* —
-  the node-by-node trace of the whole loop through the codebase, break list, and
-  minimal-wiring iteration proposals.
+- **`08_LOOP_TRACE.md`** — the node-by-node trace of the whole loop through the
+  actual codebase (file:symbol + maturity), the ranked break list, and the
+  minimal-wiring seeds. Verdict: the torus can't circulate yet — the throat (spine
+  receipts) and the credit world (GAIA) live in separate worlds with no import
+  between them; the keystone wire is SEED-1 below.
+- **`09_SIS_MERGER_VISION.md`** — *FOLDED.* Its non-redundant core (the organ-map +
+  the compounding flywheel) is absorbed into `06`; retired in the seed PR to avoid a
+  standalone thesis its sibling `10` already corrects. Kept only as history.
+- **`10_SIS_ORGAN.md`** — design of a `dharma_swarm/sis/**` ecological organ via a
+  decorrelated six-expert panel (the *what/architecture*). Carries the corpus's
+  hardest discipline line (§7): *name the first external human who will sign that it
+  helped, by name and date, or it deserves zero compute.* 3/100.
+- **`11_SIS_AI_LEVERAGE.md`** — how SIS leverages AI (the *engine that runs through*
+  the organ), second decorrelated panel. 3/100.
+- **`12_SIS_FOUNDING_CHARTER.md`** — the founding orientation (the *why*), argued
+  behind a strict patienthood firewall (moral agent toward nature, never patient).
+  Research-depth lane; the orientation register (§1) is held for operator sign-off.
+- **`hub/`** — *separate, world-facing, NOT part of the docs-seed.* A publish-ready
+  connective hub (essay `01_THE_SEAM.md` + `THE_HUNDRED.md`, ~105 named actors).
+  Publication is an irreversible outward act behind the operator's coherence gate
+  (`NORTH_STAR §8`) — gated, later, after a named-person fairness pass. *Owned by the
+  Circle lane.*
+
+**First code (SEED-1, landed by the Circle lane):**
+`dharma_swarm/gaia_sis_projection.py` + `tests/test_gaia_sis_projection.py` (7
+passing) — the read-only projector `08` found missing: estimates each dispatch's
+compute-debit as a p05/p95 band (never a point), bridges to the `ComputeUnit` shape,
+imports neither spine nor ledger (test-enforced), mints nothing. `aggregate()` is the
+recursive n=1: the swarm metering its own compute. Additive, unowned surface —
+landable as its own small PR independent of the docs-seed and the track decision.
 
 ---
 

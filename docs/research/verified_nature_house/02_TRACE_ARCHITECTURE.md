@@ -13,7 +13,8 @@ Creates no new truth store; projects over `spine.EvidenceReceipt` + the GAIA led
 
 This is a high-stakes external claim: someone may pay or stake reputation on it.
 It must survive Shrikanth's five rules (additionality, leakage, permanence,
-outcomes-after-counterfactual, credible biodiversity proxy) and emit a
+outcomes-after-counterfactual, credible biodiversity proxy — *paraphrased pending
+the primary text; see `01` §boundary*) and emit a
 tamper-evident, decomposable receipt.
 
 ## 2. The pipeline (real symbols)
