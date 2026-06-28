@@ -104,14 +104,13 @@ def _mounted_api_route_paths() -> list[str]:
     as missing. The generated OpenAPI schema is the stable public surface
     that resolves the lazy wrappers, so use it as the source of truth and
     union in any directly-attached route paths (non-schema/websocket routes
-    and older FastAPI versions)."""
+    and older FastAPI versions).
+
+    A failure to build the OpenAPI schema propagates to the caller, which
+    records it as inspection failure rather than masking it here."""
     api_main = importlib.import_module("api.main")
     app = api_main.app
-    paths: set[str] = set()
-    try:
-        paths.update(app.openapi().get("paths", {}).keys())
-    except Exception as exc:  # pragma: no cover - openapi build is normally safe
-        logger.warning("openapi() build failed during route inspection: %s", exc)
+    paths: set[str] = set(app.openapi().get("paths", {}).keys())
     for route in getattr(app, "routes", []):
         path = str(getattr(route, "path", ""))
         if path:
