@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "verified_at": "2026-06-12",
+  "verified_at": "2026-06-27",
   "ttl_days": 14,
   "assertions": [
     {
@@ -152,7 +152,8 @@
       "docs/plans/**",
       "docs/specs/**",
       "docs/sovereign_holons/**",
-      "dharma_swarm/chetana/claude_code_plugin/**"
+      "dharma_swarm/chetana/claude_code_plugin/**",
+      "docs/stop-the-slop/**"
     ],
       "registered": [
         "AGENTS.md",

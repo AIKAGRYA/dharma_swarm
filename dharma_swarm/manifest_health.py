@@ -94,13 +94,28 @@ def _route_matches(dep: str, route_path: str) -> bool:
 
 
 def _mounted_api_route_paths() -> list[str]:
-    """Return route paths mounted on the actual FastAPI app."""
+    """Return route paths mounted on the actual FastAPI app.
+
+    FastAPI >=0.116 no longer flattens ``include_router`` calls into
+    ``app.routes`` eagerly — included routers appear as lazy
+    ``_IncludedRouter`` wrappers with no ``path`` attribute, so walking
+    ``app.routes`` for ``.path`` sees only the handful of default routes
+    (``/openapi.json``, ``/docs``, ...) and reports every mounted endpoint
+    as missing. The generated OpenAPI schema is the stable public surface
+    that resolves the lazy wrappers, so use it as the source of truth and
+    union in any directly-attached route paths (non-schema/websocket routes
+    and older FastAPI versions).
+
+    A failure to build the OpenAPI schema propagates to the caller, which
+    records it as inspection failure rather than masking it here."""
     api_main = importlib.import_module("api.main")
-    return [
-        str(getattr(route, "path", ""))
-        for route in getattr(api_main.app, "routes", [])
-        if getattr(route, "path", "")
-    ]
+    app = api_main.app
+    paths: set[str] = set(app.openapi().get("paths", {}).keys())
+    for route in getattr(app, "routes", []):
+        path = str(getattr(route, "path", ""))
+        if path:
+            paths.add(path)
+    return sorted(paths)
 
 
 def _check_api_endpoint_registered(
@@ -438,6 +453,7 @@ def build_health_report() -> dict[str, Any]:
             "degraded": degraded_count,
             "broken": broken_count,
             "stub": stub_count,
+            "frozen": frozen_count,
             "unknown": unknown_count,
         },
         "sections": sections,
