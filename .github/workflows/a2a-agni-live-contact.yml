@@ -43,7 +43,7 @@ jobs:
       A2A_SCAN: "400"
       # Seconds to listen for a live reply after the reach probe (kept short:
       # Devin confirmed no peers are live on AGNI, only mirrored from local hub).
-      A2A_LISTEN_S: "8"
+      A2A_LISTEN_S: "15"
     steps:
       # No actions/checkout or actions/setup-python: this repo requires actions
       # pinned to a full SHA, and this probe needs neither the repo tree nor a
@@ -177,34 +177,54 @@ jobs:
                       active = "ACTIVE" if a.endswith(("s", "m")) else "idle"
                       print(f"  {k:<22} {v['msgs']:>5}  {a:>9}  {active:<7}  {max(v['kinds'], key=v['kinds'].get)}")
 
-                  # --- reach latency: publish a tiny probe, time the JetStream pub-ack ---
-                  # Reply channel must live in OUR account's own namespace: the
-                  # devin account may subscribe to dharma.a2a.devin.> but not
-                  # dharma.a2a.fleet.reply.* (scoped perms). A peer replies here.
-                  probe_id = uuid.uuid4().hex[:12]
+                  # --- wake the team: ping every known lane, listen on our own reply space ---
+                  # Reply channel lives in OUR account namespace (devin may sub
+                  # dharma.a2a.devin.> but not other lanes' reply space). A live
+                  # peer replies to the reply_subject we embed in each wake.
                   own_lane = "devin" if os.environ.get("DEVIN_NATS_URL") else "merge_master_mike"
-                  reply_sub = f"dharma.a2a.{own_lane}.reply.{probe_id}"
+                  reply_wild = f"dharma.a2a.{own_lane}.reply.*"
                   replies = []
                   async def on_reply(msg):
-                      replies.append(msg.subject)
+                      try:
+                          d = json.loads(msg.data.decode())
+                          replies.append({"subject": msg.subject, "from": d.get("from"), "kind": d.get("kind")})
+                      except Exception:
+                          replies.append({"subject": msg.subject, "raw": msg.data.decode("utf-8", "replace")[:200]})
                   try:
-                      sub = await nc.subscribe(reply_sub, cb=on_reply)
+                      sub = await nc.subscribe(reply_wild, cb=on_reply)
                   except Exception as exc:
                       r["reply_listen"] = f"denied: {exc}"
                       sub = None
-                  body = json.dumps({"from": "claude_code_ci", "kind": "reach_probe",
-                                     "probe_id": probe_id, "reply_subject": reply_sub,
-                                     "timestamp": datetime.now(timezone.utc).isoformat()}).encode()
-                  t1 = time.monotonic()
-                  ack = await js.publish("dharma.a2a.fleet", body, timeout=10)
-                  r["reach_ms"] = round((time.monotonic() - t1) * 1000)
-                  r["reach_ack"] = {"stream": ack.stream, "seq": ack.seq}
-                  print(f"\nREACH: published reach_probe -> pub-ack in {r['reach_ms']}ms "
-                        f"(stream={ack.stream} seq={ack.seq})")
+
+                  lanes = ["hermes", "devin", "codex", "fable_5_cursor", "merge_master_mike", "fleet"]
+                  acks, reach_ms = {}, None
+                  for lane in lanes:
+                      pid = uuid.uuid4().hex[:12]
+                      body = json.dumps({
+                          "from": "claude_code_ci", "kind": "presence_wake", "to": lane,
+                          "probe_id": pid, "reply_subject": f"dharma.a2a.{own_lane}.reply.{pid}",
+                          "content": ("Presence wake from claude_code (CI). NON-ACTIONABLE — "
+                                      "reply with your callsign to the reply_subject if you are live."),
+                          "timestamp": datetime.now(timezone.utc).isoformat(),
+                      }).encode()
+                      t1 = time.monotonic()
+                      try:
+                          ack = await js.publish(f"dharma.a2a.{lane}", body, timeout=10)
+                          ms = round((time.monotonic() - t1) * 1000)
+                          reach_ms = ms if reach_ms is None else reach_ms
+                          acks[lane] = {"ok": True, "seq": ack.seq, "ms": ms}
+                          print(f"WAKE -> dharma.a2a.{lane:<18} pub-ack seq={ack.seq} {ms}ms")
+                      except Exception as exc:
+                          acks[lane] = {"ok": False, "error": str(exc)}
+                          print(f"WAKE -> dharma.a2a.{lane:<18} DENIED {exc}")
+                  r["wake_acks"] = acks
+                  r["reach_ms"] = reach_ms
+
                   if sub is not None:
+                      print(f"\nListening {listen_s:.0f}s on {reply_wild} for LIVE replies ...")
                       await asyncio.sleep(listen_s)
                       r["replies"] = replies
-                      print(f"REPLIES in {listen_s:.0f}s window: {replies or 'none'}")
+                      print(f"LIVE REPLIES ({len(replies)}): {replies or 'none — no peer answered'}")
                       await sub.unsubscribe()
               finally:
                   await nc.close()
