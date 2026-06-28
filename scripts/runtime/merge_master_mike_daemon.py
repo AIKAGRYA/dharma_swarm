@@ -480,6 +480,23 @@ def build_fanout_command(
     return cmd
 
 
+def _convergence_advisory(limit: int = 30) -> dict[str, Any]:
+    """ADVISORY ONLY: deterministic PR convergence ordering from the sibling
+    policy module. Recorded into the cycle receipt for the operator and for
+    Mike's ordering — it is NEVER a gate input and changes no merge authority.
+    Fully guarded: any failure here degrades to an error note, never breaks the
+    cycle. Quorum-repair (reviewer_quorum_repair.py) is intentionally NOT fired
+    here — it is a deliberate request-only CLI organ, not cycle automation."""
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))  # repo-root only — never shadow bare names
+        from scripts.runtime import pr_convergence_policy  # noqa: PLC0415
+
+        return pr_convergence_policy._fetch_live(limit)
+    except Exception as exc:  # advisory must never break the cycle
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def run_cycle(
     paths: MikePaths,
     *,
@@ -540,6 +557,9 @@ def run_cycle(
             "can_push": False,
             "can_edit_source": False,
             "github_comment_posting": "not_performed",
+        },
+        "advisory": {
+            "convergence": _convergence_advisory(limit),
         },
     }
     write_json(cycle_dir / "receipt.json", receipt)

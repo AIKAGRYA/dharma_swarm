@@ -81,6 +81,11 @@ Surface separation is the safety boundary: this track owns the NATS
 transport contact modules and the master spec; it does not touch the
 operator_core read models the reconciliation lane owns.
 
+Closure for this track means offline substrate wiring is test-backed and
+governance-visible. It is not a production live-readiness claim. Live ACL
+proof, cross-host broker proof, and semantic liveness/domain-receipt proof
+remain separate operator-runtime gates.
+
 **Next items:**
 
 - [code] Confirm NATS transport contact modules are wired and receipted end-to-end.
@@ -90,6 +95,7 @@ operator_core read models the reconciliation lane owns.
 - Do not introduce Redis or gRPC as part of this track.
 - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
 - Do not add a parallel spine-check CI workflow.
+- Do not claim production live readiness without live ACL, cross-host broker, and semantic liveness proof.
 
 ### Runtime Truth Spine — Adoption (god objects flow through invoke_agent)
 

@@ -324,7 +324,9 @@ def classify_pr(pr: dict[str, Any]) -> dict[str, Any]:
         "url": pr.get("url"),
         "author": (pr.get("author") or {}).get("login") if isinstance(pr.get("author"), dict) else pr.get("author"),
         "headRefName": pr.get("headRefName"),
+        "head_sha": pr.get("headRefOid") or "",
         "baseRefName": pr.get("baseRefName"),
+        "base_sha": pr.get("baseRefOid") or "",
         "updatedAt": pr.get("updatedAt"),
         "mergeable": mergeable,
         "reviewDecision": review_decision or "NONE",
@@ -343,7 +345,7 @@ def fetch_open_prs(limit: int) -> list[dict[str, Any]]:
         "--limit",
         str(limit),
         "--json",
-        "number,title,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
+        "number,title,author,headRefName,headRefOid,baseRefName,baseRefOid,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt,url",
     ])
 
 
@@ -404,7 +406,7 @@ def fetch_pr_view(pr_number: int) -> dict[str, Any]:
         "view",
         str(pr_number),
         "--json",
-        "number,title,body,author,baseRefName,headRefName,headRefOid,isDraft,labels,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
+        "number,title,body,author,baseRefName,baseRefOid,headRefName,headRefOid,isDraft,labels,mergeable,reviewDecision,statusCheckRollup,comments,commits,updatedAt,url",
     ])
 
 
@@ -2136,6 +2138,157 @@ def select_fanout_items(
     return candidates[:max(0, max_prs)]
 
 
+def latest_packet_dir_or_none(state_root: Path, pr_number: int) -> Path | None:
+    base = state_root / f"pr-{pr_number}"
+    if not base.exists():
+        return None
+    existing = sorted(path for path in base.glob("*") if path.is_dir())
+    return existing[-1] if existing else None
+
+
+def _queue_item_fingerprint(item: dict[str, Any]) -> dict[str, str]:
+    return {
+        "head_sha": str(item.get("head_sha") or item.get("headRefOid") or ""),
+        "base_sha": str(item.get("base_sha") or item.get("baseRefOid") or ""),
+        "updated_at": str(item.get("updatedAt") or ""),
+        "status": str(item.get("status") or ""),
+        "review_decision": str(item.get("reviewDecision") or "NONE"),
+    }
+
+
+def _packet_fingerprint(packet_dir_path: Path) -> dict[str, str] | None:
+    try:
+        facts = load_json(packet_dir_path / "FACTS.json")
+    except (OSError, json.JSONDecodeError):
+        return None
+    pr = facts.get("pr") if isinstance(facts, dict) else {}
+    classification = facts.get("classification") if isinstance(facts, dict) else {}
+    if not isinstance(pr, dict) or not isinstance(classification, dict):
+        return None
+    return {
+        "head_sha": str(pr.get("headRefOid") or ""),
+        "base_sha": str(pr.get("baseRefOid") or ""),
+        "updated_at": str(pr.get("updatedAt") or ""),
+        "status": str(classification.get("status") or ""),
+        "review_decision": str(classification.get("reviewDecision") or "NONE"),
+    }
+
+
+def _packet_gate_summary(packet_dir_path: Path) -> dict[str, Any] | None:
+    try:
+        gate = load_json(packet_dir_path / "MERGE_GATE.json")
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(gate, dict):
+        return None
+    blockers = gate.get("blockers") if isinstance(gate.get("blockers"), list) else []
+    return {
+        "decision": str(gate.get("decision") or ""),
+        "blockers": [str(blocker) for blocker in blockers],
+    }
+
+
+def current_fanout_receipt_for_item(state_root: Path, item: dict[str, Any]) -> dict[str, Any]:
+    pr_number = int(item.get("number") or 0)
+    packet_path = latest_packet_dir_or_none(state_root, pr_number)
+    expected = _queue_item_fingerprint(item)
+    result: dict[str, Any] = {
+        "current": False,
+        "number": pr_number,
+        "head_sha": expected["head_sha"],
+        "updatedAt": expected["updated_at"],
+        "packet_dir": str(packet_path) if packet_path else "",
+        "reason": "",
+    }
+    if not packet_path:
+        result["reason"] = "no prior packet"
+        return result
+    if not (packet_path / "MERGE_GATE.json").exists():
+        result["reason"] = "latest packet has no merge gate"
+        return result
+    gate = _packet_gate_summary(packet_path)
+    if gate is None:
+        result["reason"] = "latest packet merge gate unreadable"
+        return result
+    result["gate"] = gate
+    if gate["decision"] != "MERGE_CANDIDATE":
+        result["reason"] = f"latest merge gate is {gate['decision'] or 'UNKNOWN'}"
+        return result
+    if gate["blockers"]:
+        result["reason"] = "latest merge gate still has blockers"
+        return result
+    observed = _packet_fingerprint(packet_path)
+    if observed is None:
+        result["reason"] = "latest packet facts unreadable"
+        return result
+    result["observed"] = observed
+    if not expected["head_sha"]:
+        result["reason"] = "queue item has no head SHA"
+        return result
+    stable_keys = ("head_sha", "base_sha", "updated_at", "status", "review_decision")
+    if all(observed.get(key) == expected.get(key) for key in stable_keys):
+        result["current"] = True
+        result["reason"] = "latest clean packet/gate already matches PR head, base, update time, queue status, and review decision"
+        return result
+    result["reason"] = "PR head, base, update time, queue status, or review decision changed since latest packet/gate"
+    return result
+
+
+def select_fanout_plan(
+    summary: dict[str, Any],
+    *,
+    statuses: list[str],
+    max_prs: int,
+    state_root: Path,
+    skip_current: bool,
+) -> dict[str, list[dict[str, Any]]]:
+    if max_prs <= 0:
+        return {"selected": [], "skipped_current": []}
+
+    status_rank = {status: index for index, status in enumerate(statuses)}
+    candidates = [
+        item
+        for item in summary.get("items", [])
+        if item.get("status") in status_rank
+    ]
+    candidates.sort(
+        key=lambda item: (
+            status_rank.get(str(item.get("status")), 999),
+            str(item.get("updatedAt") or ""),
+            int(item.get("number") or 0),
+        )
+    )
+
+    selected: list[dict[str, Any]] = []
+    skipped_current: list[dict[str, Any]] = []
+    for item in candidates:
+        if skip_current:
+            current = current_fanout_receipt_for_item(state_root, item)
+            if current["current"]:
+                skipped_current.append({
+                    "number": item.get("number"),
+                    "title": item.get("title"),
+                    "status": item.get("status"),
+                    "packet_dir": current.get("packet_dir", ""),
+                    "head_sha": current.get("head_sha", ""),
+                    "updatedAt": current.get("updatedAt", ""),
+                    "reason": current.get("reason", ""),
+                })
+                continue
+        selected.append(item)
+        if len(selected) >= max(0, max_prs):
+            break
+    return {"selected": selected, "skipped_current": skipped_current}
+
+
+def should_skip_current_fanout(args: argparse.Namespace) -> bool:
+    return bool(
+        not args.reprocess_current
+        and args.packet_only
+        and args.merge_mode == "off"
+    )
+
+
 def render_fanout_markdown(receipt: dict[str, Any]) -> str:
     lines = [
         "# Merge Master Mike Fanout",
@@ -2145,6 +2298,7 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
         f"- Dry run: `{receipt['dry_run']}`",
         f"- Selected: `{len(receipt['selected'])}`",
         f"- Processed: `{len(receipt['processed'])}`",
+        f"- Skipped current: `{len(receipt.get('skipped_current', []))}`",
         f"- Required reviewers: `{', '.join(receipt.get('required_reviewers', []))}`",
         f"- Merge mode: `{receipt.get('merge_mode', 'off')}`",
         "",
@@ -2154,6 +2308,15 @@ def render_fanout_markdown(receipt: dict[str, Any]) -> str:
     if receipt["selected"]:
         for item in receipt["selected"]:
             lines.append(f"- `#{item['number']}` `{item['status']}` {item['title']}")
+    else:
+        lines.append("- none")
+    lines.extend(["", "## Skipped Current", ""])
+    if receipt.get("skipped_current"):
+        for item in receipt["skipped_current"]:
+            lines.append(
+                f"- `#{item['number']}` `{item['status']}` {item['title']} — "
+                f"{item.get('reason')} packet=`{item.get('packet_dir')}`"
+            )
     else:
         lines.append("- none")
     lines.extend(["", "## Processed", ""])
@@ -2220,7 +2383,15 @@ def cmd_fanout(args: argparse.Namespace) -> int:
     if invalid_agents:
         raise PRControlError(f"unsupported fanout agent(s): {', '.join(invalid_agents)}")
 
-    selected = select_fanout_items(queue_summary, statuses=statuses, max_prs=args.max_prs)
+    plan = select_fanout_plan(
+        queue_summary,
+        statuses=statuses,
+        max_prs=args.max_prs,
+        state_root=root,
+        skip_current=should_skip_current_fanout(args),
+    )
+    selected = plan["selected"]
+    skipped_current = plan["skipped_current"]
     run_id = stamp()
     fanout_dir = root / "mike_fanout" / run_id
     processed: list[dict[str, Any]] = []
@@ -2341,6 +2512,7 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         "merge_auto": args.merge_auto,
         "queue_path": str(queue_dir / "latest.json"),
         "selected": selected,
+        "skipped_current": skipped_current,
         "processed": processed,
         "authority": {
             "agent_uid": "merge_master_mike",
@@ -2393,6 +2565,8 @@ def cmd_fanout(args: argparse.Namespace) -> int:
         )
     for item in selected:
         print(f"SELECTED #{item['number']} {item['status']} {item['title']}")
+    for item in skipped_current:
+        print(f"SKIPPED_CURRENT #{item['number']} {item['status']} {item['title']}")
     for item in processed:
         print(f"PROCESSED #{item['number']} gate={item.get('gate_decision')} packet={item.get('packet_dir')}")
     if args.nats_session and args.nats_required and receipt.get("a2a_nats", {}).get("status") != "OK":
@@ -2474,6 +2648,11 @@ def build_parser() -> argparse.ArgumentParser:
     add_ci_truth_flags(fanout)
     fanout.add_argument("--packet-only", action="store_true", help="Create packets and gates without reviewer fanout")
     fanout.add_argument("--dry-run", action="store_true", help="Select PRs and write Mike receipt without processing them")
+    fanout.add_argument(
+        "--reprocess-current",
+        action="store_true",
+        help="Process PRs even when the latest packet/gate already matches the current PR head and status",
+    )
     fanout.add_argument("--merge-mode", choices=MERGE_MODES, default="off", help="Mike merge authority mode")
     fanout.add_argument("--merge-method", choices=("squash", "merge", "rebase"), default="squash")
     fanout.add_argument("--no-merge-auto", dest="merge_auto", action="store_false", default=True)
