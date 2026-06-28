@@ -1,4 +1,4 @@
-# The Field — Landscape Map (~60 actors)
+# The Field — Landscape Map (~90 actors)
 
 **Status:** SEED. World-class landscape scan, 2026-06-27, from a 7-cluster parallel
 research fan-out. Every actor below was verified with sources during research;

@@ -44,8 +44,12 @@ now needs and cannot get from satellites alone.
 
 **The wedge (where the substrate is a moat, not a tax):**
 - Digital MRV verifies the physical "what" (forest cover, canopy 3D structure) at
-  >95% accuracy. It **cannot** verify additionality/counterfactual, permanence,
-  soil & below-canopy carbon, biodiversity, or social co-benefits.
+  high *vendor-reported* accuracy for canopy/cover only (the ">95%" figure is
+  vendor marketing, not independently audited — and is itself contested; flagged
+  consistently in `04`/`05` and the hub). It **cannot** verify
+  additionality/counterfactual, permanence, soil & below-canopy carbon,
+  biodiversity, or social co-benefits — which only *sharpens* the wedge: we sell
+  exactly what dMRV structurally cannot do.
 - Rating agencies (Sylvera, BeZero, Calyx) **openly disagree** on precisely those
   soft judgments — a 2023/24 Carbon Market Watch "rating the raters" study found
   low cross-rater correlation, and one Amazon project was rated high by Sylvera,
