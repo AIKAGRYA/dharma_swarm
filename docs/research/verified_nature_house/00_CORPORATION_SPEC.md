@@ -100,7 +100,8 @@ player combines all four of —
 3. per-step tamper-evident cryptographic receipts (Weilliptic/WAuth is the one
    credible agent-receipt vendor; a forming IETF Agent Audit Trail draft);
 4. a quantitative welfare/impact score (academic-only; **no productized vendor
-   found** — the clearest white space).
+   found as of 2026-06** — absence-of-evidence across a targeted search, not proof
+   of absence; the clearest white space).
 
 The broad house is the only entity assembling all four. Nature is where it earns
 its first proof because the dimensions money can't otherwise verify (E, A, B, P)
@@ -142,7 +143,8 @@ One thing, not a roadmap: **re-run the Bayou Lafourche pilot as a five-rules-sco
 externally-countersigned welfare-ton verification.** Concretely — take the
 existing working pilot (real ledger, 4-of-5 oracle quorum, 304→258.4 tCO2e), (a)
 score it against Shrikanth's five rules (additionality vs unbiased counterfactual,
-leakage, permanence, outcomes-after-the-fact, credible biodiversity proxy), (b)
+leakage, permanence, outcomes-after-the-fact, credible biodiversity proxy —
+*paraphrased pending the primary text; see `01` §boundary*), (b)
 run the soft factors (E, A, B) through decorrelated cross-family verifiers, (c)
 mint the welfare-ton **only** on an external countersignature above quorum (the
 One Wire invariant), and (d) put the tamper-evident receipt in front of one real

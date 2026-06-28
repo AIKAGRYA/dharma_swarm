@@ -60,6 +60,13 @@ labeled seed-status, per the canon-metabolism rule**):
 - A typical Sonnet query ≈ **0.19 gCO₂** (0.95 Wh × 1.15 PUE × 175 gCO₂/kWh ÷ 1000).
 - At **$17.80/welfare-ton** that is ≈ **$0.0000034/query**; at **1B queries/day ≈
   $1.24M/yr** — negligible per call, meaningful as a restoration revenue stream.
+- **Uncertainty band (binding on every point estimate above):** independent
+  studies find per-query energy contested by **~10×** (≈0.3 vs ≈2.9 Wh for a single
+  query) and spread **~65×** across deployed models. The point numbers above are
+  *central anchors only* — every one must ship inside an explicit p05/p95 band
+  (which `dharma_swarm/gaia_sis_projection.py` enforces in code), never as a settled
+  figure. The Haiku/Opus/Sonnet constants trace to the un-metabolized Mac file
+  (below), so they stay hard-labeled SEED until that source reaches main.
 - Sector scale: AI inference ≈ **15 TWh / ~6 MtCO₂ (2025)** → **~347 TWh / ~121
   MtCO₂ (2030, projected)**.
 
