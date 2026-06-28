@@ -9,6 +9,17 @@ expert at the slice they hold; the point of the map is that the *slices don't
 connect.* Figures are as-sourced; several carry ±1–2 orders-of-magnitude uncertainty
 (flagged). Named actors have **not** endorsed this work and are not affiliated with it.
 
+> **Named-person fairness pass (2026-06-28).** Every entry naming an individual was
+> re-read against one standard: *is the seam fair analysis of the person's public work,
+> or could it read as a personal charge?* Lines were softened toward the work/position
+> and away from the person where needed. The two flagged-unverified items (Long/Eleos
+> affiliation; Shrikanth's exact "five rules") remain marked *verify* and must be
+> confirmed or hard-hedged before any publication. **Redaction option:** before public
+> deployment the build can drop personal names to affiliation-level
+> (`python3 build.py --redact`; see `site/README.md`) — or the hub can stay local until
+> the operator's coherence gate clears. Keeping the source on a low-visibility repo is
+> accepted for now (operator call, 2026-06-28); deployment to a public venue is not.
+
 > **The one finding.** Across ~100 actors in six clusters, the same gap recurs from
 > every vantage: **diverse competence, correlated blind-spots, no quality
 > aggregation** — a textbook failure of the three conditions under which many judges
@@ -57,8 +68,8 @@ driving demand is **never reconciled** with the credit.*
 21. **Google (buyer)** — >$100M CDR across methods in 2024. *Seam:* each deal under a different verifier; no cross-rater check ties its own portfolio together. ([src](https://www.esgtoday.com/google-invests-over-100-million-in-carbon-removal-in-2024/))
 22. **Isometric** — science-first CDR registry/MRV. *Seam:* sets and grades its own standard, then accredits the VVBs that verify — independence is internal, not cross-checked. ([src](https://registry.isometric.com/))
 23. **Puro.earth** — durable-removal registry. *Seam:* self-issuing standard-setter; no meta-rater scores Puro credits against rivals'. ([src](https://puro.earth/))
-24. **Verra (VCS)** — the largest legacy registry. *Seam:* auditors paid by the developers they audit; >80% of some credits found not to reflect real reductions; issuance collapsed. ([src](https://news.mongabay.com/2025/09/independent-auditors-overvalue-credits-of-carbon-projects-study-finds/))
-25. **Gold Standard** — premium-integrity legacy registry. *Seam:* flagship cookstove credits found overestimated ~10×; the brand outran the verification. ([src](https://carbonmarketwatch.org/publications/))
+24. **Verra (VCS)** — the largest legacy registry. *Seam:* the structural pattern the market is reforming away from — developers select and pay their own verifiers, and independent studies found a large share of some REDD+ credits did not reflect real reductions (figure contested in magnitude, robust in direction); issuance fell sharply. ([src](https://news.mongabay.com/2025/09/independent-auditors-overvalue-credits-of-carbon-projects-study-finds/))
+25. **Gold Standard** — premium-integrity legacy registry. *Seam:* even a high-integrity brand inherits the verification gap — independent analysis found some cookstove methodologies over-credited (~10× in one study); rigor of the underlying verification is the open question. ([src](https://carbonmarketwatch.org/publications/))
 26. **Patch** — enterprise procurement across 25,000+ projects. *Seam:* routes credits, passing through each registry's own quality claim; doesn't reconcile disagreeing raters. ([src](https://www.patch.io/))
 27. **Cloverly** — API-first marketplace / supplier software. *Seam:* surfaces *liquidity*, not decorrelated *quality* — the API exposes price, not cross-verified integrity. ([src](https://cloverly.com/))
 28. **CDR.fyi** — public durable-CDR purchase tracker. *Seam:* exposes the one-buyer risk but is a tracker, not a verifier — no lever on quality or demand depth. ([src](https://www.cdr.fyi/))
