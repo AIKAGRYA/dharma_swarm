@@ -98,6 +98,12 @@ Full breakdown: `03_MATURITY_AND_ROADMAP.md`.
   decorrelation and no quality aggregation), and the bridge: decorrelated
   aggregation + a provenance/commensurability ledger + the welfare unit, with an
   honest fence around what we are *not*.
+- **`06_THE_CIRCLE.md`** — the **vision braid** (the *why*, NORTH_STAR altitude).
+  Connects AI development / AI governance / AI energy to the nature thesis via the
+  repo's own **SIS ("Silicon Is Sand")** telos layer: the self-funding torus
+  silicon → energy → witness-membrane → soil → noosphere → back. Reframes "the ring
+  everything must pass through" as an *earned* throat, not a decreed chokepoint;
+  keeps the metaphysics (R_V, strange loop) as the *why*, never the product.
 
 ---
 
