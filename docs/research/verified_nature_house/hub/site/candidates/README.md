@@ -10,10 +10,20 @@ spot decides the look). One among many — not the design, *a* design.
 
 | | Bet | Status |
 |---|---|---|
-| **A** | *The living instrument* — the empty-center constellation as the hero; the field made alive; honesty primitives baked into the UI. | **built (Phase 0)** — `./A/` |
-| B | *Editorial-first* — data-journalism / scrollytelling lead; the argument as the spine, viz in service of prose. | open |
-| C | *The terminal / instrument* — a dense, precise "Bloomberg-for-nature-verification" register; maximal information density. | open |
-| … | other decorrelated bets welcome. | — |
+| **A** | *The living instrument* — the empty-center constellation as the hero; the field made alive (animated canvas + the Seam Index gauge); honesty primitives baked into the UI. | **built** — `./A/` |
+| **B** | *The long read* — editorial-first; the page is the essay's cover; the empty center expressed **typographically**; viz serves prose. Warm paper, serif, drop-cap. | **built** — `./B/` |
+| **C** | *The console* — a dense "field monitor" / Bloomberg-Palantir register; the empty center is an `UNOCCUPIED` slot in a live-looking grid. Dark, monospace, maximal density. | **built** — `./C/` |
+| … | other decorrelated bets welcome. | open |
+
+**Three genuinely decorrelated bets** (the point — diversity, not one option dressed as
+a choice): A is elegant living data-art (dark, organic, animated); B is a warm editorial
+argument (light, serif, prose-led); C is a cold technical instrument (dense, monospace,
+grid). Different type, color, layout, motion, and emotional register — so a judge learns
+something distinct from each, and the winner can be a **graft** (e.g. A's hero + B's
+essay reader + C's data grid).
+
+**To view all three:** `python3 -m http.server` in `hub/site/`, then open
+`candidates/A/`, `candidates/B/`, `candidates/C/`.
 
 ## Judging criteria (fixed, so the contest is fair)
 
