@@ -28,6 +28,7 @@ class ReceiptValidation:
 class InboxReceipt:
     path: Path
     payload: dict[str, Any]
+    schema_version: str = RECEIPT_SCHEMA
 
 
 def validate_task_receipt(payload: dict[str, Any]) -> ReceiptValidation:
