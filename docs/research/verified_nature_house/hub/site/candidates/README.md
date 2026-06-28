@@ -25,6 +25,20 @@ essay reader + C's data grid).
 **To view all three:** `python3 -m http.server` in `hub/site/`, then open
 `candidates/A/`, `candidates/B/`, `candidates/C/`.
 
+## The verdict & the winner — `./GRAFT/`
+
+A **decorrelated panel** (design director · adversarial skeptic · data-journalist) scored
+A/B/C independently and produced **three different winners** — so the answer was a *graft*,
+not a pick (full reasoning in `VERDICT.md`; the contest itself demonstrated the project's
+Krogh–Vedelsby thesis). The winner is **`./GRAFT/`** — *A's animated empty-center hero +
+B's editorial reader & hedge-in-the-claim honesty + C's `UNOCCUPIED` field-ledger + the
+`[IND]/band/as-of` honesty system* — with the panel's six binding fixes applied (the
+skeptic caught a real bug: A had narrated random dots as "real sourced actors" — killed;
+the Seam Index is now qualitative bands not fake decimals; no live-"telemetry" cosplay; the
+ledger ships cluster-level with sources + a redaction note; the aha is taught on the hero;
+the Weave is a labelled *coming* preview). View: `candidates/GRAFT/`. Still owed: a human
+visual pass (judged from source, not pixels) before it's called final.
+
 ## Judging criteria (fixed, so the contest is fair)
 
 Score each candidate 0–5 on each; the winner may be a *graft* (best hero from one, best
