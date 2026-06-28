@@ -20,6 +20,7 @@ from .paths import (
     lifecycle_receipt_path,
     routing_receipt_path,
 )
+from .deepen import deepen_idea
 from .retrieval import retrieve
 from .see_adapter import elevate_to_graph
 
@@ -224,6 +225,27 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
             "research_is_live": elevation.research_is_live,
             "graph_path": elevation.graph_path,
         }
+    if args.deepen:
+        report = deepen_idea(
+            result.candidate.claim,
+            result.correlation_id,
+            authority_level=args.authority_level or "proposal",
+            state_root=state_root,
+            reseed=not args.no_reseed,
+        )
+        summary["deepen"] = {
+            "internal_hits": report.internal_hits,
+            "internal_coverage": report.internal_coverage,
+            "external_sources": report.external_sources,
+            "reframed_question": report.reframed_question,
+            "floor_blocked": report.floor_blocked,
+            "llm_provider": report.llm_provider,
+            "reseeded_concepts": report.reseeded_concepts,
+            "deepened_chars": len(report.deepened_text),
+            "graph_path": report.graph_path,
+            "report_path": report.report_path,
+            "notes": report.notes,
+        }
     if args.json:
         _print_json(summary)
     else:
@@ -241,6 +263,14 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
                 f"annotations={e['annotation_count']} research_live={e['research_is_live']}"
             )
             print(f"elevated_graph: {e['graph_path']}")
+        if args.deepen:
+            d = summary["deepen"]
+            print(
+                f"deepened: internal_hits={d['internal_hits']} external={d['external_sources']} "
+                f"floor_blocked={d['floor_blocked']} provider={d['llm_provider'] or '<none>'} "
+                f"reseeded={d['reseeded_concepts']}"
+            )
+            print(f"deepen_report: {d['report_path']}")
     return 0
 
 
@@ -324,6 +354,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="with --elevate, use LIVE external research (real citations) instead "
         "of the canned table; transmits the spark text to a search backend (opt-in)",
+    )
+    ingest.add_argument(
+        "--deepen",
+        action="store_true",
+        help="run the full multi-tier DEEPEN pipeline (internal recall -> reframe "
+        "-> external research -> deepen -> reseed); LLM stages use the Kimi-floored "
+        "router and report floor_blocked rather than degrading below floor",
+    )
+    ingest.add_argument(
+        "--no-reseed",
+        action="store_true",
+        help="with --deepen, skip reseeding the deepened idea into the UnifiedIndex",
     )
     ingest.add_argument("--json", action="store_true")
     ingest.set_defaults(func=_cmd_ingest)
