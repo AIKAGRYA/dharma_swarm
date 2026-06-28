@@ -20,12 +20,30 @@ organization or person named in the content.
 
 ```bash
 cd docs/research/verified_nature_house/hub/site
-python3 build.py          # generates the-seam.html + the-hundred.html
-python3 -m http.server    # open http://localhost:8000/index.html
+python3 build.py            # generates the-seam.html + the-hundred.html (names as in source)
+python3 build.py --redact   # same, but personal names dropped to affiliation level
+python3 -m http.server      # open http://localhost:8000/index.html
 ```
 
 `build.py` uses the `markdown` package if installed (richer output) and otherwise
 falls back to a minimal stdlib renderer. Either way it makes no network calls.
+
+## Hiding the names (the safety valve)
+
+`--redact` drops a curated set of **personal names** (AI-industry / researcher
+individuals where a person's name attaches to a critique — e.g. NVIDIA's CEO, the
+sustainable-AI and water-footprint researchers, the interpretability leads) down to
+**affiliation level**, while keeping the institution and the point. Thinkers and
+authors cited for a **named public work** (the Dasgupta Review, Doughnut Economics,
+*Braiding Sweetgrass*, "Taking AI Welfare Seriously", etc.) are intentionally **not**
+redacted — the named work *is* the legitimate citation and those seams are respectful.
+The source markdown stays canonical; redaction only affects the generated HTML.
+
+**Or just keep it local.** The whole hub can stay un-pushed / local-only until the gate
+clears — nothing here needs to live on a remote to be useful internally.
+
+**Operator call (2026-06-28):** keeping the source on the current low-visibility repo
+is accepted for now; a public **deployment** is not, and is still gated below.
 
 ## The publish gate (binding — do NOT deploy until ALL are true)
 
