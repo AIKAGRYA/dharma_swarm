@@ -104,6 +104,15 @@ Full breakdown: `03_MATURITY_AND_ROADMAP.md`.
   silicon → energy → witness-membrane → soil → noosphere → back. Reframes "the ring
   everything must pass through" as an *earned* throat, not a decreed chokepoint;
   keeps the metaphysics (R_V, strange loop) as the *why*, never the product.
+- **`07_SIS_MATERIAL_LEDGER.md`** — the **debit half** of the Circle (the AI-energy
+  connection). Per-inference compute → energy → carbon → welfare-ton, as a
+  *projection over `spine.EvidenceReceipt`* (which already carries provider/model/
+  tokens/cost). Real seed numbers (Haiku 0.22 → Opus 4.05 Wh; 1B queries/day ≈
+  $1.24M/yr), declared ±40–50% uncertainty, the "verifiable compute offsets"
+  fundable surface, and the recursive n=1 (the swarm meters its own compute-debit).
+- **`08_LOOP_TRACE.md`** *(owned by a parallel instance — see the master prompt)* —
+  the node-by-node trace of the whole loop through the codebase, break list, and
+  minimal-wiring iteration proposals.
 
 ---
 
