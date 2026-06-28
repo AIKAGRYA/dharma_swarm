@@ -8,7 +8,8 @@ truth stays the markdown; this only generates preview HTML.
 Uses the `markdown` package if installed (richer output); otherwise falls back to a
 minimal stdlib renderer covering the constructs these docs use. No network calls.
 
-    python3 build.py            # build both pages
+    python3 build.py            # build both pages (names as in source)
+    python3 build.py --redact   # build with personal names dropped to affiliation level
     python3 -m http.server      # then serve this dir to preview locally
 
 SEED-stage. Nothing built here is published; deployment is gated (see README.md).
@@ -17,10 +18,34 @@ from __future__ import annotations
 
 import html
 import re
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 HUB = HERE.parent
+
+# --- Redaction map (build.py --redact) ------------------------------------------
+# Drops personal names to affiliation level for individuals where a person's name
+# attaches to a critique. Thinkers/authors cited for a named public work (Dasgupta,
+# Raworth, Kimmerer, Shrikanth, the "Taking AI Welfare Seriously" authors, etc.) are
+# intentionally NOT redacted — the named book/paper IS the legitimate citation and
+# the seams there are respectful. Source markdown stays canonical; this only affects
+# the published HTML when --redact is passed.
+REDACT_MAP = {
+    "NVIDIA / Jensen Huang": "NVIDIA",
+    "Sasha Luccioni (Hugging Face / AI Energy Score)": "Hugging Face — AI Energy Score",
+    "Shaolei Ren (UC Riverside)": "UC Riverside — AI water-footprint research",
+    "Barbara Haya / Berkeley Carbon Trading Project": "Berkeley Carbon Trading Project",
+    "Chris Olah (Anthropic interpretability)": "Anthropic interpretability",
+    "Neel Nanda (DeepMind mech-interp)": "DeepMind mechanistic interpretability",
+    "Kate Crawford": "Atlas of AI (AI-as-extraction scholarship)",
+}
+
+
+def _redact(md_text: str) -> str:
+    for name, repl in REDACT_MAP.items():
+        md_text = md_text.replace(name, repl)
+    return md_text
 
 PAGES = [
     ("01_THE_SEAM.md", "the-seam.html", "The Seam — flagship essay (draft)"),
@@ -106,12 +131,17 @@ def _shell(title: str, body_html: str) -> str:
 
 
 def main() -> None:
+    redact = "--redact" in sys.argv[1:]
+    if redact:
+        print(f"  --redact ON: dropping {len(REDACT_MAP)} personal names to affiliation level")
     for src_name, out_name, title in PAGES:
         src = HUB / src_name
         if not src.exists():
             print(f"  skip: {src_name} not found")
             continue
         md_text = src.read_text(encoding="utf-8")
+        if redact:
+            md_text = _redact(md_text)
         body = _render_with_lib(md_text) or _render_minimal(md_text)
         (HERE / out_name).write_text(_shell(title, body), encoding="utf-8")
         print(f"  built: {out_name}  (from {src_name})")
