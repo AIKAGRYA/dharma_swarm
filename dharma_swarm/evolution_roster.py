@@ -584,6 +584,8 @@ _ENV_KEYS_FOR_PROVIDER: dict[ProviderType, str] = {
         # SambaNova is a keyed secondary route (DeepSeek-V4-Pro floor fan-out),
         # not a subscription lane — gate it on its API key, not keyless.
         ProviderType.SAMBANOVA,
+        ProviderType.KIMI_CODE,
+        ProviderType.ZHIPU,
     )
 }
 
@@ -592,7 +594,7 @@ def _provider_has_key(provider: ProviderType) -> bool:
     """Check if the env var for a provider is set (non-empty)."""
     env_key = _ENV_KEYS_FOR_PROVIDER.get(provider)
     if env_key is None:
-        # Ollama, Claude Code, Codex don't need API keys
+        # Ollama, Claude Code, Codex don't need API keys.
         return True
     return bool(os.environ.get(env_key, "").strip())
 

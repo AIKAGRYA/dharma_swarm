@@ -107,6 +107,18 @@ class TestProviderHasKey:
         monkeypatch.setenv("FIREWORKS_API_KEY", "test-key")
         assert _provider_has_key(ProviderType.FIREWORKS) is True
 
+    def test_kimi_code_requires_key(self, monkeypatch):
+        monkeypatch.delenv("KIMI_API_KEY", raising=False)
+        assert _provider_has_key(ProviderType.KIMI_CODE) is False
+        monkeypatch.setenv("KIMI_API_KEY", "test-key")
+        assert _provider_has_key(ProviderType.KIMI_CODE) is True
+
+    def test_zhipu_requires_key(self, monkeypatch):
+        monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+        assert _provider_has_key(ProviderType.ZHIPU) is False
+        monkeypatch.setenv("ZHIPU_API_KEY", "test-key")
+        assert _provider_has_key(ProviderType.ZHIPU) is True
+
     def test_ollama_no_key_needed(self):
         # Ollama not in _ENV_KEYS_FOR_PROVIDER — returns True
         assert _provider_has_key(ProviderType.OLLAMA) is True
@@ -130,6 +142,12 @@ class TestGetAvailableRoster:
         monkeypatch.delenv("NVIDIA_NIM_API_KEY", raising=False)
         monkeypatch.delenv("SAMBANOVA_API_KEY", raising=False)
         monkeypatch.delenv("FIREWORKS_API_KEY", raising=False)
+        monkeypatch.delenv("KIMI_API_KEY", raising=False)
+        monkeypatch.delenv("MOONSHOT_KIMI_API_KEY", raising=False)
+        monkeypatch.delenv("ZHIPU_API_KEY", raising=False)
+        monkeypatch.delenv("GLM_API_KEY", raising=False)
+        monkeypatch.delenv("ZAI_API_KEY", raising=False)
+        monkeypatch.delenv("ZHIPUAI_API_KEY", raising=False)
         # Ollama not reachable
         with patch("dharma_swarm.evolution_roster._ollama_reachable", return_value=False):
             available = get_available_roster()
@@ -142,6 +160,8 @@ class TestGetAvailableRoster:
         # No keyed provider leaks through without its key.
         assert ProviderType.OPENROUTER not in providers
         assert ProviderType.SAMBANOVA not in providers
+        assert ProviderType.KIMI_CODE not in providers
+        assert ProviderType.ZHIPU not in providers
 
     def test_openrouter_gives_models(self, monkeypatch):
         reset_ollama_cache()
