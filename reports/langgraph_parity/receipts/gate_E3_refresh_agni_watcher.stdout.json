@@ -1,0 +1,309 @@
+{
+  "checked_at": "2026-06-29T17:52:14Z",
+  "error": "",
+  "exchange_key_mutation": false,
+  "health_score": 3,
+  "live_order_authority": false,
+  "metadata": {
+    "paper_only": true,
+    "read_only_remote_commands": [
+      {
+        "command": "ssh agni cd /root/trading_lab && python3 -c '\nimport json\nimport time\nfrom datetime import datetime, timezone\nfrom pathlib import Path\n\nBASE = Path(\"/root/trading_lab\")\nnow = time.time()\n\ndef iso(ts):\n    if ts is None:\n        return \"\"\n    return datetime.fromtimestamp(ts, timezone.utc).isoformat()\n\ndef file_status(rel, max_age_s):\n    path = BASE / rel\n    if not path.exists():\n        return {\n            \"path\": rel,\n            \"exists\": False,\n            \"fresh\": False,\n            \"age_s\": None,\n            \"max_age_s\": max_age_s,\n            \"mtime_utc\": \"\",\n        }\n    mtime = path.stat().st_mtime\n    age = max(0, int(now - mtime))\n    return {\n        \"path\": rel,\n        \"exists\": True,\n        \"fresh\": age <= max_age_s,\n        \"age_s\": age,\n        \"max_age_s\": max_age_s,\n        \"mtime_utc\": iso(mtime),\n    }\n\ndef feed_status(name, threshold):\n    rel = f\"data/cache/{name}.json\"\n    path = BASE / rel\n    out = file_status(rel, threshold)\n    cached_at = None\n    if path.exists():\n        try:\n            payload = json.loads(path.read_text())\n            cached_at = payload.get(\"_cached_at\")\n        except Exception:\n            cached_at = None\n    if isinstance(cached_at, (int, float)):\n        age = max(0, int(now - cached_at))\n        out.update({\n            \"age_s\": age,\n            \"fresh\": age <= threshold,\n            \"cached_at\": cached_at,\n            \"cached_at_utc\": iso(cached_at),\n        })\n    out[\"status\"] = \"fresh\" if out[\"fresh\"] else \"stale\" if out[\"exists\"] else \"missing\"\n    out[\"threshold_s\"] = threshold\n    return out\n\ncritical = {\n    \"alpaca_1m\": 1800,\n    \"congressional_trades\": 3600,\n    \"crypto_history\": 3600,\n    \"defi_overview\": 3600,\n    \"defi_tvl\": 3600,\n    \"etf_prices\": 86400,\n    \"insider_trades\": 3600,\n    \"oanda_forex\": 1800,\n    \"sentiment\": 3600,\n    \"yield_curve\": 86400,\n}\n\npayload = {\n    \"generated_at\": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),\n    \"files\": {\n        \"data/dashboard_snapshot.json\": file_status(\"data/dashboard_snapshot.json\", 1800),\n        \"data/market_snapshot.json\": file_status(\"data/market_snapshot.json\", 600),\n        \"data/heartbeat\": file_status(\"data/heartbeat\", 300),\n        \"data/net_exposure.json\": file_status(\"data/net_exposure.json\", 300),\n        \"data/system/dharma_paper_sweep_latest.json\": file_status(\n            \"data/system/dharma_paper_sweep_latest.json\",\n            86400,\n        ),\n    },\n    \"feed_freshness\": {name: feed_status(name, threshold) for name, threshold in critical.items()},\n}\nprint(json.dumps(payload, sort_keys=True))\n'",
+        "exit_code": 0,
+        "name": "snapshot_probe",
+        "stderr": ""
+      },
+      {
+        "command": "ssh agni cd /root/trading_lab && python3 scripts/cron_audit.py --json --days 2",
+        "exit_code": 0,
+        "name": "cron_audit",
+        "stderr": ""
+      },
+      {
+        "command": "ssh agni cd /root/trading_lab && python3 scripts/killed_routes_audit.py --json --positions",
+        "exit_code": 0,
+        "name": "killed_routes_audit",
+        "stderr": ""
+      }
+    ]
+  },
+  "mode": "paper",
+  "node_id": "agni",
+  "ok": true,
+  "packet": {
+    "blockers": [
+      "Dashboard snapshot must be <=30 minutes old.",
+      "Market snapshot must be <=10 minutes old for route promotion.",
+      "2 critical feed(s) are stale or missing: congressional_trades, insider_trades",
+      "Cron audit is not clean: RED_STALE_LOG=4, UNKNOWN_NO_LOG=3.",
+      "Real-money permission remains blocked without explicit operator approval."
+    ],
+    "capital_status": "paper_only",
+    "cron_audit": {
+      "counts": {
+        "GREEN": 47,
+        "RED_STALE_LOG": 4,
+        "UNKNOWN_NO_LOG": 3,
+        "UNKNOWN_NO_PROBE": 43
+      },
+      "red_stale_log": 4,
+      "timestamp": "2026-06-29T17:52:15.626753+00:00",
+      "total_crons": 97,
+      "unknown_no_log": 3,
+      "window_days": 2
+    },
+    "exchange_key_mutation": false,
+    "freshness": {
+      "current_stale_feeds": {
+        "congressional_trades": {
+          "age_s": 21118,
+          "cached_at": 1782734416.3842754,
+          "cached_at_utc": "2026-06-29T12:00:16.384275+00:00",
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T12:00:16.386607+00:00",
+          "path": "data/cache/congressional_trades.json",
+          "status": "stale",
+          "threshold_s": 3600
+        },
+        "insider_trades": {
+          "age_s": 17481,
+          "cached_at": 1782738053.5098984,
+          "cached_at_utc": "2026-06-29T13:00:53.509898+00:00",
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T13:00:53.509744+00:00",
+          "path": "data/cache/insider_trades.json",
+          "status": "stale",
+          "threshold_s": 3600
+        }
+      },
+      "feed_freshness": {
+        "alpaca_1m": {
+          "age_s": 1628,
+          "cached_at": 1782753906.2180092,
+          "cached_at_utc": "2026-06-29T17:25:06.218009+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 1800,
+          "mtime_utc": "2026-06-29T17:25:06.226697+00:00",
+          "path": "data/cache/alpaca_1m.json",
+          "status": "fresh",
+          "threshold_s": 1800
+        },
+        "congressional_trades": {
+          "age_s": 21118,
+          "cached_at": 1782734416.3842754,
+          "cached_at_utc": "2026-06-29T12:00:16.384275+00:00",
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T12:00:16.386607+00:00",
+          "path": "data/cache/congressional_trades.json",
+          "status": "stale",
+          "threshold_s": 3600
+        },
+        "crypto_history": {
+          "age_s": 2111,
+          "cached_at": 1782753423.3763635,
+          "cached_at_utc": "2026-06-29T17:17:03.376364+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T17:17:03.379519+00:00",
+          "path": "data/cache/crypto_history.json",
+          "status": "fresh",
+          "threshold_s": 3600
+        },
+        "defi_overview": {
+          "age_s": 3120,
+          "cached_at": 1782752414.5525014,
+          "cached_at_utc": "2026-06-29T17:00:14.552501+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T17:00:14.552491+00:00",
+          "path": "data/cache/defi_overview.json",
+          "status": "fresh",
+          "threshold_s": 3600
+        },
+        "defi_tvl": {
+          "age_s": 2112,
+          "cached_at": 1782753422.6943433,
+          "cached_at_utc": "2026-06-29T17:17:02.694343+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T17:17:02.694492+00:00",
+          "path": "data/cache/defi_tvl.json",
+          "status": "fresh",
+          "threshold_s": 3600
+        },
+        "etf_prices": {
+          "age_s": 40921,
+          "cached_at": 1782714613.967344,
+          "cached_at_utc": "2026-06-29T06:30:13.967344+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 86400,
+          "mtime_utc": "2026-06-29T06:30:13.982637+00:00",
+          "path": "data/cache/etf_prices.json",
+          "status": "fresh",
+          "threshold_s": 86400
+        },
+        "insider_trades": {
+          "age_s": 17481,
+          "cached_at": 1782738053.5098984,
+          "cached_at_utc": "2026-06-29T13:00:53.509898+00:00",
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T13:00:53.509744+00:00",
+          "path": "data/cache/insider_trades.json",
+          "status": "stale",
+          "threshold_s": 3600
+        },
+        "oanda_forex": {
+          "age_s": 1030,
+          "cached_at": 1782754504.5994883,
+          "cached_at_utc": "2026-06-29T17:35:04.599488+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 1800,
+          "mtime_utc": "2026-06-29T17:35:04.649429+00:00",
+          "path": "data/cache/oanda_forex.json",
+          "status": "fresh",
+          "threshold_s": 1800
+        },
+        "sentiment": {
+          "age_s": 3128,
+          "cached_at": 1782752406.3777447,
+          "cached_at_utc": "2026-06-29T17:00:06.377745+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 3600,
+          "mtime_utc": "2026-06-29T17:00:06.377167+00:00",
+          "path": "data/cache/sentiment.json",
+          "status": "fresh",
+          "threshold_s": 3600
+        },
+        "yield_curve": {
+          "age_s": 40925,
+          "cached_at": 1782714609.228779,
+          "cached_at_utc": "2026-06-29T06:30:09.228779+00:00",
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 86400,
+          "mtime_utc": "2026-06-29T06:30:09.228455+00:00",
+          "path": "data/cache/yield_curve.json",
+          "status": "fresh",
+          "threshold_s": 86400
+        }
+      },
+      "files": {
+        "data/dashboard_snapshot.json": {
+          "age_s": 41787,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 1800,
+          "mtime_utc": "2026-06-29T06:15:47.990283+00:00",
+          "path": "data/dashboard_snapshot.json"
+        },
+        "data/heartbeat": {
+          "age_s": 114,
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 300,
+          "mtime_utc": "2026-06-29T17:50:20.955432+00:00",
+          "path": "data/heartbeat"
+        },
+        "data/market_snapshot.json": {
+          "age_s": 2506894,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 600,
+          "mtime_utc": "2026-05-31T17:30:40.723664+00:00",
+          "path": "data/market_snapshot.json"
+        },
+        "data/net_exposure.json": {
+          "age_s": 11,
+          "exists": true,
+          "fresh": true,
+          "max_age_s": 300,
+          "mtime_utc": "2026-06-29T17:52:03.974672+00:00",
+          "path": "data/net_exposure.json"
+        },
+        "data/system/dharma_paper_sweep_latest.json": {
+          "age_s": 2506620,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 86400,
+          "mtime_utc": "2026-05-31T17:35:15.158119+00:00",
+          "path": "data/system/dharma_paper_sweep_latest.json"
+        }
+      },
+      "stale_evidence": [
+        {
+          "age_s": 41787,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 1800,
+          "mtime_utc": "2026-06-29T06:15:47.990283+00:00",
+          "path": "data/dashboard_snapshot.json"
+        },
+        {
+          "age_s": 2506894,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 600,
+          "mtime_utc": "2026-05-31T17:30:40.723664+00:00",
+          "path": "data/market_snapshot.json"
+        },
+        {
+          "age_s": 2506620,
+          "exists": true,
+          "fresh": false,
+          "max_age_s": 86400,
+          "mtime_utc": "2026-05-31T17:35:15.158119+00:00",
+          "path": "data/system/dharma_paper_sweep_latest.json"
+        }
+      ]
+    },
+    "generated_at": "2026-06-29T17:52:14Z",
+    "killed_routes": {
+      "killed_route_count": 94,
+      "routes_with_capital": 94,
+      "routes_with_positions": 0,
+      "timestamp": "2026-06-29T17:52:16.609915+00:00",
+      "total_cash_trapped_usd": 7703.09,
+      "total_open_positions": 0,
+      "total_positions_value_usd": 0.0
+    },
+    "live_order_authority": false,
+    "real_money_permission": "blocked",
+    "remote_validation_generated_at": "2026-06-29T17:52:14Z",
+    "route_screen": {
+      "candidate_use": "paper_review_only_not_capital_permission",
+      "capital_eligible": false,
+      "screen_rules": [
+        "positive paper PnL",
+        ">=30 trades for shadow candidate; >=100 trades preferred for micro-live review",
+        "Sharpe >=1.0 before deeper validation",
+        "no capital without OOS, fee/slippage stress, kill-switch proof, and model council review"
+      ]
+    },
+    "schema_version": "agni.kaizen_watcher.v1",
+    "watcher": "KaizenOpsForShaktiGinko_AGNITradingLab"
+  },
+  "readiness_score": 0,
+  "real_money_permission": "blocked",
+  "remote_writes": [],
+  "schema_version": "dharma_remote_kaizen_agni_result.v1",
+  "ssh_alias": "agni",
+  "status": "watching",
+  "trading_root": "/root/trading_lab",
+  "updated_at": "2026-06-29T17:52:14Z",
+  "watcher": "KaizenOpsForShaktiGinko_AGNITradingLab"
+}

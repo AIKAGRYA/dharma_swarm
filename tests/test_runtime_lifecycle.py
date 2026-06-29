@@ -257,6 +257,17 @@ async def test_runtime_lifecycle_receipts_use_session_mission_when_task_lacks_mi
         result="done",
         require_identity=True,
     )
+    artifact_path = tmp_path / "artifact.md"
+    artifact_path.write_text("done\n", encoding="utf-8")
+    await lifecycle.record_artifact(
+        task=task,
+        artifact_id="artifact-mission-fallback",
+        artifact_kind="task_result",
+        payload_path=artifact_path,
+        checksum="sha256:fallback",
+        run_id="run-mission-fallback",
+        require_identity=True,
+    )
 
     receipts = await RuntimeStateStore(runtime_db_path).list_runtime_receipts(
         run_id="run-mission-fallback",
@@ -272,14 +283,28 @@ async def test_runtime_lifecycle_receipts_use_session_mission_when_task_lacks_mi
         for receipt in receipts
         if receipt.receipt_type == "delegation_run" and receipt.status == "completed"
     )
+    artifact_written = next(
+        receipt
+        for receipt in receipts
+        if receipt.receipt_type == "artifact_written" and receipt.status == "completed"
+    )
 
-    assert claim.payload["mission_id"] == ""
+    assert claim.payload["mission_id"] == "sess-runtime-lifecycle-mission-fallback"
     assert claim.payload["mission"] == "sess-runtime-lifecycle-mission-fallback"
-    assert run.payload["mission_id"] == ""
+    assert claim.payload["mission_id_source"] == "runtime_lifecycle_fallback"
+    assert run.payload["mission_id"] == "sess-runtime-lifecycle-mission-fallback"
     assert run.payload["mission"] == "sess-runtime-lifecycle-mission-fallback"
+    assert run.payload["mission_id_source"] == "runtime_lifecycle_fallback"
     assert run.payload["no_artifact_refs_reason"] == (
         "delegation_run has no current_artifact_id"
     )
+    assert artifact_written.payload["mission_id"] == (
+        "sess-runtime-lifecycle-mission-fallback"
+    )
+    assert artifact_written.payload["mission_id_source"] == "runtime_lifecycle_fallback"
+    assert artifact_written.payload["artifact_refs"] == [
+        "artifact_records:artifact-mission-fallback"
+    ]
     with sqlite3.connect(runtime_db_path) as db:
         metadata_json = db.execute(
             "SELECT metadata_json FROM delegation_runs WHERE run_id = ?",
@@ -288,12 +313,29 @@ async def test_runtime_lifecycle_receipts_use_session_mission_when_task_lacks_mi
     assert json.loads(metadata_json)["mission"] == (
         "sess-runtime-lifecycle-mission-fallback"
     )
+    assert json.loads(metadata_json)["mission_id"] == (
+        "sess-runtime-lifecycle-mission-fallback"
+    )
 
     coverage_report = _load_receipt_coverage_report().build_report(
         runtime_db_path,
         run_id="run-mission-fallback",
     )
     assert coverage_report["summary"]["score_gate_70_to_75"] is True
+
+    from dharma_swarm.operator_core.runtime_truth import (
+        runtime_truth_packets_from_runtime_db,
+    )
+
+    packets = runtime_truth_packets_from_runtime_db(
+        runtime_db_path,
+        observed_at="2026-06-29T16:20:00Z",
+    )
+    latest = next(
+        packet for packet in packets if packet.surface_id == "runtime_state.latest_receipt"
+    )
+    assert latest.mission_id == "sess-runtime-lifecycle-mission-fallback"
+    assert "mission_id" not in latest.missing_machine_fields
 
 
 @pytest.mark.asyncio
@@ -858,6 +900,24 @@ async def test_runtime_lifecycle_long_timeout_keeps_provider_execution_unknown(
         error="Execution exceeded long timeout",
         require_identity=True,
     )
+
+    from dharma_swarm.operator_core.runtime_truth import (
+        runtime_truth_packets_from_runtime_db,
+    )
+
+    packets = runtime_truth_packets_from_runtime_db(
+        runtime_db_path,
+        observed_at="2026-06-29T17:45:00Z",
+    )
+    latest = next(
+        packet for packet in packets if packet.surface_id == "runtime_state.latest_receipt"
+    )
+    assert latest.receipt_refs[0].startswith("runtime_receipts:")
+    assert latest.metadata["no_artifact_refs_reason"] == (
+        "delegation_run has no current_artifact_id"
+    )
+    assert "artifact_refs" not in latest.missing_machine_fields
+
     await lifecycle.record_task_claim(
         dispatch,
         task=task,

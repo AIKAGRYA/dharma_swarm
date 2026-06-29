@@ -1,0 +1,213 @@
+{
+  "daemon_health": {
+    "evidence": "daemon /health returned non-secret runtime_dispatch block",
+    "http_status": 200,
+    "runtime_dispatch": {
+      "dispatch_mode": "spine",
+      "env_key_present": true,
+      "source": "process_env_non_secret_boolean",
+      "spine_dispatch_enabled": true
+    },
+    "state": "spine_enabled_self_report",
+    "url": "http://127.0.0.1:7433/health"
+  },
+  "entries": [
+    {
+      "activation": "set DHARMA_SPINE_DISPATCH=1 to route through invoke_agent",
+      "current_state": "legacy_default_in_current_process",
+      "default_path": "direct runner.run_task unless DHARMA_SPINE_DISPATCH=1",
+      "evidence": "_execute_task branches on DHARMA_SPINE_DISPATCH before runner.run_task",
+      "file": "dharma_swarm/orchestrator.py",
+      "line": 2648,
+      "mode": "spine_opt_in_legacy_default",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "medium",
+      "surface": "orchestrator",
+      "verification": "tests/test_orchestrator_spine_dispatch.py"
+    },
+    {
+      "activation": "LaunchAgent EnvironmentVariables or command string",
+      "current_state": "spine_enabled_launch_spec",
+      "default_path": "launch spec declares an explicit dispatch mode",
+      "evidence": "launch spec declares DHARMA_SPINE_DISPATCH=1 and invokes repo-pinned dharma_swarm.dgc_cli module",
+      "file": "/Users/dhyana/Library/LaunchAgents/com.dharma.swarm.plist",
+      "line": null,
+      "mode": "spine_enabled_launch_spec",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "orchestrator.persistent-daemon",
+      "verification": "plutil -p ~/Library/LaunchAgents/com.dharma.swarm.plist"
+    },
+    {
+      "activation": "Docstring / example code",
+      "current_state": "excluded_from_live_ingress",
+      "default_path": "not a live production dispatch path",
+      "evidence": "Docstring / example code",
+      "file": "dharma_swarm/a2a/a2a_server.py",
+      "line": 259,
+      "mode": "non_production",
+      "owner": "",
+      "risk": "low",
+      "surface": "a2a.non-production",
+      "verification": ""
+    },
+    {
+      "activation": "Inside invoke_agent() invoker closure",
+      "current_state": "spine_available_for_explicit_call",
+      "default_path": "submit_via_spine invokes invoke_agent around A2AServer.submit",
+      "evidence": "Inside invoke_agent() invoker closure",
+      "file": "dharma_swarm/a2a/a2a_bridge.py",
+      "line": 126,
+      "mode": "spine_native_adapter",
+      "owner": "",
+      "risk": "low",
+      "surface": "a2a.spine-adopted",
+      "verification": ""
+    },
+    {
+      "activation": "director named-runner execution traverses invoke_agent",
+      "current_state": "wrapped_by_runtime_spine",
+      "default_path": "named swarm runner is called inside invoke_agent",
+      "evidence": "runner.run_task(captured[\"_task_obj\"]),",
+      "file": "dharma_swarm/thinkodynamic_director.py",
+      "line": 1429,
+      "mode": "spine_wrapped_direct_runner",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.spine_wrapped_direct_runner",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    },
+    {
+      "activation": "manual integration script; still excluded from daemon readiness",
+      "current_state": "manual_operator_script_spine_wrapped_not_default_daemon",
+      "default_path": "manual script calls AgentRunner through invoke_agent helper",
+      "evidence": "result, receipt = await run_manual_agent_runner_via_spine(",
+      "file": "scripts/live_claude_code.py",
+      "line": 65,
+      "mode": "manual_live_spine_wrapped",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.manual_live_spine_wrapped",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    },
+    {
+      "activation": "manual integration script; still excluded from daemon readiness",
+      "current_state": "manual_operator_script_spine_wrapped_not_default_daemon",
+      "default_path": "manual script calls AgentRunner through invoke_agent helper",
+      "evidence": "result, receipt = await run_manual_agent_runner_via_spine(",
+      "file": "scripts/live_fanout.py",
+      "line": 58,
+      "mode": "manual_live_spine_wrapped",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.manual_live_spine_wrapped",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    },
+    {
+      "activation": "manual integration script; still excluded from daemon readiness",
+      "current_state": "manual_operator_script_spine_wrapped_not_default_daemon",
+      "default_path": "manual script calls AgentRunner through invoke_agent helper",
+      "evidence": "result, receipt = await run_manual_agent_runner_via_spine(",
+      "file": "scripts/live_genome_test.py",
+      "line": 52,
+      "mode": "manual_live_spine_wrapped",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.manual_live_spine_wrapped",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    },
+    {
+      "activation": "manual integration script; still excluded from daemon readiness",
+      "current_state": "manual_operator_script_spine_wrapped_not_default_daemon",
+      "default_path": "manual script calls AgentRunner through invoke_agent helper",
+      "evidence": "result2, receipt2 = await run_manual_agent_runner_via_spine(",
+      "file": "scripts/live_genome_test.py",
+      "line": 84,
+      "mode": "manual_live_spine_wrapped",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.manual_live_spine_wrapped",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    },
+    {
+      "activation": "manual integration script; still excluded from daemon readiness",
+      "current_state": "manual_operator_script_spine_wrapped_not_default_daemon",
+      "default_path": "manual script calls AgentRunner through invoke_agent helper",
+      "evidence": "result, receipt = await run_manual_agent_runner_via_spine(",
+      "file": "scripts/live_test.py",
+      "line": 52,
+      "mode": "manual_live_spine_wrapped",
+      "owner": "runtime-truth-spine-adoption-2026-06",
+      "risk": "low",
+      "surface": "agent_runner.manual_live_spine_wrapped",
+      "verification": "python3 scripts/governance/spine_dispatch_mode_report.py --strict"
+    }
+  ],
+  "launch_specs": [
+    {
+      "ambient_dgc_invocation": false,
+      "command": "/bin/bash -c cd /Users/dhyana/dharma_swarm && source .env && exec env PYTHONPATH=/Users/dhyana/dharma_swarm TINY_ROUTER_BACKEND=heuristic ./.venv/bin/python -m dharma_swarm.dgc_cli orchestrate-live",
+      "env": {
+        "DHARMA_DAEMON_SELF_HEAL_STALE_PID": "1",
+        "DHARMA_SPINE_DISPATCH": "1",
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      },
+      "evidence": "launch spec declares DHARMA_SPINE_DISPATCH=1 and invokes repo-pinned dharma_swarm.dgc_cli module",
+      "exists": true,
+      "file": "/Users/dhyana/Library/LaunchAgents/com.dharma.swarm.plist",
+      "repo_module_invocation": true,
+      "state": "spine_enabled_launch_spec"
+    },
+    {
+      "ambient_dgc_invocation": false,
+      "command": "/bin/bash -c cd /Users/dhyana/dharma_swarm && source .env && exec env PYTHONPATH=/Users/dhyana/dharma_swarm TINY_ROUTER_BACKEND=heuristic ./.venv/bin/python -m dharma_swarm.dgc_cli orchestrate-live",
+      "env": {
+        "DHARMA_DAEMON_SELF_HEAL_STALE_PID": "1",
+        "DHARMA_SPINE_DISPATCH": "1",
+        "PATH": "/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin"
+      },
+      "evidence": "launch spec declares DHARMA_SPINE_DISPATCH=1 and invokes repo-pinned dharma_swarm.dgc_cli module",
+      "exists": true,
+      "file": "com.dharma.swarm.plist",
+      "repo_module_invocation": true,
+      "state": "spine_enabled_launch_spec"
+    }
+  ],
+  "live_census": {
+    "evidence": "live ops census has no proof-gap surfaces",
+    "freshness": {
+      "age_minutes": 18.8,
+      "evidence": "live ops census receipt generated_at is fresh",
+      "max_age_hours": 24.0,
+      "state": "fresh"
+    },
+    "generated_at": "2026-06-29T17:52:41Z",
+    "proof_gap_surfaces": [],
+    "receipt": "/Users/dhyana/.dharma/ops/live_process_census.json",
+    "source_stale_surfaces": [],
+    "state": "bound"
+  },
+  "repo": "/Users/dhyana/dharma_swarm",
+  "report": "spine_dispatch_mode_report",
+  "summary": {
+    "a2a_legacy_quarantined": 0,
+    "a2a_spine_native": 1,
+    "a2a_unknown": 0,
+    "agent_runner_legacy_direct": 0,
+    "agent_runner_manual_scripts": 0,
+    "agent_runner_manual_spine_wrapped": 5,
+    "agent_runner_spine_wrapped": 1,
+    "daemon_health_self_report": "spine_enabled_self_report",
+    "explicit_modes": true,
+    "intentional_quarantine_complete": true,
+    "live_census_proof_gap_surfaces": 0,
+    "live_census_source_stale_surfaces": 0,
+    "live_census_state": "bound",
+    "manual_direct_runner_clear": true,
+    "orchestrator_current_process": "legacy_default_in_current_process",
+    "orchestrator_mode": "spine_opt_in_legacy_default",
+    "orchestrator_persistent_daemon": "spine_enabled_launch_spec",
+    "production_direct_runner_clear": true,
+    "score_gate_65_to_70": true
+  }
+}

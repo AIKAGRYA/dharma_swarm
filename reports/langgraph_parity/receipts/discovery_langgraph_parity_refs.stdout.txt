@@ -1,0 +1,10 @@
+dharma_swarm/langgraph_parity/state.py:62:    return bool(message.metadata.get("langgraph_parity_routing"))
+dharma_swarm/langgraph_parity/tools.py:28:            metadata={"langgraph_parity_routing": True, "routing_type": "handoff"},
+dharma_swarm/langgraph_parity/tools.py:35:            metadata={"langgraph_parity_routing": True, "routing_type": "handoff"},
+dharma_swarm/langgraph_parity/tools.py:61:                "langgraph_parity_routing": True,
+dharma_swarm/langgraph_parity/tools.py:71:                "langgraph_parity_routing": True,
+tests/test_langgraph_parity_supervisor.py:5:from dharma_swarm.langgraph_parity.state import ParityMessage, is_routing_message
+tests/test_langgraph_parity_supervisor.py:6:from dharma_swarm.langgraph_parity.supervisor_runtime import (
+docs/langgraph_parity/LANGGRAPH_DOCS_REQUIREMENTS.md:326:- `tests/langgraph_parity/test_swarm_contract.py`
+docs/langgraph_parity/LANGGRAPH_DOCS_REQUIREMENTS.md:327:- `tests/langgraph_parity/test_supervisor_contract.py`
+docs/langgraph_parity/LANGGRAPH_DOCS_REQUIREMENTS.md:328:- `tests/langgraph_parity/test_local_state_boundary.py`

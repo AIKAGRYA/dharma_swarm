@@ -60,7 +60,7 @@ class RuntimeLifecycle:
         *,
         task_id: str,
     ) -> dict[str, str]:
-        mission_id = self._first_text(
+        explicit_mission_id = self._first_text(
             task_metadata.get("mission_id"),
             task_metadata.get("missionId"),
             dispatch_metadata.get("mission_id"),
@@ -68,17 +68,28 @@ class RuntimeLifecycle:
             identity_metadata.get("mission_id"),
             identity_metadata.get("missionId"),
         )
-        mission = self._first_text(
+        explicit_mission = self._first_text(
             task_metadata.get("mission"),
             dispatch_metadata.get("mission"),
             identity_metadata.get("mission"),
-            mission_id,
+        )
+        mission = self._first_text(
+            explicit_mission,
+            explicit_mission_id,
             self._ledger.session_id,
             task_id,
         )
+        mission_id = self._first_text(explicit_mission_id, explicit_mission, mission)
         return {
             "mission_id": mission_id,
             "mission": mission,
+            "mission_id_source": (
+                "explicit_mission_id"
+                if explicit_mission_id
+                else "explicit_mission"
+                if explicit_mission
+                else "runtime_lifecycle_fallback"
+            ),
         }
 
     @classmethod
@@ -879,9 +890,11 @@ class RuntimeLifecycle:
             **self._task_meta(task),
             **dict(metadata or {}),
         }
-        mission_id = self._first_text(
-            artifact_metadata.get("mission_id"),
-            artifact_metadata.get("mission"),
+        mission_payload = self._mission_payload(
+            artifact_metadata,
+            {},
+            {},
+            task_id=task.id,
         )
         route_truth = self._route_truth(artifact_metadata, {}, {})
         identity = ExecutionIdentity.from_metadata(
@@ -925,7 +938,7 @@ class RuntimeLifecycle:
                     "artifact_id": artifact_id,
                     "artifact_kind": artifact_kind,
                     "artifact_refs": [f"artifact_records:{artifact_id}"],
-                    "mission_id": mission_id,
+                    **mission_payload,
                     "payload_path": str(payload_path),
                     "manifest_path": str(manifest_path or ""),
                     **route_truth,

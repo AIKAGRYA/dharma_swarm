@@ -26,6 +26,8 @@ def test_a2a_readiness_degrades_when_queue_missing(tmp_path: Path) -> None:
     assert report.ready is False
     assert report.gate_status == "DEGRADED"
     assert report.reasons == ["queue_missing"]
+    assert report.blocker_task_ids == {"queue_missing": []}
+    assert report.blocker_task_id_coverage_complete is False
 
 
 def test_a2a_readiness_degrades_for_open_or_claimed_tasks(tmp_path: Path) -> None:
@@ -43,6 +45,10 @@ def test_a2a_readiness_degrades_for_open_or_claimed_tasks(tmp_path: Path) -> Non
     assert report.gate_status == "DEGRADED"
     assert report.open_tasks == 2
     assert "open_or_claimed_tasks_present" in report.reasons
+    assert report.blocker_task_ids == {
+        "open_or_claimed_tasks_present": ["t1", "t2"]
+    }
+    assert report.blocker_task_id_coverage_complete is True
 
 
 def test_a2a_readiness_ready_for_verified_closed_queue(tmp_path: Path) -> None:
@@ -71,6 +77,34 @@ def test_a2a_readiness_ready_for_verified_closed_queue(tmp_path: Path) -> None:
     assert report.ready is True
     assert report.gate_status == "READY"
     assert report.reasons == []
+    assert report.blocker_task_ids == {}
+    assert report.blocker_task_id_coverage_complete is True
+
+
+def test_a2a_readiness_groups_unverified_and_unknown_blocker_task_ids(
+    tmp_path: Path,
+) -> None:
+    _write_queue(
+        tmp_path,
+        [
+            {"id": "t-expired", "status": "expired"},
+            {
+                "id": "t-closed",
+                "status": "completed",
+                "completed_by": "agent-1",
+            },
+        ],
+    )
+
+    report = evaluate_a2a_readiness(tmp_path)
+
+    assert report.ready is False
+    assert report.blocker_task_ids == {
+        "open_or_claimed_tasks_present": ["t-expired"],
+        "unverified_closed_tasks_present": ["t-closed"],
+        "unknown_status_tasks_present": ["t-expired"],
+    }
+    assert report.blocker_task_id_coverage_complete is True
 
 
 def test_a2a_readiness_strict_exits_nonzero_when_degraded(tmp_path: Path) -> None:
