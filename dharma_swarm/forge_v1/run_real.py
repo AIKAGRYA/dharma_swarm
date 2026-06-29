@@ -9,10 +9,10 @@ What it measures
 ----------------
 For each instance, two arms at EQUAL token budget:
 
-  CHAMPION : best-of-N on ONE model (gemini-2.5-flash). Sample up to N patches
+  CHAMPION : best-of-N on ONE Gemini Flash model. Sample up to N patches
              under a TokenBroker cap; grade EACH with verify_prediction (Docker);
              keep the first that resolves.
-  SWARM    : two DECORRELATED real model families (gemini-2.5-flash + glm-5.1)
+  SWARM    : two DECORRELATED real model families (Gemini Flash + GLM)
              each propose one patch; grade each with verify_prediction; keep the
              first that resolves. Same TokenBroker cap as champion (equal budget).
 
@@ -83,16 +83,18 @@ from dharma_swarm.forge_v1.run_real_proposer import (  # noqa: E402
     SweBenchProposer,
     _rate_limit_wait_s,
 )
+from dharma_swarm.model_defaults import default_for_provider  # noqa: E402
+from dharma_swarm.models import ProviderType  # noqa: E402
 
 # Default tiny/fast pure-logic instances (no network tests). Picked by smallest
 # (FAIL_TO_PASS, PASS_TO_PASS, patch size) over sympy/django in Verified.
 DEFAULT_INSTANCES = ["django__django-12209"]
 
-CHAMPION_MODEL = "gemini-2.5-flash"
+CHAMPION_MODEL = default_for_provider(ProviderType.GOOGLE_AI)
 # Second DECORRELATED family for the swarm (Ollama-Cloud GLM, chinese_cluster) —
 # a genuinely different model family from Gemini (deepmind), not a temperature
 # stand-in. Verified live via dkeys + a real PONG call before this run.
-SWARM_MODELS = ["gemini-2.5-flash", "glm-5.1"]
+SWARM_MODELS = [CHAMPION_MODEL, default_for_provider(ProviderType.OLLAMA)]
 
 
 # --------------------------------------------------------------------------- #
@@ -199,7 +201,7 @@ def run(
 
 
 def _gemini_price_usd(tokens: int) -> float:
-    """Rough blended $ for gemini-2.5-flash (~$0.30/M in, ~$2.50/M out). We only
+    """Rough blended Gemini Flash cost. We only
     track a total token count, so use a blended ~$1/M as a coarse upper bound."""
     return tokens / 1_000_000 * 1.0
 
@@ -211,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("-n", "--best-of-n", type=int, default=3, help="champion best-of-N (<=3 for a proof)")
     ap.add_argument("--budget", type=int, default=20000, help="token cap PER ARM (equal budget)")
     ap.add_argument("--grade-timeout", type=int, default=1800, help="swebench per-eval timeout (s)")
-    ap.add_argument("--swarm-second-model", default="glm-5.1",
+    ap.add_argument("--swarm-second-model", default=default_for_provider(ProviderType.OLLAMA),
                     help="second swarm family (must be a live key)")
     ap.add_argument("--single-family-standin", action="store_true",
                     help="if no 2nd live family: use gemini@2 temperatures (honest stand-in)")

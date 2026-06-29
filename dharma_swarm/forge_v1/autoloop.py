@@ -15,11 +15,10 @@ Two coupled loops:
 Why this exists: the 2026-06-28/29 runs scored 0/0 not because the models can't
 code, but because (a) the champion/2nd models (kimi-for-coding, glm) TIMED OUT or
 TRUNCATED on the 78KB full-file context, and (b) the raw output was never saved,
-so the failure was unreadable. Probed 2026-06-29: Max-plan (claude-opus-4.8) and
-codex (gpt-5.5) models CANNOT be called nested inside a Claude Code session
-(they time out); gemini-2.5-flash / glm-5.2 / kimi-for-coding all parse+apply on
-small inputs. gemini-2.5-flash has a ~1M context and is the champion that can eat
-the whole file.
+so the failure was unreadable. Probed 2026-06-29: Max-plan Claude and Codex
+models CANNOT be called nested inside a Claude Code session (they time out);
+Gemini Flash / direct GLM / Kimi Code all parse+apply on small inputs. Gemini
+Flash has a very large context and is the champion that can eat the whole file.
 
 Artifacts: ~/.dharma/forge_v1/autoloop/<run>/ (raw text, patches, scoreboard).
 Never the repo.
@@ -62,37 +61,41 @@ from dharma_swarm.forge_v1.run_real import (  # noqa: E402
 )
 from dharma_swarm.forge_v1.swebench_real import verified_instances, verify_prediction  # noqa: E402
 from dharma_swarm.forge_v1.autoloop_context import pull_context, window_context  # noqa: E402
+from dharma_swarm.model_defaults import default_for_provider  # noqa: E402
 from dharma_swarm.model_pool import (  # noqa: E402
     FORGE_KIMI_CODE_MODEL_ID,
     FORGE_NVIDIA_KIMI_MODEL_ID,
 )
+from dharma_swarm.models import ProviderType  # noqa: E402
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "autoloop"
 DEFAULT_INSTANCE = "django__django-12209"
+FORGE_GEMINI_FLASH_MODEL_ID = default_for_provider(ProviderType.GOOGLE_AI)
+FORGE_ZHIPU_GLM_MODEL_ID = default_for_provider(ProviderType.ZHIPU)
 
 # Live + callable roster (probed 2026-06-29). gemini eats the full file (1M ctx)
-# and emits a clean SEARCH/REPLACE block. glm-5.2 is a REASONING model that thinks
+# and emits a clean SEARCH/REPLACE block. GLM is a REASONING model that thinks
 # in the output channel, so it needs a large output budget or it truncates before
 # emitting the block (observed: 8192 tokens -> stop_reason=length, 0 blocks).
 # kimi-for-coding REQUIRES temperature=1 and TIMES OUT on the 78KB full file, so it
 # is not in the default swarm (kept as an opt-in for windowed-context experiments).
-CHAMPION = {"model": "gemini-2.5-flash", "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"}
+CHAMPION = {"model": FORGE_GEMINI_FLASH_MODEL_ID, "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"}
 # The WHOLE callable, decorrelated swarm. Each member's wall is recoded around:
 #  - gemini: fine (1M ctx, clean format).
-#  - glm-5.2: reasoning model — narrates the fix then ends the turn without the
+#  - direct GLM: reasoning model — narrates the fix then ends the turn without the
 #    block; the finish-the-block continuation (continue_rounds) pushes it to emit.
 #  - moonshotai/kimi-k2.6 via NVIDIA NIM: decorrelated moonshot family, avoids the
 #    kimi-for-coding endpoint that times out on the 78KB file.
 SWARM = [
-    {"model": "gemini-2.5-flash", "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"},
-    {"model": "glm-5.2", "temperature": 0.2, "max_tokens": 16000, "timeout_s": 240, "continue_rounds": 3, "family": "zai"},
+    {"model": FORGE_GEMINI_FLASH_MODEL_ID, "temperature": 0.2, "max_tokens": 8192, "timeout_s": 150, "continue_rounds": 2, "family": "deepmind"},
+    {"model": FORGE_ZHIPU_GLM_MODEL_ID, "temperature": 0.2, "max_tokens": 16000, "timeout_s": 240, "continue_rounds": 3, "family": "zai"},
     {"model": FORGE_NVIDIA_KIMI_MODEL_ID, "temperature": 0.3, "max_tokens": 8192, "timeout_s": 240, "continue_rounds": 3, "family": "moonshot-nvidia"},
 ]
-DEFAULT_CAPTURE_MODELS = ",".join((CHAMPION["model"], "glm-5.2"))
+DEFAULT_CAPTURE_MODELS = ",".join((CHAMPION["model"], FORGE_ZHIPU_GLM_MODEL_ID))
 DEFAULT_MATRIX_MODELS = ",".join(
-    (FORGE_KIMI_CODE_MODEL_ID, FORGE_NVIDIA_KIMI_MODEL_ID, "glm-5.2", CHAMPION["model"])
+    (FORGE_KIMI_CODE_MODEL_ID, FORGE_NVIDIA_KIMI_MODEL_ID, FORGE_ZHIPU_GLM_MODEL_ID, CHAMPION["model"])
 )
-DEFAULT_MULTI_SWARM_MODELS = ",".join((FORGE_NVIDIA_KIMI_MODEL_ID, "glm-5.2", CHAMPION["model"]))
+DEFAULT_MULTI_SWARM_MODELS = ",".join((FORGE_NVIDIA_KIMI_MODEL_ID, FORGE_ZHIPU_GLM_MODEL_ID, CHAMPION["model"]))
 
 
 def _safe(name: str) -> str:
@@ -104,7 +107,7 @@ def spec_for(model_id: str, temperature: float | None = None) -> dict:
     encoding each family's known wall. Used by the CLI to build champion/swarm
     rosters from bare model ids."""
     s = {"model": model_id, "temperature": 0.2, "max_tokens": 8192, "timeout_s": 600, "continue_rounds": 3}
-    if model_id == "gemini-2.5-flash":
+    if model_id == FORGE_GEMINI_FLASH_MODEL_ID:
         s.update(max_tokens=8192, timeout_s=300, continue_rounds=2)
     elif model_id.startswith("glm"):
         s.update(max_tokens=16000, timeout_s=600, continue_rounds=3)   # reasoning + flaky latency: give it room
