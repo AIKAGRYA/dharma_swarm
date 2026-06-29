@@ -597,6 +597,13 @@ def _packet_from_latest_runtime_receipt(
         _json_map(_field(run, "metadata_json")),
         _json_map(_field(claim, "metadata_json")),
     )
+    no_artifact_refs_reason = _first_metadata_value(
+        "no_artifact_refs_reason",
+        receipt_payload,
+        _json_map(_field(identity, "metadata_json")),
+        _json_map(_field(run, "metadata_json")),
+        _json_map(_field(claim, "metadata_json")),
+    )
 
     stale = _is_stale(_field(claim, "stale_after"))
     latest_artifact_at = _field(artifacts[0], "created_at") if artifacts else ""
@@ -612,6 +619,7 @@ def _packet_from_latest_runtime_receipt(
         claim=claim,
         run=run,
         artifact_refs=artifact_refs,
+        no_artifact_refs_reason=no_artifact_refs_reason or "",
     )
     return ProjectionRuntimeTruthPacket(
         surface_id="runtime_state.latest_receipt",
@@ -668,6 +676,7 @@ def _packet_from_latest_runtime_receipt(
             "delegation_status": _field(run, "status"),
             "task_claim_status": _field(claim, "status"),
             "artifact_count_for_latest": len(artifacts),
+            "no_artifact_refs_reason": no_artifact_refs_reason or "",
             "read_only_probe": True,
         },
     )
@@ -987,6 +996,7 @@ def _missing_fields(
     claim: sqlite3.Row | None,
     run: sqlite3.Row | None,
     artifact_refs: list[str],
+    no_artifact_refs_reason: str = "",
 ) -> list[str]:
     fields: list[str] = []
     if not run_id:
@@ -1005,7 +1015,7 @@ def _missing_fields(
         fields.append("task_claim")
     if run is None:
         fields.append("delegation_run")
-    if not artifact_refs:
+    if not artifact_refs and not str(no_artifact_refs_reason or "").strip():
         fields.append("artifact_refs")
     return fields
 

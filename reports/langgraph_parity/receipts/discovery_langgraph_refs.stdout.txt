@@ -1,0 +1,39 @@
+pyproject.toml:36:    "langgraph>=0.2.0",
+dharma_swarm/field_knowledge_base.py:389:        "id": "langgraph",
+dharma_swarm/field_knowledge_base.py:390:        "source": "LangChain — LangGraph stateful agent workflows",
+dharma_swarm/field_knowledge_base.py:391:        "url": "https://github.com/langchain-ai/langgraph",
+dharma_swarm/field_knowledge_base.py:397:        "relevance_to_dgc": "DGC's sleep_cycle is a state machine similar to LangGraph's graph workflows but biologically inspired (LIGHT→DEEP→REM→SEMANTIC→WAKE). DGC adds semantic gravity for concept-level workflow optimization.",
+dharma_swarm/field_knowledge_base.py:436:        "relevance_to_dgc": "Unique in the agentic AI space: no other coding agent framework uses stigmergic coordination. CrewAI, AutoGen, LangGraph all use explicit message passing.",
+dharma_swarm/field_knowledge_base.py:695:        "summary": "Batteries-included harness with planning, filesystem context offload, subagents, shell access, and auto-summarization on top of LangGraph.",
+docs/governance/hygiene/baselines/2026-06-29.txt:2195:  docs/sovereign_holons/00_RESEARCH_DOSSIER.md:42:- **Frameworks:** LangGraph durable-execution docs; a counter-source (diagrid) arguing
+docs/governance/hygiene/baselines/2026-06-29.txt:2217:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-29.txt:3007:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-23.txt:2319:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-23.txt:3024:  docs/sovereign_holons/00_RESEARCH_DOSSIER.md:42:- **Frameworks:** LangGraph durable-execution docs; a counter-source (diagrid) arguing
+docs/governance/hygiene/baselines/2026-06-23.txt:3731:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-14.txt:1791:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-14.txt:2351:  docs/sovereign_holons/00_RESEARCH_DOSSIER.md:42:- **Frameworks:** LangGraph durable-execution docs; a counter-source (diagrid) arguing
+docs/governance/hygiene/baselines/2026-06-14.txt:3419:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-18.txt:1703:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-18.txt:2558:  docs/sovereign_holons/00_RESEARCH_DOSSIER.md:42:- **Frameworks:** LangGraph durable-execution docs; a counter-source (diagrid) arguing
+docs/governance/hygiene/baselines/2026-06-18.txt:3262:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-07.txt:1194:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-07.txt:2652:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-12.txt:2022:  docs/reports/BRIEFING.md:159:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+docs/governance/hygiene/baselines/2026-06-12.txt:2066:  docs/sovereign_holons/00_RESEARCH_DOSSIER.md:42:- **Frameworks:** LangGraph durable-execution docs; a counter-source (diagrid) arguing
+docs/governance/hygiene/baselines/2026-06-12.txt:2517:  docs/archive/BRIEFING.md:161:- `research_swarm_frameworks.md` — LangGraph, CrewAI, AutoGen, DSPy
+dharma_swarm/autonomous_agent.py:8:The pattern is identical to what LangGraph, CrewAI, and Claude Code use internally:
+tests/test_langgraph_parity_supervisor.py:5:from dharma_swarm.langgraph_parity.state import ParityMessage, is_routing_message
+tests/test_langgraph_parity_supervisor.py:6:from dharma_swarm.langgraph_parity.supervisor_runtime import (
+dharma_swarm/workflow_graph.py:8:  - LangGraph: graph-based state machines for agent orchestration
+dharma_swarm/checkpoint.py:3:Stolen from LangGraph's best ideas, adapted to dharma_swarm's eigenform engine:
+dharma_swarm/durable_execution.py:7:  - LangGraph: durable execution with state persistence at every node
+dharma_swarm/langgraph_parity/state.py:1:"""State primitives for deterministic LangGraph supervisor parity tests."""
+dharma_swarm/langgraph_parity/state.py:62:    return bool(message.metadata.get("langgraph_parity_routing"))
+dharma_swarm/langgraph_parity/tools.py:1:"""Deterministic handoff helpers for LangGraph supervisor parity."""
+dharma_swarm/langgraph_parity/tools.py:28:            metadata={"langgraph_parity_routing": True, "routing_type": "handoff"},
+dharma_swarm/langgraph_parity/tools.py:35:            metadata={"langgraph_parity_routing": True, "routing_type": "handoff"},
+dharma_swarm/langgraph_parity/tools.py:61:                "langgraph_parity_routing": True,
+dharma_swarm/langgraph_parity/tools.py:71:                "langgraph_parity_routing": True,
+dharma_swarm/langgraph_parity/supervisor_runtime.py:1:"""Deterministic LangGraph-style supervisor runtime.
+dharma_swarm/langgraph_parity/supervisor_runtime.py:3:This module intentionally avoids importing LangGraph. It models the supervisor

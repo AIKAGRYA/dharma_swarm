@@ -957,11 +957,12 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
     pool = IntegrationMockPool()
 
+    runtime_db_path = state_dir / "state" / "runtime.db"
     orch = Orchestrator(
         task_board=board,
         agent_pool=pool,
         ledger_dir=state_dir / "ledgers",
-        runtime_db_path=state_dir / "state" / "runtime.db",
+        runtime_db_path=runtime_db_path,
     )
 
     # Step 1: create a task
@@ -977,8 +978,12 @@ async def test_full_loop_closure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert tick1["dispatched"] >= 1, "Tick must dispatch the pending task"
 
     # Step 3: the orchestrator's _execute_task background coroutine calls
-    # runner.run_task(task) async.  Yield to let it finish.
-    await asyncio.sleep(0.1)
+    # runner.run_task(task) async.  Poll its terminal runtime write rather than
+    # sleeping a fixed interval, which races slow CI runners.
+    await _await_condition(
+        lambda: _runtime_delegation_statuses(runtime_db_path) == ["completed"],
+        what="integration delegation status completed",
+    )
 
     # Step 4: verify the task completed via the real orchestrator path
     completed_task = await board.get(task.id)

@@ -173,11 +173,19 @@ def test_failure_outcome_requires_nonempty_error() -> None:
         DirectorOutcome.failure("")
 
 
-def test_think_once_wraps_run_cycle_in_outcome(remix: ThinkodynamicDirectorRemix) -> None:
-    # delegate=False keeps it offline; we only assert the envelope shape + that a
-    # failure (if any) is witnessed rather than raised.
+def test_think_once_wraps_run_cycle_in_outcome(
+    remix: ThinkodynamicDirectorRemix, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fake_run_cycle(*, delegate: bool, model: str) -> dict[str, object]:
+        assert delegate is False
+        assert model == "sonnet"
+        return {"cycle_id": "contract-stub", "delegated": delegate, "model": model}
+
+    monkeypatch.setattr(remix._engine, "run_cycle", fake_run_cycle)
+
+    # The remix contract is the envelope around the engine call; keep this
+    # hermetic so fast/no-network CI never invokes live director providers.
     outcome = asyncio.run(remix.think_once(delegate=False))
     assert isinstance(outcome, DirectorOutcome)
-    if not outcome.ok:
-        assert outcome.error
-        assert outcome.witness
+    assert outcome.ok, outcome.error
+    assert outcome.unwrap()["cycle_id"] == "contract-stub"

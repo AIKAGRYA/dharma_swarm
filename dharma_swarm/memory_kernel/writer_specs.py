@@ -122,6 +122,16 @@ def default_writer_specs() -> tuple[MemoryWriterSpec, ...]:
             "RuntimeStateStore is the runtime/control-plane writer boundary, not semantic canon.",
         ),
         MemoryWriterSpec(
+            "runtime_receipt_history_normalizer.store",
+            "scripts.runtime.normalize_runtime_receipt_history",
+            "normalize_runtime_receipt_history",
+            ("home.runtime_state",),
+            WriteMode.READ_WRITE,
+            WriterClassification.REVIEW_REQUIRED,
+            RiskLevel.MEDIUM,
+            "Operator-invoked receipt normalizer mutates runtime.db receipt/idempotency rows only under --apply.",
+        ),
+        MemoryWriterSpec(
             "telemetry_plane.store",
             "dharma_swarm.telemetry_plane",
             "TelemetryPlaneStore",

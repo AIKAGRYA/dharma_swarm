@@ -1,0 +1,502 @@
+.venv/bin/python scripts/governance/agent_onboard.py
+
+========================================================================
+DHARMA SWARM — AGENT ONBOARDING
+========================================================================
+Worktree     : /Users/dhyana/dharma_swarm  (this checkout — symbols may be mirrored in sibling worktrees)
+Branch       : agent/magpie-seed
+HEAD         : 260a11539b
+Commit       : 2026-06-28 01:24:09 +0900 snapshot: preserve agent/magpie-seed WIP before metabolize (rescue; guards intentionally bypassed)
+vs origin/main: ahead 25, behind 298
+Dirty files  : 270  (top: tests=54, reports/langgraph_parity/receipts=30, dharma_swarm=20)
+Today (UTC)  : 2026-06-29  (commit timestamps may show local +0900)
+
+Remember only: make onboard
+Next command : make agent-build-closeout  # before PR/merge handoff
+If unsure    : rerun make onboard (or --fast); it repeats the next command
+
+========================================================================
+WHY / IDENTITY (owners: foundations/THE_ORGANISM.md, docs/vision_maps/NORTH_STAR.md)
+========================================================================
+  dharma_swarm is a self-evolving emergent organism (Krishna); its outward action against the world's brokenness (Arjuna) flows from — and is only valid when rooted in — its inward coherence.
+  Read-first (the 10-second map):
+    - foundations/THE_ORGANISM.md
+    - docs/vision_maps/NORTH_STAR.md
+    - reports/swarm_genome/2026-06-11/SYNTHESIS.md
+    - docs/MEGAFILE_INDEX.md
+  Whole-system view: python3 scripts/governance/orientation_graph.py [--json]  (make orient)
+
+========================================================================
+ACTIVE PORTFOLIO (owner: docs/governance/ACTIVE_TRACK.yaml)
+========================================================================
+  Evidence age: 0m (fresh)
+  11 co-equal active track(s) (WIP warn 11, max 11). A new project is a NEW TRACK here, not a violation.
+  Spine coverage: substrate-nativeness, revenue-external-humans-served, research-depth
+
+  • runtime-truth-reconciliation-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-nats-2026-06']
+      ✓ [file_exists] runtime_spine_package_exists
+      ✓ [file_exists] receipt_equivalence_matrix_exists
+      ✓ [file_exists] a2a_persistence_invariant_tests_exist
+      ✓ [file_contains] runtime_truth_packet_defined
+      ✓ [file_contains] runtime_truth_axes_defined
+      ✓ [file_contains] onboard_runtime_truth_render
+      ✓ [file_contains] onboard_runtime_truth_no_write_test
+      ✓ [file_contains] runtime_truth_packet_axis_test
+      ✓ [file_contains] a2a_single_persistence_invariant
+      ✓ [file_exists] spine_bypass_report_exists
+      ✓ [file_contains] receipt_json_projection_only_doc
+      ✓ [file_contains] correlation_spine_manifest_still_declared
+      ✓ [file_contains] evidence_receipt_still_defined
+      ✓ [file_contains] runtime_receipt_still_defined
+
+  • runtime-truth-nats-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-reconciliation-2026-06']
+      ✓ [file_exists] nats_master_spec_exists
+      ✓ [file_exists] nats_master_spec_present
+      ✓ [file_contains] nats_transport_landed
+
+  • runtime-truth-spine-adoption-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06']
+      readiness: baseline=54/100; current=70/100; cap=70/100; evidence=reports/governance/runtime_spine_dispatch_mode_progress_2026-06-14.md; rejected=88/100 production-ready
+      ✓ [file_exists] spine_package_exists
+      ✓ [file_contains] invoke_agent_defined
+      ✓ [file_contains] a2a_bridge_calls_spine
+      ✓ [file_contains] orchestrator_calls_spine
+      ✓ [file_contains] agent_runner_direct_paths_drained
+      ✓ [file_contains] dispatch_emits_evidence_receipt
+      ✓ [file_contains] zero_dropoff_sources
+      ✓ [file_contains] bypass_allowlist_empty
+      ✓ [file_exists] adoption_narrative_docs
+      ✓ [file_exists] gate1_witnessed
+      ✓ [file_exists] hardening_goal_exists
+
+  • loop-closure-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-reconciliation-2026-06']
+      ✓ [file_exists] loop_map_exists
+      ✓ [file_exists] loop_supervisor_exists
+      ✓ [file_exists] phase0_dossier_exists
+      ✓ [file_contains] phase0_fresh_status_table
+      ✓ [file_contains] one_wire_invariant_stated
+      ✓ [file_contains] cybernetics_codex_manifest_registered
+      ✓ [file_exists] cybernetics_codex_seed_exists
+      ✓ [file_exists] cybernetics_codex_soul_exists
+      ✓ [file_exists] cybernetics_codex_context_desk_exists
+      ✓ [file_exists] cybernetics_codex_audit_script_exists
+      ✓ [file_exists] cybernetics_codex_registration_script_exists
+      ✓ [file_exists] loop1_closure_receipt_exists
+      ✓ [file_exists] campaign_retrospective_exists
+
+  • orientation-graph-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-reconciliation-2026-06']
+      ✓ [file_exists] identity_owner_on_branch
+      ✓ [file_exists] vision_owner_on_branch
+      ✓ [file_exists] orientation_graph_exists
+      ✓ [file_contains] orientation_packet_defined
+      ✓ [file_contains] orientation_read_only_test
+      ✓ [file_contains] onboard_identity_render
+      ✓ [file_contains] make_orient_target
+      ✓ [file_contains] megafile_points_at_north_star
+
+  • composer-holon-spine-longrun-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['runtime-truth-reconciliation-2026-06', 'runtime-truth-nats-2026-06']  depends_on=['runtime-truth-spine-adoption-2026-06']
+      ✓ [file_contains] evidence_receipt_exists
+      ✓ [file_exists] holon_orchestrator_spec_exists
+      ✓ [file_exists] holon_runtime_exists
+      ✓ [file_exists] readiness_packet_exists
+      ✓ [file_contains] receipt_profile_documented
+      ✓ [file_contains] frozen_verifier_runbook_present
+      ✓ [file_exists] holon_bridge_verifier_exists
+      ✓ [file_exists] holon_runtime_verifier_exists
+      ✓ [file_exists] composer_wake_witness_pending
+
+  • agent-admission-semantic-commons-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['cybernetics-codex-stewardship-2026-06']
+      ✓ [file_exists] generic_onboarding_doc_exists
+      ✓ [file_exists] living_agent_kernel_exists
+      ✓ [file_exists] semantic_commons_doc_exists
+      ✓ [file_exists] semantic_objects_index_exists
+      ✓ [file_exists] semantic_aliases_index_exists
+      ✓ [file_exists] agent_admission_doc_exists
+      ✓ [file_exists] name_drift_preflight_exists
+      ✓ [file_exists] agent_admission_verifier_exists
+      ✓ [file_exists] semantic_commons_tests_exist
+      ✓ [file_exists] agent_admission_tests_exist
+      ✓ [file_exists] pkm_projection_config_exists
+      ✓ [file_exists] retrieval_scope_contract_exists
+      ✓ [file_exists] pkm_projection_script_exists
+      ✓ [file_exists] semantic_commons_projection_tests_exist
+      ✓ [file_exists] semantic_commons_projection_manifest_exists
+      ✓ [file_exists] semantic_commons_runtime_helper_exists
+      ✓ [file_contains] hybrid_retriever_scope_consumes_semantic_commons
+      ✓ [file_contains] retrieval_scope_runtime_test_exists
+
+  • cybernetics-codex-stewardship-2026-06  [ACTIVE]  serves=research-depth  (SHIPPABLE)
+      complements=['agent-admission-semantic-commons-2026-06']  depends_on=['loop-closure-2026-06']
+      ✓ [file_contains] loop_closure_track_exists
+      ✓ [file_contains] cybernetics_codex_manifest_registered
+      ✓ [file_exists] cybernetics_codex_charter_exists
+      ✓ [file_exists] cybernetics_codex_seed_exists
+      ✓ [file_exists] cybernetics_codex_soul_exists
+      ✓ [file_exists] cybernetics_codex_wake_context_exists
+      ✓ [file_exists] cybernetics_codex_protocols_exists
+      ✓ [file_exists] cybernetics_codex_context_desk_exists
+      ✓ [file_exists] cybernetics_codex_audit_script_exists
+      ✓ [file_exists] cybernetics_codex_registration_script_exists
+      ✓ [file_exists] cybernetics_codex_tests_exist
+      ✓ [file_exists] cybernetics_codex_admission_receipt_exists
+      ✓ [file_exists] cybernetics_codex_runtime_receipt_exists
+
+  • telos-ai-morning-refinery-2026-06  [ACTIVE]  serves=revenue-external-humans-served  (6/7)
+      ✓ [file_exists] telos_seed_spec_exists
+      ✓ [file_exists] morning_refinery_spec_exists
+      ✓ [file_exists] seed_research_exists
+      ✓ [file_exists] feasibility_audit_exists
+      ✓ [file_exists] persona_council_exists
+      ✓ [file_exists] refinery_example_exists
+      ✓ [file_contains] telos_product_surface_registered
+      ✓ [file_exists] consent_boundary_test_exists
+      ✗ [external_acted_receipt] first_external_receipt_exists  — reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md MISSING
+
+  • helm-worldclass-terminal-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      ✓ [file_exists] terminal_package_exists
+      ✓ [file_exists] terminal_app_exists
+      ✓ [file_exists] app_test_exists
+      ✓ [file_exists] golden_capture_exists
+      ✓ [file_exists] ratchet_script_exists
+      ✓ [file_exists] chat_golden_exists
+      ✓ [file_exists] compact_shell_test_exists
+      ✓ [file_exists] live_tmux_receipt_exists
+      ✓ [file_exists] merge_readiness_packet_exists
+
+  • a2a-cloud-agent-bridge-2026-06  [ACTIVE]  serves=substrate-nativeness  (SHIPPABLE)
+      complements=['agent-admission-semantic-commons-2026-06']
+      ✓ [file_exists] proposed_bridge_packet_exists
+      ✓ [file_exists] nats_spec_exists
+      ✓ [file_exists] cloud_contact_module_exists
+      ✓ [file_contains] cloud_contact_publishes_to_nats
+      ✓ [file_contains] contact_registry_supports_cloud_agents
+      ✓ [file_contains] verifier_includes_cloud_population
+      ✓ [file_exists] score_denominator_doc_exists
+      ✓ [file_exists] design_doc_exists
+      ✓ [file_contains] round_trip_test_exists
+
+  To OPEN A NEW TRACK (when the operator proposes a project): add an entry
+  under `active_tracks:` in docs/governance/ACTIVE_TRACK.yaml with serves:
+  <spine objective>, owned_surfaces:, and acceptance criteria; then run
+  `python3 scripts/governance/render_active_track_includes.py`. Up to 11 may run concurrently with non-overlapping surfaces.
+
+========================================================================
+PARALLEL WORK LANES — who else is building (owner: git worktree/branches)
+========================================================================
+  Worktrees: 31  ·  Local branches: 248
+  ▶ dharma_swarm  branch=agent/magpie-seed
+    ds_loop  branch=ratchet/loop-phases-1-3
+    dharma-debug-corral  branch=claude/debug-corral
+    dharma_helm_build  branch=helm/worldclass-20260612
+    dharma_swarm_cashclaw  branch=cashclaw/revenue-hydra-v1
+    dharma_swarm_live  branch=organ/03-seat
+    dharma_swarm_main  branch=(none) [detached]
+    dharma_swarm_oz_integration  branch=oz/integration-2026-06-25
+    dharma_swarm_slice_roast  branch=slice/roast-skill
+    render-on-demand  branch=chore/render-on-demand-stop-churn-20260625
+    dharma_ws_idea_spark  branch=feat/operator-idea-spark-ingest
+    ds_a2a_nats_rebuild_preflight_20260618  branch=runtime-truth/nats-rebuild-preflight-20260618
+    ... (19 more — `git worktree list`)
+  Lane families: other=157, pr/review/merge=51, docops/governance=24, cleanup/repair=19, runtime-truth/spine=15, forge/measurement=9, capital/revenue=4
+  Most recent branches:
+    - claude/monetization-strategy-team-rgn7g6  (2026-06-30)  fix(vnh-hub): keep seed site build dependency-free
+    - claude/sis-seed1-carbon-attribution  (2026-06-30)  feat(sis): SEED-1 — carbon-attribution projector over the sw
+    - codex/pudgala-autopoiesis-protostar-20260626  (2026-06-30)  governance: add Pudgala Autopoiesis Protostar evidence gate
+    - claude/anti-slop-enforcement-2026-06  (2026-06-30)  feat(governance): wire global quality-ratchet into CI + base
+    - codex/routing-canon-20260630  (2026-06-30)  routing: update runtime provider surface inventory [impact-c
+  Before editing a hot-path symbol: it may exist in several worktrees.
+  Policy: parallel lanes are allowed; non-overlapping surfaces are the boundary.
+
+========================================================================
+LIVE OPS SNAPSHOT (owner: docs/state/LIVE_OPS_DASHBOARD.md)
+========================================================================
+  Snapshot date : 2026-05-29
+  Status        : CURRENT — refreshed to main at `a919852` (702 commits)
+  Last git touch: 28d ago (stale threshold 7d)
+  NOTE: dashboard prose may lag reality. Trust git log + this command.
+
+========================================================================
+LIVE OPS COCKPIT — READ-ONLY OPERATIONS CONTROL
+========================================================================
+  Runbook       : present docs/ops/LIVE_OPS_COCKPIT.md
+  Census script : present scripts/runtime/live_ops_census.py
+  Dashboard     : present /dashboard/cockpit
+  NATS spec     : present docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+  tmux spec     : present docs/ops/TMUX_AGENT_SUBSTRATE.md
+  Receipt       : present /Users/dhyana/.dharma/ops/live_process_census.json
+  Generated     : 2026-06-29T18:11:36Z (26m old; fresh)
+  Surfaces      : 17 total; status={'blocked': 2, 'live': 13, 'stopped': 2}
+  Daemon spine  : launch=spine_enabled_launch_spec; running=spine_enabled_self_report
+  Receipt head : clean=true; fresh=true; age_hours=0.04; max_age_hours=6.0; total=50618; latest=2026-06-29T18:09:21.024299+00:00; windows=5m:0/214,15m:0/266,60m:0/1085
+  Provider/model: latest=8/58; percent=13.79; proof=58/58; proof_percent=100.0; accounted=58/58; accounted_percent=100.0; terminal=8/21; terminal_percent=38.1; terminal_proof=21/21; terminal_proof_percent=100.0; terminal_accounted=21/21; terminal_accounted_percent=100.0; pending=37; complete=true; gate_70_75=core:pass|idempotency:pass|mission:pass|artifact:pass|active_head:pass
+  ds-goal CLI  : target=/Users/dhyana/dharma_swarm; source=installed_wrapper_dharma_swarm_preference; default=/Users/dhyana/dharma_swarm; matches_current=true; wrapper_sha256=ea0a78487df2; pin=true; hardening=sync_receipt_side_effect_keys_hardened; decision=not_required_default_matches_audited_checkout; preflight=pass_default_matches_audited_checkout
+  Operator gates: 5 require John
+  VPS candidates: 1
+  Authority     : read-only; shows commands/policies but executes nothing
+
+========================================================================
+IDEA SPARK INGEST HEALTH (owner: ~/.dharma/meta/idea_spark/*)
+========================================================================
+  Root          : /Users/dhyana/.dharma/meta/idea_spark
+  Input receipts: 3
+  Candidates    : 3
+  Lifecycle     : 3 (implemented 3, completion 1.0)
+  Front door    : python -m dharma_swarm.idea_spark.cli ingest --text '<note>'
+  Health check  : python -m dharma_swarm.idea_spark.cli health --json
+  Promotion     : gate-only (chetana.promote); never bulk-promoted
+  Authority     : read-only; counts append-only receipts, executes nothing
+
+========================================================================
+SURFACE MANIFEST HEALTH (owner: ACTIVE_SURFACE_MANIFEST.yaml)
+========================================================================
+  Last git touch: 14d ago (fresh)
+  Health        : green=0 yellow=0 red=0
+
+========================================================================
+BROKEN REGISTER (owner: docs/state/BROKEN_REGISTER.md)
+========================================================================
+  Items: total=23 open-like=5 closed-like=8
+  Top open items:
+    - [PARTIAL] BR-003 — Apply gate present but closed (self-evolution loop)
+    - [PARTIAL] BR-004 — Cron split-brain (repo vs live)
+    - [PARTIAL] BR-005 — Algedonic stream in degenerate steady-state
+
+========================================================================
+LIVING AXIOMS (owner: docs/governance/SOVEREIGN_MANIFEST.md)
+========================================================================
+  A1 — NO FLAT-PACKAGE GROWTH
+  A2 — NO DUPLICATE IMPLEMENTATIONS
+  A3 — NO UNDOCUMENTED SEAMS
+  A4 — NO VIBE-CODING
+  A5 — NO GOD OBJECTS
+  A6 — DOCS DECAY -- CHECK BEFORE CITING
+  A7 — NO CIRCULAR IMPORTS
+  A8 — FRONTMATTER DISCIPLINE
+
+========================================================================
+RECENT TRACK ACTIVITY (last 14 days, 56 surfaces)
+========================================================================
+  260a11539 snapshot: preserve agent/magpie-seed WIP before metabolize (rescue; guards intentionally bypassed)
+  7a31ed4b7 idea-spark PR0+PR8: ingest health (counts/receipt/freshness) + onboard section
+  69506fc80 recover: snapshot L4 holon substrate + orchestrate (rescue uncommitted work)
+  f70644d84 feat(governance): wire semantic commons admission
+  5deeb970b fix(stigmergy): use unique temp files to prevent race condition
+
+========================================================================
+CORRELATION SPINE — closure layers and canonical receipts
+========================================================================
+  Invariant: Receipts may differ by closure layer. Correlation identity must not.
+
+  [ok] request_response: A2ATaskReceipt (canonical-within-layer)
+          module: dharma_swarm.operator_core.a2a_task_lifecycle
+          identity: correlation_id
+  [ok] dispatch_invocation: EvidenceReceipt (canonical-within-layer)
+          module: dharma_swarm.spine.receipt
+          identity: trace_id
+  [ok] test_acceptance: EvidenceReceipt (canonical-within-layer)
+          module: dharma_swarm.operator_core.closure_v0
+          identity: correlation_id
+
+  runtime_state.py receipt_json DDL: present
+  Live receipt fill rate (delegation_runs): 2068/7468 (27%)
+
+========================================================================
+RUNTIME TRUTH PACKETS — read-only projection
+========================================================================
+  Doctrine: packets project existing owners; this section is not authority.
+  Compact: runtime_db=/Users/dhyana/.dharma/state/runtime.db; latest_receipt=runtime_receipts:rr_run_f885fab96ca2486b_artifact_task_result_ea367dc8fd2c4480_artifact_written; run_id=run_f885fab96ca2486b; task_id=ea367dc8fd2c4480; mission_id=20260629T183516Z; artifact_refs=1; heartbeat=running_by_heartbeat; progress=progressing_by_artifact; completion=completed_by_receipt; retry=retry_equivalent
+  Packets (full rows in the onboard receipt):
+    - governance.active_track  [governance_projection]
+    - correlation_spine.manifest  [owner_manifest]
+    - runtime_state.store  [local_runtime_store_probe]
+    - runtime_state.latest_receipt  [runtime_state_reconciliation]
+    - a2a.persistence_invariant  [test_contract]
+
+========================================================================
+LIVE PROVIDER/MODEL ROUTES — current served evidence
+========================================================================
+  Truth source : telemetry_plane.provider_attempts
+  Runtime DB   : /Users/dhyana/.dharma/state/runtime.db
+  Available    : True
+  Recent       : attempts=40 successes=20 failures=20 latest=2026-06-29T18:07:48.798210+00:00
+  Recent green : ollama:kimi-k2.5:cloud, ollama:glm-5:cloud, ollama:qwen3-coder:480b-cloud, ollama:deepseek-v3.2:cloud, claude_code:claude-code
+  Blocked      : openrouter:mistralai/mistral-small-3.1-24b-instruct
+  Degraded     : none
+  Lane rollup:
+    - ollama:kimi-k2.5:cloud status=live_success ok=1 fail=1 latest=success
+    - ollama:glm-5:cloud status=live_success ok=2 fail=1 latest=success
+    - ollama:qwen3-coder:480b-cloud status=live_success ok=15 fail=14 latest=success
+    - ollama:deepseek-v3.2:cloud status=in_flight ok=1 fail=1 latest=started
+    - openrouter:mistralai/mistral-small-3.1-24b-instruct status=blocked ok=0 fail=2 latest=Error code: 402 - {'error': {'message': 'Insufficient credits. Add more using https://openrouter.ai/settings/credits', '
+    - claude_code:claude-code status=live_success ok=1 fail=1 latest=success
+  Rule         : route from provider_attempts/live receipts, not memory or prose.
+
+========================================================================
+PR HYGIENE — open pull request health
+========================================================================
+  Rule owners (read these, not prose copies):
+    - Throttling: .github/workflows/bot-pr-limit.yml  (per-INTENT-lane limits, not per-author)
+    - Stale lifecycle: .github/workflows/stale-pr.yml  (warn → auto-close; drafts exempt)
+    - Quality gates: docs/governance/PR_QUALITY_GATES.md
+
+  Before opening a PR:
+    1. Run: make agent-build-closeout
+    2. Check for existing PRs on same topic:
+       gh pr list --state open --search '<your topic>'
+    3. Fill all PR template sections (Why, Surface, Coherence Delta, ...)
+    4. Mark WIP/scaffold PRs as drafts; prefix shelved PRs with [SHELVED]
+
+  Current open PRs: 4
+  ✓  Healthy
+    #723 [draft]  routing: canonicalize Forge benchmark lanes  (AmitabhainArunachala, 2026-06-29)
+    #719  feat(sis): SEED-1 — carbon-attribution projector over the swarm'  (AmitabhainArunachala, 2026-06-29)
+    #718  seed(vnh): Verified Nature House / SIS dossier (00–12) + draft h  (AmitabhainArunachala, 2026-06-29)
+    #704 [draft]  Pudgala Autopoiesis Protostar: graded evidence gate  (AmitabhainArunachala, 2026-06-29)
+
+========================================================================
+HYGIENE SYSTEM (owner: docs/governance/hygiene/)
+========================================================================
+  Patterns: 70 (AI=12, VC=58; advisory=15, measured=27, observed=28)
+  Latest baseline: docs/governance/hygiene/baselines/2026-06-29.txt
+  AI-agent governance: docs/governance/hygiene/AI_AGENT_GOVERNANCE.md
+  Deep-dive packet: reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md
+  Control backlog: reports/governance/anti_ai_slop_control_backlog_2026-06-08.md
+  Scan snapshot: reports/governance/anti_ai_slop_scan_snapshot_2026-06-08.json
+  Doctrine: AI-* signals are advisory until promoted through LIFECYCLE.md
+  Run: make hygiene-audit   # non-blocking scan
+  Run: make hygiene-check   # generated docs + pattern integrity
+  Run: make agent-build-preflight   # start an agent build session
+  Run: make agent-build-closeout    # close an agent build before PR handoff
+  AI-agent review signals:
+    - AI-A1: Untrusted text treated as agent instruction (advisory)
+    - AI-B1: Evidence-free verification claim (advisory)
+    - AI-C1: Same-PR gate weakening (advisory)
+    - AI-D1: Unproven dependency provenance (advisory)
+    - AI-E1: Autonomous task without admission contract (advisory)
+  Code hygiene review signals:
+    - VC-C4: God file emergence (advisory)
+    - VC-H2: Synchronous blocking in async contexts (advisory)
+    - VC-L1: AI PR spam (advisory)
+
+========================================================================
+KNOWN-DECAY DOCS — verify before citing
+========================================================================
+  [recent (12d)] docs/governance/BUILD_SESSION_ENTRYPOINT.md
+  [STALE (55d since last touch)] docs/plans/NEXT_10_SUBSTRATE_TODO.md
+  [STALE (59d since last touch)] docs/plans/ONTOLOGY_NATIVE_OPERATOR_BRIEF_MASTER_SPEC.md
+  [STALE (59d since last touch)] docs/plans/HANDOFF_ONTOLOGY_NATIVE_OPERATOR_BRIEF.md
+  [STALE (36d since last touch)] CYBERNETIC_LOOP_MAP.md
+  [STALE (63d since last touch)] reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md
+
+========================================================================
+TOOLING-FIRST CONTEXT PASS
+========================================================================
+  Before grep/read-heavy investigation in dharma_swarm, prefer:
+  - make onboard
+  - xray.py / make xray                   — repo overview
+  - GitNexus impact/context                — blast radius, callers/callees
+  - Context+ MCP semantic search           — blast radius where available
+  - ast-grep                               — structural search
+  - radon                                  — complexity hotspots
+  - grimp                                  — import graph / dependency truth
+  - vulture + ruff F401/F811               — dead-code / import rot
+  - lint-imports                           — advisory unless contracts green
+  - wiki show <topic> / wiki search <term> — dharma wiki at ~/.dharma/knowledge/wiki/
+  - memory MCP open_nodes / search_nodes   — cross-session graph (most-skipped tool)
+
+  Tool availability on this machine:
+    ✅ xray.py
+    ✅ gitnexus
+    ✅ ast-grep
+    ❌ radon  (install: pip install radon)
+    ✅ grimp
+    ✅ vulture
+    ❌ lint-imports  (install: pip install import-linter)
+  import dharma_swarm resolves to: this worktree
+
+========================================================================
+MODEL & KEY ROUTING — THE ONE WAY
+========================================================================
+  Keys:  ONE home ~/.dharma/agent_keys.env  ·  ONE tool: dkeys (add / test / find)
+         read keys in code ONLY via dharma_swarm/api_keys.py — never os.environ, never project .env
+  Model: ONE door  runtime_provider.resolve_runtime_provider_config() -> create_runtime_provider()
+         ordered by model_hierarchy (most-powerful-first); live-fallback never blocks on a dead brain
+  Claude/Anthropic -> Max plan (claude_code), NOT the metered API   (force API: DHARMA_FORCE_ANTHROPIC_API=1)
+  Rules: never hardcode a model string; never read a key outside api_keys.py; add keys only via `dkeys add`
+  Canon: docs/ops/MODEL_KEY_ROUTING.md  (lists the deprecated routes — do not use them)
+
+========================================================================
+ENFORCEMENT (run before opening a PR)
+========================================================================
+  make agent-build-preflight # onboarding + hygiene integrity at session start
+  make agent-build-closeout  # no-write hygiene scan + full governance bundle
+  make docops-integrity      # documentation invariants
+  make governance-all        # full governance gate bundle
+  make bug-corral-scan       # name drift -> DE_BUG_CORRAL routing
+  python3 scripts/governance/check_track_status.py
+  python3 scripts/governance/render_active_track_includes.py --check
+
+========================================================================
+DEPTH POINTERS (read on demand, not in order)
+========================================================================
+  Repo rules & behaviour : CLAUDE.md, AGENTS.md, docs/AGENTS.md
+  Anti-slop rules (10)   : docs/governance/ANTI_SLOP_RULES.md   [enforced]
+  AI-agent hygiene       : docs/governance/hygiene/AI_AGENT_GOVERNANCE.md
+  Vibe-code hygiene (54) : docs/governance/VIBE_CODE_HYGIENE.md [advisory catalogue]
+     scan & baseline     : scripts/governance/vibe_code_scan.sh
+                           reports/governance/vibe_code_baseline_2026-06-07.txt
+  De Bug Corral          : DE_BUG_CORRAL/00.md
+     scan & name drift   : make bug-corral-scan
+  Doc ownership map      : docs/governance/CANONICAL_DOC_STACK.md
+  First-token map        : docs/governance/SWARM_GENOME.md
+  Reality debt           : docs/governance/REALITY_DEBT_LEDGER.md (11 guarded claims)
+  Architecture/doctrine  : docs/governance/SOVEREIGN_MANIFEST.md, docs/doctrine/
+  Coherence Delta        : docs/governance/COHERENCE_DELTA.md
+  Daily/work loops       : docs/governance/AGENTOPS.md, KAIZENOPS.md, DAILY_OPERATING_BRIEF.md
+
+========================================================================
+DRIFT TRIAGE (owner: dharma_swarm/dhyana/drift_triage.py)
+========================================================================
+  79 zones triaged. Top 5 by priority_score:
+
+  1. [partial] Evolution
+     score=42.0  blast=3.0  age=7d  centrality=2.00 [BR-003]
+     → Wire DarwinEngine to apply diffs in sandbox
+  2. [partial] Telos Gates
+     score=42.0  blast=3.0  age=7d  centrality=2.00
+     → Wire gate status to live telos_gates.py state
+  3. [partial] BoardStore Facade
+     score=42.0  blast=3.0  age=7d  centrality=2.00
+     → Adapt TaskBoard behind facade in a later BoardStore adapter track
+  4. [partial] Observatory
+     score=21.0  blast=3.0  age=7d  centrality=1.00
+     → Wire observatory to live telemetry data
+  5. [partial] Runtime
+     score=21.0  blast=3.0  age=7d  centrality=1.00
+     → Connect runtime view to OperatorBridge live state
+
+
+========================================================================
+WHAT TO DO NEXT
+========================================================================
+  If the operator proposes a NEW project: open a new track (see the
+  ACTIVE PORTFOLIO section above for how) — do NOT treat it as a
+  violation of an existing track. Concurrency is allowed up to the WIP limit.
+
+  Shippable now: runtime-truth-reconciliation-2026-06, runtime-truth-nats-2026-06, runtime-truth-spine-adoption-2026-06, loop-closure-2026-06, orientation-graph-2026-06, composer-holon-spine-longrun-2026-06, agent-admission-semantic-commons-2026-06, cybernetics-codex-stewardship-2026-06, helm-worldclass-terminal-2026-06, a2a-cloud-agent-bridge-2026-06
+  Operator lifecycle review required. Do NOT move an active track to
+  closed_tracks from this renderer, gate output, or WIP pressure alone.
+  Closure requires explicit operator authorization, like a PR merge.
+  Or continue an unshipped active track — next_items:
+    - [telos-ai-morning-refinery-2026-06] [external] (blocker) Run an operator-mediated external action on a consented, sanitized TELOS output and capture redacted durable evidence outside the repo.
+    - [telos-ai-morning-refinery-2026-06] [receipt] (blocker) Only after that external action exists, create reports/telos_ai/FIRST_EXTERNAL_ACTED_RECEIPT.md using the schema without exposing private material.
+
+  Reminder: this command renders the owners; it does not own any fact.
+  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.
+  Machine receipt: /Users/dhyana/.dharma/ops/onboard_receipt.json  (fleet-readable; also: --json)

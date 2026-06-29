@@ -1,0 +1,672 @@
+{
+  "counts": {
+    "artifact_records": 3495,
+    "delegation_runs": 7458,
+    "execution_identities": 8440,
+    "idempotency_records": 23076,
+    "runtime_receipts": 71507,
+    "task_claims": 7708
+  },
+  "db_exists": true,
+  "db_path": "/Users/dhyana/.dharma/state/runtime.db",
+  "delegation_runs": {
+    "current_artifact_id_percent": 30.67,
+    "mission_metadata_percent": 32.03,
+    "receipt_json_percent": 27.73,
+    "scoped_total": 7458,
+    "with_current_artifact_id": 2287,
+    "with_mission_in_metadata": 2389,
+    "with_receipt_json": 2068
+  },
+  "gate_70_to_75_components": [
+    {
+      "blocker": "",
+      "evidence": "missing=0 across 7 runtime fields",
+      "id": "core_runtime_receipt_fields",
+      "passed": true,
+      "required": "all runtime_receipts core identity/idempotency fields are filled",
+      "scope": "score_gate",
+      "short_label": "core",
+      "status": "pass"
+    },
+    {
+      "blocker": "",
+      "evidence": "matching_idempotency=11341/11341; fields=11341/11341",
+      "id": "major_idempotency_join",
+      "passed": true,
+      "required": "all major task receipts have idempotency fields and join idempotency_records",
+      "scope": "score_gate",
+      "short_label": "idempotency",
+      "status": "pass"
+    },
+    {
+      "blocker": "",
+      "evidence": "latest_mission=58/58",
+      "id": "latest_major_mission_payload",
+      "passed": true,
+      "required": "latest major task receipts carry mission_id-like payloads",
+      "scope": "score_gate",
+      "short_label": "mission",
+      "status": "pass"
+    },
+    {
+      "blocker": "",
+      "evidence": "artifact_record=6477/11341; latest_artifact_or_no_artifact=58/58",
+      "id": "artifact_or_explicit_no_artifact",
+      "passed": true,
+      "required": "major task receipts join artifact_records or latest receipts carry artifact evidence / explicit no-artifact reasons",
+      "scope": "score_gate",
+      "short_label": "artifact",
+      "status": "pass"
+    },
+    {
+      "blocker": "",
+      "evidence": "5m=0/214|15m=0/266|60m=0/1085",
+      "id": "active_head_side_effect_key",
+      "passed": true,
+      "required": "recent DB-head runtime receipts have side_effect_key coverage",
+      "scope": "strict_runtime_blocker",
+      "short_label": "active_head",
+      "status": "pass"
+    }
+  ],
+  "major_task_receipts": {
+    "field_gap_action_queue": [],
+    "field_gap_producer_groups": [],
+    "field_gap_summary": {
+      "active_head_missing": 0,
+      "by_freshness_class": {},
+      "by_gap_type": {},
+      "by_producer_source": {},
+      "by_receipt_type": {},
+      "by_recommended_action": {},
+      "future_clock_skew_missing": 0,
+      "group_count": 0,
+      "older_historical_missing": 0,
+      "quarantine_candidate_missing": 0,
+      "recent_historical_missing": 0,
+      "total_missing": 0,
+      "unknown_freshness_missing": 0
+    },
+    "fixture_quarantine_policy": {
+      "active_head_missing": 0,
+      "applies_to_score_gate": false,
+      "blockers": [],
+      "by_freshness_class": {},
+      "by_gap_type": {},
+      "candidate_group_count": 0,
+      "candidate_missing": 0,
+      "eligible_after_operator_decision": false,
+      "older_historical_missing": 0,
+      "operator_decision_required": false,
+      "owner_surface": "test_fixtures",
+      "recent_historical_missing": 0,
+      "required_evidence": [
+        "fixture-shaped rows are proven non-production and cannot recur in live runtime",
+        "test/runtime DB isolation remains enforced",
+        "production gate documents the quarantine boundary without hiding live debt"
+      ],
+      "status": "no_fixture_candidates",
+      "test_runtime_db_isolation": {
+        "enforced": true,
+        "patches_default_runtime_db": true,
+        "path": "tests/conftest.py",
+        "present": true,
+        "redirects_dgc_ledger_dir": true,
+        "redirects_dharma_runtime_db": true
+      },
+      "top_group": {}
+    },
+    "latest_ds_goal_preflight_sample": [],
+    "latest_ds_goal_preflight_status_breakdown": {},
+    "latest_major_status_breakdown": {
+      "claimed": 19,
+      "completed": 17,
+      "failed": 4,
+      "running": 18
+    },
+    "latest_payload_parse_errors": 0,
+    "latest_provider_model_payload_class_breakdown": {
+      "failed_before_serve": 1,
+      "no_provider_execution": 35,
+      "pending_execution": 15,
+      "served_field": 7
+    },
+    "latest_provider_model_pending_execution": 37,
+    "latest_provider_model_unproven_producer_groups": [
+      {
+        "latest_created_at": "2026-06-29T18:08:12.915547+00:00",
+        "missing_provider_model_provenance": 15,
+        "producer_failure_code": "<none>",
+        "producer_source": "<unknown>",
+        "provider_model_payload_class": "pending_execution",
+        "provider_model_truth_source": "<pending>",
+        "receipt_type": "delegation_run",
+        "sample_agent_id": "9315261221ea43fc",
+        "sample_run_id": "run_bcd404ede2be4eb8",
+        "sample_task_id": "a927c0e364e145cc",
+        "topology": "<blank>"
+      }
+    ],
+    "latest_provider_model_unproven_sample": [],
+    "latest_sample_size": 58,
+    "latest_terminal_provider_model_payload_class_breakdown": {
+      "failed_before_serve": 1,
+      "no_provider_execution": 13,
+      "served_field": 7
+    },
+    "latest_terminal_provider_model_unproven_producer_groups": [],
+    "latest_terminal_provider_model_unproven_sample": [],
+    "latest_terminal_sample_size": 21,
+    "latest_terminal_with_model_payload": 8,
+    "latest_terminal_with_provider_model_accounted": 21,
+    "latest_terminal_with_provider_model_payload": 8,
+    "latest_terminal_with_provider_model_provenance": 21,
+    "latest_terminal_with_provider_payload": 8,
+    "latest_with_artifact_payload": 17,
+    "latest_with_ds_goal_preflight_payload": 0,
+    "latest_with_explicit_no_artifact_reason": 41,
+    "latest_with_mission_payload": 58,
+    "latest_with_model_payload": 8,
+    "latest_with_provider_model_accounted": 58,
+    "latest_with_provider_model_payload": 8,
+    "latest_with_provider_model_provenance": 58,
+    "latest_with_provider_payload": 8,
+    "top_missing_side_effect_groups": [],
+    "total": 11341,
+    "type_breakdown": [
+      {
+        "artifact_record_gap": 4864,
+        "idempotency_gap": 0,
+        "receipt_type": "delegation_run",
+        "total": 11341,
+        "with_artifact_record": 6477,
+        "with_idempotency_fields": 11341,
+        "with_matching_idempotency_record": 11341
+      }
+    ],
+    "types": [
+      "a2a_task",
+      "delegation_run"
+    ],
+    "with_artifact_record": 6477,
+    "with_idempotency_fields": 11341,
+    "with_matching_idempotency_record": 11341
+  },
+  "missing_tables": [],
+  "report": "runtime_receipt_coverage_report",
+  "runtime_receipts": {
+    "active_head_side_effect_key_gate": {
+      "blocked_windows": [],
+      "gate": "active_head_side_effect_key_clean",
+      "passed": true,
+      "reason": "recent DB-head windows have complete side_effect_key coverage",
+      "widest_window": {
+        "anchor_created_at": "2026-06-29T18:09:21.024299+00:00",
+        "missing_side_effect_key": 0,
+        "missing_side_effect_key_percent": 0.0,
+        "total": 1085,
+        "window_minutes": 60
+      },
+      "windows_evaluated": [
+        5,
+        15,
+        60
+      ]
+    },
+    "field_coverage": {
+      "agent_id": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "correlation_id": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "idempotency_key": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "run_id": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "side_effect_key": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "task_id": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      },
+      "trace_id": {
+        "filled": 71507,
+        "missing": 0,
+        "percent": 100.0,
+        "total": 71507
+      }
+    },
+    "latest_sample": [
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:21.024299+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_run_590e66a8c3614812_artifact_task_result_1584281263d542c8_artifact_written",
+        "receipt_type": "artifact_written",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "artifact:artifact_task_result_1584281263d542c8",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:21.016198+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_run_590e66a8c3614812_artifact_task_result_1584281263d542c8_artifact",
+        "receipt_type": "artifact",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "artifact:artifact_task_result_1584281263d542c8",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.924877+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_09ea0170c49e44ee",
+        "receipt_type": "side_effect_complete",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "delegation_run:run_590e66a8c3614812:completed",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.907203+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_run_590e66a8c3614812_completed_run",
+        "receipt_type": "delegation_run",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "delegation_run:run_590e66a8c3614812:completed",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.892704+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_b2836b4ec554481f",
+        "receipt_type": "side_effect_intent",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "delegation_run:run_590e66a8c3614812:completed",
+        "status": "started",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.888611+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_503e92f1000d4aa6",
+        "receipt_type": "idempotency_consumed",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "delegation_run:run_590e66a8c3614812:completed",
+        "status": "accepted",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.876304+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_1d09b6fbeab04897",
+        "receipt_type": "side_effect_complete",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "task_claim:89816a9c20444b14:completed",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.859163+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_run_590e66a8c3614812_completed_claim",
+        "receipt_type": "task_claim",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "task_claim:89816a9c20444b14:completed",
+        "status": "completed",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.846892+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_3be696da74904987",
+        "receipt_type": "side_effect_intent",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "task_claim:89816a9c20444b14:completed",
+        "status": "started",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      },
+      {
+        "agent_id": "88299016c3ca402f",
+        "correlation_id": "trace_b842f5eb9c9f4d00",
+        "created_at": "2026-06-29T18:09:20.841072+00:00",
+        "idempotency_key": "idem_run_590e66a8c3614812",
+        "receipt_id": "rr_b11b8b6cbedd46aa",
+        "receipt_type": "idempotency_consumed",
+        "run_id": "run_590e66a8c3614812",
+        "side_effect_key": "task_claim:89816a9c20444b14:completed",
+        "status": "accepted",
+        "task_id": "1584281263d542c8",
+        "trace_id": "trace_b842f5eb9c9f4d00"
+      }
+    ],
+    "latest_side_effect_key_gap_diagnostics": [],
+    "latest_side_effect_key_gap_sample": [],
+    "recent_side_effect_key_gap_windows": [
+      {
+        "anchor_created_at": "2026-06-29T18:09:21.024299+00:00",
+        "cutoff_created_at": "2026-06-29T18:04:21.024299+00:00",
+        "missing_side_effect_key": 0,
+        "missing_side_effect_key_percent": 0.0,
+        "top_gap_producer_groups": [],
+        "total": 214,
+        "window_minutes": 5
+      },
+      {
+        "anchor_created_at": "2026-06-29T18:09:21.024299+00:00",
+        "cutoff_created_at": "2026-06-29T17:54:21.024299+00:00",
+        "missing_side_effect_key": 0,
+        "missing_side_effect_key_percent": 0.0,
+        "top_gap_producer_groups": [],
+        "total": 266,
+        "window_minutes": 15
+      },
+      {
+        "anchor_created_at": "2026-06-29T18:09:21.024299+00:00",
+        "cutoff_created_at": "2026-06-29T17:09:21.024299+00:00",
+        "missing_side_effect_key": 0,
+        "missing_side_effect_key_percent": 0.0,
+        "top_gap_producer_groups": [],
+        "total": 1085,
+        "window_minutes": 60
+      }
+    ],
+    "scoped_total": 71507,
+    "side_effect_key_gap_by_type": [],
+    "side_effect_key_gap_producer_groups": [],
+    "type_status": [
+      {
+        "n": 14686,
+        "receipt_type": "idempotency_consumed",
+        "status": "accepted"
+      },
+      {
+        "n": 14685,
+        "receipt_type": "side_effect_intent",
+        "status": "started"
+      },
+      {
+        "n": 14671,
+        "receipt_type": "side_effect_complete",
+        "status": "completed"
+      },
+      {
+        "n": 3999,
+        "receipt_type": "task_claim",
+        "status": "claimed"
+      },
+      {
+        "n": 3984,
+        "receipt_type": "delegation_run",
+        "status": "claimed"
+      },
+      {
+        "n": 3260,
+        "receipt_type": "delegation_run",
+        "status": "running"
+      },
+      {
+        "n": 3204,
+        "receipt_type": "task_claim",
+        "status": "running"
+      },
+      {
+        "n": 2221,
+        "receipt_type": "delegation_run",
+        "status": "completed"
+      },
+      {
+        "n": 2208,
+        "receipt_type": "task_claim",
+        "status": "completed"
+      },
+      {
+        "n": 2140,
+        "receipt_type": "artifact",
+        "status": "completed"
+      },
+      {
+        "n": 2140,
+        "receipt_type": "artifact_written",
+        "status": "completed"
+      },
+      {
+        "n": 1882,
+        "receipt_type": "task_claim",
+        "status": "failed"
+      },
+      {
+        "n": 1876,
+        "receipt_type": "delegation_run",
+        "status": "failed"
+      },
+      {
+        "n": 344,
+        "receipt_type": "idempotency_consumed",
+        "status": "duplicate"
+      },
+      {
+        "n": 107,
+        "receipt_type": "runtime_warrant",
+        "status": "granted"
+      },
+      {
+        "n": 41,
+        "receipt_type": "a2a_send",
+        "status": "PUBLISH_ACKED"
+      },
+      {
+        "n": 16,
+        "receipt_type": "runtime_truth_clean_epoch",
+        "status": "active"
+      },
+      {
+        "n": 11,
+        "receipt_type": "a2a_send",
+        "status": "CODEX_COMPOSER_CONSUMED"
+      },
+      {
+        "n": 7,
+        "receipt_type": "a2a_send",
+        "status": "HERMES_M5_CONSUMED"
+      },
+      {
+        "n": 6,
+        "receipt_type": "a2a_send",
+        "status": "FABLE_COMPOSER_CONSUMED"
+      },
+      {
+        "n": 5,
+        "receipt_type": "a2a_send",
+        "status": "OPUS_COMPOSER_CONSUMED"
+      },
+      {
+        "n": 4,
+        "receipt_type": "a2a_send",
+        "status": "PALANTIR_PILOT_REPLIED"
+      },
+      {
+        "n": 3,
+        "receipt_type": "a2a_send",
+        "status": "DEVIN_ROAMING_2987D222_CONSUMED"
+      },
+      {
+        "n": 3,
+        "receipt_type": "a2a_send",
+        "status": "PERPLEXITY_COMPUTER_CONSUMED"
+      },
+      {
+        "n": 1,
+        "receipt_type": "a2a_send",
+        "status": "CODEX_LIVE_DRILL_PY_20260613_CONSUMED"
+      },
+      {
+        "n": 1,
+        "receipt_type": "a2a_send",
+        "status": "OPERATOR_GUIDE_CURSOR_CONSUMED"
+      },
+      {
+        "n": 1,
+        "receipt_type": "a2a_send",
+        "status": "PUBLISH_FAILED"
+      },
+      {
+        "n": 1,
+        "receipt_type": "side_effect_complete",
+        "status": "failed"
+      }
+    ]
+  },
+  "runtime_surfaces": {
+    "cli.ds_goal": {}
+  },
+  "scope": {
+    "mode": "all",
+    "run_id": "",
+    "since_created_at": ""
+  },
+  "summary": {
+    "active_head_side_effect_key_clean": true,
+    "artifact_coverage_complete": true,
+    "blockers": [],
+    "core_runtime_receipt_fields_complete": true,
+    "delegation_receipt_json_percent": 27.73,
+    "gate_70_to_75_components": [
+      {
+        "blocker": "",
+        "evidence": "missing=0 across 7 runtime fields",
+        "id": "core_runtime_receipt_fields",
+        "passed": true,
+        "required": "all runtime_receipts core identity/idempotency fields are filled",
+        "scope": "score_gate",
+        "short_label": "core",
+        "status": "pass"
+      },
+      {
+        "blocker": "",
+        "evidence": "matching_idempotency=11341/11341; fields=11341/11341",
+        "id": "major_idempotency_join",
+        "passed": true,
+        "required": "all major task receipts have idempotency fields and join idempotency_records",
+        "scope": "score_gate",
+        "short_label": "idempotency",
+        "status": "pass"
+      },
+      {
+        "blocker": "",
+        "evidence": "latest_mission=58/58",
+        "id": "latest_major_mission_payload",
+        "passed": true,
+        "required": "latest major task receipts carry mission_id-like payloads",
+        "scope": "score_gate",
+        "short_label": "mission",
+        "status": "pass"
+      },
+      {
+        "blocker": "",
+        "evidence": "artifact_record=6477/11341; latest_artifact_or_no_artifact=58/58",
+        "id": "artifact_or_explicit_no_artifact",
+        "passed": true,
+        "required": "major task receipts join artifact_records or latest receipts carry artifact evidence / explicit no-artifact reasons",
+        "scope": "score_gate",
+        "short_label": "artifact",
+        "status": "pass"
+      },
+      {
+        "blocker": "",
+        "evidence": "5m=0/214|15m=0/266|60m=0/1085",
+        "id": "active_head_side_effect_key",
+        "passed": true,
+        "required": "recent DB-head runtime receipts have side_effect_key coverage",
+        "scope": "strict_runtime_blocker",
+        "short_label": "active_head",
+        "status": "pass"
+      }
+    ],
+    "idempotency_match_complete": true,
+    "latest_major_task_receipts_artifact_payload_percent": 100.0,
+    "latest_major_task_receipts_mission_percent": 100.0,
+    "latest_major_task_receipts_pending_execution": 37,
+    "latest_major_task_receipts_provider_model_accounted_percent": 100.0,
+    "latest_major_task_receipts_provider_model_percent": 13.79,
+    "latest_major_task_receipts_provider_model_provenance_percent": 100.0,
+    "latest_runtime_receipt_created_at": "2026-06-29T18:09:21.024299+00:00",
+    "latest_terminal_major_task_receipts_provider_model_accounted_percent": 100.0,
+    "latest_terminal_major_task_receipts_provider_model_percent": 38.1,
+    "latest_terminal_major_task_receipts_provider_model_provenance_percent": 100.0,
+    "latest_terminal_major_task_receipts_total": 21,
+    "major_task_receipts_artifact_record_percent": 57.11,
+    "major_task_receipts_idempotency_percent": 100.0,
+    "major_task_receipts_total": 11341,
+    "mission_coverage_complete": true,
+    "production_readiness_blockers": [],
+    "provider_model_accounted_complete": true,
+    "provider_model_coverage_complete": false,
+    "provider_model_provenance_complete": true,
+    "readable": true,
+    "required_tables_present": true,
+    "runtime_receipts_total": 71507,
+    "score_gate_70_to_75": true,
+    "terminal_provider_model_accounted_complete": true,
+    "terminal_provider_model_coverage_complete": false,
+    "terminal_provider_model_provenance_complete": true
+  },
+  "tables": {
+    "artifact_records": true,
+    "delegation_runs": true,
+    "execution_identities": true,
+    "idempotency_records": true,
+    "runtime_receipts": true,
+    "task_claims": true
+  }
+}
