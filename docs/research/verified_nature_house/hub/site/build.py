@@ -5,8 +5,8 @@ Renders ../01_THE_SEAM.md -> the-seam.html and ../THE_HUNDRED.md -> the-hundred.
 each wrapped in the shared site shell (draft banner + style.css). Single source of
 truth stays the markdown; this only generates preview HTML.
 
-Uses the `markdown` package if installed (richer output); otherwise falls back to a
-minimal stdlib renderer covering the constructs these docs use. No network calls.
+Uses a minimal stdlib renderer covering the constructs these docs use. No network
+calls and no optional third-party imports.
 
     python3 build.py            # build both pages (names as in source)
     python3 build.py --redact   # build with personal names dropped to affiliation level
@@ -57,14 +57,6 @@ BANNER = (
     "coherence gate; pending the named-person fairness pass and source verifications. "
     'Nothing here is live. <a href="index.html">&larr; back to the hub</a></div>'
 )
-
-
-def _render_with_lib(md_text: str) -> str | None:
-    try:
-        import markdown  # type: ignore
-    except Exception:
-        return None
-    return markdown.markdown(md_text, extensions=["tables", "fenced_code"])
 
 
 def _inline(text: str) -> str:
@@ -142,7 +134,7 @@ def main() -> None:
         md_text = src.read_text(encoding="utf-8")
         if redact:
             md_text = _redact(md_text)
-        body = _render_with_lib(md_text) or _render_minimal(md_text)
+        body = _render_minimal(md_text)
         (HERE / out_name).write_text(_shell(title, body), encoding="utf-8")
         print(f"  built: {out_name}  (from {src_name})")
     print("Done. Preview: python3 -m http.server  (then open index.html). NOT published.")
