@@ -41,7 +41,7 @@ import os
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -139,6 +139,34 @@ def load_baselines(path: Path) -> dict[str, int]:
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise BrokenCounter(f"baseline {name!r} must be a non-negative integer, got {value!r}")
     return dict(counters)
+
+
+def read_tightened_on(path: Path) -> str | None:
+    """Return the baselines file's ``tightened_on`` date (YYYY-MM-DD), or None.
+
+    Tolerant: any read/parse failure yields None so the caller treats an
+    unreadable date as 'cannot trust freshness' (fail-closed) rather than
+    crashing the gate."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    value = payload.get("tightened_on")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def baseline_age_days(tightened_on: str, today: str) -> int | None:
+    """Whole days between ``tightened_on`` and ``today`` (both ISO dates).
+
+    None if either date is unparseable. A negative value means the baseline date
+    is in the future; the freshness gate treats that as untrustworthy too.
+    """
+    try:
+        then = date.fromisoformat(tightened_on)
+        now = date.fromisoformat(today)
+    except ValueError:
+        return None
+    return (now - then).days
 
 
 def save_baselines(path: Path, counters: dict[str, int], today: str) -> None:
@@ -242,7 +270,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--explain", metavar="COUNTER", help="show the evidence behind one counter")
     parser.add_argument("--list", action="store_true", help="list counters and definitions")
-    parser.add_argument("--today", default=date.today().isoformat(), help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--max-baseline-age-days",
+        type=int,
+        default=None,
+        metavar="N",
+        help="fail (BROKEN) if the baselines file's tightened_on is older than N "
+        "days — a freshness gate so a stale baseline cannot silently mask drift",
+    )
+    parser.add_argument(
+        "--refresh-baseline-date",
+        action="store_true",
+        help="with --tighten, rewrite tightened_on even when counters are unchanged; "
+        "use only for reviewed stale-but-green baseline refreshes",
+    )
+    parser.add_argument(
+        "--today",
+        default=datetime.now(timezone.utc).date().isoformat(),
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     repo_root = args.repo_root.resolve()
     baseline_path = repo_root / BASELINE_PATH
@@ -291,6 +337,39 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ratchet: BROKEN — {exc}", file=sys.stderr)
         return EXIT_BROKEN
 
+    # Freshness gate: a baseline that is never re-measured silently masks
+    # drift (the watcher needs a watcher). When asked, fail closed if the
+    # stored tightened_on is older than the allowed window or unreadable.
+    if args.max_baseline_age_days is not None:
+        tightened = read_tightened_on(baseline_path)
+        age = baseline_age_days(tightened, args.today) if tightened else None
+        if age is None:
+            print(
+                "ratchet: BROKEN — baselines file has no readable tightened_on "
+                "date; a freshness gate cannot trust it.",
+                file=sys.stderr,
+            )
+            return EXIT_BROKEN
+        if age < 0:
+            print(
+                f"ratchet: BROKEN — baseline tightened_on={tightened} is after "
+                f"today={args.today}; future baseline dates cannot be trusted.",
+                file=sys.stderr,
+            )
+            return EXIT_BROKEN
+        stale_refresh_requested = args.tighten and args.refresh_baseline_date
+        if age > args.max_baseline_age_days and not stale_refresh_requested:
+            print(
+                f"ratchet: BROKEN — baseline is {age}d old "
+                f"(tightened_on={tightened}) and exceeds the "
+                f"--max-baseline-age-days {args.max_baseline_age_days} freshness "
+                "gate. A stale baseline silently masks drift; re-measure and run "
+                "`ratchet.py --tighten --refresh-baseline-date` only as a reviewed "
+                "stale-but-green baseline refresh.",
+                file=sys.stderr,
+            )
+            return EXIT_BROKEN
+
     regressions = [c for c in comparisons if c.regressed]
     improvements = [c for c in comparisons if c.improved]
 
@@ -318,11 +397,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         return EXIT_REGRESSION
 
-    if improvements and args.tighten:
+    refresh_requested = args.tighten and args.refresh_baseline_date
+    if args.tighten and (improvements or refresh_requested):
         save_baselines(baseline_path, tighten(baselines, comparisons), args.today)
         for comparison in improvements:
             print(f"ratchet: tightened {comparison.name} {comparison.baseline} -> {comparison.value}")
-        print(f"ratchet: commit {BASELINE_PATH} together with the improving change.")
+        if refresh_requested and not improvements:
+            print(f"ratchet: refreshed {BASELINE_PATH} tightened_on to {args.today}.")
+            print(f"ratchet: commit {BASELINE_PATH} as a reviewed baseline refresh.")
+        else:
+            print(f"ratchet: commit {BASELINE_PATH} together with the improving change.")
     elif improvements:
         names = ", ".join(c.name for c in improvements)
         print(f"ratchet: improvements available ({names}); run with --tighten to adopt.")
