@@ -1460,6 +1460,7 @@ class RuntimeStateStore:
         if corr.cell_id:
             claim.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 "INSERT INTO task_claims (claim_id, task_id, session_id, agent_id, status,"
                 " claimed_at, acked_at, heartbeat_at, stale_after, recovered_at,"
@@ -1613,6 +1614,7 @@ class RuntimeStateStore:
         if corr.cell_id:
             run.metadata.setdefault("cell_id", corr.cell_id)
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 "INSERT INTO delegation_runs (run_id, session_id, task_id, claim_id,"
                 " parent_run_id, assigned_by, assigned_to, requested_output_json,"
@@ -2295,6 +2297,7 @@ class RuntimeStateStore:
         await self.init_db()
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
+            await _apply_connection_pragmas_async(db)
             await db.execute(
                 self._identity_upsert_sql(),
                 self._identity_params(identity, source=source, now=now, metadata=metadata),
