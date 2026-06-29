@@ -41,6 +41,28 @@ make governance-all    # full governance suite
 
 See `make help` for the complete, authoritative target list — it is regenerated alongside the Makefile and never drifts.
 
+## Cybernetic Ratchet Loop
+
+A 5-stage governance pipeline (`scripts/governance/loop/`) that audits code for slop, triages findings, remediates with anti-gaming enforcement, re-audits with a fresh verifier, and ratchets CI gates to prevent recurrence. Core invariant: **LLM proposes, deterministic oracle disposes** — no LLM opinion is ever recorded as truth.
+
+**Stages:** `prompt_audit_run` (Auditor) → `prompt_audit_triage` (deterministic triage) → `prompt_audit_remediate` (Implementer + §8 anti-gaming) → `prompt_audit_reaudit` (Verifier, falsification-first) → `prompt_audit_learn` (Ratcheter, drives existing ratchet engine)
+
+**Run the loop:**
+```bash
+PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/loop/prompt_audit_run.py --help
+```
+
+**Test the loop:**
+```bash
+PYTHONPATH=. /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest tests/governance/loop/ -q
+```
+
+**Agent backends:** `LOOP_AGENT_BACKEND=stub|droid|api` (default: stub). The droid backend shells out to the `droid` CLI for role-separated Auditor/Implementer/Verifier invocations with heterogeneous verifier routing.
+
+**CI integration:** `.github/workflows/loop-ratchet-gates.yml` runs the cheap-tier governance gates on push, pull_request, and merge_group. `wire_ci_gate.py` adds new ratcheted gates from the learn stage.
+
+See `scripts/governance/loop/README.md` for the full module reference.
+
 ## What The Inventory Says
 
 For a current static snapshot of the repo (module/test counts, hotspots, coupling, language mix), run the DocOps inventory pass:
