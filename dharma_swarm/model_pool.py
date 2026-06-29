@@ -42,35 +42,13 @@ from dharma_swarm.model_defaults import (
 )
 from dharma_swarm.models import ProviderType
 
-# ═══════════════════════════════════════════════════════════════════════════
-# THE POWER FLOOR — the unmistakable demarcation in the DATA
-# ═══════════════════════════════════════════════════════════════════════════
-# Operator word (2026-06-17): "sub-floor models can exist just for real grunt
-# work only but ONLY with a very clear demarcation."
-#
-# :data:`MODEL_POWER_FLOOR` (re-exported from ``evolution_roster``, and equal to
-# :data:`K2_FLOOR_ID`) is the documented line: Kimi K2.6-class. Every roster slot
-# carries a ``below_floor`` boolean; the pool propagates it onto each
-# :class:`ModelEntry` (``below_floor`` == True iff a grouped slot is sub-floor).
-#
-# REAL path  (``below_floor == False``): the default chat brain, the frontier,
-#            and the model picker's main list — sourced via :func:`floor_entries`.
-# GRUNT path (``below_floor == True``):  old / weak / genuinely-local weights the
-#            K2.6 floor banishes from the real path. Reachable ONLY via an
-#            explicit grunt opt-in (:func:`grunt_entries`) — NEVER the
-#            default/frontier path or the picker's main list.
-#
-# The demarcation lives in the data so no consumer can route a sub-floor model
-# onto the frontier by accident: they read one boolean.
-# ═══════════════════════════════════════════════════════════════════════════
+# THE POWER FLOOR: the documented Kimi K2.6-class line. Roster slots carry
+# ``below_floor`` and the pool propagates it. ``floor_entries`` feeds real paths;
+# ``grunt_entries`` is the explicit opt-in for old/weak/local weights.
 K2_FLOOR_ID = MODEL_POWER_FLOOR  # "kimi-k2.6" — single documented source
 
-# The per-provider default model strings live in :mod:`model_defaults` (a leaf
-# that imports only ``models``, so it sits below the roster→ollama_config→
-# model_hierarchy import cycle). The pool re-exports :func:`default_for_provider`
-# (imported above) so it remains the public model-grain owner the consolidation
-# goal names; ``_PROVIDER_DEFAULTS`` is reused below for the import-time coherence
-# guard against the roster route table.
+# Provider defaults live in :mod:`model_defaults` to avoid import cycles; the
+# pool re-exports :func:`default_for_provider` and validates those defaults below.
 
 
 # ---------------------------------------------------------------------------

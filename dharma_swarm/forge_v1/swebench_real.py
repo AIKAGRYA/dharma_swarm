@@ -99,9 +99,9 @@ def _ensure_docker_host() -> None:
             host = data[0]["Endpoints"]["docker"]["Host"]
             if host:
                 os.environ["DOCKER_HOST"] = host
-    except Exception:
+    except (OSError, KeyError, IndexError, json.JSONDecodeError) as e:
         # Leave DOCKER_HOST unset; swebench will raise a clear DockerException.
-        pass
+        print(f"[swebench] unable to infer DOCKER_HOST from docker context: {e}", flush=True)
 
 
 def verified_instances(n: int = 1, instance_ids: list[str] | None = None) -> list[dict[str, Any]]:

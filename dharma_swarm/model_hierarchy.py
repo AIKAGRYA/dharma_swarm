@@ -1,23 +1,4 @@
-"""Canonical model hierarchy — the single source of truth.
-
-Every file that needs provider ordering, tier definitions, or model hints
-imports from HERE.  Not from runtime_provider.  Not from smart_router.
-Not from provider_policy.  HERE.
-
-The seed ordering below is the Day 1 default.  After ~100 routing events,
-EWMA scores from routing_memory.py dominate and the system self-orders
-based on real performance data.
-
-Architecture (Tiny Dancer inspired):
-    REQUEST → router_v1 classify (50µs) → routing_memory EWMA lookup (1ms)
-    → circuit_breaker filter (10µs) → RANKED TOP 3 → asyncio race
-    → first good response wins → heuristic_score → EWMA update → RETURN
-
-References:
-    - Tiny Dancer (ruvnet/RuVector): sub-ms neural routing, EWMA, circuit breakers
-    - RouteLLM (LMSYS): 72% cost savings at 95% quality via learned routing
-    - Not Diamond: awesome-ai-model-routing curated patterns
-"""
+"""Canonical provider hierarchy and model defaults."""
 
 from __future__ import annotations
 
@@ -29,9 +10,7 @@ from typing import TYPE_CHECKING, Mapping
 from dharma_swarm.models import LLMResponse, ProviderType
 from dharma_swarm.model_defaults import MODEL_POWER_FLOOR, default_for_provider
 
-# The documented power-floor line (Kimi K2.6-class). Re-exported here so the
-# provider-grain hierarchy and any caller that already imports model_hierarchy
-# read the SAME constant the pool/roster carry as ``below_floor`` demarcation.
+# Re-export the roster/pool power-floor line for provider-grain callers.
 __all_floor__ = ("MODEL_POWER_FLOOR",)
 
 if TYPE_CHECKING:
@@ -61,25 +40,9 @@ class LaneRole(str, Enum):
     GENERAL_SUPPORT = "general_support"
 
 
-# ─── Tier Definitions ────────────────────────────────────────────────────
-# Which providers belong to which cost tier.
-# Within each tier, ordering is the Day 1 seed.  EWMA scores override this
-# after sufficient routing events (~100 calls).
-
-# MODEL PREFERENCE DOCTRINE — POWER-FIRST (operator decision 2026-06-21).
-# Selection is power-first: ProviderPolicyRouter ranks providers most-capable-
-# first by default (cost is an opt-in nudge). This file is the data/registry
-# layer; see docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md for the precedence.
-# Within every lane the default *model* is still the MOST POWERFUL model that
-# lane offers — never the small convenience model. Small models (llama3.2,
-# mistral-small, 8B-class) are permitted ONLY as explicit keyless local
-# fallbacks (see ollama_config.OLLAMA_DEFAULT_LOCAL_MODEL) or fast-path T0
-# classifiers — never as a lane's default. Every other file seeds its models
-# from DEFAULT_MODELS / default_model() below; do not hardcode model ids
-# elsewhere.
-
-# Tier members are listed MOST INTELLIGENT FIRST (see MODEL_INTELLIGENCE
-# below) — the cost ladder picks the tier, intelligence picks within it.
+# Tier order is the Day-1 seed; EWMA scores refine after enough routing events.
+# Defaults stay power-first. Small models are explicit local/fast-path fallbacks,
+# never lane defaults.
 TIER_FREE: tuple[ProviderType, ...] = (
     ProviderType.OLLAMA,         # GLM-5 744B, DeepSeek-v3.2, Kimi-K2.5 (cloud)
     ProviderType.GROQ,           # Kimi K2 1T (fast inference)
@@ -122,23 +85,12 @@ ALL_TIERS: dict[str, tuple[ProviderType, ...]] = {
     "paid": TIER_PAID,
 }
 
-# The canonical provider REGISTRY — all tiers, used as the base list for
-# power-first reranking (operator decision 2026-06-21). The tier enumeration
-# below is the historical fallback only: ProviderPolicyRouter applies
-# power_first_priority at selection time, so this seed order no longer drives
-# the default selection. EWMA scores still refine within that reranking.
-# 1. Free frontier (Ollama Cloud, Groq, Cerebras, etc.) — $0, high quality
-# 2. Cheap (Mistral, Google AI, Zhipu, etc.) — ~$0
-# 3. Subscription (Claude Max, Codex) — unlimited via active plans
-# 4. Paid API (Anthropic, OpenAI credits) — credit-limited
+# Canonical provider registry. ProviderPolicyRouter applies power-first
+# reranking; this seed is the historical fallback and EWMA starting point.
 CANONICAL_SEED_ORDER: tuple[ProviderType, ...] = (
     TIER_FREE + TIER_CHEAP + TIER_SUBSCRIPTION + TIER_PAID_API
 )
 
-
-# ─── Canonical Lane Roles ────────────────────────────────────────────────
-# Codex + Opus are the sovereign drivers. Open/cheap lanes do the bulk of
-# delegated search, challenge, and implementation work.
 
 PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
     ProviderType.CLAUDE_CODE,    # Subscription-backed (unlimited)
