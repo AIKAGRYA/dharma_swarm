@@ -150,8 +150,9 @@ Stages 1–4 shipped; Stage 5 done with scoped exceptions recorded below.
 - **Stage 2 — power-first default:** DONE. `power_first` base ordering;
   `preferred_low_cost` defaults False (request + production derivation).
 - **Stage 3 — z.ai/Zhipu first-party:** DONE. `ProviderType.ZHIPU`, default
-  `glm-5.2`, endpoint `https://api.z.ai/api/paas/v4`. (Live calls require the
-  environment's network egress allowlist to include `api.z.ai`.)
+  `glm-5.2`, endpoint `https://api.z.ai/api/coding/paas/v4`. The coding endpoint
+  is intentional for coding-plan keys; live calls require the environment's
+  network egress allowlist to include `api.z.ai`.
 - **Stage 4 — one precedence, documented + tested:** DONE. See §2 and
   `tests/test_provider_routing_explicit.py`.
 - **Stage 5 — drift cleanup:** env templates updated for Zhipu. The following

@@ -136,6 +136,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
     ProviderType.CLAUDE_CODE: 0,
     ProviderType.OPENAI: 1,
     ProviderType.CODEX: 1,
+    ProviderType.KIMI_CODE: 2,
     ProviderType.OLLAMA: 2,
     ProviderType.NVIDIA_NIM: 3,
     ProviderType.GROQ: 4,
@@ -309,6 +310,29 @@ def entry_for_model_id(model_id: str) -> ModelEntry | None:
     return None
 
 
+def _required_provider_route(logical_id: str, provider: ProviderType) -> str:
+    entry = get_entry(logical_id)
+    if entry is None:
+        raise AssertionError(f"missing model-pool entry for {logical_id!r}")
+    for route in entry.routes:
+        if route.provider is provider:
+            return route.model_id
+    raise AssertionError(f"missing {provider.value!r} route for {logical_id!r}")
+
+
+FORGE_KIMI_CODE_MODEL_ID = default_for_provider(ProviderType.KIMI_CODE)
+FORGE_KIMI_27_CODE_LOGICAL_ID = "kimi-k2.7-code"
+FORGE_KIMI_27_CODE_CLOUD_MODEL_ID = _required_provider_route(
+    FORGE_KIMI_27_CODE_LOGICAL_ID,
+    ProviderType.OLLAMA,
+)
+FORGE_NVIDIA_KIMI_MODEL_ID = _required_provider_route(K2_FLOOR_ID, ProviderType.NVIDIA_NIM)
+FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID = _required_provider_route(
+    "llama-3.3-70b-instruct",
+    ProviderType.NVIDIA_NIM,
+)
+
+
 # Providers whose default is a deliberate operator pin that supersedes the
 # legacy roster (the roster predates gpt-5 / opus-4.6 / codex gpt-5.4). These are
 # still owned by _PROVIDER_DEFAULTS; the coherence guard below only exempts them
@@ -469,6 +493,11 @@ __all__ = [
     "get_entry",
     "entry_for_model_id",
     "default_for_provider",
+    "FORGE_KIMI_CODE_MODEL_ID",
+    "FORGE_KIMI_27_CODE_LOGICAL_ID",
+    "FORGE_KIMI_27_CODE_CLOUD_MODEL_ID",
+    "FORGE_NVIDIA_KIMI_MODEL_ID",
+    "FORGE_NVIDIA_LLAMA_VERIFIER_MODEL_ID",
     "live_routes",
     "best_live_route",
     "provider_model_ids",

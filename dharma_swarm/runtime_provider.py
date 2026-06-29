@@ -25,6 +25,8 @@ from dharma_swarm.api_keys import (
     GOOGLE_AI_BASE_URL_ENV,
     GROQ_API_KEY_ENV,
     GROQ_BASE_URL_ENV,
+    KIMI_API_KEY_ENV,
+    KIMI_BASE_URL_ENV,
     MISTRAL_API_KEY_ENV,
     MISTRAL_BASE_URL_ENV,
     NVIDIA_NIM_API_KEY_ENV,
@@ -63,8 +65,11 @@ GOOGLE_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 SAMBANOVA_BASE_URL = "https://api.sambanova.ai/v1"
 MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 CHUTES_BASE_URL = "https://api.chutes.ai/v1"
-# z.ai / Zhipu OpenAI-compatible endpoint (GLM models, first-party lane)
-ZHIPU_BASE_URL = "https://api.z.ai/api/paas/v4"
+# z.ai / Zhipu coding-plan OpenAI-compatible endpoint. The generic Z.ai
+# endpoint can reject coding-plan keys as out of funds even when coding quota is
+# live, so this default is intentionally the coding endpoint.
+ZHIPU_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
+KIMI_BASE_URL = "https://api.kimi.com/coding/v1"
 from dharma_swarm.model_hierarchy import (
     CANONICAL_SEED_ORDER,
     default_model,
@@ -85,6 +90,7 @@ DEFAULT_MISTRAL_MODEL = default_model(ProviderType.MISTRAL)
 DEFAULT_CHUTES_MODEL = default_model(ProviderType.CHUTES)
 DEFAULT_GOOGLE_AI_MODEL = default_model(ProviderType.GOOGLE_AI)
 DEFAULT_ZHIPU_MODEL = default_model(ProviderType.ZHIPU)
+DEFAULT_KIMI_CODE_MODEL = default_model(ProviderType.KIMI_CODE)
 DEFAULT_CODEX_MODEL = default_model(ProviderType.CODEX)
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 300
 
@@ -105,6 +111,8 @@ PREFERRED_LOW_COST_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = (
     ProviderType.TOGETHER,        # FREE: Qwen3-Coder 480B
     ProviderType.FIREWORKS,       # FREE: Qwen3-Coder 480B
     ProviderType.OPENROUTER_FREE, # FREE: auto-discovered
+    ProviderType.KIMI_CODE,       # CHEAP/SUBSCRIPTION: Kimi Code stable K2.x coding lane
+    ProviderType.ZHIPU,           # CHEAP: Z.ai coding-plan GLM-5.2 direct API
     ProviderType.MISTRAL,         # CHEAP
     ProviderType.GOOGLE_AI,       # CHEAP
     ProviderType.CHUTES,          # CHEAP
@@ -120,6 +128,8 @@ PREFERRED_LOW_COST_WITH_ANTHROPIC_RUNTIME_PROVIDERS: tuple[ProviderType, ...] = 
     ProviderType.OPENROUTER_FREE,
     ProviderType.TOGETHER,
     ProviderType.FIREWORKS,
+    ProviderType.KIMI_CODE,
+    ProviderType.ZHIPU,
     ProviderType.OPENROUTER,      # PAID (moonshotai/kimi-k2.5)
     ProviderType.ANTHROPIC,
     ProviderType.CLAUDE_CODE,     # FALLBACK: always available if claude binary installed
@@ -445,6 +455,23 @@ def resolve_runtime_provider_config(
             api_key=token,
             base_url=resolved_base,
             default_model=model or DEFAULT_ZHIPU_MODEL,
+            timeout_seconds=timeout,
+            available=bool(token),
+        )
+
+    if provider == ProviderType.KIMI_CODE:
+        token = api_key or _env_value(env_map, KIMI_API_KEY_ENV)
+        resolved_base = (
+            base_url
+            or _env_value(env_map, KIMI_BASE_URL_ENV)
+            or KIMI_BASE_URL
+        ).rstrip("/")
+        return RuntimeProviderConfig(
+            provider=provider,
+            api_key=token,
+            base_url=resolved_base,
+            default_model=model or DEFAULT_KIMI_CODE_MODEL,
+            timeout_seconds=timeout,
             available=bool(token),
         )
 
@@ -463,6 +490,7 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
         FireworksProvider,
         GoogleAIProvider,
         GroqProvider,
+        KimiCodeProvider,
         MistralProvider,
         NVIDIANIMProvider,
         OllamaProvider,
@@ -569,12 +597,25 @@ def create_runtime_provider(config: RuntimeProviderConfig) -> Any:
             kwargs["api_key"] = config.api_key
         return ChutesProvider(**kwargs)
     if config.provider == ProviderType.ZHIPU:
-        kwargs = {}
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_ZHIPU_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
         if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         if config.base_url is not None:
             kwargs["base_url"] = config.base_url
         return ZhipuProvider(**kwargs)
+    if config.provider == ProviderType.KIMI_CODE:
+        kwargs = {
+            "default_model": config.default_model or DEFAULT_KIMI_CODE_MODEL,
+            "timeout": config.timeout_seconds or DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        }
+        if config.api_key is not None:
+            kwargs["api_key"] = config.api_key
+        if config.base_url is not None:
+            kwargs["base_url"] = config.base_url
+        return KimiCodeProvider(**kwargs)
     raise ValueError(f"Unsupported runtime provider: {config.provider.value}")
 
 
@@ -701,6 +742,7 @@ __all__ = [
     "CEREBRAS_BASE_URL",
     "DEFAULT_CLAUDE_MODEL",
     "DEFAULT_GROQ_MODEL",
+    "DEFAULT_KIMI_CODE_MODEL",
     "DEFAULT_FIREWORKS_MODEL",
     "DEFAULT_NIM_MODEL",
     "DEFAULT_OPENAI_MODEL",
@@ -709,9 +751,11 @@ __all__ = [
     "DEFAULT_RUNTIME_PROVIDERS",
     "DEFAULT_SILICONFLOW_MODEL",
     "DEFAULT_TOGETHER_MODEL",
+    "DEFAULT_ZHIPU_MODEL",
     "FIREWORKS_BASE_URL",
     "GOOGLE_AI_BASE_URL",
     "GROQ_BASE_URL",
+    "KIMI_BASE_URL",
     "NVIDIA_NIM_BASE_URL",
     "OPENAI_BASE_URL",
     "OPENROUTER_BASE_URL",
@@ -720,6 +764,7 @@ __all__ = [
     "RuntimeProviderConfig",
     "SILICONFLOW_BASE_URL",
     "TOGETHER_BASE_URL",
+    "ZHIPU_BASE_URL",
     "complete_via_preferred_runtime_providers",
     "create_default_provider_map",
     "create_runtime_provider",
