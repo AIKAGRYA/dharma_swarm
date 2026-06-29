@@ -71,6 +71,63 @@ def test_default_workflow_has_full_cheap_tier_and_phase0_gates():
         assert needle in step_text
 
 
+def test_f1_marker_strictness_gate_fails_closed_on_reintroduced_slop(tmp_path):
+    """VAL-CI-003: the F1 marker-strictness gate exits non-zero on reintroduced slop.
+
+    The F1 gate command (``pytest --collect-only -q --strict-markers``) must
+    fail-closed: a typo'd / unregistered marker causes a non-zero exit (failing
+    CI), while a clean tree exits zero. This is the red-before/green-after proof
+    pattern for the Phase-0 gates, now verified against the actual gate command
+    used in ``loop-ratchet-gates.yml``.
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+
+    # --- green: clean tree (registered marker) ---
+    clean_dir = tmp_path / "clean"
+    clean_dir.mkdir()
+    (clean_dir / "conftest.py").write_text(
+        "import pytest\n"
+        "pytest_plugins: list = []\n"
+        "def pytest_configure(config):\n"
+        "    config.addinivalue_line('markers', 'clean_marker: registered')\n"
+    )
+    (clean_dir / "test_clean.py").write_text(
+        "import pytest\n"
+        "def test_ok():\n"
+        "    pytest.mark.clean_marker(lambda: None)()\n"
+        "    assert True\n"
+    )
+    proc_clean = subprocess.run(
+        [VENV_PYTHON, "-m", "pytest", "--collect-only", "-q", "--strict-markers",
+         str(clean_dir / "test_clean.py")],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_clean.returncode == 0, (
+        f"clean tree should pass (exit 0), got {proc_clean.returncode}\n"
+        f"stdout: {proc_clean.stdout}\nstderr: {proc_clean.stderr}"
+    )
+
+    # --- red: reintroduced slop (unregistered marker) ---
+    slop_dir = tmp_path / "slop"
+    slop_dir.mkdir()
+    (slop_dir / "test_slop.py").write_text(
+        "import pytest\n"
+        "@pytest.mark.typoed_unregistered_marker\n"
+        "def test_slop():\n"
+        "    assert True\n"
+    )
+    proc_slop = subprocess.run(
+        [VENV_PYTHON, "-m", "pytest", "--collect-only", "-q", "--strict-markers",
+         str(slop_dir / "test_slop.py")],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_slop.returncode != 0, (
+        f"reintroduced slop should fail (non-zero exit), got {proc_slop.returncode}\n"
+        f"stdout: {proc_slop.stdout}\nstderr: {proc_slop.stderr}"
+    )
+
+
 def test_wire_ci_gate_adds_new_gate_step(tmp_path):
     workflow = tmp_path / "loop-ratchet-gates.yml"
     env = os.environ.copy()
