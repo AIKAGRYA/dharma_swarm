@@ -26,6 +26,8 @@ class A2AReadinessReport:
     unverified_closed_tasks: int
     unknown_status_tasks: int
     reasons: list[str]
+    blocker_task_ids: dict[str, list[str]]
+    blocker_task_id_coverage_complete: bool
     tasks: list[dict[str, Any]]
 
 
@@ -45,6 +47,8 @@ def evaluate_a2a_readiness(
             unverified_closed_tasks=0,
             unknown_status_tasks=0,
             reasons=["queue_missing"],
+            blocker_task_ids={"queue_missing": []},
+            blocker_task_id_coverage_complete=False,
             tasks=[],
         )
 
@@ -54,6 +58,11 @@ def evaluate_a2a_readiness(
     open_tasks = 0
     unverified_closed_tasks = 0
     unknown_status_tasks = 0
+    blocker_task_ids: dict[str, list[str]] = {
+        "open_or_claimed_tasks_present": [],
+        "unverified_closed_tasks_present": [],
+        "unknown_status_tasks_present": [],
+    }
 
     for row in rows:
         task_id = str(row.get("id") or "")
@@ -67,10 +76,13 @@ def evaluate_a2a_readiness(
         verified = bool(lifecycle.get("verified"))
         if not closed:
             open_tasks += 1
+            blocker_task_ids["open_or_claimed_tasks_present"].append(task_id)
         elif not verified:
             unverified_closed_tasks += 1
+            blocker_task_ids["unverified_closed_tasks_present"].append(task_id)
         if state.endswith("_unknown"):
             unknown_status_tasks += 1
+            blocker_task_ids["unknown_status_tasks_present"].append(task_id)
         task_reports.append(
             {
                 "id": task_id,
@@ -89,6 +101,19 @@ def evaluate_a2a_readiness(
         reasons.append("unknown_status_tasks_present")
 
     ready = not reasons
+    active_blocker_task_ids = {
+        reason: sorted(
+            task_id for task_id in blocker_task_ids.get(reason, []) if task_id
+        )
+        for reason in reasons
+    }
+    blocker_task_id_coverage_complete = bool(
+        ready
+        or (
+            reasons
+            and all(active_blocker_task_ids.get(reason) for reason in reasons)
+        )
+    )
     return A2AReadinessReport(
         queue_path=str(path),
         gate_status="READY" if ready else "DEGRADED",
@@ -98,6 +123,8 @@ def evaluate_a2a_readiness(
         unverified_closed_tasks=unverified_closed_tasks,
         unknown_status_tasks=unknown_status_tasks,
         reasons=reasons,
+        blocker_task_ids=active_blocker_task_ids,
+        blocker_task_id_coverage_complete=blocker_task_id_coverage_complete,
         tasks=task_reports,
     )
 

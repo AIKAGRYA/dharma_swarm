@@ -1,0 +1,512 @@
+{
+  "deterministic": true,
+  "distractor_domain_count": 8,
+  "mission_id": "langgraph-swarm-supervisor-parity-to-10-10",
+  "provider_profile": {
+    "cost_per_1k_tokens": 0.0002,
+    "model": "deterministic-isolation-harness-v1",
+    "provider": "local"
+  },
+  "results": [
+    {
+      "admitted_memory_domains_by_agent": {
+        "climate_agent": [
+          "climate_ops"
+        ]
+      },
+      "agents": [
+        "climate_agent"
+      ],
+      "cost_estimate_usd": 1.8e-05,
+      "failure_classes": [
+        "missing_required_domain"
+      ],
+      "handoff_count": 0,
+      "latency_ms": 19,
+      "mode": "single_agent",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 0.5,
+      "selected_domains": [
+        "climate_ops",
+        "finance_risk"
+      ],
+      "task_id": "climate_finance_multihop",
+      "token_estimate": 90,
+      "visible_tools_by_agent": {
+        "climate_agent": [
+          "carbon_project_lookup",
+          "satellite_restoration_score",
+          "welfare_ton_calculator",
+          "transfer_to_finance_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "climate_agent": [
+          "climate_ops"
+        ],
+        "finance_agent": [
+          "finance_risk"
+        ]
+      },
+      "agents": [
+        "climate_agent",
+        "finance_agent"
+      ],
+      "cost_estimate_usd": 3.5e-05,
+      "failure_classes": [],
+      "handoff_count": 1,
+      "latency_ms": 38,
+      "mode": "swarm",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "climate_ops",
+        "finance_risk"
+      ],
+      "task_id": "climate_finance_multihop",
+      "token_estimate": 174,
+      "visible_tools_by_agent": {
+        "climate_agent": [
+          "carbon_project_lookup",
+          "satellite_restoration_score",
+          "welfare_ton_calculator",
+          "transfer_to_finance_agent"
+        ],
+        "finance_agent": [
+          "risk_budget_calculator",
+          "cashflow_projection",
+          "variance_scan",
+          "transfer_to_climate_agent",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "climate_agent": [
+          "climate_ops"
+        ],
+        "finance_agent": [
+          "finance_risk"
+        ]
+      },
+      "agents": [
+        "climate_agent",
+        "finance_agent"
+      ],
+      "cost_estimate_usd": 3.9e-05,
+      "failure_classes": [],
+      "handoff_count": 2,
+      "latency_ms": 51,
+      "mode": "supervisor",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "climate_ops",
+        "finance_risk"
+      ],
+      "task_id": "climate_finance_multihop",
+      "token_estimate": 194,
+      "visible_tools_by_agent": {
+        "climate_agent": [
+          "carbon_project_lookup",
+          "satellite_restoration_score",
+          "welfare_ton_calculator",
+          "transfer_to_finance_agent"
+        ],
+        "finance_agent": [
+          "risk_budget_calculator",
+          "cashflow_projection",
+          "variance_scan",
+          "transfer_to_climate_agent",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "security_agent": [
+          "code_security"
+        ]
+      },
+      "agents": [
+        "security_agent"
+      ],
+      "cost_estimate_usd": 1.6e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 19,
+      "mode": "single_agent",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "code_security"
+      ],
+      "task_id": "security_patch_review",
+      "token_estimate": 78,
+      "visible_tools_by_agent": {
+        "security_agent": [
+          "dependency_cve_lookup",
+          "patch_diff_reader",
+          "semgrep_scan",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "security_agent": [
+          "code_security"
+        ]
+      },
+      "agents": [
+        "security_agent"
+      ],
+      "cost_estimate_usd": 1.8e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 25,
+      "mode": "swarm",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "code_security"
+      ],
+      "task_id": "security_patch_review",
+      "token_estimate": 88,
+      "visible_tools_by_agent": {
+        "security_agent": [
+          "dependency_cve_lookup",
+          "patch_diff_reader",
+          "semgrep_scan",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "security_agent": [
+          "code_security"
+        ]
+      },
+      "agents": [
+        "security_agent"
+      ],
+      "cost_estimate_usd": 2.2e-05,
+      "failure_classes": [],
+      "handoff_count": 1,
+      "latency_ms": 38,
+      "mode": "supervisor",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "code_security"
+      ],
+      "task_id": "security_patch_review",
+      "token_estimate": 108,
+      "visible_tools_by_agent": {
+        "security_agent": [
+          "dependency_cve_lookup",
+          "patch_diff_reader",
+          "semgrep_scan",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "legal_agent": [
+          "legal_policy"
+        ]
+      },
+      "agents": [
+        "legal_agent"
+      ],
+      "cost_estimate_usd": 1.7e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 19,
+      "mode": "single_agent",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "legal_policy"
+      ],
+      "task_id": "contract_policy_check",
+      "token_estimate": 85,
+      "visible_tools_by_agent": {
+        "legal_agent": [
+          "contract_clause_search",
+          "jurisdiction_check",
+          "policy_matrix",
+          "transfer_to_finance_agent",
+          "transfer_to_security_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "legal_agent": [
+          "legal_policy"
+        ]
+      },
+      "agents": [
+        "legal_agent"
+      ],
+      "cost_estimate_usd": 1.9e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 25,
+      "mode": "swarm",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "legal_policy"
+      ],
+      "task_id": "contract_policy_check",
+      "token_estimate": 95,
+      "visible_tools_by_agent": {
+        "legal_agent": [
+          "contract_clause_search",
+          "jurisdiction_check",
+          "policy_matrix",
+          "transfer_to_finance_agent",
+          "transfer_to_security_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "legal_agent": [
+          "legal_policy"
+        ]
+      },
+      "agents": [
+        "legal_agent"
+      ],
+      "cost_estimate_usd": 2.3e-05,
+      "failure_classes": [],
+      "handoff_count": 1,
+      "latency_ms": 38,
+      "mode": "supervisor",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "legal_policy"
+      ],
+      "task_id": "contract_policy_check",
+      "token_estimate": 115,
+      "visible_tools_by_agent": {
+        "legal_agent": [
+          "contract_clause_search",
+          "jurisdiction_check",
+          "policy_matrix",
+          "transfer_to_finance_agent",
+          "transfer_to_security_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "supply_agent": [
+          "supply_chain"
+        ]
+      },
+      "agents": [
+        "supply_agent"
+      ],
+      "cost_estimate_usd": 1.8e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 19,
+      "mode": "single_agent",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "supply_chain"
+      ],
+      "task_id": "supply_eta_risk",
+      "token_estimate": 92,
+      "visible_tools_by_agent": {
+        "supply_agent": [
+          "vendor_eta_lookup",
+          "inventory_buffer_model",
+          "customs_delay_estimator",
+          "transfer_to_finance_agent",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "supply_agent": [
+          "supply_chain"
+        ]
+      },
+      "agents": [
+        "supply_agent"
+      ],
+      "cost_estimate_usd": 2e-05,
+      "failure_classes": [],
+      "handoff_count": 0,
+      "latency_ms": 25,
+      "mode": "swarm",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "supply_chain"
+      ],
+      "task_id": "supply_eta_risk",
+      "token_estimate": 102,
+      "visible_tools_by_agent": {
+        "supply_agent": [
+          "vendor_eta_lookup",
+          "inventory_buffer_model",
+          "customs_delay_estimator",
+          "transfer_to_finance_agent",
+          "transfer_to_legal_agent"
+        ]
+      }
+    },
+    {
+      "admitted_memory_domains_by_agent": {
+        "supply_agent": [
+          "supply_chain"
+        ]
+      },
+      "agents": [
+        "supply_agent"
+      ],
+      "cost_estimate_usd": 2.4e-05,
+      "failure_classes": [],
+      "handoff_count": 1,
+      "latency_ms": 38,
+      "mode": "supervisor",
+      "model": "deterministic-isolation-harness-v1",
+      "provider": "local",
+      "score": 1.0,
+      "selected_domains": [
+        "supply_chain"
+      ],
+      "task_id": "supply_eta_risk",
+      "token_estimate": 122,
+      "visible_tools_by_agent": {
+        "supply_agent": [
+          "vendor_eta_lookup",
+          "inventory_buffer_model",
+          "customs_delay_estimator",
+          "transfer_to_finance_agent",
+          "transfer_to_legal_agent"
+        ]
+      }
+    }
+  ],
+  "suite_name": "langgraph_parity_isolation_distractors",
+  "summary": {
+    "distractor_domain_count": 8,
+    "modes": {
+      "single_agent": {
+        "average_score": 0.875,
+        "cost_estimate_usd": 6.9e-05,
+        "failure_classes": [
+          "missing_required_domain"
+        ],
+        "task_count": 4,
+        "token_estimate": 345
+      },
+      "supervisor": {
+        "average_score": 1.0,
+        "cost_estimate_usd": 0.000108,
+        "failure_classes": [],
+        "task_count": 4,
+        "token_estimate": 539
+      },
+      "swarm": {
+        "average_score": 1.0,
+        "cost_estimate_usd": 9.2e-05,
+        "failure_classes": [],
+        "task_count": 4,
+        "token_estimate": 459
+      }
+    },
+    "multi_hop_task_count": 1,
+    "suite_name": "langgraph_parity_isolation_distractors",
+    "task_count": 4
+  },
+  "tasks": [
+    {
+      "expected_tools": {
+        "climate_ops": [
+          "carbon_project_lookup",
+          "welfare_ton_calculator"
+        ],
+        "finance_risk": [
+          "risk_budget_calculator",
+          "cashflow_projection"
+        ]
+      },
+      "id": "climate_finance_multihop",
+      "prompt": "Estimate welfare-ton upside for a mangrove restoration pilot, then convert that into a risk-bounded deployment cash budget.",
+      "required_domains": [
+        "climate_ops",
+        "finance_risk"
+      ],
+      "requires_multi_hop": true
+    },
+    {
+      "expected_tools": {
+        "code_security": [
+          "dependency_cve_lookup",
+          "patch_diff_reader"
+        ]
+      },
+      "id": "security_patch_review",
+      "prompt": "Review a dependency patch for CVE exposure and static-analysis regression risk.",
+      "required_domains": [
+        "code_security"
+      ],
+      "requires_multi_hop": false
+    },
+    {
+      "expected_tools": {
+        "legal_policy": [
+          "contract_clause_search",
+          "jurisdiction_check"
+        ]
+      },
+      "id": "contract_policy_check",
+      "prompt": "Check a cancellation clause against jurisdiction and compliance policy constraints.",
+      "required_domains": [
+        "legal_policy"
+      ],
+      "requires_multi_hop": false
+    },
+    {
+      "expected_tools": {
+        "supply_chain": [
+          "vendor_eta_lookup",
+          "inventory_buffer_model"
+        ]
+      },
+      "id": "supply_eta_risk",
+      "prompt": "Assess vendor lead time, customs delay risk, and inventory buffer for a fulfillment lane.",
+      "required_domains": [
+        "supply_chain"
+      ],
+      "requires_multi_hop": false
+    }
+  ]
+}

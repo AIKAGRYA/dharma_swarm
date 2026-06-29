@@ -1,0 +1,143 @@
+{
+  "blockers": [],
+  "gates": [
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/benchmark/benchmark_report.json",
+      "id": "A.swarm_parity",
+      "metrics": {
+        "distractor_domain_count": 8,
+        "modes": [
+          "single_agent",
+          "supervisor",
+          "swarm"
+        ],
+        "multi_hop_task_count": 1
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "local deterministic swarm parity exercised in focused tests"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/benchmark/benchmark_report.json",
+      "id": "B.supervisor_parity",
+      "metrics": {
+        "distractor_domain_count": 8,
+        "modes": [
+          "single_agent",
+          "supervisor",
+          "swarm"
+        ],
+        "multi_hop_task_count": 1
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "local deterministic supervisor parity exercised in focused tests"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/benchmark/benchmark_report.json",
+      "id": "C.context_tool_isolation",
+      "metrics": {
+        "distractor_domain_count": 8,
+        "modes": [
+          "single_agent",
+          "supervisor",
+          "swarm"
+        ],
+        "multi_hop_task_count": 1
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "distractor benchmark includes hard domain/tool isolation evidence"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/benchmark/benchmark_report.json",
+      "id": "D.benchmark",
+      "metrics": {
+        "distractor_domain_count": 8,
+        "modes": [
+          "single_agent",
+          "supervisor",
+          "swarm"
+        ],
+        "multi_hop_task_count": 1
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "single-agent, swarm, and supervisor benchmark report is present"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/receipts/gate_C_runtime_receipt_coverage_report.json",
+      "id": "E1.runtime_receipt_coverage",
+      "metrics": {
+        "fresh_major_task_receipts_total": 164,
+        "fresh_runtime_receipts_total": 1439,
+        "fresh_score_gate_70_to_75": true,
+        "global_runtime_receipts_total": 71507,
+        "global_score_gate_70_to_75": true
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "global and fresh runtime receipt gates pass"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/receipts/gate_E_check_a2a_readiness.stdout.txt",
+      "id": "E2.a2a_readiness",
+      "metrics": {
+        "accepted_degraded": true,
+        "blocker_task_id_coverage_complete": true,
+        "gate_status": "DEGRADED",
+        "open_tasks": 19,
+        "ready": false,
+        "tracked_blocker_ids": [
+          "a2a.open-or-claimed-tasks-present",
+          "a2a.unknown-status-tasks-present",
+          "a2a.unverified-closed-tasks-present"
+        ],
+        "unknown_status_tasks": 2,
+        "unverified_closed_tasks": 19
+      },
+      "passed": true,
+      "status": "amber",
+      "summary": "A2A degraded, but accepted by complete blocker task-id coverage"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/receipts/gate_D_spine_dispatch_mode_report.json",
+      "id": "E3.spine_live_ops",
+      "metrics": {
+        "live_census_proof_gap_surfaces": 0,
+        "live_census_state": "bound",
+        "orchestrator_current_process": "legacy_default_in_current_process",
+        "orchestrator_persistent_daemon": "spine_enabled_launch_spec",
+        "score_gate_65_to_70": true
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "spine dispatch and live ops are green"
+    },
+    {
+      "blocker_ids": [],
+      "evidence_path": "reports/langgraph_parity/receipts/gate_C_runtime_receipt_coverage_report.json",
+      "id": "E.runtime_truth",
+      "metrics": {
+        "a2a_ready": false,
+        "runtime_blocker_ids": [],
+        "runtime_fresh_score_gate_70_to_75": true,
+        "runtime_global_score_gate_70_to_75": true,
+        "spine_score_gate_65_to_70": true
+      },
+      "passed": true,
+      "status": "green",
+      "summary": "runtime truth is green"
+    }
+  ],
+  "mission_id": "langgraph-swarm-supervisor-parity-to-10-10",
+  "overall_status": "green",
+  "ten_out_of_ten": true
+}
