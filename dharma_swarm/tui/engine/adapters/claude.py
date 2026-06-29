@@ -83,7 +83,6 @@ class ClaudeAdapter(ProviderAdapter):
         self._cli_path = cli_path
         self._workdir = workdir or DHARMA_SWARM
         self._proc: asyncio.subprocess.Process | None = None
-
         self._profiles: dict[str, ModelProfile] = {
             "claude-sonnet-4-5": ModelProfile(
                 provider_id=self.provider_id,

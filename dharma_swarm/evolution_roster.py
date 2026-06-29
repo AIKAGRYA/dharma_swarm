@@ -27,11 +27,6 @@ import httpx
 
 from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS
 from dharma_swarm.models import ProviderType
-from dharma_swarm.ollama_config import (
-    build_ollama_headers,
-    ollama_transport_mode,
-    resolve_ollama_base_url,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -586,6 +581,11 @@ def _provider_has_key(provider: ProviderType) -> bool:
 
 def _ollama_reachable() -> bool:
     """Quick synchronous check if Ollama is responding."""
+    from dharma_swarm.ollama_config import (  # noqa: PLC0415 (lazy: cycle break)
+        build_ollama_headers,
+        resolve_ollama_base_url,
+    )
+
     base = resolve_ollama_base_url()
     headers = build_ollama_headers(base_url=base)
     try:
@@ -603,6 +603,10 @@ def _is_ollama_available() -> bool:
     if _ollama_status is None:
         _ollama_status = _ollama_reachable()
         if _ollama_status:
+            from dharma_swarm.ollama_config import (  # noqa: PLC0415 (lazy: cycle break)
+                ollama_transport_mode,
+            )
+
             if ollama_transport_mode() == "cloud_api":
                 logger.info("Ollama Cloud detected — cloud models available")
             else:
