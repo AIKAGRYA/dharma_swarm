@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
+from dharma_swarm.sleep_state import has_operational_sleep_state
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -297,6 +298,9 @@ class SleepCycle:
         from dharma_swarm.semantic_memory_bridge import run_semantic_sleep_phase
 
         state_root = self._memory_dir.parent
+        if not has_operational_sleep_state(state_root):
+            return {"phase": "semantic", "skipped": True}
+
         project_root = Path(__file__).resolve().parent.parent
         try:
             result = await run_semantic_sleep_phase(
@@ -331,6 +335,9 @@ class SleepCycle:
         edges enable cross-graph queries like conceptual blast radius.
         """
         result: dict[str, Any] = {"bridges_discovered": 0, "errors": []}
+        if not has_operational_sleep_state(self._memory_dir.parent):
+            return {"bridges_discovered": 0, "errors": [], "skipped": True}
+
         try:
             from dharma_swarm.bridge_coordinator import BridgeCoordinator
 
@@ -358,6 +365,9 @@ class SleepCycle:
         Signal stays, noise goes.
         """
         result: dict[str, Any] = {"noise_removed": 0, "signal_remaining": 0}
+        if not has_operational_sleep_state(self._memory_dir.parent):
+            return {"noise_removed": 0, "signal_remaining": 0, "skipped": True}
+
         try:
             from dharma_swarm.pruner import Pruner
 
