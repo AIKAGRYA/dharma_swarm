@@ -19,7 +19,7 @@ repos:
     hooks:
       - id: dharma-test-hygiene
         name: dharma test hygiene (rule 3 + 5)
-        entry: python3 scripts/governance/check_test_hygiene.py --warn-only
+        entry: .venv/bin/python scripts/governance/check_test_hygiene.py --warn-only
         language: system
         pass_filenames: false
         always_run: true
@@ -33,28 +33,28 @@ repos:
         stages: [pre-commit]
       - id: dharma-uplift-guards
         name: dharma uplift guards
-        entry: bash -c '"${DHARMA_PYTHON:-python3}" scripts/uplift_guards/run_pre_commit.py'
+        entry: bash -c '"${DHARMA_PYTHON:-.venv/bin/python}" scripts/uplift_guards/run_pre_commit.py'
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-docops-integrity
         name: dharma docops integrity
-        entry: python3 scripts/docops/check_docops_integrity.py --counts-advisory
+        entry: .venv/bin/python scripts/docops/check_docops_integrity.py --counts-advisory
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-hygiene-integrity
         name: dharma hygiene integrity
-        entry: python3 scripts/governance/hygiene/check_hygiene_integrity.py
+        entry: .venv/bin/python scripts/governance/hygiene/check_hygiene_integrity.py
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: dharma-manifest-check
         name: dharma manifest check (ACTIVE_SURFACE_MANIFEST ↔ repo reality)
-        entry: python3 tools/manifest_check.py
+        entry: .venv/bin/python tools/manifest_check.py
         language: system
         pass_filenames: false
         always_run: true
