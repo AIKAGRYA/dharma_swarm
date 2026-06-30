@@ -170,3 +170,24 @@
 - Scoreboard: remains `46/100`, explicitly not 100/100.
 - Current blocker:
   - Phase 4 is still red: the live queue needs task-specific terminal A2A receipts or governed blocked receipts for 17 stale open rows, plus an accepted semantic-to-A2A bridge or proper A2A receipts for 18 SAB rows and one receipt-less `ts-converge-0611` completion.
+
+## 2026-06-30T18:10:38Z - Phase 5 Memory Text Query Live Context Slice
+
+- Target gate: make `MemoryKernel` text query support real enough for live graph context, using the existing `ContextCompiler` and MemoryKernel facade rather than a side retrieval lane.
+- Code changes landed locally:
+  - Added `MemoryQuery.text_query` and central normalized-atom text filtering in `dharma_swarm/memory_kernel/atoms.py`.
+  - Wired `build_memory_kernel_default_context()` to pass the compiler `recall_query` into `MemoryQuery.text_query`.
+  - Added a MemoryKernel facade test proving a text query admits the matching witness atom and excludes an unrelated witness atom.
+  - Added a live `ContextCompiler.compile_bundle()` test with a temporary `home.witness` surface proving the Memory Kernel section includes only matching admitted memory, carries `memory_kernel:home.witness`, and records `text_query_applied=true`.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/memory_live_retrieval_text_query_20260630T181038Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py::test_memory_query_filters_atoms_by_text_query tests/test_context_compiler_memory_kernel.py` -> `4 passed in 0.40s`.
+  - `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `26 passed in 0.47s`.
+  - `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py` -> `69 passed in 0.48s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/atoms.py dharma_swarm/memory_kernel/default_context.py tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- Scoreboard: raised conservatively to `50/100`, still explicitly not 100/100.
+- Current blockers:
+  - Phase 5 remains partial: MemoryKernel text-query live context is now proven, but topology-wide memory/tool isolation across live SWARM, SUPERVISOR, and SUBAGENTS_AS_TOOLS remains unproven.
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Full provider served-model truth and cockpit/API graph inspection remain pending.

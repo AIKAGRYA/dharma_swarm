@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from dharma_swarm.context_compiler import ContextCompiler
+from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
 
 
 def _compiler(memory_kernel: object) -> ContextCompiler:
@@ -99,13 +103,70 @@ async def test_context_compiler_adds_memory_kernel_default_section() -> None:
     assert "projection_blocked" in bundle.rendered_text
     metadata = bundle.metadata["memory_kernel_default"]
     assert metadata["status"] == "used"
+    assert metadata["text_query_applied"] is True
     assert metadata["pack_id"] == "memory_context_pack:test"
     assert metadata["admitted_count"] == 1
     assert metadata["omitted_count"] == 1
+    query = kernel.kwargs["query"]
+    assert getattr(query, "text_query") == "governed memory"
     budget = kernel.kwargs["budget"]
     assert getattr(budget, "require_context_admissible") is False
     assert getattr(budget, "allow_projections") is False
     assert getattr(budget, "allow_high_risk") is False
+
+
+@pytest.mark.asyncio
+async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    repo = tmp_path / "repo"
+    witness = home / ".dharma/witness/2026-05-12.jsonl"
+    witness.parent.mkdir(parents=True, exist_ok=True)
+    witness.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "content": "alpha governed memory for live graph context",
+                        "timestamp": "2026-05-12T01:00:00Z",
+                    }
+                ),
+                json.dumps(
+                    {
+                        "content": "unrelated operational note",
+                        "timestamp": "2026-05-12T01:01:00Z",
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    kernel = MemoryKernel(
+        MemoryKernelConfig(
+            census=CensusConfig(repo_root=repo, home=home, include_discovered=False),
+            adapter=ReadOnlyAdapterConfig(default_limit=10),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_memory_kernel_live",
+        task_id="task_memory_kernel_live",
+        task_description="Use governed memory.",
+        query="alpha governed memory",
+        token_budget=1200,
+    )
+
+    assert "## Memory Kernel" in bundle.rendered_text
+    assert "alpha governed memory for live graph context" in bundle.rendered_text
+    assert "unrelated operational note" not in bundle.rendered_text
+    assert "memory_kernel:home.witness" in bundle.source_refs
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["text_query_applied"] is True
+    assert metadata["admitted_count"] == 1
 
 
 @pytest.mark.asyncio

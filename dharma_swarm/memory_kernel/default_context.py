@@ -32,6 +32,7 @@ def build_memory_kernel_default_context(
         atom_budget = max(4, min(24, int(token_budget) // 100))
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
+                text_query=recall_query or None,
                 limit_total=atom_budget,
                 limit_per_surface=atom_budget,
                 include_content=True,
@@ -71,6 +72,7 @@ def build_memory_kernel_default_context(
     metadata = memory_kernel_pack_metadata(pack)
     metadata["status"] = "used"
     metadata["query_present"] = bool(recall_query)
+    metadata["text_query_applied"] = bool(recall_query)
     return (
         ContextSection(
             name="Memory Kernel",

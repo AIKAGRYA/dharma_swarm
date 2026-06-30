@@ -2,7 +2,7 @@
 
 Status: **not 100/100**.
 
-Current score: **46/100**.
+Current score: **50/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
@@ -19,6 +19,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `RuntimeStateStore` now has first-class `topology_states` rows. SWARM accepted handoff state and SUBAGENTS_AS_TOOLS parent/child run IDs are written through `RuntimeLifecycle.record_delegation_run`.
 - Restart-readable proof exists: a fresh `RuntimeStateStore` instance reopens the same DB and reads the SWARM active agent/handoff receipt plus subagent child delegation rows.
 - Orchestrator `EvidenceReceipt` now stamps run/idempotency/side-effect/topology/planned-provider/actual-provider attributes.
+- `MemoryKernel` now supports `MemoryQuery.text_query`, and the default live `ContextCompiler` Memory Kernel section passes `recall_query` into that lane. A live bundle test proves a matching witness atom is admitted while an unrelated witness atom is excluded.
 
 ## Verification
 
@@ -50,6 +51,12 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `git diff --check` -> pass.
 - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
 - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+- Phase 5 MemoryKernel text-query live context slice: added `MemoryQuery.text_query` filtering and wired `build_memory_kernel_default_context()` to use the compiler `recall_query`.
+- `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py::test_memory_query_filters_atoms_by_text_query tests/test_context_compiler_memory_kernel.py` -> `4 passed in 0.40s`.
+- `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `26 passed in 0.47s`.
+- `.venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py` -> `69 passed in 0.48s`.
+- `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/atoms.py dharma_swarm/memory_kernel/default_context.py tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- Phase 5 receipt: `reports/langgraph_parity/allnight/memory_live_retrieval_text_query_20260630T181038Z.json`.
 
 ## Failing Gates
 
@@ -58,7 +65,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A blocker audit classification: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, 18 valid SAB semantic receipts that are still non-A2A evidence, and 1 completed `ts-converge-0611` row with no receipt pointer.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Live topology restart/resume: SWARM accepted handoff and SUBAGENTS_AS_TOOLS parent/child run records now have restart-readable `RuntimeStateStore` tests. Supervisor final-output restart semantics still need a dedicated live acceptance test.
-- Memory live retrieval: not completed; no proof that live agents receive only allowed memory/tool context through production retrieval.
+- Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, but topology-wide memory/tool isolation across live SWARM, SUPERVISOR, and SUBAGENTS_AS_TOOLS remains unproven.
 - Provider truth: improved in receipts, but actual served provider/model remains runner-config-derived for this slice, not independently verified from every live provider call.
 - Cockpit/API: not wired for assistants, threads, runs, checkpoints/history, streaming events, interrupts, and active graph inspection.
 
@@ -67,7 +74,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 1. Add supervisor restart/resume acceptance for final-output-only semantics and delegated-agent state.
 2. Extend topology persistence to streaming/interrupt/checkpoint history once those cockpit/API surfaces exist.
 3. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
-4. Wire live MemoryKernel text retrieval into agent context with isolation tests against stale/cross-domain memory.
+4. Extend the MemoryKernel live context tests to topology-level agent isolation, stale-memory rejection, curated-source coverage, and retrieval telemetry.
 5. Stamp provider route plan and actual served provider/model from `ProviderPolicyRouter` / `ModelRouter` completion telemetry on every live receipt.
 6. Add API/cockpit endpoints for assistants, threads, runs, checkpoints/history, streaming events, interrupt state, and active topology graph.
 

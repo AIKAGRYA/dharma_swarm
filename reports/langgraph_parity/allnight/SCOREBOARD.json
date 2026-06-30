@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T17:46:37Z",
+  "updated_at": "2026-06-30T18:10:38Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 46,
+    "current": 50,
     "target": 100,
-      "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation that eliminated unknown-status blockers, and a replayable blocker audit for the remaining A2A failures. A2A strict green, memory retrieval isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, and a Phase 5 MemoryKernel text-query lane feeding live ContextCompiler bundles. A2A strict green, full topology-level memory isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
   },
   "rounds": [
     {
@@ -211,6 +211,33 @@
         "Audit classification counts: open_stale_claimed_without_terminal_receipt=11, open_stale_unclaimed_without_terminal_receipt=6, closed_semantic_receipt_present_non_a2a=18, closed_missing_a2a_receipt_no_pointer=1.",
         "The 18 SAB semantic artifacts validate as sab.semantic_receipt.v1 only through /Users/dhyana/dharma_swarm and still are not embedded dharma_a2a_task_receipt.v1 receipts."
       ]
+    },
+    {
+      "id": "phase-5-memory-text-query-live-context",
+      "timestamp": "2026-06-30T18:10:38Z",
+      "status": "completed_partial",
+      "target_gate": "Make MemoryKernel recall_query affect live ContextCompiler memory context without weakening safety filters",
+      "files_touched": [
+        "dharma_swarm/memory_kernel/atoms.py",
+        "dharma_swarm/memory_kernel/default_context.py",
+        "tests/test_memory_kernel_readiness.py",
+        "tests/test_context_compiler_memory_kernel.py",
+        "reports/langgraph_parity/allnight/memory_live_retrieval_text_query_20260630T181038Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py::test_memory_query_filters_atoms_by_text_query tests/test_context_compiler_memory_kernel.py",
+        ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py",
+        ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/atoms.py dharma_swarm/memory_kernel/default_context.py tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py"
+      ],
+      "blockers": [
+        "Phase 5 remains partial: text-query selection now feeds live ContextCompiler bundles, but full topology-level memory/tool isolation acceptance across SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS remains unproven.",
+        "A2A strict readiness remains red and still blocks any 100/100 claim.",
+        "Provider truth and cockpit/API graph inspection remain pending."
+      ]
     }
   ],
   "gates": {
@@ -224,7 +251,7 @@
     "phase_3_live_topologies": "partial_plus_runtime_state_swarm_handoff_restart_and_subagents_child_parent_run_proofs_pass",
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
-    "phase_5_memory_live_retrieval": "pending",
+    "phase_5_memory_live_retrieval": "partial_memorykernel_text_query_filters_live_context_bundle",
     "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
     "phase_7_platform_surface": "pending"
   },
@@ -244,6 +271,7 @@
       "a2a_embedded_receipt_reconciler": "19 passed in 0.44s",
       "a2a_embedded_receipt_reconciler_post_apply_dry_run": "candidate_count=0",
       "a2a_readiness_blocker_audit": "4 passed in 0.39s; broader A2A focused suite 23 passed in 0.41s; blocker_count=36 with 11 stale claimed, 6 stale unclaimed, 18 SAB semantic non-A2A, 1 no-pointer completed row",
+      "memory_live_retrieval_text_query": "MemoryQuery.text_query filters normalized atoms; ContextCompiler live bundle admitted matching home.witness atom and excluded unrelated witness atom; focused 4 passed in 0.40s; broader memory/context subset 69 passed in 0.48s",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
