@@ -108,15 +108,27 @@ def _telos_summary() -> dict:
         objs = [json.loads(l) for l in lines]
         total = len(objs)
         active = sum(1 for o in objs if o.get("status") == "active")
+        done = sum(1 for o in objs if o.get("status") == "done")
+        abandoned = sum(1 for o in objs if o.get("status") == "abandoned")
+        superseded = sum(1 for o in objs if o.get("status") == "superseded")
+        blocked = sum(1 for o in objs if o.get("status") == "blocked")
+        # avg_progress is over ALL records (incl. terminal) so it reflects
+        # the full objective corpus, not just the active WIP pool.
         avg_progress = sum(o.get("progress", 0) for o in objs) / total if total else 0
         high_priority = sorted(
-            [o for o in objs if o.get("priority", 0) >= 8],
+            [o for o in objs if o.get("priority", 0) >= 8
+             and o.get("status") == "active"],
             key=lambda o: -o.get("progress", 0)
         )[:5]
         return {
             "total_objectives": total,
             "active": active,
+            "done": done,
+            "abandoned": abandoned,
+            "superseded": superseded,
+            "blocked": blocked,
             "avg_progress": round(avg_progress, 3),
+            "avg_progress_scope": "all_objectives",
             "top_objectives": [
                 {"name": o.get("name", "")[:60], "progress": o.get("progress", 0)}
                 for o in high_priority

@@ -48,6 +48,21 @@ class ObjectiveStatus(str, Enum):
     ACHIEVED = "achieved"
     BLOCKED = "blocked"
     DEPRECATED = "deprecated"
+    # Terminal lifecycle states (2026-06-29): let completed/stale work exit
+    # the WIP pool so active_objectives() stops counting finished objectives.
+    DONE = "done"
+    ABANDONED = "abandoned"
+    SUPERSEDED = "superseded"
+
+
+# Terminal states — once entered, an objective is no longer WIP.
+TERMINAL_STATUSES: frozenset[ObjectiveStatus] = frozenset({
+    ObjectiveStatus.DONE,
+    ObjectiveStatus.ABANDONED,
+    ObjectiveStatus.SUPERSEDED,
+    ObjectiveStatus.ACHIEVED,
+    ObjectiveStatus.DEPRECATED,
+})
 
 
 class HypothesisStatus(str, Enum):
@@ -483,6 +498,16 @@ class TelosGraph:
     def active_objectives(self) -> list[TelosObjective]:
         """Objectives with status ACTIVE."""
         return self.list_objectives(status=ObjectiveStatus.ACTIVE)
+
+    def terminal_objectives(self) -> list[TelosObjective]:
+        """Objectives in a terminal state (DONE/ABANDONED/SUPERSEDED/...).
+
+        These no longer count against the WIP limit.
+        """
+        return [
+            o for o in self._objectives.values()
+            if o.status in TERMINAL_STATUSES
+        ]
 
     def untested_hypotheses(self, min_priority: int = 0) -> list[TelosHypothesis]:
         """Hypotheses that haven't been validated yet.

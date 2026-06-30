@@ -32,7 +32,9 @@ CLI::
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
@@ -4501,10 +4503,220 @@ async def _async_main() -> None:
     print(f"  TOTAL entities created: {total}")
 
 
-def main() -> None:
-    """CLI entry point: python -m dharma_swarm.telos_substrate"""
-    import asyncio
+# ---------------------------------------------------------------------------
+# Telos lifecycle sweep — promote completed/stale objectives to terminal states
+# ---------------------------------------------------------------------------
 
+# Threshold: an active objective whose updated_at is older than this many days
+# AND whose progress < 1.0 is considered stale → abandoned.
+STALE_DAYS = 60
+
+
+def _sweep_classify(obj: dict, now) -> tuple[str, str]:
+    """Classify one objective record.
+
+    Returns ``(new_status, reason)``.  Only touches ``active`` records;
+    ``blocked`` and already-terminal records are left untouched.
+    """
+    status = obj.get("status", "active")
+    if status == "blocked":
+        return ("blocked", "untouched (blocked)")
+    if status not in ("active", "proposed", "partially_met"):
+        return (status, f"untouched (already {status})")
+    progress = float(obj.get("progress", 0.0) or 0.0)
+    if progress >= 1.0:
+        return ("done", "progress>=1.0")
+    updated_raw = obj.get("updated_at") or obj.get("created_at")
+    if updated_raw:
+        try:
+            updated = datetime.fromisoformat(updated_raw.replace("Z", "+00:00"))
+        except ValueError:
+            updated = None
+        if updated is not None and (now - updated).days > STALE_DAYS:
+            return ("abandoned", f"stale ({(now - updated).days}d since updated_at, progress<{1.0})")
+    return (status, "unchanged")
+
+
+def telos_sweep(
+    obj_path: Path,
+    *,
+    dry_run: bool = False,
+    stash_backup: bool = False,
+    stale_days: int = STALE_DAYS,
+    now=None,
+) -> dict:
+    """Sweep ``objectives.jsonl`` and promote completed/stale records.
+
+    Rules (only ``active``/``proposed``/``partially_met`` records are
+    eligible; ``blocked`` is never touched):
+
+    * ``progress >= 1.0``                    → ``done``
+    * ``updated_at`` older than *stale_days* AND ``progress < 1.0`` → ``abandoned``
+    * otherwise                              → unchanged
+
+    Writes are atomic (tmp file + ``os.replace``).  When *dry_run* is True
+    nothing is written; the proposed transitions are returned in the report.
+    When *stash_backup* is True a copy is saved to
+    ``objectives.jsonl.bak.<unix_ts>`` before writing.
+
+    Returns a report dict::
+
+        {
+            "total": N,
+            "done": [("id","name","reason"), ...],
+            "abandoned": [...],
+            "unchanged": N,
+            "blocked_untouched": N,
+            "written": bool,
+            "backup_path": str | None,
+        }
+    """
+    import os
+    import time
+    from datetime import datetime, timezone
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if not obj_path.exists():
+        return {"total": 0, "done": [], "abandoned": [], "unchanged": 0,
+                "blocked_untouched": 0, "written": False, "backup_path": None,
+                "error": f"{obj_path} does not exist"}
+
+    lines = [l for l in obj_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    objs = [json.loads(l) for l in lines]
+
+    done_transitions: list[tuple[str, str, str]] = []
+    abandoned_transitions: list[tuple[str, str, str]] = []
+    unchanged = 0
+    blocked_untouched = 0
+    modified = False
+
+    # Compact json separators matching the existing writer (no spaces after
+    # separators) so the file stays byte-stable aside from the status field.
+    compact_seps = (",", ":")
+
+    out_lines: list[str] = []
+    for obj in objs:
+        new_status, reason = _sweep_classify(obj, now)
+        old_status = obj.get("status", "active")
+        if new_status != old_status:
+            modified = True
+            obj = dict(obj)
+            obj["status"] = new_status
+            obj["updated_at"] = now.isoformat().replace("+00:00", "Z")
+            if new_status == "done":
+                done_transitions.append((obj.get("id", ""), obj.get("name", ""), reason))
+            elif new_status == "abandoned":
+                abandoned_transitions.append((obj.get("id", ""), obj.get("name", ""), reason))
+        else:
+            if old_status == "blocked":
+                blocked_untouched += 1
+            else:
+                unchanged += 1
+        out_lines.append(json.dumps(obj, separators=compact_seps, ensure_ascii=False))
+
+    written = False
+    backup_path: str | None = None
+
+    if dry_run:
+        # No writes.
+        pass
+    elif not modified:
+        # No transitions — leave the file byte-identical (don't even touch it).
+        pass
+    else:
+        if stash_backup:
+            backup_path = str(obj_path) + ".bak." + str(int(time.time()))
+            shutil_copy(obj_path, Path(backup_path))
+        tmp = obj_path.with_suffix(obj_path.suffix + ".tmp")
+        tmp.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+        os.replace(tmp, obj_path)
+        written = True
+
+    return {
+        "total": len(objs),
+        "done": done_transitions,
+        "abandoned": abandoned_transitions,
+        "unchanged": unchanged,
+        "blocked_untouched": blocked_untouched,
+        "written": written,
+        "backup_path": backup_path,
+    }
+
+
+def shutil_copy(src: Path, dst: Path) -> None:
+    """Local copy helper (kept out of module-top imports to avoid clutter)."""
+    import shutil
+
+    shutil.copy2(src, dst)
+
+
+def _print_sweep_report(report: dict) -> None:
+    """Human-readable sweep report to stdout."""
+    print(f"\nTelos lifecycle sweep report")
+    print(f"  total objectives:   {report.get('total', 0)}")
+    print(f"  → done:             {len(report.get('done', []))}")
+    print(f"  → abandoned:        {len(report.get('abandoned', []))}")
+    print(f"  unchanged:          {report.get('unchanged', 0)}")
+    print(f"  blocked (untouched):{report.get('blocked_untouched', 0)}")
+    print(f"  written:            {report.get('written', False)}")
+    if report.get("backup_path"):
+        print(f"  backup:             {report['backup_path']}")
+    for tid, name, reason in report.get("done", []):
+        print(f"    [done]      {tid[:8]} {name[:60]} — {reason}")
+    for tid, name, reason in report.get("abandoned", []):
+        print(f"    [abandoned] {tid[:8]} {name[:60]} — {reason}")
+
+
+def _run_sweep_cli(args: list[str]) -> int:
+    """Handle ``python -m dharma_swarm.telos_substrate --sweep [...]``.
+
+    Returns process exit code.
+    """
+    dry_run = "--dry-run" in args
+    stash_backup = "--stash-backup" in args
+    obj_path = dharma_state_dir() / "telos" / "objectives.jsonl"
+    # Allow --path override for tests.
+    for i, a in enumerate(args):
+        if a == "--path" and i + 1 < len(args):
+            obj_path = Path(args[i + 1])
+    if "--help-sweep" in args or (args and args[0] == "--sweep" and "--help" in args):
+        print(
+            "telos_substrate --sweep [--dry-run] [--stash-backup] [--path PATH]\n"
+            "  Promotes active objectives to terminal states:\n"
+            "    progress>=1.0          → done\n"
+            f"    stale > {STALE_DAYS}d & <1.0 → abandoned\n"
+            "  blocked records are never touched."
+        )
+        return 0
+    report = telos_sweep(obj_path, dry_run=dry_run, stash_backup=stash_backup)
+    if "error" in report:
+        print(f"error: {report['error']}", file=sys_stderr())
+        return 1
+    _print_sweep_report(report)
+    return 0
+
+
+def sys_stderr():
+    import sys
+    return sys.stderr
+
+
+def main() -> None:
+    """CLI entry point: python -m dharma_swarm.telos_substrate [--sweep ...]"""
+    import asyncio
+    import sys
+
+    argv = sys.argv[1:]
+    if argv and argv[0] == "--sweep":
+        sys.exit(_run_sweep_cli(argv[1:]))
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
     asyncio.run(_async_main())
 
 
