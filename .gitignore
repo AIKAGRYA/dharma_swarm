@@ -72,6 +72,9 @@ reports/docops/
 reports/system_map/latest.json
 reports/revenue_wedge/
 reports/forge/
+!reports/forge/
+reports/forge/*
+!reports/forge/FORGE_CANONICAL_INDEX.md
 results.tsv
 run.log
 synthesizer_memory.json
@@ -119,6 +122,15 @@ reports/model_routing/e2e/
 reports/a2a/*_receipts/
 reports/model_*/e2e/
 reports/model_pool/
+
+# Generated report subdirectories (loop artifacts, not source).
+reports/sab_first_six_agent_flywheel/
+reports/agentops/
+reports/loop_closure/
+reports/livelihood_loom/
+reports/idea_spark/
+reports/telos_ai/
+reports/runtime_truth/
 
 # Personal obey-plugin rule state belongs outside the repo.
 .claude/obey.rules.local.json
