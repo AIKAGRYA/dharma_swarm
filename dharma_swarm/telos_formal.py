@@ -381,7 +381,23 @@ def evaluate_formal_gates(context: ActionContext) -> FormalGateReport:
     else:
         decision = GateDecision.ALLOW
 
-    report = FormalGateReport(decision=decision, results=results)
+    return _report_with_receipt(decision=decision, results=results)
+
+
+def _report_with_receipt(
+    *,
+    decision: GateDecision,
+    results: Sequence[FormalGateResult],
+    base_report: FormalGateReport | None = None,
+) -> FormalGateReport:
+    if base_report is None:
+        report = FormalGateReport(decision=decision, results=list(results))
+    else:
+        report = FormalGateReport(
+            decision=decision,
+            results=list(results),
+            evaluated_at=base_report.evaluated_at,
+        )
     report.receipt_sha256 = report.compute_receipt()
     return report
 
@@ -415,7 +431,12 @@ class FormalTelosGatekeeper:
                 "reason": keyword_check.reason,
             }
             if keyword_check.decision == GateDecision.BLOCK:
-                blocked = evaluate_formal_gates(context)
+                measured = evaluate_formal_gates(context)
+                blocked = _report_with_receipt(
+                    decision=GateDecision.BLOCK,
+                    results=measured.results,
+                    base_report=measured,
+                )
                 return GateDecision.BLOCK, blocked, keyword_payload
 
         report = evaluate_formal_gates(context)

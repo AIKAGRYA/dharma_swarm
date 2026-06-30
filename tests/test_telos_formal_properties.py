@@ -293,7 +293,8 @@ def test_receipt_is_canonical_and_deterministic(report):
     second = report.compute_receipt()
     assert first == second
     payload = json.loads(report._canonical_json())
-    for item in payload:
+    assert payload["decision"] == report.decision.value
+    for item in payload["results"]:
         assert item["measure"] is None or isinstance(item["measure"], float)
         assert item["threshold"] is None or isinstance(item["threshold"], float)
 
@@ -309,6 +310,18 @@ def test_receipt_changes_when_payload_changes(report):
         }
     )
     changed = report.model_copy(update={"results": [changed_result, *report.results[1:]]})
+    assert original != changed.compute_receipt()
+
+
+@given(formal_gate_results())
+def test_receipt_changes_when_decision_changes(report):
+    original = report.compute_receipt()
+    new_decision = (
+        GateDecision.BLOCK
+        if report.decision != GateDecision.BLOCK
+        else GateDecision.ALLOW
+    )
+    changed = report.model_copy(update={"decision": new_decision})
     assert original != changed.compute_receipt()
 
 
@@ -378,6 +391,41 @@ def test_provenance_claim_only_cycle_is_ungrounded(size):
     analysis = analyze_provenance_claims(claims)
     assert set(analysis.cycle_claim_ids) == {claim.claim_id for claim in claims}
     assert set(analysis.ungrounded_claim_ids) == {claim.claim_id for claim in claims}
+
+
+def test_provenance_deep_grounded_chain_is_stack_safe():
+    depth = 1500
+    claims = [
+        ProvenanceClaim(claim_id="c0", confidence=0.9, evidence_ids=["root"])
+    ]
+    claims.extend(
+        ProvenanceClaim(
+            claim_id=f"c{i}",
+            confidence=0.9,
+            evidence_ids=[f"c{i - 1}"],
+        )
+        for i in range(1, depth)
+    )
+
+    analysis = analyze_provenance_claims(claims)
+    assert len(analysis.grounded_claim_ids) == depth
+    assert analysis.ungrounded_claim_ids == ()
+
+
+def test_provenance_deep_cycle_is_stack_safe():
+    depth = 1500
+    claims = [
+        ProvenanceClaim(
+            claim_id=f"c{i}",
+            confidence=0.9,
+            evidence_ids=[f"c{(i + 1) % depth}"],
+        )
+        for i in range(depth)
+    ]
+
+    analysis = analyze_provenance_claims(claims)
+    assert len(analysis.cycle_claim_ids) == depth
+    assert len(analysis.ungrounded_claim_ids) == depth
 
 
 # === Non-interference lattice ===============================================

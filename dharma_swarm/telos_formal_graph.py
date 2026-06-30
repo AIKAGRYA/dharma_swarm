@@ -31,42 +31,54 @@ def _build_graphs(
     return claim_edges, evidence_map, claim_ids
 
 
-def _tarjan_scc(adjacency: Mapping[str, Sequence[str]]) -> list[list[str]]:
-    index = 0
-    indices: dict[str, int] = {}
-    lowlinks: dict[str, int] = {}
-    stack: list[str] = []
-    on_stack: set[str] = set()
+def _strongly_connected_components(
+    adjacency: Mapping[str, Sequence[str]],
+) -> list[list[str]]:
+    nodes = set(adjacency)
+    for neighbors in adjacency.values():
+        nodes.update(neighbors)
+
+    visited: set[str] = set()
+    order: list[str] = []
+
+    for start in sorted(nodes):
+        if start in visited:
+            continue
+        stack: list[tuple[str, bool]] = [(start, False)]
+        while stack:
+            node, expanded = stack.pop()
+            if expanded:
+                order.append(node)
+                continue
+            if node in visited:
+                continue
+            visited.add(node)
+            stack.append((node, True))
+            for neighbor in sorted(adjacency.get(node, ()), reverse=True):
+                if neighbor not in visited:
+                    stack.append((neighbor, False))
+
+    reverse_adjacency = {node: [] for node in nodes}
+    for node, neighbors in adjacency.items():
+        for neighbor in neighbors:
+            reverse_adjacency.setdefault(neighbor, []).append(node)
+
     components: list[list[str]] = []
-
-    def strongconnect(node: str) -> None:
-        nonlocal index
-        indices[node] = index
-        lowlinks[node] = index
-        index += 1
-        stack.append(node)
-        on_stack.add(node)
-
-        for neighbor in adjacency.get(node, ()):
-            if neighbor not in indices:
-                strongconnect(neighbor)
-                lowlinks[node] = min(lowlinks[node], lowlinks[neighbor])
-            elif neighbor in on_stack:
-                lowlinks[node] = min(lowlinks[node], indices[neighbor])
-
-        if lowlinks[node] == indices[node]:
-            component: list[str] = []
-            while True:
-                popped = stack.pop()
-                on_stack.remove(popped)
-                component.append(popped)
-                if popped == node:
-                    break
-            components.append(sorted(component))
-
-    for node in adjacency:
-        if node not in indices:
-            strongconnect(node)
+    visited.clear()
+    for start in reversed(order):
+        if start in visited:
+            continue
+        component: list[str] = []
+        stack = [start]
+        visited.add(start)
+        while stack:
+            node = stack.pop()
+            component.append(node)
+            for neighbor in reverse_adjacency.get(node, ()):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+        components.append(sorted(component))
 
     return components
 
@@ -81,35 +93,25 @@ def _has_cycle(component: Sequence[str], adjacency: Mapping[str, Sequence[str]])
 def _grounded_nodes(
     evidence_map: Mapping[str, Sequence[str]], claim_ids: set[str]
 ) -> set[str]:
-    memo: dict[str, bool] = {}
-    active: set[str] = set()
-
-    def grounded(node: str) -> bool:
-        if node in memo:
-            return memo[node]
-        if node in active:
-            memo[node] = False
-            return False
-        active.add(node)
-        try:
-            edges = evidence_map.get(node, ())
-            if any(evidence not in claim_ids for evidence in edges):
-                memo[node] = True
-                return True
-            result = any(
-                grounded(evidence) for evidence in edges if evidence in claim_ids
-            )
-            memo[node] = result
-            return result
-        finally:
-            active.remove(node)
-
-    return {node for node in evidence_map if grounded(node)}
+    grounded: set[str] = set()
+    changed = True
+    while changed:
+        changed = False
+        for node, evidence_ids in evidence_map.items():
+            if node in grounded:
+                continue
+            if any(
+                evidence_id not in claim_ids or evidence_id in grounded
+                for evidence_id in evidence_ids
+            ):
+                grounded.add(node)
+                changed = True
+    return grounded
 
 
 def analyze_provenance_claims(claims: Sequence[ProvenanceClaim]) -> ProvenanceGraphAnalysis:
     claim_edges, evidence_map, claim_ids = _build_graphs(claims)
-    components = _tarjan_scc(claim_edges)
+    components = _strongly_connected_components(claim_edges)
     cycle_components = tuple(
         tuple(component)
         for component in sorted(

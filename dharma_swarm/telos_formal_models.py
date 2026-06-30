@@ -175,6 +175,8 @@ class FormalGateReport(BaseModel):
     tamper-resistant form when a key is available.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     decision: GateDecision
     results: list[FormalGateResult]
     evaluated_at: str = Field(default_factory=lambda: _utc_now().isoformat())
@@ -185,17 +187,20 @@ class FormalGateReport(BaseModel):
     def _float_to_json(value: float) -> float | None:
         return None if not math.isfinite(value) else round(value, 9)
 
-    def _canonical_payload(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "gate": r.gate.value,
-                "tier": r.tier.value,
-                "result": r.result.value,
-                "measure": self._float_to_json(r.measure),
-                "threshold": self._float_to_json(r.threshold),
-            }
-            for r in self.results
-        ]
+    def _canonical_payload(self) -> dict[str, Any]:
+        return {
+            "decision": self.decision.value,
+            "results": [
+                {
+                    "gate": r.gate.value,
+                    "tier": r.tier.value,
+                    "result": r.result.value,
+                    "measure": self._float_to_json(r.measure),
+                    "threshold": self._float_to_json(r.threshold),
+                }
+                for r in self.results
+            ],
+        }
 
     def _canonical_json(self) -> str:
         return json.dumps(
@@ -214,6 +219,13 @@ class FormalGateReport(BaseModel):
     def compute_receipt(self) -> str:
         return hashlib.sha256(self._canonical_json().encode("utf-8")).hexdigest()
 
+    def receipt_matches(self) -> bool:
+        return hmac.compare_digest(self.receipt_sha256, self.compute_receipt())
+
     def sign(self, key: bytes) -> str:
-        self.receipt_hmac = hmac.new(key, self._canonical_json().encode("utf-8"), hashlib.sha256).hexdigest()
+        self.receipt_hmac = hmac.new(
+            key,
+            self._canonical_json().encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
         return self.receipt_hmac

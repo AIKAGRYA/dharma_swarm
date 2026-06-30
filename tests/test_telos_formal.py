@@ -21,6 +21,7 @@ from dharma_swarm.telos_formal import (
     DataLabel,
     EvaluatorJudgment,
     FormalGateName,
+    FormalTelosGatekeeper,
     InformationFlow,
     ProvenanceClaim,
     anekanta_contextuality_gate,
@@ -34,6 +35,25 @@ from dharma_swarm.telos_formal import (
     shannon_entropy,
     von_neumann_entropy,
 )
+
+
+class _KeywordResult:
+    def __init__(self, decision: GateDecision) -> None:
+        self.decision = decision
+        self.gate = "legacy_keyword"
+        self.reason = "stubbed keyword decision"
+
+
+class _KeywordGatekeeper:
+    def __init__(self, decision: GateDecision) -> None:
+        self.decision = decision
+        self.calls: list[dict[str, str]] = []
+
+    def check(self, *, action: str, content: str, tool_name: str) -> _KeywordResult:
+        self.calls.append(
+            {"action": action, "content": content, "tool_name": tool_name}
+        )
+        return _KeywordResult(self.decision)
 
 
 # === Information-theoretic primitives =======================================
@@ -381,8 +401,9 @@ def test_report_receipt_is_deterministic():
 def test_report_receipt_canonicalizes_nonfinite_values():
     report = evaluate_formal_gates(ActionContext(action="noop"))
     payload = json.loads(report._canonical_json())
-    assert all(item["measure"] is None for item in payload)
-    assert all(item["threshold"] is None for item in payload)
+    assert payload["decision"] == GateDecision.ALLOW.value
+    assert all(item["measure"] is None for item in payload["results"])
+    assert all(item["threshold"] is None for item in payload["results"])
 
 
 def test_report_hmac_signing_is_keyed_and_deterministic():
@@ -404,7 +425,67 @@ def test_report_receipt_changes_with_verdict():
     assert clean.receipt_sha256 != blocked.receipt_sha256
 
 
+def test_report_receipt_detects_decision_mutation():
+    report = evaluate_formal_gates(ActionContext(action="noop"))
+    assert report.receipt_matches()
+    original = report.receipt_sha256
+    report.decision = GateDecision.BLOCK
+    assert not report.receipt_matches()
+    assert report.compute_receipt() != original
+
+
 def test_all_gates_skipped_yields_allow():
     report = evaluate_formal_gates(ActionContext(action="noop"))
     assert report.decision == GateDecision.ALLOW
     assert all(r.skipped for r in report.results)
+
+
+def test_formal_gatekeeper_keyword_block_matches_report_decision():
+    gatekeeper = FormalTelosGatekeeper(
+        keyword_gatekeeper=_KeywordGatekeeper(GateDecision.BLOCK)
+    )
+    decision, report, keyword_payload = gatekeeper.check(
+        ActionContext(action="legacy block would apply"),
+        content="blocked by legacy keyword gate",
+        tool_name="publish",
+    )
+
+    assert decision == GateDecision.BLOCK
+    assert report.decision == GateDecision.BLOCK
+    assert report.receipt_matches()
+    assert keyword_payload is not None
+    assert keyword_payload["decision"] == GateDecision.BLOCK
+    assert all(result.skipped for result in report.results)
+
+
+def test_formal_gatekeeper_keyword_allow_preserves_formal_block():
+    gatekeeper = FormalTelosGatekeeper(
+        keyword_gatekeeper=_KeywordGatekeeper(GateDecision.ALLOW)
+    )
+    decision, report, keyword_payload = gatekeeper.check(
+        ActionContext(
+            action="overconfident claim",
+            belief=BeliefState(probabilities=[1.0, 0.0]),
+        )
+    )
+
+    assert decision == GateDecision.BLOCK
+    assert report.decision == GateDecision.BLOCK
+    assert report.receipt_matches()
+    assert keyword_payload is not None
+    assert keyword_payload["decision"] == GateDecision.ALLOW
+
+
+def test_formal_gatekeeper_can_skip_keyword_prefilter():
+    keyword = _KeywordGatekeeper(GateDecision.BLOCK)
+    gatekeeper = FormalTelosGatekeeper(keyword_gatekeeper=keyword)
+    decision, report, keyword_payload = gatekeeper.check(
+        ActionContext(action="clean"),
+        run_keyword_prefilter=False,
+    )
+
+    assert keyword.calls == []
+    assert keyword_payload is None
+    assert decision == GateDecision.ALLOW
+    assert report.decision == GateDecision.ALLOW
+    assert report.receipt_matches()
