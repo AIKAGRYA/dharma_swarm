@@ -7,6 +7,7 @@ state — the antidote to existence-grep sign-off."""
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -15,12 +16,17 @@ sys.path.insert(0, str(REPO_ROOT / "scripts/governance"))
 
 from check_track_status import (  # type: ignore  # noqa: E402
     EXISTENCE_KINDS,
+    FINAL_BOSS_DIMENSIONS,
+    FINAL_BOSS_MIN_ROUNDS,
     RIGOROUS_KINDS,
+    Finding,
     check_commit_on_main,
     check_receipt_valid,
     check_test_passes,
     evaluate_criterion,
     evaluate_track,
+    normalize_portfolio,
+    validate_portfolio_graph,
 )
 
 
@@ -79,33 +85,39 @@ def test_test_passes_executed_true_on_real_run(tmp_path):
     assert r.passed is True and r.executed is True
 
 
-def test_unverified_test_runs_do_not_block_the_gate(monkeypatch):
-    """End-to-end against the REAL portfolio: when every test_passes criterion
-    can only report 'could not execute' (the minimal-deps governance gate has
-    no pytest), the checker must still exit 0 — a missing runner is not a
-    regression and must not manufacture a false CI failure. Authority for this
-    is the unverified-vs-regression split in run()."""
+def test_unverified_test_runs_do_not_block_the_gate(tmp_path, monkeypatch):
+    """When every test_passes criterion can only report 'could not execute'
+    (the minimal-deps governance gate has no pytest), the checker must still
+    exit 0. A missing runner is not evidence the code regressed."""
     import argparse
 
     import check_track_status as cts  # type: ignore
 
-    # Mark every rigorous test_passes criterion as previously-passing so the
-    # regression path is exercised, then force it unverified now.
-    raw = cts.load_active_track(cts.ACTIVE_TRACK_PATH)
-    portfolio = cts.normalize_portfolio(raw)
-    prior: dict[str, set[str]] = {}
-    for t in portfolio["active_tracks"]:
-        ids = {c.get("id") for c in (t.get("completion_criteria") or [])
-               if c.get("kind") == "test_passes"}
-        if ids:
-            prior[t["id"]] = ids
-    assert prior, "expected at least one test_passes criterion in the portfolio"
+    track_file = tmp_path / "ACTIVE_TRACK.yaml"
+    track_file.write_text(
+        """
+schema_version: 2
+active_tracks:
+  - id: minimal-test-track
+    status: ACTIVE
+    verified_at: "2026-06-30"
+    ttl_days: 14
+    completion_criteria:
+      - id: behavior_test
+        kind: test_passes
+        test: tests/test_track_closure_rigor.py::test_rigor_kind_sets_are_disjoint_and_sane
+closed_tracks: []
+""".lstrip(),
+        encoding="utf-8",
+    )
 
     def _unverified(_target, timeout=180):
         return cts.CriterionResult(id="", kind="test_passes", passed=False,
                                    executed=False,
                                    detail="pytest not installed (could not execute)")
 
+    prior = {"minimal-test-track": {"behavior_test"}}
+    monkeypatch.setattr(cts, "ACTIVE_TRACK_PATH", track_file)
     monkeypatch.setattr(cts, "check_test_passes", _unverified)
     monkeypatch.setattr(cts, "_load_prior_passed", lambda: prior)
     monkeypatch.setattr(cts, "emit_reports", lambda *_a, **_k: None)
@@ -188,40 +200,329 @@ def test_rigorous_evidence_plus_no_blockers_earns_shippable():
     assert r["shippable"] is True
 
 
+def test_substrate_trusted_target_requires_final_boss_review():
+    """Generic rigorous evidence proves a verified slice, not trusted substrate.
+
+    This is the Active Track Final Boss invariant: the last gate cannot let a
+    track become production/substrate truth until the final_boss_review packet
+    exists and passes the profile-specific bar.
+    """
+    t = _track(
+        [{"id": "landed", "kind": "commit_on_main", "commit": _root_commit()}],
+    )
+    t.update({
+        "target_closure_kind": "SUBSTRATE_TRUSTED",
+        "graduation_profile": "runtime_transport",
+    })
+    r = evaluate_track(t)
+    assert r["criteria_pass"] is True
+    assert r["has_rigorous_evidence"] is True
+    assert r["shippable"] is False
+    assert r["final_boss_blocks"]
+    assert any("final_boss_review" in block for block in r["final_boss_blocks"])
+
+
+def test_verified_slice_target_can_close_without_final_boss_review():
+    t = _track(
+        [{"id": "landed", "kind": "commit_on_main", "commit": _root_commit()}],
+    )
+    t.update({
+        "target_closure_kind": "VERIFIED_SLICE",
+        "graduation_profile": "runtime_transport",
+    })
+    r = evaluate_track(t)
+    assert r["target_closure_kind"] == "VERIFIED_SLICE"
+    assert r["final_boss_blocks"] == []
+    assert r["shippable"] is True
+
+
+def test_recent_closed_track_requires_typed_closure_kind():
+    p = normalize_portfolio({
+        "schema_version": 2,
+        "spine_objectives": [{"id": "obj-a", "name": "A"}],
+        "active_tracks": [{
+            "id": "keep-active",
+            "status": "ACTIVE",
+            "serves": "obj-a",
+            "verified_at": "2026-06-30",
+            "ttl_days": 21,
+        }],
+        "closed_tracks": [{
+            "id": "new-closed",
+            "status": "SHIPPED",
+            "closed_at": "2026-07-01",
+            "serves": "obj-a",
+        }],
+    })
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(f.check == "closure-kind-missing:new-closed" for f in findings)
+
+
+def test_closed_substrate_claim_requires_final_boss_review():
+    p = normalize_portfolio({
+        "schema_version": 2,
+        "spine_objectives": [{"id": "obj-a", "name": "A"}],
+        "active_tracks": [{
+            "id": "keep-active",
+            "status": "ACTIVE",
+            "serves": "obj-a",
+            "verified_at": "2026-06-30",
+            "ttl_days": 21,
+        }],
+        "closed_tracks": [{
+            "id": "new-closed",
+            "status": "SHIPPED",
+            "closed_at": "2026-07-01",
+            "serves": "obj-a",
+            "closure_kind": "SUBSTRATE_TRUSTED",
+            "graduation_profile": "runtime_transport",
+        }],
+    })
+    findings: list[Finding] = []
+    validate_portfolio_graph(p, findings)
+    assert any(f.check == "final-boss-block:new-closed" for f in findings)
+
+
+def _valid_final_boss_dossier(tmp_path, *, track_id="t", kind="SUBSTRATE_TRUSTED", profile="generic"):
+    path = tmp_path / "dossier.json"
+    path.write_text(
+        json.dumps({
+            "track_id": track_id,
+            "target_closure_kind": kind,
+            "graduation_profile": profile,
+            "review_dimensions": sorted(FINAL_BOSS_DIMENSIONS),
+            "profile_requirements": {
+                "required_evidence_themes": ["claim boundary is explicit"],
+                "hard_rejects": ["confidence language replaces executable evidence"],
+            },
+        }),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _thin_final_boss_dossier(tmp_path, *, track_id="t", kind="SUBSTRATE_TRUSTED", profile="generic"):
+    path = tmp_path / "thin-dossier.json"
+    path.write_text(
+        json.dumps({
+            "track_id": track_id,
+            "target_closure_kind": kind,
+            "graduation_profile": profile,
+            "review_dimensions": sorted(FINAL_BOSS_DIMENSIONS),
+        }),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _council_receipt(tmp_path, *, gate="pass_fullness", score=100, blockers=None, name="council"):
+    path = tmp_path / f"{name}.json"
+    critics = []
+    for i in range(6):
+        critics.append({
+            "lane_id": f"lane-{i}",
+            "ok": True,
+            "required": True,
+            "parsed": {
+                "verdict": "approve",
+                "score": score,
+                "explicit_disagreement": "",
+            },
+        })
+    path.write_text(
+        json.dumps({
+            "conviction_gate": gate,
+            "target_score": 100,
+            "score_min": score,
+            "critic_count": 6,
+            "required_critic_count": 6,
+            "blockers": blockers or [],
+            "persistent_agent_witness": {"fresh": True},
+            "critics": critics,
+        }),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _final_boss_coverage(receipts, *, rounds=FINAL_BOSS_MIN_ROUNDS):
+    rows = []
+    receipt_iter = iter(receipts)
+    for round_index in range(1, rounds + 1):
+        for dimension in sorted(FINAL_BOSS_DIMENSIONS):
+            rows.append({
+                "round": round_index,
+                "dimension": dimension,
+                "council_receipt": str(next(receipt_iter)),
+            })
+    return rows
+
+
+def test_failed_council_receipt_cannot_satisfy_substrate_claim(tmp_path):
+    dossier = _valid_final_boss_dossier(tmp_path)
+    receipt = _council_receipt(tmp_path, gate="hold_blockers", score=100, blockers=["real issue"])
+    t = _track(
+        [{"id": "landed", "kind": "commit_on_main", "commit": _root_commit()}],
+    )
+    t.update({
+        "target_closure_kind": "SUBSTRATE_TRUSTED",
+        "graduation_profile": "generic",
+        "final_boss_review": {
+            "dossier": str(dossier),
+            "council_receipt": str(receipt),
+            "reviewer_count": 6,
+            "score_min": 100,
+            "explicit_disagreements": 0,
+            "local_verifiers_passed": True,
+            "local_verifier_results": [{
+                "id": "track_status",
+                "command": "python scripts/governance/check_track_status.py",
+                "passed": True,
+                "returncode": 0,
+            }],
+            "rounds": 1,
+            "dimensions": sorted(FINAL_BOSS_DIMENSIONS),
+        },
+    })
+    r = evaluate_track(t)
+    assert r["shippable"] is False
+    assert any("conviction_gate" in block for block in r["final_boss_blocks"])
+    assert any("has blockers" in block for block in r["final_boss_blocks"])
+
+
+def test_thin_final_boss_dossier_cannot_satisfy_substrate_claim(tmp_path):
+    dossier = _thin_final_boss_dossier(tmp_path)
+    receipts = [
+        _council_receipt(tmp_path, name=f"council-{i}")
+        for i in range(FINAL_BOSS_MIN_ROUNDS * len(FINAL_BOSS_DIMENSIONS))
+    ]
+    t = _track(
+        [{"id": "landed", "kind": "commit_on_main", "commit": _root_commit()}],
+    )
+    t.update({
+        "target_closure_kind": "SUBSTRATE_TRUSTED",
+        "graduation_profile": "generic",
+        "final_boss_review": {
+            "dossier": str(dossier),
+            "council_receipt": str(receipts[0]),
+            "council_receipts": [str(receipt) for receipt in receipts],
+            "council_coverage": _final_boss_coverage(receipts),
+            "reviewer_count": 6,
+            "score_min": 100,
+            "explicit_disagreements": 0,
+            "local_verifiers_passed": True,
+            "local_verifier_results": [{
+                "id": "track_status",
+                "command": "python scripts/governance/check_track_status.py",
+                "passed": True,
+                "returncode": 0,
+            }],
+            "rounds": FINAL_BOSS_MIN_ROUNDS,
+            "dimensions": sorted(FINAL_BOSS_DIMENSIONS),
+        },
+    })
+    r = evaluate_track(t)
+    assert r["shippable"] is False
+    assert any("profile_requirements missing" in block for block in r["final_boss_blocks"])
+
+
+def test_valid_final_boss_receipt_allows_substrate_claim(tmp_path):
+    dossier = _valid_final_boss_dossier(tmp_path)
+    receipts = [
+        _council_receipt(tmp_path, name=f"council-{i}")
+        for i in range(FINAL_BOSS_MIN_ROUNDS * len(FINAL_BOSS_DIMENSIONS))
+    ]
+    t = _track(
+        [{"id": "landed", "kind": "commit_on_main", "commit": _root_commit()}],
+    )
+    t.update({
+        "target_closure_kind": "SUBSTRATE_TRUSTED",
+        "graduation_profile": "generic",
+        "final_boss_review": {
+            "dossier": str(dossier),
+            "council_receipt": str(receipts[0]),
+            "council_receipts": [str(receipt) for receipt in receipts],
+            "council_coverage": _final_boss_coverage(receipts),
+            "reviewer_count": 6,
+            "score_min": 100,
+            "explicit_disagreements": 0,
+            "local_verifiers_passed": True,
+            "local_verifier_results": [{
+                "id": "track_status",
+                "command": "python scripts/governance/check_track_status.py",
+                "passed": True,
+                "returncode": 0,
+            }],
+            "rounds": FINAL_BOSS_MIN_ROUNDS,
+            "dimensions": sorted(FINAL_BOSS_DIMENSIONS),
+        },
+    })
+    r = evaluate_track(t)
+    assert r["final_boss_blocks"] == []
+    assert r["shippable"] is True
+
+
 def test_rigor_kind_sets_are_disjoint_and_sane():
     assert RIGOROUS_KINDS.isdisjoint(EXISTENCE_KINDS)
     assert "test_passes" in RIGOROUS_KINDS and "commit_on_main" in RIGOROUS_KINDS
     assert "file_exists" in EXISTENCE_KINDS and "file_contains" in EXISTENCE_KINDS
 
 
-def test_provider_routing_track_earns_rigorous_shippable():
-    """Integration: the real provider-routing track in ACTIVE_TRACK.yaml now
-    carries rigorous evidence (passing precedence test + commit_on_main) and no
-    open blockers -> SHIPPABLE under the rigorous bar."""
+def test_provider_routing_track_is_closed_with_rigorous_evidence_receipt():
+    """Once provider-routing graduates, it must leave an auditable closed-track
+    receipt instead of remaining active just to keep this test green."""
     from check_track_status import _parse_minimal_yaml, normalize_portfolio
 
     raw = _parse_minimal_yaml((REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml").read_text())
     portfolio = normalize_portfolio(raw)
     track = next(
-        t for t in portfolio["active_tracks"]
+        t for t in portfolio["closed_tracks"]
         if t.get("id") == "provider-routing-consolidation-2026-06"
     )
-    r = evaluate_track(track)
-    assert r["has_rigorous_evidence"] is True, r["ship_blocks"]
-    assert r["shippable"] is True, r["ship_blocks"]
+    assert track["status"] == "SHIPPED"
+    assert track["closure_kind"] == "VERIFIED_SLICE"
+    assert track["graduation_profile"] == "provider_routing"
+    evidence = "\n".join(track.get("evidence") or [])
+    assert "ACTIVE_TRACK_CLOSEOUT_2026-06-30.md" in evidence
+    assert "test_precedence_explicit_beats_power_beats_cost" in evidence
+    assert "bc110d84" in evidence
 
 
-def test_provider_routing_track_eval_is_repo_root_anchored(tmp_path, monkeypatch):
-    """Track criteria are authored as repo-relative paths and pytest targets.
-    Evaluation must not depend on the caller's current working directory."""
+def test_nats_track_is_verified_slice_not_production_substrate():
     from check_track_status import _parse_minimal_yaml, normalize_portfolio
 
-    monkeypatch.chdir(tmp_path)
     raw = _parse_minimal_yaml((REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml").read_text())
     portfolio = normalize_portfolio(raw)
     track = next(
-        t for t in portfolio["active_tracks"]
-        if t.get("id") == "provider-routing-consolidation-2026-06"
+        t for t in portfolio["closed_tracks"]
+        if t.get("id") == "runtime-truth-nats-2026-06"
+    )
+    assert track["status"] == "SHIPPED"
+    assert track["closure_kind"] == "VERIFIED_SLICE"
+    assert track["graduation_profile"] == "runtime_transport"
+    assert track.get("closure_kind") != "SUBSTRATE_TRUSTED"
+
+
+def test_test_passes_track_eval_is_repo_root_anchored(tmp_path, monkeypatch):
+    """Track criteria are authored as repo-relative paths and pytest targets.
+    Evaluation must not depend on the caller's current working directory."""
+    monkeypatch.chdir(tmp_path)
+
+    track = _track(
+        [
+            {
+                "id": "precedence_test_exists",
+                "kind": "file_contains",
+                "file": "tests/test_provider_routing_explicit.py",
+                "pattern": "test_precedence_explicit_beats_power_beats_cost",
+            },
+            {
+                "id": "precedence_test_passes",
+                "kind": "test_passes",
+                "test": "tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost",
+            },
+        ]
     )
     r = evaluate_track(track)
     assert r["criteria_pass"] is True, [c.detail for c in r["completion"] if not c.passed]
