@@ -2,6 +2,8 @@
 
 Generated: 2026-07-01T00:59:58+09:00 (schema v2)
 Active tracks: **10** (warn 5, max 10) — shippable 0
+Generated: 2026-07-01T07:27:23+09:00 (schema v2)
+Active tracks: **4** (warn 5, max 10) — shippable 0
 
 ## Spine coverage
 
@@ -202,7 +204,6 @@ Active tracks: **10** (warn 5, max 10) — shippable 0
 
 ## Findings
 
-- **WARN** `wip-high`: 10 ACTIVE tracks exceed warn_active=5 — focus is spreading thin.
 - **WARN** `spine-uncovered:research-depth`: Spine objective 'research-depth' has no ACTIVE track serving it (coverage gap).
 - **WARN** `spine-uncovered:revenue-external-humans-served`: Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).
 - **ERROR** `regression:runtime-truth-reconciliation-2026-06:operator_core_contracts_pass`: [runtime-truth-reconciliation-2026-06] REGRESSION — 'operator_core_contracts_pass' passed before and now fails: pytest tests/test_operator_core_contracts.py: FAIL — 1 warning, 1 error in 0.24s
@@ -227,3 +228,7 @@ Active tracks: **10** (warn 5, max 10) — shippable 0
 - **ERROR** `regression:filesystem-native-substrate-2026-06:organizer_test_passes`: [filesystem-native-substrate-2026-06] REGRESSION — 'organizer_test_passes' passed before and now fails: pytest tests/test_organizer.py: FAIL — 1 warning, 1 error in 0.22s
 - **ERROR** `regression:filesystem-native-substrate-2026-06:fs_substrate_e2e_passes`: [filesystem-native-substrate-2026-06] REGRESSION — 'fs_substrate_e2e_passes' passed before and now fails: pytest tests/test_fs_substrate_e2e.py: FAIL — 1 warning, 1 error in 0.22s
 - **INFO** `track-in-progress:filesystem-native-substrate-2026-06`: [filesystem-native-substrate-2026-06] 7/12 completion criteria pass.
+- **INFO** `track-in-progress:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] 7/8 completion criteria pass.
+- **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 10/11 completion criteria pass.
+- **INFO** `track-provisional:orchestration-arena-v1-2026-06`: [orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains — add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).
+- **INFO** `track-in-progress:merge-master-mike-d4-2026-06`: [merge-master-mike-d4-2026-06] 3/4 completion criteria pass.
