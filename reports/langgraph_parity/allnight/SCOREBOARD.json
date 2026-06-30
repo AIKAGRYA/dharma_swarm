@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-06-30T16:12:53Z",
+  "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "base": {
+    "remote": "origin/main",
+    "head": "f84f40344cbdfab9d236239b0d3ec00718e10bf9",
+    "pr_727_merge": "3c2e4a684",
+    "pr_727_merge_is_ancestor": true
+  },
+  "score": {
+    "current": 36,
+    "target": 100,
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, topology enum/metadata slice passing, and A2A/memory/cockpit/full restart gates still failing or unproven."
+  },
+  "rounds": [
+    {
+      "id": "phase-0-baseline-start",
+      "timestamp": "2026-06-30T15:59:09Z",
+      "status": "completed",
+      "target_gate": "Phase 0 clean baseline",
+      "files_touched": [
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json"
+      ],
+      "tests_run": [
+        "git status --short --branch",
+        "make onboard",
+        "python -m pytest -q tests/test_langgraph_parity_*.py",
+        "python scripts/governance/check_a2a_readiness.py",
+        "python scripts/governance/spine_dispatch_mode_report.py --json"
+      ],
+      "blockers": [
+        "Exact python commands failed before venv activation because `python` was not on PATH.",
+        "Initial make onboard failed under system python3 3.9; uv-created .venv Python 3.12 fixed the interpreter mismatch.",
+        "scripts/governance/spine_dispatch_mode_report.py was missing before this implementation round."
+      ]
+    },
+    {
+      "id": "phase-1-2-3-vertical-slice",
+      "timestamp": "2026-06-30T16:12:53Z",
+      "status": "completed",
+      "target_gate": "Expanded oracle, default spine dispatch, live topology metadata",
+      "files_touched": [
+        "dharma_swarm/langgraph_parity/benchmark.py",
+        "dharma_swarm/langgraph_parity/benchmark_runner.py",
+        "dharma_swarm/langgraph_parity/benchmark_types.py",
+        "dharma_swarm/models.py",
+        "dharma_swarm/orchestrator.py",
+        "scripts/governance/spine_dispatch_mode_report.py",
+        "tests/test_langgraph_parity_isolation_benchmark.py",
+        "tests/test_orchestrator.py",
+        "tests/test_orchestrator_spine_dispatch.py",
+        "tests/test_topology_execution.py",
+        "reports/langgraph_parity/benchmark/benchmark_report.json",
+        "reports/langgraph_parity/benchmark/benchmark_report.md",
+        "reports/langgraph_parity/benchmark/benchmark_receipt.json"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py",
+        ".venv/bin/python -m pytest -q tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "make onboard"
+      ],
+      "blockers": [
+        "A2A strict readiness still fails: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19.",
+        "Live restart/resume topology persistence is only partially implemented via dispatch metadata; no process-restart acceptance proof yet.",
+        "Memory live retrieval lane and cockpit/API graph inspection are not implemented in this slice."
+      ]
+    }
+  ],
+  "gates": {
+    "phase_0_clean_worktree": "passed_initially_clean_origin_main_worktree",
+    "phase_0_make_onboard": "passed_after_uv_created_python312_venv",
+    "phase_0_langgraph_parity_tests": "passed_20_tests",
+    "phase_0_a2a_readiness": "failed_strict_ready_false_open_19_unknown_2_unverified_19",
+    "phase_0_spine_dispatch_report": "passed_after_script_added",
+    "phase_1_25_case_oracle": "passed_26_cases_all_required_tags_covered",
+    "phase_2_default_spine_dispatch": "passed_slice_default_on_and_receipt_persisted",
+    "phase_3_live_topologies": "partial_enum_and_dispatch_metadata_added_no_restart_resume_proof",
+    "phase_4_a2a_strict_green": "failed",
+    "phase_5_memory_live_retrieval": "pending",
+    "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
+    "phase_7_platform_surface": "pending"
+  },
+  "latest_verification": {
+    "benchmark_summary": {
+      "task_count": 26,
+      "multi_hop_task_count": 12,
+      "distractor_domain_count": 8,
+      "case_tags_complete": true
+    },
+    "tests": {
+      "focused_combined": "66 passed in 28.95s",
+      "langgraph_parity": "20 passed in 0.37s",
+      "spine_dispatch_mode_report_strict": "passed",
+      "a2a_readiness_strict": "failed exit 2"
+    }
+  }
+}

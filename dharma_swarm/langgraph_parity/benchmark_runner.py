@@ -27,69 +27,274 @@ from dharma_swarm.langgraph_parity.isolation import (
 
 
 def default_benchmark_tasks() -> tuple[BenchmarkTask, ...]:
-    """Return a stable suite with distractors and one two-agent multi-hop task."""
+    """Return the stable deterministic LangGraph parity case suite."""
 
     return (
-        BenchmarkTask(
+        _benchmark_task(
             id="climate_finance_multihop",
             prompt=(
                 "Estimate welfare-ton upside for a mangrove restoration pilot, "
                 "then convert that into a risk-bounded deployment cash budget."
             ),
             required_domains=("climate_ops", "finance_risk"),
-            expected_tools={
-                "climate_ops": (
-                    "carbon_project_lookup",
-                    "welfare_ton_calculator",
-                ),
-                "finance_risk": (
-                    "risk_budget_calculator",
-                    "cashflow_projection",
-                ),
-            },
+            case_tags=("fan_out", "swarm", "supervisor", "command_send_routing"),
         ),
-        BenchmarkTask(
+        _benchmark_task(
+            id="climate_checkpoint_reload",
+            prompt=(
+                "Resume a restoration scoring thread after checkpoint reload and "
+                "reuse only climate-domain memory."
+            ),
+            required_domains=("climate_ops",),
+            case_tags=("checkpoint_reload", "memory_isolation"),
+        ),
+        _benchmark_task(
+            id="finance_legal_pipeline",
+            prompt=(
+                "Pipeline a budget cap decision into legal policy review for a "
+                "customer deployment clause."
+            ),
+            required_domains=("finance_risk", "legal_policy"),
+            case_tags=("pipeline", "command_send_routing"),
+        ),
+        _benchmark_task(
+            id="security_legal_retry_patch",
+            prompt=(
+                "Retry a failed patch-review lane, then route confirmed CVE "
+                "exposure into legal compliance review."
+            ),
+            required_domains=("code_security", "legal_policy"),
+            case_tags=("retry", "provider_fallback"),
+        ),
+        _benchmark_task(
+            id="supply_finance_fan_in",
+            prompt=(
+                "Fan in inventory-delay evidence and cash-buffer estimates for "
+                "a vendor fulfillment lane."
+            ),
+            required_domains=("supply_chain", "finance_risk"),
+            case_tags=("fan_in", "subagents_as_tools"),
+        ),
+        _benchmark_task(
+            id="supply_finance_legal_send",
+            prompt=(
+                "Use Send-style routing from supply analysis to finance and legal "
+                "workers before producing a deployment recommendation."
+            ),
+            required_domains=("supply_chain", "finance_risk", "legal_policy"),
+            case_tags=("command_send_routing", "subagents_as_tools"),
+        ),
+        _benchmark_task(
+            id="travel_finance_pipeline",
+            prompt=(
+                "Pipeline visa-window and lodging estimates into a cash budget "
+                "that can resume after restart."
+            ),
+            required_domains=("travel_logistics", "finance_risk"),
+            case_tags=("pipeline", "checkpoint_reload"),
+        ),
+        _benchmark_task(
+            id="growth_finance_broadcast",
+            prompt=(
+                "Broadcast cohort-retention signals to pricing and finance risk "
+                "views for a go/no-go growth experiment."
+            ),
+            required_domains=("product_growth", "finance_risk"),
+            case_tags=("broadcast",),
+        ),
+        _benchmark_task(
+            id="medical_interrupt_resume",
+            prompt=(
+                "Pause a non-diagnostic triage flow for human approval and resume "
+                "with only medical-domain context."
+            ),
+            required_domains=("medical_triage",),
+            case_tags=("interrupt_resume", "memory_isolation"),
+        ),
+        _benchmark_task(
+            id="a2a_blocker_queue",
+            prompt=(
+                "Classify open, unknown, and unverified A2A task states as hard "
+                "readiness blockers with exact task IDs."
+            ),
+            required_domains=("code_security",),
+            case_tags=("a2a_blocker_semantics",),
+        ),
+        _benchmark_task(
+            id="vendor_timeout_cancellation",
+            prompt=(
+                "Cancel a vendor ETA watch after timeout while preserving the "
+                "last durable supply-chain checkpoint."
+            ),
+            required_domains=("supply_chain",),
+            case_tags=("timeout", "cancellation"),
+        ),
+        _benchmark_task(
             id="security_patch_review",
             prompt=(
                 "Review a dependency patch for CVE exposure and static-analysis "
                 "regression risk."
             ),
             required_domains=("code_security",),
-            expected_tools={
-                "code_security": (
-                    "dependency_cve_lookup",
-                    "patch_diff_reader",
-                )
-            },
+            case_tags=("retry", "timeout"),
         ),
-        BenchmarkTask(
+        _benchmark_task(
+            id="climate_broadcast_measurement",
+            prompt=(
+                "Broadcast restoration measurement evidence to parallel scoring "
+                "workers and compare carbon versus welfare-ton confidence."
+            ),
+            required_domains=("climate_ops",),
+            case_tags=("broadcast", "fan_out"),
+        ),
+        _benchmark_task(
+            id="finance_fan_in_variance",
+            prompt=(
+                "Fan in risk budget, cashflow, and variance scans for a capital "
+                "allocation decision."
+            ),
+            required_domains=("finance_risk",),
+            case_tags=("fan_in",),
+        ),
+        _benchmark_task(
             id="contract_policy_check",
             prompt=(
                 "Check a cancellation clause against jurisdiction and compliance "
                 "policy constraints."
             ),
             required_domains=("legal_policy",),
-            expected_tools={
-                "legal_policy": (
-                    "contract_clause_search",
-                    "jurisdiction_check",
-                )
-            },
+            case_tags=("checkpoint_reload", "interrupt_resume"),
         ),
-        BenchmarkTask(
+        _benchmark_task(
+            id="growth_provider_fallback",
+            prompt=(
+                "Route a pricing experiment summary through fallback provider "
+                "selection while preserving growth-domain tools."
+            ),
+            required_domains=("product_growth",),
+            case_tags=("provider_fallback",),
+        ),
+        _benchmark_task(
+            id="travel_memory_isolation",
+            prompt=(
+                "Retrieve route and visa memory while rejecting finance, legal, "
+                "and medical distractor context."
+            ),
+            required_domains=("travel_logistics",),
+            case_tags=("memory_isolation",),
+        ),
+        _benchmark_task(
+            id="medical_tool_boundary",
+            prompt=(
+                "Keep red-flag triage tools isolated from legal, finance, and "
+                "travel distractors."
+            ),
+            required_domains=("medical_triage",),
+            case_tags=("memory_isolation",),
+        ),
+        _benchmark_task(
+            id="security_subagent_tool_review",
+            prompt=(
+                "Expose a security reviewer as a tool to a legal supervisor for "
+                "a patch-risk compliance answer."
+            ),
+            required_domains=("code_security", "legal_policy"),
+            case_tags=("subagents_as_tools", "supervisor"),
+        ),
+        _benchmark_task(
+            id="climate_finance_budget_retry",
+            prompt=(
+                "Retry a failed welfare-ton budget handoff without duplicating "
+                "provider calls or cross-domain memory."
+            ),
+            required_domains=("climate_ops", "finance_risk"),
+            case_tags=("retry", "swarm"),
+        ),
+        _benchmark_task(
+            id="supply_broadcast_inventory",
+            prompt=(
+                "Broadcast vendor and inventory-buffer signals for fulfillment "
+                "risk review."
+            ),
+            required_domains=("supply_chain",),
+            case_tags=("broadcast",),
+        ),
+        _benchmark_task(
+            id="legal_finance_fan_out_policy",
+            prompt=(
+                "Fan out a policy clause to legal and finance reviewers, then "
+                "compare compliance and budget constraints."
+            ),
+            required_domains=("legal_policy", "finance_risk"),
+            case_tags=("fan_out", "supervisor"),
+        ),
+        _benchmark_task(
+            id="growth_finance_command_send",
+            prompt=(
+                "Send pricing-test outputs to finance risk workers for a launch "
+                "budget decision."
+            ),
+            required_domains=("product_growth", "finance_risk"),
+            case_tags=("command_send_routing", "swarm"),
+        ),
+        _benchmark_task(
+            id="travel_finance_a2a_operator",
+            prompt=(
+                "Treat missing operator approval on a travel budget packet as an "
+                "A2A readiness blocker, not a soft warning."
+            ),
+            required_domains=("travel_logistics", "finance_risk"),
+            case_tags=("a2a_blocker_semantics", "interrupt_resume"),
+        ),
+        _benchmark_task(
+            id="climate_cancellation_watch",
+            prompt=(
+                "Cancel a stale restoration-monitoring run and preserve a queryable "
+                "checkpoint for restart."
+            ),
+            required_domains=("climate_ops",),
+            case_tags=("cancellation", "checkpoint_reload"),
+        ),
+        _benchmark_task(
             id="supply_eta_risk",
             prompt=(
                 "Assess vendor lead time, customs delay risk, and inventory buffer "
                 "for a fulfillment lane."
             ),
             required_domains=("supply_chain",),
-            expected_tools={
-                "supply_chain": (
-                    "vendor_eta_lookup",
-                    "inventory_buffer_model",
-                )
-            },
+            case_tags=("timeout", "pipeline"),
         ),
+    )
+
+
+_EXPECTED_TOOLS: dict[str, tuple[str, ...]] = {
+    "climate_ops": ("carbon_project_lookup", "welfare_ton_calculator"),
+    "finance_risk": ("risk_budget_calculator", "cashflow_projection"),
+    "code_security": ("dependency_cve_lookup", "patch_diff_reader"),
+    "legal_policy": ("contract_clause_search", "jurisdiction_check"),
+    "medical_triage": ("symptom_red_flag_check", "care_escalation_boundary"),
+    "travel_logistics": ("route_planner", "visa_window_check"),
+    "supply_chain": ("vendor_eta_lookup", "inventory_buffer_model"),
+    "product_growth": ("cohort_retention_curve", "funnel_dropoff_scan"),
+}
+
+
+def _benchmark_task(
+    *,
+    id: str,
+    prompt: str,
+    required_domains: tuple[str, ...],
+    case_tags: tuple[str, ...],
+) -> BenchmarkTask:
+    return BenchmarkTask(
+        id=id,
+        prompt=prompt,
+        required_domains=required_domains,
+        expected_tools={
+            domain: _EXPECTED_TOOLS[domain]
+            for domain in required_domains
+        },
+        case_tags=case_tags,
     )
 
 

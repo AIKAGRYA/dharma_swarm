@@ -15,6 +15,24 @@ BENCHMARK_MODES: tuple[BenchmarkMode, ...] = (
 )
 BENCHMARK_AGENT_ID = "langgraph_parity_benchmark"
 BENCHMARK_OPERATION = "langgraph_parity.benchmark"
+REQUIRED_CASE_TAGS: tuple[str, ...] = (
+    "fan_out",
+    "fan_in",
+    "pipeline",
+    "broadcast",
+    "swarm",
+    "supervisor",
+    "subagents_as_tools",
+    "retry",
+    "timeout",
+    "cancellation",
+    "checkpoint_reload",
+    "interrupt_resume",
+    "provider_fallback",
+    "memory_isolation",
+    "a2a_blocker_semantics",
+    "command_send_routing",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +59,7 @@ class BenchmarkTask:
     prompt: str
     required_domains: tuple[str, ...]
     expected_tools: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    case_tags: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def requires_multi_hop(self) -> bool:
@@ -54,6 +73,7 @@ class BenchmarkTask:
             "expected_tools": {
                 domain: list(tools) for domain, tools in self.expected_tools.items()
             },
+            "case_tags": list(self.case_tags),
             "requires_multi_hop": self.requires_multi_hop,
         }
 
@@ -140,12 +160,21 @@ class BenchmarkReport:
                 "cost_estimate_usd": cost,
                 "failure_classes": failures,
             }
+        case_tag_coverage = {
+            tag: sum(tag in task.case_tags for task in self.tasks)
+            for tag in REQUIRED_CASE_TAGS
+        }
 
         return {
             "suite_name": self.suite_name,
             "task_count": len(self.tasks),
             "multi_hop_task_count": sum(task.requires_multi_hop for task in self.tasks),
             "distractor_domain_count": self.distractor_domain_count,
+            "required_case_tags": list(REQUIRED_CASE_TAGS),
+            "case_tag_coverage": case_tag_coverage,
+            "case_tags_complete": all(
+                count > 0 for count in case_tag_coverage.values()
+            ),
             "modes": by_mode,
         }
 

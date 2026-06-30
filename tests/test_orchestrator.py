@@ -687,6 +687,70 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_orchestrator_spine_dispatch_is_default_and_persists_receipt(
+    tmp_path, monkeypatch
+):
+    """Unset DHARMA_SPINE_DISPATCH should use invoke_agent, not legacy direct."""
+    import sqlite3
+
+    monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-spine-default", title="Spine default", description="safe")]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner("a1", DummyRunner(result="spine ok"))
+    runtime_db = tmp_path / "runtime.db"
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_spine_default",
+    )
+
+    await orch.route_next()
+    for _ in range(50):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+    receipt = orch._last_evidence_receipt
+    assert receipt.operation == "invoke_agent"
+    assert receipt.task_id == "t-spine-default"
+    assert receipt.status == "ok"
+
+    with sqlite3.connect(runtime_db) as db:
+        row = db.execute(
+            "SELECT receipt_json FROM delegation_runs WHERE task_id = ?",
+            ("t-spine-default",),
+        ).fetchone()
+
+    assert row is not None and row[0]
+    persisted = json.loads(row[0])
+    assert persisted["operation"] == "invoke_agent"
+    assert persisted["receipt_id"] == str(receipt.receipt_id)
+    assert persisted["attributes"]["topology"] == "fan_out"
+    assert persisted["attributes"]["run_id"]
+    assert persisted["attributes"]["idempotency_key"]
+    assert persisted["attributes"]["side_effect_key"] == "invoke_agent:t-spine-default:a1"
+
+
+def test_orchestrator_spine_dispatch_false_like_env_values_opt_out(monkeypatch):
+    monkeypatch.delenv("DHARMA_SPINE_DISPATCH", raising=False)
+    assert Orchestrator._spine_dispatch_enabled() is True
+
+    for value in ("0", "false", "False", "off", "legacy", "direct"):
+        monkeypatch.setenv("DHARMA_SPINE_DISPATCH", value)
+        assert Orchestrator._spine_dispatch_enabled() is False
+
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "1")
+    assert Orchestrator._spine_dispatch_enabled() is True
+
+
+@pytest.mark.asyncio
 async def test_orchestrator_fail_closes_when_honors_checkpoint_missing(tmp_path):
     board = MockTaskBoard()
     board.tasks = [

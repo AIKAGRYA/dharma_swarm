@@ -22,7 +22,15 @@ def _stub_td(agent="agent-1", task_id="t-123"):
     return types.SimpleNamespace(
         agent_id=agent,
         task_id=task_id,
-        metadata={"execution_identity": {"trace_id": "trace-xyz", "session_id": "sess-1"}},
+        metadata={
+            "execution_identity": {
+                "trace_id": "trace-xyz",
+                "session_id": "sess-1",
+                "run_id": "run-xyz",
+                "claim_id": "claim-xyz",
+                "idempotency_key": "idem-xyz",
+            }
+        },
         topology=types.SimpleNamespace(value="dispatch"),
     )
 
@@ -49,6 +57,14 @@ def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
     assert receipt.agent_id == "agent-1"
     assert receipt.task_id == "t-123"
     assert receipt.trace_id == "trace-xyz"
+    assert receipt.claim_id == "claim-xyz"
+    assert receipt.attributes["run_id"] == "run-xyz"
+    assert receipt.attributes["idempotency_key"] == "idem-xyz"
+    assert receipt.attributes["side_effect_key"] == "invoke_agent:t-123:agent-1"
+    assert receipt.attributes["topology"] == "dispatch"
+    assert receipt.attributes["agent_identity"] == "agent-1"
+    assert receipt.attributes["planned_provider"] == "orchestrator"
+    assert receipt.attributes["actual_provider"] == "orchestrator"
     assert td.metadata["evidence_receipt_id"] == str(receipt.receipt_id)
 
 

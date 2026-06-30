@@ -182,8 +182,20 @@ class Orchestrator:
         if not idle:
             return []
 
-        if topology in (TopologyType.FAN_OUT, TopologyType.BROADCAST):
+        if topology == TopologyType.FAN_OUT:
             return await self.fan_out(task, idle)
+
+        if topology == TopologyType.BROADCAST:
+            return await self.fan_out(task, idle, topology=TopologyType.BROADCAST)
+
+        if topology == TopologyType.SWARM:
+            return await self._dispatch_swarm(task, idle)
+
+        if topology == TopologyType.SUPERVISOR:
+            return await self._dispatch_supervisor(task, idle)
+
+        if topology == TopologyType.SUBAGENTS_AS_TOOLS:
+            return await self._dispatch_subagents_as_tools(task, idle)
 
         # PIPELINE / FAN_IN: single agent per step
         selected = self._select_idle_agent(task, list(idle))
@@ -247,7 +259,11 @@ class Orchestrator:
         return dispatches
 
     async def fan_out(
-        self, task: Task, agents: list[AgentState]
+        self,
+        task: Task,
+        agents: list[AgentState],
+        *,
+        topology: TopologyType = TopologyType.FAN_OUT,
     ) -> list[TaskDispatch]:
         """Split task across multiple agents, one dispatch per agent."""
         dispatches: list[TaskDispatch] = []
@@ -255,7 +271,7 @@ class Orchestrator:
             td = TaskDispatch(
                 task_id=task.id,
                 agent_id=agent.id,
-                topology=TopologyType.FAN_OUT,
+                topology=topology,
                 timeout_seconds=self._resolve_timeout_seconds(
                     task,
                     self._default_timeout_seconds,
@@ -265,6 +281,152 @@ class Orchestrator:
             await self._assign_dispatch(td)
             dispatches.append(td)
         return dispatches
+
+    async def _dispatch_swarm(
+        self,
+        task: Task,
+        agents: list[AgentState],
+    ) -> list[TaskDispatch]:
+        """Dispatch to the current active swarm agent and persist handoff state."""
+        selected = self._select_topology_agent(task, agents)
+        if selected is None:
+            return []
+        allowed_targets = self._allowed_handoff_targets(task, selected, agents)
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=selected.id,
+            topology=TopologyType.SWARM,
+            timeout_seconds=self._resolve_timeout_seconds(
+                task,
+                self._default_timeout_seconds,
+            ),
+            metadata={
+                "active_agent": selected.id,
+                "current_node": selected.id,
+                "allowed_handoffs": {selected.id: allowed_targets},
+                "checkpoint_id": self._topology_checkpoint_id(task, TopologyType.SWARM),
+                "topology_state": {
+                    "mode": TopologyType.SWARM.value,
+                    "active_agent": selected.id,
+                    "current_node": selected.id,
+                    "allowed_handoffs": {selected.id: allowed_targets},
+                },
+            },
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    async def _dispatch_supervisor(
+        self,
+        task: Task,
+        agents: list[AgentState],
+    ) -> list[TaskDispatch]:
+        """Dispatch through one supervisor while preserving delegated agents."""
+        supervisor = self._select_topology_agent(task, agents)
+        if supervisor is None:
+            return []
+        delegated = tuple(agent.id for agent in agents if agent.id != supervisor.id)
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=supervisor.id,
+            topology=TopologyType.SUPERVISOR,
+            timeout_seconds=self._resolve_timeout_seconds(
+                task,
+                self._default_timeout_seconds,
+            ),
+            metadata={
+                "active_agent": supervisor.id,
+                "current_node": "supervisor",
+                "delegated_agent_ids": list(delegated),
+                "supervisor_final_output_only": True,
+                "checkpoint_id": self._topology_checkpoint_id(
+                    task,
+                    TopologyType.SUPERVISOR,
+                ),
+                "topology_state": {
+                    "mode": TopologyType.SUPERVISOR.value,
+                    "active_agent": supervisor.id,
+                    "delegated_agent_ids": list(delegated),
+                    "user_visible_output": "supervisor_final",
+                },
+            },
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    async def _dispatch_subagents_as_tools(
+        self,
+        task: Task,
+        agents: list[AgentState],
+    ) -> list[TaskDispatch]:
+        """Dispatch parent graph run with child agents exposed as tools."""
+        parent = self._select_topology_agent(task, agents)
+        if parent is None:
+            return []
+        child_agents = tuple(agent.id for agent in agents if agent.id != parent.id)
+        tool_names = [f"call_{agent_id}" for agent_id in child_agents]
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=parent.id,
+            topology=TopologyType.SUBAGENTS_AS_TOOLS,
+            timeout_seconds=self._resolve_timeout_seconds(
+                task,
+                self._default_timeout_seconds,
+            ),
+            metadata={
+                "active_agent": parent.id,
+                "current_node": parent.id,
+                "child_agent_ids": list(child_agents),
+                "subagent_tool_names": tool_names,
+                "checkpoint_id": self._topology_checkpoint_id(
+                    task,
+                    TopologyType.SUBAGENTS_AS_TOOLS,
+                ),
+                "parent_graph_state": {
+                    "mode": TopologyType.SUBAGENTS_AS_TOOLS.value,
+                    "parent_agent_id": parent.id,
+                    "child_agent_ids": list(child_agents),
+                    "child_run_ids": [],
+                },
+                "topology_state": {
+                    "mode": TopologyType.SUBAGENTS_AS_TOOLS.value,
+                    "active_agent": parent.id,
+                    "subagent_tool_names": tool_names,
+                },
+            },
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    def _select_topology_agent(
+        self,
+        task: Task,
+        agents: list[AgentState],
+    ) -> AgentState | None:
+        preferred = str(self._task_meta(task).get("active_agent", "") or "")
+        if preferred:
+            for agent in agents:
+                if agent.id == preferred:
+                    return agent
+        return self._select_idle_agent(task, list(agents))
+
+    def _allowed_handoff_targets(
+        self,
+        task: Task,
+        selected: AgentState,
+        agents: list[AgentState],
+    ) -> list[str]:
+        raw = self._task_meta(task).get("allowed_handoffs")
+        if isinstance(raw, dict):
+            targets = raw.get(selected.id, ())
+            if isinstance(targets, (list, tuple, set)):
+                known = {agent.id for agent in agents}
+                return [str(target) for target in targets if str(target) in known]
+        return [agent.id for agent in agents if agent.id != selected.id]
+
+    @staticmethod
+    def _topology_checkpoint_id(task: Task, topology: TopologyType) -> str:
+        return f"{task.id}:{topology.value}:checkpoint"
 
     async def fan_in(self, dispatches: list[TaskDispatch]) -> str:
         """Collect results from completed dispatches, concatenate them."""
@@ -2271,7 +2433,7 @@ class Orchestrator:
         dispatch. Mirrors ``a2a_bridge.submit_via_spine``: the real execution
         runs inside the invoker, the result is captured for downstream use, and
         any exception is re-raised so the caller's timeout/failure handling is
-        unchanged. Gated by ``DHARMA_SPINE_DISPATCH=1`` (default OFF)."""
+        unchanged."""
         from datetime import datetime, timezone
         from dharma_swarm.spine.invoke import invoke_agent
         from dharma_swarm.spine.receipt import EvidenceReceipt
@@ -2298,6 +2460,8 @@ class Orchestrator:
         provider = getattr(_prov, "value", _prov) if _prov is not None else "orchestrator"
         provider = str(provider) if provider else "orchestrator"
         model = str(getattr(_cfg, "model", "") or "")
+        topology_value = str(getattr(td.topology, "value", td.topology) or "dispatch")
+        side_effect_key = f"invoke_agent:{td.task_id}:{td.agent_id}"
         started = datetime.now(timezone.utc)
         captured: dict[str, Any] = {}
 
@@ -2328,6 +2492,8 @@ class Orchestrator:
                 context_id=context_id,
                 task_id=td.task_id,
                 agent_id=agent_id,
+                claim_id=str(ident.get("claim_id", "") or "") or None,
+                claim_status=str(ident.get("claim_status", "") or "") or None,
                 provider=provider,
                 model=model,
                 operation="invoke_agent",
@@ -2341,7 +2507,19 @@ class Orchestrator:
                 input_tokens=in_tokens,
                 output_tokens=out_tokens,
                 routing_decision_id=routing.decision_id,
-                attributes={"router": "orchestrator_dispatch"},
+                attributes={
+                    "router": "orchestrator_dispatch",
+                    "run_id": str(ident.get("run_id", "") or ""),
+                    "idempotency_key": str(ident.get("idempotency_key", "") or ""),
+                    "side_effect_key": side_effect_key,
+                    "topology": topology_value,
+                    "agent_identity": agent_id,
+                    "planned_provider": provider,
+                    "actual_provider": provider,
+                    "planned_model": model,
+                    "actual_model": model,
+                    "route_reason": routing.reason,
+                },
             )
 
         captured["_task_obj"] = task
@@ -2396,6 +2574,18 @@ class Orchestrator:
             raise captured["exc"]
         return captured["result"]
 
+    @staticmethod
+    def _spine_dispatch_enabled() -> bool:
+        """Return whether live execution should traverse ``invoke_agent``.
+
+        The runtime truth spine is the default path. Operators can still opt
+        out for emergency compatibility with explicit false-like values.
+        """
+        raw = os.environ.get("DHARMA_SPINE_DISPATCH")
+        if raw is None:
+            return True
+        return raw.strip().lower() not in {"0", "false", "no", "off", "legacy", "direct"}
+
     async def _execute_task(self, runner: Any, task: Task, td: TaskDispatch) -> None:
         """Run agent.run_task() in background, update board on completion/failure."""
         # Yield immediately so the dispatching coroutine can finish its loop
@@ -2444,11 +2634,11 @@ class Orchestrator:
                 task=task,
                 status="running",
             )
-            if os.environ.get("DHARMA_SPINE_DISPATCH") == "1":
-                # WS3: route execution through the Runtime Truth Spine's one
-                # blessed path (invoke_agent), emitting exactly one EvidenceReceipt.
-                # Default OFF: when unset, the direct call below is byte-identical
-                # to prior behavior. Preserves timeout + exception semantics.
+            if self._spine_dispatch_enabled():
+                # Route execution through the Runtime Truth Spine's one blessed
+                # path (invoke_agent), emitting exactly one EvidenceReceipt.
+                # Explicit false-like DHARMA_SPINE_DISPATCH values preserve the
+                # legacy direct path as a rollback lane.
                 result = await self._run_task_via_spine(runner, task, td, timeout_seconds)
             else:
                 result = await asyncio.wait_for(
