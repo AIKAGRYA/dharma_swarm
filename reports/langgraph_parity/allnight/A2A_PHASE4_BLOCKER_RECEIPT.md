@@ -82,6 +82,39 @@ Both moved from `expired` to `blocked_verified` using their existing valid `a2a_
 - `sab-flywheel-d02-rushabdev-federation-watch`
 - `ts-converge-0611`
 
+## Read-Only Blocker Audit
+
+Added a replayable audit tool:
+
+`scripts/governance/a2a_readiness_blocker_audit.py`
+
+Audit artifact:
+
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`
+
+Command:
+
+`.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`
+
+Result:
+
+- `blocker_count=36`
+- `open_stale_claimed_without_terminal_receipt=11`
+- `open_stale_unclaimed_without_terminal_receipt=6`
+- `closed_semantic_receipt_present_non_a2a=18`
+- `closed_missing_a2a_receipt_no_pointer=1`
+- The 18 SAB semantic receipt pointers resolve as valid `sab.semantic_receipt.v1` artifacts only through `/Users/dhyana/dharma_swarm`, not through this clean parity branch. They remain non-A2A evidence and do not satisfy the strict embedded `dharma_a2a_task_receipt.v1` receipt contract.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_readiness_blocker_audit.py` -> `4 passed in 0.39s`
+- `.venv/bin/python -m pytest -q tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `23 passed in 0.41s`
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_readiness_blocker_audit.py tests/test_a2a_readiness_blocker_audit.py` -> pass
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`
+- `git diff --check` -> pass
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`
+
 ## Blocker
 
 Phase 4 is not green. The live queue still contains open/claimed work and completed rows without embedded A2A task receipts. The SAB rows carry `sab.semantic_receipt` pointers or stale `receipt_validation` metadata, but the strict A2A gate correctly requires an embedded valid `dharma_a2a_task_receipt.v1` receipt or terminal closure through the governed lifecycle.

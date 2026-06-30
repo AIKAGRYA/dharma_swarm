@@ -143,3 +143,30 @@
 - Current blockers:
   - A2A strict green still fails on 17 open/claimed/pending rows and 19 completed rows without embedded A2A task receipts.
   - Full-history closeout gitleaks aggregate, supervisor final-output restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection remain pending.
+
+## 2026-06-30T17:46:37Z - Phase 4 A2A Blocker Audit
+
+- Target gate: produce a concrete, replayable blocker receipt for the remaining A2A strict-readiness failures without weakening `check_a2a_readiness.py`.
+- Code changes landed locally:
+  - Added `scripts/governance/a2a_readiness_blocker_audit.py`.
+  - Added `tests/test_a2a_readiness_blocker_audit.py`.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`
+- Audit result:
+  - Total live queue rows: 44.
+  - Remaining blocker rows: 36.
+  - Lifecycle counts: `claimed_open=11`, `open_unclaimed=6`, `completed_unverified=19`.
+  - Classification counts: `open_stale_claimed_without_terminal_receipt=11`, `open_stale_unclaimed_without_terminal_receipt=6`, `closed_semantic_receipt_present_non_a2a=18`, `closed_missing_a2a_receipt_no_pointer=1`.
+  - All 18 SAB semantic receipt pointers resolve to valid `sab.semantic_receipt.v1` artifacts only via `/Users/dhyana/dharma_swarm`; the clean parity branch does not contain those receipt artifacts, and they still are not embedded `dharma_a2a_task_receipt.v1` receipts.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_readiness_blocker_audit.py` -> `4 passed in 0.39s`.
+  - `.venv/bin/python -m pytest -q tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `23 passed in 0.41s`.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_readiness_blocker_audit.py tests/test_a2a_readiness_blocker_audit.py` -> pass.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json` -> pass.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `git diff --check` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings for `orchestrator.py` and `runtime_state.py`.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+- Scoreboard: remains `46/100`, explicitly not 100/100.
+- Current blocker:
+  - Phase 4 is still red: the live queue needs task-specific terminal A2A receipts or governed blocked receipts for 17 stale open rows, plus an accepted semantic-to-A2A bridge or proper A2A receipts for 18 SAB rows and one receipt-less `ts-converge-0611` completion.
