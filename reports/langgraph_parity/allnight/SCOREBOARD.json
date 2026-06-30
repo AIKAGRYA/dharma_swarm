@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T18:39:05Z",
+  "updated_at": "2026-06-30T19:04:22Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 54,
+    "current": 58,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, and Phase 5 MemoryKernel improvements: text-query live ContextCompiler bundles plus topology-derived agent memory isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS compiler metadata. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, and a Phase 6 provider-truth spine receipt slice: orchestrator dispatch receipts now bind requested/planned provider-model intent to actual served provider-model telemetry from AgentRunner route decisions and LLMResponse when available. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and cockpit/API graph inspection remain failing or unproven."
   },
   "rounds": [
     {
@@ -271,6 +271,41 @@
         "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
         "Provider truth and cockpit/API graph inspection remain pending."
       ]
+    },
+    {
+      "id": "phase-6-provider-truth-spine-receipt",
+      "timestamp": "2026-06-30T19:04:22Z",
+      "status": "completed_partial",
+      "target_gate": "Bind orchestrator spine EvidenceReceipt provider/model fields to actual route decision and LLMResponse telemetry when available",
+      "files_touched": [
+        "dharma_swarm/agent_runner.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/provider_truth.py",
+        "tests/test_orchestrator_spine_dispatch.py",
+        "reports/langgraph_parity/allnight/provider_truth_spine_receipt_20260630T190422Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest tests/test_orchestrator_spine_dispatch.py tests/test_loop1_spine_provider_model.py -q",
+        ".venv/bin/python -m pytest tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state -q",
+        ".venv/bin/python -m compileall -q dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        ".venv/bin/python -m ruff check dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py",
+        "git diff --check",
+        ".venv/bin/python -m ruff check dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py"
+      ],
+      "blockers": [
+        "Phase 6 remains partial: routed orchestrator dispatch receipts now bind actual served provider/model when AgentRunner has route/response telemetry, but there is no exhaustive live-provider matrix proof.",
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Module budget now passes after moving provider-truth normalization to dharma_swarm/provider_truth.py, but orchestrator.py remains close to its ceiling.",
+        "Ruff on the full touched production files still fails on pre-existing lint debt outside this diff; the new provider_truth helper and focused test pass ruff.",
+        "Cockpit/API graph inspection remains pending."
+      ]
     }
   ],
   "gates": {
@@ -285,7 +320,7 @@
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
-    "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
+    "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
     "phase_7_platform_surface": "pending"
   },
   "latest_verification": {
@@ -306,6 +341,7 @@
       "a2a_readiness_blocker_audit": "4 passed in 0.39s; broader A2A focused suite 23 passed in 0.41s; blocker_count=36 with 11 stale claimed, 6 stale unclaimed, 18 SAB semantic non-A2A, 1 no-pointer completed row",
       "memory_live_retrieval_text_query": "MemoryQuery.text_query filters normalized atoms; ContextCompiler live bundle admitted matching home.witness atom and excluded unrelated witness atom; focused 4 passed in 0.40s; broader memory/context subset 69 passed in 0.48s",
       "memory_topology_agent_isolation": "MemoryContextBudget.allowed_agent_ids blocks cross-agent AGENT-scoped atoms; ContextCompiler applies topology-derived isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS metadata; orchestrator dispatch metadata mirrors isolation telemetry; focused 4 passed in 0.19s; broader memory/context subset 84 passed in 0.85s; broader runtime/topology/langgraph subset 75 passed in 30.52s",
+      "provider_truth_spine_receipt": "AgentRunner now exposes last route request/decision/response/usage; dharma_swarm/provider_truth.py normalizes requested/planned/actual/served provider-model truth; orchestrator spine EvidenceReceipt prefers LLMResponse served provider/model, falls back to ProviderRouteDecision, then runner config; focused spine/provider tests 8 passed in 0.35s; adjacent dispatch/topology tests 2 passed in 7.42s; module budget, hygiene ratchet, focused ruff, compileall, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",

@@ -221,3 +221,33 @@
   - Phase 5 remains partial: topology agent memory isolation is now proven at compiler/admission/dispatch-metadata level, but stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Provider truth and cockpit/API graph inspection remain pending.
+
+## 2026-06-30T19:04:22Z - Phase 6 Provider Truth Spine Receipt Slice
+
+- Target gate: make orchestrator spine receipts bind requested/planned provider-model intent to actual served provider-model telemetry without changing `AgentRunner.run_task()`'s string return contract.
+- Code changes landed locally:
+  - Added `AgentRunner` last-dispatch telemetry fields: `_last_route_request`, `_last_route_decision`, `_last_response`, and `_last_usage`.
+  - Reset those fields at task start and populate them on both success and failure from the existing route decision and `LLMResponse`.
+  - Added `dharma_swarm/provider_truth.py` to normalize provider/model truth outside the oversized orchestrator module.
+  - Updated `Orchestrator._run_task_via_spine()` to build `EvidenceReceipt.provider`/`model` from `LLMResponse` first, `ProviderRouteDecision` second, and runner config as the final fallback.
+  - Extended `EvidenceReceipt.attributes` with `requested_provider`, `requested_model`, `planned_provider`, `planned_model`, `actual_provider`, `actual_model`, `served_provider`, `served_model`, `route_path`, `route_confidence`, `route_reasons`, `route_fallback_plan`, `route_requires_human`, `provider_truth_source`, `fallback_used`, and `actual_differs_from_requested`.
+  - Normalized `prompt_tokens`/`completion_tokens` usage into receipt `input_tokens`/`output_tokens`.
+  - Added a no-network routed-runner spine dispatch test proving requested Anthropic config can produce an actual OpenRouter served receipt with fallback plan and route confidence preserved.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/provider_truth_spine_receipt_20260630T190422Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest tests/test_orchestrator_spine_dispatch.py tests/test_loop1_spine_provider_model.py -q` -> `8 passed in 0.35s`.
+  - `.venv/bin/python -m pytest tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state -q` -> `2 passed in 7.42s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with warnings; `orchestrator.py` is 3205 lines against ceiling 3215.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `.venv/bin/python -m ruff check dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py` -> pass.
+  - `git diff --check` -> pass.
+  - `.venv/bin/python -m ruff check dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py` -> fail on pre-existing lint debt outside this diff: unused legacy imports, semicolon statements, unused locals, and one ambiguous variable name.
+- Scoreboard: raised conservatively to `58/100`, still explicitly not 100/100.
+- Current blockers:
+  - Phase 6 remains partial: routed orchestrator dispatch receipts now bind actual served provider/model when `AgentRunner` has route/response telemetry, but there is no exhaustive live-provider matrix proof.
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Cockpit/API graph inspection remains pending.

@@ -2420,31 +2420,34 @@ class Orchestrator:
         any exception is re-raised so the caller's timeout/failure handling is
         unchanged."""
         from datetime import datetime, timezone
+        from dharma_swarm.provider_truth import build_provider_truth_snapshot
         from dharma_swarm.spine.invoke import invoke_agent
         from dharma_swarm.spine.receipt import EvidenceReceipt
         from dharma_swarm.spine.routing import RoutingDecision
 
         ident = td.metadata.get("execution_identity")
         ident = ident if isinstance(ident, dict) else {}
-        routing = RoutingDecision(
-            agent_id=td.agent_id,
-            reason=f"orchestrator dispatch: {getattr(td.topology, 'value', 'dispatch')}",
-            router_name="orchestrator_dispatch",
-            context_id=str(ident.get("session_id", "") or ""),
-            task_id=td.task_id,
-        )
-        # Dispatch-time source of truth for provider/model: the runner's static
-        # config (AgentRunner._config) — config.provider is a ProviderType
-        # (string via .value, exactly as agent_runner.py:885) and config.model is
-        # the model string (agent_runner.py:886). run_task() returns only the
-        # completion text, so it cannot supply these; the config is the only
-        # available dispatch-time source. Tolerant of a missing/partial config
-        # (falls back to the empty-string EvidenceReceipt defaults).
+        # Dispatch-time requested provider/model: the runner's static config.
+        # AgentRunner may later expose actual served provider/model from the
+        # route decision and LLMResponse; stubs/direct runners fall back here.
         _cfg = getattr(runner, "_config", None)
         _prov = getattr(_cfg, "provider", None)
         provider = getattr(_prov, "value", _prov) if _prov is not None else "orchestrator"
         provider = str(provider) if provider else "orchestrator"
         model = str(getattr(_cfg, "model", "") or "")
+        routing = RoutingDecision(
+            agent_id=td.agent_id,
+            provider=provider,
+            model=model,
+            reason=f"orchestrator dispatch: {getattr(td.topology, 'value', 'dispatch')}",
+            router_name="orchestrator_dispatch",
+            context_id=str(ident.get("session_id", "") or ""),
+            task_id=td.task_id,
+            attributes={
+                "planned_provider": provider,
+                "planned_model": model,
+            },
+        )
         topology_value = str(getattr(td.topology, "value", td.topology) or "dispatch")
         side_effect_key = f"invoke_agent:{td.task_id}:{td.agent_id}"
         started = datetime.now(timezone.utc)
@@ -2466,12 +2469,13 @@ class Orchestrator:
                 captured["exc"] = exc
                 status, err_source, err_detail = "failed", "internal_error", str(exc)
             finished = datetime.now(timezone.utc)
-            # Surface token usage only when the runner's last-completion state
-            # exposes it (no fabrication — None stays None when absent).
-            _usage = getattr(runner, "_last_usage", None)
-            if isinstance(_usage, dict):
-                in_tokens = _usage.get("input_tokens")
-                out_tokens = _usage.get("output_tokens")
+            truth = build_provider_truth_snapshot(
+                runner,
+                requested_provider=provider,
+                requested_model=model,
+            )
+            in_tokens = truth.input_tokens
+            out_tokens = truth.output_tokens
             return EvidenceReceipt(
                 trace_id=str(ident.get("trace_id", "") or ""),
                 context_id=context_id,
@@ -2479,8 +2483,8 @@ class Orchestrator:
                 agent_id=agent_id,
                 claim_id=str(ident.get("claim_id", "") or "") or None,
                 claim_status=str(ident.get("claim_status", "") or "") or None,
-                provider=provider,
-                model=model,
+                provider=truth.actual_provider,
+                model=truth.actual_model,
                 operation="invoke_agent",
                 provider_attempted=True,
                 status=status,
@@ -2499,11 +2503,8 @@ class Orchestrator:
                     "side_effect_key": side_effect_key,
                     "topology": topology_value,
                     "agent_identity": agent_id,
-                    "planned_provider": provider,
-                    "actual_provider": provider,
-                    "planned_model": model,
-                    "actual_model": model,
                     "route_reason": routing.reason,
+                    **truth.receipt_attributes(),
                 },
             )
 

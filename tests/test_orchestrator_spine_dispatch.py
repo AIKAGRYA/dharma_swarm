@@ -68,6 +68,80 @@ def test_spine_dispatch_success_emits_one_receipt_and_returns_result():
     assert td.metadata["evidence_receipt_id"] == str(receipt.receipt_id)
 
 
+def test_spine_dispatch_receipt_records_actual_route_and_fallback_truth():
+    from dharma_swarm.decision_router import RoutePath
+    from dharma_swarm.models import LLMResponse, ProviderType
+    from dharma_swarm.provider_policy import ProviderRouteDecision, ProviderRouteRequest
+
+    class RoutedRunner:
+        _config = types.SimpleNamespace(
+            provider=ProviderType.ANTHROPIC,
+            model="claude-sonnet-4-20250514",
+        )
+
+        async def run_task(self, task):
+            self._last_route_request = ProviderRouteRequest(
+                action_name="route_truth",
+                risk_score=0.2,
+                uncertainty=0.4,
+                novelty=0.3,
+                urgency=0.5,
+                expected_impact=0.4,
+                context={
+                    "preferred_provider": ProviderType.ANTHROPIC.value,
+                    "preferred_model": "claude-sonnet-4-20250514",
+                },
+            )
+            self._last_route_decision = ProviderRouteDecision(
+                path=RoutePath.DELIBERATIVE,
+                selected_provider=ProviderType.OPENROUTER,
+                selected_model_hint="moonshotai/kimi-k2.5",
+                fallback_providers=[ProviderType.CLAUDE_CODE, ProviderType.OPENAI],
+                fallback_model_hints=["claude-opus-4-6", "gpt-5"],
+                confidence=0.82,
+                requires_human=False,
+                reasons=["deliberative_route", "fallback_provider_selected"],
+            )
+            self._last_response = LLMResponse(
+                content="RUN_RESULT",
+                model="moonshotai/kimi-k2.5",
+                provider=ProviderType.OPENROUTER.value,
+                usage={"prompt_tokens": 12, "completion_tokens": 5},
+            )
+            self._last_usage = dict(self._last_response.usage)
+            return "RUN_RESULT"
+
+    me = _stub_self()
+    td = _stub_td(task_id="t-route-truth")
+    result = asyncio.run(
+        Orchestrator._run_task_via_spine(me, RoutedRunner(), object(), td, 5.0)
+    )
+
+    assert result == "RUN_RESULT"
+    receipt = me._last_evidence_receipt
+    attrs = receipt.attributes
+    assert receipt.provider == ProviderType.OPENROUTER.value
+    assert receipt.model == "moonshotai/kimi-k2.5"
+    assert receipt.input_tokens == 12
+    assert receipt.output_tokens == 5
+    assert attrs["requested_provider"] == ProviderType.ANTHROPIC.value
+    assert attrs["planned_provider"] == ProviderType.ANTHROPIC.value
+    assert attrs["actual_provider"] == ProviderType.OPENROUTER.value
+    assert attrs["served_provider"] == ProviderType.OPENROUTER.value
+    assert attrs["planned_model"] == "claude-sonnet-4-20250514"
+    assert attrs["actual_model"] == "moonshotai/kimi-k2.5"
+    assert attrs["route_path"] == RoutePath.DELIBERATIVE.value
+    assert attrs["route_confidence"] == 0.82
+    assert attrs["route_reasons"] == ["deliberative_route", "fallback_provider_selected"]
+    assert attrs["route_fallback_plan"] == [
+        {"provider": ProviderType.CLAUDE_CODE.value, "model": "claude-opus-4-6"},
+        {"provider": ProviderType.OPENAI.value, "model": "gpt-5"},
+    ]
+    assert attrs["provider_truth_source"] == "llm_response"
+    assert attrs["fallback_used"] is True
+    assert attrs["actual_differs_from_requested"] is True
+
+
 def test_spine_dispatch_failure_reraises_and_records_failed_receipt():
     class BoomRunner:
         async def run_task(self, task):
