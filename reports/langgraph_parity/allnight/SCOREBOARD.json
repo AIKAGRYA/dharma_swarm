@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T16:58:31Z",
+  "updated_at": "2026-06-30T17:23:08Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 44,
+    "current": 46,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, and a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof. A2A, memory retrieval isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, and a small Phase 4 A2A reconciliation that eliminated unknown-status blockers. A2A strict green, memory retrieval isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
   },
   "rounds": [
     {
@@ -149,6 +149,38 @@
         "make agent-build-closeout remains documented as blocked by aggregate full-history gitleaks findings.",
         "PR CI must be re-run after this repair commit."
       ]
+    },
+    {
+      "id": "phase-4-a2a-reconciliation",
+      "timestamp": "2026-06-30T17:15:54Z",
+      "status": "completed",
+      "target_gate": "Reconcile valid terminal A2A receipts already embedded in live queue rows without weakening strict readiness",
+      "files_touched": [
+        "scripts/governance/a2a_reconcile_embedded_receipts.py",
+        "tests/test_a2a_embedded_receipt_reconciler.py",
+        "reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md",
+        "reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_dry_run_20260630T171554Z.json",
+        "reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_apply_20260630T171554Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json"
+      ],
+      "tests_run": [
+        "make onboard",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        ".venv/bin/python -m pytest -q tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py",
+        ".venv/bin/python -m compileall -q scripts/governance/a2a_reconcile_embedded_receipts.py",
+        ".venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py --output reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_dry_run_20260630T171554Z.json",
+        ".venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py --apply --output reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_apply_20260630T171554Z.json",
+        ".venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py",
+        "git diff --no-index --stat /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.pr732-phase4-20260630T171554Z.bak /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45"
+      ],
+      "blockers": [
+        "A2A strict readiness still fails after reconciliation: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Nineteen completed rows lack embedded dharma_a2a_task_receipt.v1 receipts and cannot be counted verified by the strict gate.",
+        "Seventeen remaining open/claimed/pending rows need task-specific closure or external blocker receipts."
+      ]
     }
   ],
   "gates": {
@@ -161,7 +193,7 @@
     "phase_2_default_spine_dispatch": "passed_slice_default_on_and_receipt_persisted",
     "phase_3_live_topologies": "partial_plus_runtime_state_swarm_handoff_restart_and_subagents_child_parent_run_proofs_pass",
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
-    "phase_4_a2a_strict_green": "failed",
+    "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19",
     "phase_5_memory_live_retrieval": "pending",
     "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
     "phase_7_platform_surface": "pending"
@@ -179,10 +211,12 @@
       "runtime_orchestrator_topology_langgraph_combined": "75 passed in 30.44s",
       "runtime_orchestrator_topology_langgraph_combined_after_ci_repair": "75 passed in 37.48s",
       "models_after_ci_pytest_enum_repair": "16 passed in 0.13s",
+      "a2a_embedded_receipt_reconciler": "19 passed in 0.44s",
+      "a2a_embedded_receipt_reconciler_post_apply_dry_run": "candidate_count=0",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
-      "a2a_readiness_strict": "failed exit 2",
+      "a2a_readiness_strict": "failed exit 2 before reconciliation: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19; failed exit 2 after reconciliation: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19",
       "agent_build_preflight": "passed twice; latest run compileall clean, F821 clean, 12328 tests collected, onboard OK, hygiene integrity OK",
       "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits"
     }

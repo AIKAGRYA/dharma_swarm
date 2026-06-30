@@ -102,3 +102,44 @@
 - Verification:
   - `.venv/bin/python -m pytest -q tests/test_models.py` -> `16 passed in 0.13s`.
 - Current blockers remain unchanged: A2A strict readiness, full-history closeout gitleaks aggregate, supervisor restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection.
+
+## 2026-06-30T17:15:54Z - Phase 4 A2A Reconciliation Start
+
+- Target gate: move A2A strict readiness toward green without weakening `check_a2a_readiness.py`.
+- Current branch: `codex/langgraph-orchestration-parity-20260701` at `86c975319`.
+- Worktree status at round start: clean after restoring unrelated `make onboard` governance projection churn.
+- Baseline verification:
+  - `make onboard` -> pass; reports PR #732 healthy, but runtime receipt fill rate remains 2460/8090.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=19`, `unknown_status_tasks=2`, `unverified_closed_tasks=19`.
+- Current blocker classes:
+  - Two `expired` queue rows already contain valid embedded terminal `blocked` receipts but are still counted as open/unknown because the row status was never normalized.
+  - Seventeen stale open/claimed/pending rows remain unresolved.
+  - Nineteen `completed` rows are unverified because they do not embed a valid `dharma_a2a_task_receipt.v1` receipt, even when a non-A2A semantic receipt id/path is present.
+- Next target gate: add a narrow, tested reconciliation path for rows that already carry valid embedded terminal A2A receipts, run it on the live queue with a backup, rerun strict readiness, and record remaining blockers exactly.
+
+## 2026-06-30T17:23:08Z - Phase 4 A2A Embedded Receipt Reconciliation
+
+- Target gate: eliminate false unknown/open blockers for queue rows that already contain valid terminal A2A receipts.
+- Code changes landed locally:
+  - Added `scripts/governance/a2a_reconcile_embedded_receipts.py`.
+  - Added `tests/test_a2a_embedded_receipt_reconciler.py`.
+  - Added blocker receipt `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`.
+- Live queue action:
+  - Backed up `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl` to `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.pr732-phase4-20260630T171554Z.bak`.
+  - Dry-run receipt: `reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_dry_run_20260630T171554Z.json`.
+  - Apply receipt: `reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_apply_20260630T171554Z.json`.
+  - Normalized two rows from `expired` to `blocked`: `collab:fleet-health-collab-20260528:reviewer:opus_composer` and `collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222`.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `19 passed in 0.44s`.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_reconcile_embedded_receipts.py` -> pass.
+  - `.venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py --output reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_dry_run_20260630T171554Z.json` -> `candidate_count=2`.
+  - `.venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py --apply --output reports/langgraph_parity/allnight/a2a_reconcile_embedded_receipts_apply_20260630T171554Z.json` -> 2 rows normalized.
+  - `.venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py` after apply -> `candidate_count=0`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `git diff --no-index --stat /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.pr732-phase4-20260630T171554Z.bak /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl` -> `1 file changed, 2 insertions(+), 2 deletions(-)`.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass; existing warnings unchanged for `orchestrator.py` and `runtime_state.py`.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+- Scoreboard: `46/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict green still fails on 17 open/claimed/pending rows and 19 completed rows without embedded A2A task receipts.
+  - Full-history closeout gitleaks aggregate, supervisor final-output restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection remain pending.

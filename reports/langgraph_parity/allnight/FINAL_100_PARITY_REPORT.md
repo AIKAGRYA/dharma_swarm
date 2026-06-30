@@ -2,7 +2,7 @@
 
 Status: **not 100/100**.
 
-Current score: **44/100**.
+Current score: **46/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
@@ -36,10 +36,17 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 37.48s` after the CI repair extraction.
 - CI repair after draft PR #732 second run: `pytest (3.12)` found a stale `TopologyType` enum count assertion in `tests/test_models.py`; it now asserts the explicit 7 topology values.
 - `.venv/bin/python -m pytest -q tests/test_models.py` -> `16 passed in 0.13s`.
+- Phase 4 A2A reconciliation: added `scripts/governance/a2a_reconcile_embedded_receipts.py` and normalized two live queue rows that already had valid embedded terminal `a2a_supervisor` receipts.
+- `.venv/bin/python -m pytest -q tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `19 passed in 0.44s`.
+- `.venv/bin/python scripts/governance/a2a_reconcile_embedded_receipts.py` after apply -> `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` after reconciliation -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
 
 ## Failing Gates
 
-- A2A strict readiness: `ready=false`, `open_tasks=19`, `unknown_status_tasks=2`, `unverified_closed_tasks=19`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
+- A2A strict readiness: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
+- A2A remaining blocker receipt: `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Live topology restart/resume: SWARM accepted handoff and SUBAGENTS_AS_TOOLS parent/child run records now have restart-readable `RuntimeStateStore` tests. Supervisor final-output restart semantics still need a dedicated live acceptance test.
 - Memory live retrieval: not completed; no proof that live agents receive only allowed memory/tool context through production retrieval.
