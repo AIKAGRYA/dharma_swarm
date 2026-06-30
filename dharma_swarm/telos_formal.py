@@ -8,8 +8,15 @@ from typing import Any, Optional
 import numpy as np
 
 from dharma_swarm.models import GateDecision, GateResult, GateTier
-from dharma_swarm.telos_formal_math import EPS, effective_rank, shannon_entropy
-from dharma_swarm.telos_formal_math import von_neumann_entropy
+from dharma_swarm.telos_formal_graph import analyze_provenance_claims
+from dharma_swarm.telos_formal_math import (
+    EPS,
+    commutator_frobenius_norm,
+    effective_rank,
+    shannon_entropy,
+    validate_density_matrix,
+    von_neumann_entropy,
+)
 from dharma_swarm.telos_formal_models import (
     ActionContext,
     BeliefState,
@@ -45,6 +52,13 @@ __all__ = [
     "von_neumann_entropy",
 ]
 
+_DATA_LABEL_RANK = {
+    DataLabel.LOW: 0,
+    DataLabel.INTERNAL: 1,
+    DataLabel.CONFIDENTIAL: 2,
+    DataLabel.HIGH: 3,
+}
+
 
 def _skip(gate: FormalGateName, tier: GateTier, why: str) -> FormalGateResult:
     return FormalGateResult(
@@ -60,20 +74,42 @@ def _skip(gate: FormalGateName, tier: GateTier, why: str) -> FormalGateResult:
 def epistemic_humility_gate(
     belief: Optional[BeliefState],
     min_entropy_bits: float = 0.05,
+    max_belief_mass: float = 0.97,
 ) -> FormalGateResult:
     gate = FormalGateName.EPISTEMIC_HUMILITY
     tier = GateTier.B
     if belief is None:
         return _skip(gate, tier, "no belief state provided")
-    entropy = belief.entropy(base=2.0)
-    if entropy > min_entropy_bits:
+    matrix = belief.to_density_matrix()
+    eigenvalues = validate_density_matrix(matrix)
+    entropy = von_neumann_entropy(matrix, base=2.0)
+    lambda_max = float(np.max(eigenvalues)) if eigenvalues.size else 0.0
+    entropy_ok = entropy > min_entropy_bits
+    mass_ok = lambda_max < max_belief_mass
+    detail = {
+        "entropy_bits": entropy,
+        "lambda_max": lambda_max,
+        "min_entropy_bits": min_entropy_bits,
+        "max_belief_mass": max_belief_mass,
+    }
+    if entropy_ok and mass_ok:
         return FormalGateResult(
             gate=gate,
             tier=tier,
             result=GateResult.PASS,
             measure=entropy,
             threshold=min_entropy_bits,
-            reason=f"S(rho)={entropy:.4f} bits > {min_entropy_bits}",
+            reason=f"S(rho)={entropy:.4f} bits > {min_entropy_bits} and lambda_max={lambda_max:.4f} < {max_belief_mass}",
+            detail=detail,
+        )
+    reasons = []
+    if not entropy_ok:
+        reasons.append(
+            f"entropy floor violated: S(rho)={entropy:.4f} bits <= {min_entropy_bits}"
+        )
+    if not mass_ok:
+        reasons.append(
+            f"dominant belief mass ceiling violated: lambda_max={lambda_max:.4f} >= {max_belief_mass}"
         )
     return FormalGateResult(
         gate=gate,
@@ -81,10 +117,8 @@ def epistemic_humility_gate(
         result=GateResult.FAIL,
         measure=entropy,
         threshold=min_entropy_bits,
-        reason=(
-            f"belief is effectively certain (S(rho)={entropy:.4f} bits "
-            f"<= {min_entropy_bits}); certainty is forbidden"
-        ),
+        reason="; ".join(reasons),
+        detail=detail,
     )
 
 
@@ -105,7 +139,18 @@ def anekanta_contextuality_gate(
     unit = matrix / norms
     gram = unit @ unit.T
     erank = effective_rank(gram)
-    detail = {"n_evaluators": len(judgments), "effective_rank": erank}
+    projectors = [np.outer(vec, vec) for vec in unit]
+    incompatibilities = [
+        commutator_frobenius_norm(projectors[i], projectors[j])
+        for i in range(len(projectors))
+        for j in range(i + 1, len(projectors))
+    ]
+    mean_incompatibility = float(np.mean(incompatibilities)) if incompatibilities else 0.0
+    detail = {
+        "n_evaluators": len(judgments),
+        "effective_rank": erank,
+        "mean_incompatibility": mean_incompatibility,
+    }
     if erank >= min_effective_evaluators - EPS:
         return FormalGateResult(
             gate=gate,
@@ -174,32 +219,51 @@ def provenance_integrity_gate(
     tier = GateTier.B
     if not claims:
         return _skip(gate, tier, "no provenance claims provided")
-    orphans = [
-        c.claim_id
-        for c in claims
-        if c.confidence >= high_confidence_threshold and not c.evidence_ids
+    analysis = analyze_provenance_claims(claims)
+    high_confidence_ids = [
+        claim.claim_id for claim in claims if claim.confidence >= high_confidence_threshold
     ]
-    detail = {"orphan_claims": orphans, "n_claims": len(claims)}
-    if not orphans:
+    orphan_claims = [
+        claim.claim_id
+        for claim in claims
+        if claim.confidence >= high_confidence_threshold and not claim.evidence_ids
+    ]
+    cycle_claim_ids = [cid for cid in analysis.cycle_claim_ids if cid in high_confidence_ids]
+    ungrounded_claim_ids = [
+        cid for cid in analysis.ungrounded_claim_ids if cid in high_confidence_ids
+    ]
+    failing_ids = sorted({*orphan_claims, *cycle_claim_ids, *ungrounded_claim_ids})
+    detail = {
+        "orphan_claims": orphan_claims,
+        "cycle_claim_ids": cycle_claim_ids,
+        "cycle_components": [list(component) for component in analysis.cycle_components],
+        "ungrounded_claim_ids": ungrounded_claim_ids,
+        "n_claims": len(claims),
+    }
+    if not failing_ids:
         return FormalGateResult(
             gate=gate,
             tier=tier,
             result=GateResult.PASS,
             measure=0.0,
             threshold=0.0,
-            reason="all high-confidence claims carry evidence",
+            reason="all high-confidence claims are grounded and acyclic",
             detail=detail,
         )
+    reasons = []
+    if orphan_claims:
+        reasons.append(f"orphan claims: {', '.join(orphan_claims)}")
+    if cycle_claim_ids:
+        reasons.append(f"circular justification: {', '.join(cycle_claim_ids)}")
+    if ungrounded_claim_ids:
+        reasons.append(f"ungrounded claims: {', '.join(ungrounded_claim_ids)}")
     return FormalGateResult(
         gate=gate,
         tier=tier,
         result=GateResult.FAIL,
-        measure=float(len(orphans)),
+        measure=float(len(failing_ids)),
         threshold=0.0,
-        reason=(
-            f"{len(orphans)} high-confidence claim(s) without evidence: "
-            f"{', '.join(orphans)}"
-        ),
+        reason="; ".join(reasons),
         detail=detail,
     )
 
@@ -210,9 +274,11 @@ def noninterference_gate(flows: Sequence[InformationFlow]) -> FormalGateResult:
     if not flows:
         return _skip(gate, tier, "no information flows declared")
     leaks = [
-        f
-        for f in flows
-        if f.source_label == DataLabel.HIGH and f.sink_is_public and not f.declassified
+        flow
+        for flow in flows
+        if _DATA_LABEL_RANK[flow.source_label] > _DATA_LABEL_RANK[DataLabel.LOW]
+        and flow.sink_is_public
+        and not flow.declassified
     ]
     detail = {"n_flows": len(flows), "leaks": len(leaks)}
     if not leaks:
@@ -286,7 +352,11 @@ def evaluate_formal_gates(context: ActionContext) -> FormalGateReport:
             context.mutates_state,
         ),
         noninterference_gate(context.information_flows),
-        epistemic_humility_gate(context.belief, context.min_entropy_bits),
+        epistemic_humility_gate(
+            context.belief,
+            context.min_entropy_bits,
+            context.max_belief_mass,
+        ),
         provenance_integrity_gate(
             context.provenance_claims, context.high_confidence_threshold
         ),

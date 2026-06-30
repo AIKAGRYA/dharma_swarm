@@ -7,12 +7,14 @@ could not stop.
 
 from __future__ import annotations
 
+import json
 import math
 
 import numpy as np
 import pytest
 
 from dharma_swarm.models import GateDecision, GateResult, GateTier
+from dharma_swarm.telos_formal_math import commutator_frobenius_norm
 from dharma_swarm.telos_formal import (
     ActionContext,
     BeliefState,
@@ -103,6 +105,19 @@ def test_humility_passes_mixed_state():
     assert res.measure > 0.0
 
 
+def test_humility_blocks_dominant_belief_mass():
+    ctx = ActionContext(
+        belief=BeliefState(probabilities=[0.7, 0.3]),
+        max_belief_mass=0.6,
+    )
+    report = evaluate_formal_gates(ctx)
+    res = report.by_gate(FormalGateName.EPISTEMIC_HUMILITY)
+    assert report.decision == GateDecision.BLOCK
+    assert res is not None and res.result == GateResult.FAIL
+    assert res.detail["lambda_max"] == pytest.approx(0.7)
+    assert "dominant belief mass ceiling" in res.reason
+
+
 def test_humility_blocks_near_certain_state_below_epsilon():
     # 99.99% on one hypothesis: tiny but nonzero entropy, below default floor
     res = epistemic_humility_gate(
@@ -158,6 +173,25 @@ def test_anekanta_orthogonal_evaluators_pass():
     res = anekanta_contextuality_gate(judgments)
     assert res.result == GateResult.PASS
     assert res.measure == pytest.approx(3.0, abs=1e-6)
+    assert res.detail["mean_incompatibility"] == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    ("theta_degrees", "expected"),
+    [
+        (0.0, 0.0),
+        (45.0, math.sqrt(2.0) / 2.0),
+        (90.0, 0.0),
+    ],
+)
+def test_projector_commutator_identity(theta_degrees, expected):
+    theta = math.radians(theta_degrees)
+    projector_a = np.outer(np.array([1.0, 0.0]), np.array([1.0, 0.0]))
+    vector_b = np.array([math.cos(theta), math.sin(theta)])
+    projector_b = np.outer(vector_b, vector_b)
+    assert commutator_frobenius_norm(projector_a, projector_b) == pytest.approx(
+        expected, abs=1e-9
+    )
 
 
 def test_anekanta_skipped_with_fewer_than_two():
@@ -215,6 +249,28 @@ def test_provenance_low_confidence_orphan_is_fine():
     assert provenance_integrity_gate(claims).result == GateResult.PASS
 
 
+def test_provenance_cycle_fails():
+    claims = [
+        ProvenanceClaim(claim_id="a", confidence=0.9, evidence_ids=["b"]),
+        ProvenanceClaim(claim_id="b", confidence=0.9, evidence_ids=["a"]),
+    ]
+    res = provenance_integrity_gate(claims)
+    assert res.result == GateResult.FAIL
+    assert sorted(res.detail["cycle_claim_ids"]) == ["a", "b"]
+    assert "circular justification" in res.reason
+
+
+def test_provenance_ungrounded_chain_fails():
+    claims = [
+        ProvenanceClaim(claim_id="a", confidence=0.9, evidence_ids=["b"]),
+        ProvenanceClaim(claim_id="b", confidence=0.4, evidence_ids=[]),
+    ]
+    res = provenance_integrity_gate(claims)
+    assert res.result == GateResult.FAIL
+    assert res.detail["ungrounded_claim_ids"] == ["a"]
+    assert "ungrounded claims" in res.reason
+
+
 def test_provenance_skipped_when_no_claims():
     assert provenance_integrity_gate([]).skipped
 
@@ -246,6 +302,14 @@ def test_noninterference_allows_low_to_public():
         [InformationFlow(source_label=DataLabel.LOW, sink_is_public=True)]
     )
     assert res.result == GateResult.PASS
+
+
+def test_noninterference_blocks_intermediate_label_to_public():
+    res = noninterference_gate(
+        [InformationFlow(source_label=DataLabel.INTERNAL, sink_is_public=True)]
+    )
+    assert res.result == GateResult.FAIL
+    assert res.measure == pytest.approx(1.0)
 
 
 # === Observer separation (anatta) ===========================================
@@ -312,6 +376,22 @@ def test_report_receipt_is_deterministic():
     r2 = evaluate_formal_gates(ctx)
     assert r1.receipt_sha256 == r2.receipt_sha256
     assert len(r1.receipt_sha256) == 64
+
+
+def test_report_receipt_canonicalizes_nonfinite_values():
+    report = evaluate_formal_gates(ActionContext(action="noop"))
+    payload = json.loads(report._canonical_json())
+    assert all(item["measure"] is None for item in payload)
+    assert all(item["threshold"] is None for item in payload)
+
+
+def test_report_hmac_signing_is_keyed_and_deterministic():
+    report_a = evaluate_formal_gates(ActionContext(action="noop"))
+    report_b = evaluate_formal_gates(ActionContext(action="noop"))
+    assert report_a.sign(b"alpha") == report_b.sign(b"alpha")
+    report_c = evaluate_formal_gates(ActionContext(action="noop"))
+    report_d = evaluate_formal_gates(ActionContext(action="noop"))
+    assert report_c.sign(b"alpha") != report_d.sign(b"beta")
 
 
 def test_report_receipt_changes_with_verdict():

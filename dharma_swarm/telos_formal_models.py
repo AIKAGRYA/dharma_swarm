@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import math
 from enum import Enum
 from typing import Any, Optional
 
@@ -11,11 +13,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from dharma_swarm.models import GateDecision, GateResult, GateTier, _utc_now
-from dharma_swarm.telos_formal_math import (
-    EPS,
-    validate_density_matrix,
-    von_neumann_entropy,
-)
+from dharma_swarm.telos_formal_math import EPS, validate_density_matrix, von_neumann_entropy
 
 __all__ = [
     "ActionContext",
@@ -33,19 +31,21 @@ __all__ = [
 class FormalGateName(str, Enum):
     """The measured gates, named for the dharmic principle each enforces."""
 
-    EPISTEMIC_HUMILITY = "epistemic_humility"  # anicca: no pure (certain) states
-    ANEKANTA_CONTEXTUALITY = "anekanta_contextuality"  # genuine many-sidedness
-    REQUISITE_VARIETY = "requisite_variety"  # Ashby: H(reg) >= H(disturbance)
-    PROVENANCE_INTEGRITY = "provenance_integrity"  # pratityasamutpada / satya
-    NON_INTERFERENCE = "non_interference"  # consent: no High->Low flow
-    OBSERVER_SEPARATION = "observer_separation"  # anatta: measure != mutate
+    EPISTEMIC_HUMILITY = "epistemic_humility"
+    ANEKANTA_CONTEXTUALITY = "anekanta_contextuality"
+    REQUISITE_VARIETY = "requisite_variety"
+    PROVENANCE_INTEGRITY = "provenance_integrity"
+    NON_INTERFERENCE = "non_interference"
+    OBSERVER_SEPARATION = "observer_separation"
 
 
 class DataLabel(str, Enum):
-    """Confidentiality lattice for information-flow control (two-point)."""
+    """Confidentiality lattice for information-flow control."""
 
-    HIGH = "high"  # sensitive / secret
-    LOW = "low"  # public-releasable
+    LOW = "low"
+    INTERNAL = "internal"
+    CONFIDENTIAL = "confidential"
+    HIGH = "high"
 
 
 class BeliefState(BaseModel):
@@ -71,11 +71,8 @@ class BeliefState(BaseModel):
         return v
 
     def to_density_matrix(self) -> np.ndarray:
-        """Return the density operator for this belief (diagonal if classical)."""
         if (self.probabilities is None) == (self.density_matrix is None):
-            raise ValueError(
-                "exactly one of probabilities or density_matrix must be set"
-            )
+            raise ValueError("exactly one of probabilities or density_matrix must be set")
         if self.probabilities is not None:
             p = np.asarray(self.probabilities, dtype=np.float64)
             p = p / p.sum()
@@ -92,10 +89,7 @@ class BeliefState(BaseModel):
         return np.asarray(rows, dtype=np.complex128)
 
     def entropy(self, base: float = 2.0) -> float:
-        """Von Neumann entropy of this belief (bits, by default)."""
-        matrix = self.to_density_matrix()
-        validate_density_matrix(matrix)
-        return von_neumann_entropy(matrix, base=base)
+        return von_neumann_entropy(self.to_density_matrix(), base=base)
 
 
 class EvaluatorJudgment(BaseModel):
@@ -142,21 +136,16 @@ class ActionContext(BaseModel):
 
     action: str = ""
     actor_id: str = ""
-
     belief: Optional[BeliefState] = None
     min_entropy_bits: float = 0.05
-
+    max_belief_mass: float = 0.97
     evaluator_judgments: list[EvaluatorJudgment] = Field(default_factory=list)
     min_effective_evaluators: float = 2.0
-
     regulator_distribution: Optional[list[float]] = None
     disturbance_distribution: Optional[list[float]] = None
-
     provenance_claims: list[ProvenanceClaim] = Field(default_factory=list)
     high_confidence_threshold: float = 0.85
-
     information_flows: list[InformationFlow] = Field(default_factory=list)
-
     observer_id: Optional[str] = None
     observed_id: Optional[str] = None
     measures_state: bool = False
@@ -180,12 +169,41 @@ class FormalGateResult(BaseModel):
 
 
 class FormalGateReport(BaseModel):
-    """Aggregate verdict across all applicable formal gates."""
+    """Aggregate verdict across all applicable formal gates.
+
+    The unkeyed SHA-256 receipt is tamper-evident; the optional HMAC is the
+    tamper-resistant form when a key is available.
+    """
 
     decision: GateDecision
     results: list[FormalGateResult]
     evaluated_at: str = Field(default_factory=lambda: _utc_now().isoformat())
     receipt_sha256: str = ""
+    receipt_hmac: str = ""
+
+    @staticmethod
+    def _float_to_json(value: float) -> float | None:
+        return None if not math.isfinite(value) else round(value, 9)
+
+    def _canonical_payload(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "gate": r.gate.value,
+                "tier": r.tier.value,
+                "result": r.result.value,
+                "measure": self._float_to_json(r.measure),
+                "threshold": self._float_to_json(r.threshold),
+            }
+            for r in self.results
+        ]
+
+    def _canonical_json(self) -> str:
+        return json.dumps(
+            self._canonical_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
 
     def by_gate(self, gate: FormalGateName) -> Optional[FormalGateResult]:
         for r in self.results:
@@ -194,16 +212,8 @@ class FormalGateReport(BaseModel):
         return None
 
     def compute_receipt(self) -> str:
-        """Deterministic content hash over the (gate, result, measure) tuples."""
-        payload = [
-            {
-                "gate": r.gate.value,
-                "tier": r.tier.value,
-                "result": r.result.value,
-                "measure": round(r.measure, 9),
-                "threshold": round(r.threshold, 9),
-            }
-            for r in self.results
-        ]
-        serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+        return hashlib.sha256(self._canonical_json().encode("utf-8")).hexdigest()
+
+    def sign(self, key: bytes) -> str:
+        self.receipt_hmac = hmac.new(key, self._canonical_json().encode("utf-8"), hashlib.sha256).hexdigest()
+        return self.receipt_hmac
