@@ -38,6 +38,11 @@ from dharma_swarm.models import (
 )
 from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
+from dharma_swarm.runtime_topology import (
+    resolve_swarm_handoff,
+    subagent_tool_metadata,
+    swarm_dispatch_metadata,
+)
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
@@ -282,11 +287,7 @@ class Orchestrator:
             dispatches.append(td)
         return dispatches
 
-    async def _dispatch_swarm(
-        self,
-        task: Task,
-        agents: list[AgentState],
-    ) -> list[TaskDispatch]:
+    async def _dispatch_swarm(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch to the current active swarm agent and persist handoff state."""
         meta = self._task_meta(task)
         selected = self._select_topology_agent(task, agents)
@@ -297,58 +298,38 @@ class Orchestrator:
         requested_handoff = str(
             meta.get("handoff_to_agent") or meta.get("requested_handoff") or ""
         ).strip()
-        handoff_receipts: list[dict[str, Any]] = []
-        if requested_handoff:
-            target = next((agent for agent in agents if agent.id == requested_handoff), None)
-            status = "accepted" if target is not None and requested_handoff in allowed_before else "rejected"
-            handoff_receipts.append(
-                {
-                    "status": status,
-                    "from_agent": active_before,
-                    "to_agent": requested_handoff,
-                    "reason": str(meta.get("handoff_reason") or ""),
-                    "checkpoint_id": self._topology_checkpoint_id(task, TopologyType.SWARM),
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            if status == "accepted" and target is not None:
-                selected = target
-        allowed_targets = self._allowed_handoff_targets(task, selected, agents)
-        allowed_handoffs = {active_before: allowed_before}
-        allowed_handoffs[selected.id] = allowed_targets
         checkpoint_id = self._topology_checkpoint_id(task, TopologyType.SWARM)
+        selected_id, handoff_receipts = resolve_swarm_handoff(
+            active_before=active_before,
+            known_agent_ids={agent.id for agent in agents},
+            allowed_before=allowed_before,
+            requested_handoff=requested_handoff,
+            handoff_reason=str(meta.get("handoff_reason") or ""),
+            checkpoint_id=checkpoint_id,
+        )
+        if selected_id != selected.id:
+            selected = next(agent for agent in agents if agent.id == selected_id)
+        allowed_targets = self._allowed_handoff_targets(task, selected, agents)
         td = TaskDispatch(
             task_id=task.id,
             agent_id=selected.id,
             topology=TopologyType.SWARM,
-            timeout_seconds=self._resolve_timeout_seconds(
-                task,
-                self._default_timeout_seconds,
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
+            metadata=swarm_dispatch_metadata(
+                active_agent=selected.id,
+                active_before=active_before,
+                allowed_before=allowed_before,
+                allowed_targets=allowed_targets,
+                requested_handoff=requested_handoff,
+                handoff_receipts=handoff_receipts,
+                checkpoint_id=checkpoint_id,
+                topology_mode=TopologyType.SWARM.value,
             ),
-            metadata={
-                "active_agent": selected.id,
-                "current_node": selected.id,
-                "allowed_handoffs": allowed_handoffs,
-                "requested_handoff": requested_handoff,
-                "handoff_receipts": handoff_receipts,
-                "checkpoint_id": checkpoint_id,
-                "topology_state": {
-                    "mode": TopologyType.SWARM.value,
-                    "active_agent": selected.id,
-                    "current_node": selected.id,
-                    "allowed_handoffs": allowed_handoffs,
-                    "handoff_receipts": handoff_receipts,
-                },
-            },
         )
         await self._assign_dispatch(td)
         return [td]
 
-    async def _dispatch_supervisor(
-        self,
-        task: Task,
-        agents: list[AgentState],
-    ) -> list[TaskDispatch]:
+    async def _dispatch_supervisor(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch through one supervisor while preserving delegated agents."""
         supervisor = self._select_topology_agent(task, agents)
         if supervisor is None:
@@ -358,10 +339,7 @@ class Orchestrator:
             task_id=task.id,
             agent_id=supervisor.id,
             topology=TopologyType.SUPERVISOR,
-            timeout_seconds=self._resolve_timeout_seconds(
-                task,
-                self._default_timeout_seconds,
-            ),
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
             metadata={
                 "active_agent": supervisor.id,
                 "current_node": "supervisor",
@@ -382,51 +360,25 @@ class Orchestrator:
         await self._assign_dispatch(td)
         return [td]
 
-    async def _dispatch_subagents_as_tools(
-        self,
-        task: Task,
-        agents: list[AgentState],
-    ) -> list[TaskDispatch]:
+    async def _dispatch_subagents_as_tools(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
         """Dispatch parent graph run with child agents exposed as tools."""
         parent = self._select_topology_agent(task, agents)
         if parent is None:
             return []
-        child_agents = tuple(agent.id for agent in agents if agent.id != parent.id)
-        tool_names = [f"call_{agent_id}" for agent_id in child_agents]
-        child_run_ids = [f"run_{_new_id()}" for _ in child_agents]
-        child_run_map = dict(zip(child_agents, child_run_ids, strict=False))
         td = TaskDispatch(
             task_id=task.id,
             agent_id=parent.id,
             topology=TopologyType.SUBAGENTS_AS_TOOLS,
-            timeout_seconds=self._resolve_timeout_seconds(
-                task,
-                self._default_timeout_seconds,
-            ),
-            metadata={
-                "active_agent": parent.id,
-                "current_node": parent.id,
-                "child_agent_ids": list(child_agents),
-                "child_run_ids": child_run_ids,
-                "child_run_map": child_run_map,
-                "subagent_tool_names": tool_names,
-                "checkpoint_id": self._topology_checkpoint_id(
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
+            metadata=subagent_tool_metadata(
+                parent_agent_id=parent.id,
+                child_agent_ids=[agent.id for agent in agents if agent.id != parent.id],
+                checkpoint_id=self._topology_checkpoint_id(
                     task,
                     TopologyType.SUBAGENTS_AS_TOOLS,
                 ),
-                "parent_graph_state": {
-                    "mode": TopologyType.SUBAGENTS_AS_TOOLS.value,
-                    "parent_agent_id": parent.id,
-                    "child_agent_ids": list(child_agents),
-                    "child_run_ids": child_run_ids,
-                },
-                "topology_state": {
-                    "mode": TopologyType.SUBAGENTS_AS_TOOLS.value,
-                    "active_agent": parent.id,
-                    "child_run_ids": child_run_ids,
-                    "subagent_tool_names": tool_names,
-                },
-            },
+                topology_mode=TopologyType.SUBAGENTS_AS_TOOLS.value,
+            ),
         )
         await self._assign_dispatch(td)
         return [td]

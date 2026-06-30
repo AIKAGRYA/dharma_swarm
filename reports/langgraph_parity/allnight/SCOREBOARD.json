@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T16:31:54Z",
+  "updated_at": "2026-06-30T16:48:44Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -101,6 +101,34 @@
         "Supervisor topology has dispatch metadata coverage, but no dedicated restart/resume acceptance test for supervisor final-output semantics yet.",
         "Memory live retrieval, full provider served-model truth, and cockpit/API graph inspection remain pending."
       ]
+    },
+    {
+      "id": "ci-governance-repair",
+      "timestamp": "2026-06-30T16:48:44Z",
+      "status": "completed",
+      "target_gate": "Repair PR CI module-budget and quality-ratchet regressions without changing topology behavior",
+      "files_touched": [
+        "dharma_swarm/langgraph_parity/benchmark_runner.py",
+        "dharma_swarm/langgraph_parity/benchmark_tasks.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/runtime_lifecycle.py",
+        "dharma_swarm/runtime_state.py",
+        "dharma_swarm/runtime_topology.py",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m compileall -q dharma_swarm/langgraph_parity/benchmark_runner.py dharma_swarm/langgraph_parity/benchmark_tasks.py dharma_swarm/runtime_state.py dharma_swarm/runtime_lifecycle.py dharma_swarm/runtime_topology.py dharma_swarm/orchestrator.py",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+        ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py",
+        "make agent-build-preflight"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red from the same live queue state.",
+        "make agent-build-closeout remains documented as blocked by aggregate full-history gitleaks findings.",
+        "PR CI must be re-run after this repair commit."
+      ]
     }
   ],
   "gates": {
@@ -129,10 +157,12 @@
       "focused_combined": "66 passed in 28.95s",
       "focused_runtime_topology_new": "4 passed in 2.35s",
       "runtime_orchestrator_topology_langgraph_combined": "75 passed in 30.44s",
+      "runtime_orchestrator_topology_langgraph_combined_after_ci_repair": "75 passed in 37.48s",
       "langgraph_parity": "20 passed in 0.37s",
+      "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
       "a2a_readiness_strict": "failed exit 2",
-      "agent_build_preflight": "passed; compileall clean, F821 clean, 12328 tests collected, onboard OK, hygiene integrity OK",
+      "agent_build_preflight": "passed twice; latest run compileall clean, F821 clean, 12328 tests collected, onboard OK, hygiene integrity OK",
       "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits"
     }
   }

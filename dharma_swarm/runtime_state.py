@@ -563,6 +563,7 @@ class TopologyStateRecord:
     run_id: str
     task_id: str
     topology: str
+    schema_version: str = "topology_state_record.v1"
     session_id: str = ""
     active_agent: str = ""
     current_node: str = ""

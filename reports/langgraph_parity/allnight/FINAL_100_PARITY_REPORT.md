@@ -31,6 +31,9 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2.
 - `make agent-build-preflight` -> pass; compileall clean, F821 clean, 12,328 tests collected, onboard OK, hygiene integrity OK.
 - `make agent-build-closeout` -> fail exit 2; semgrep skipped because it is not installed on PATH, then gitleaks reported 68 redacted findings after scanning 2,720 commits.
+- CI repair after draft PR #732 first run: extracted topology helpers to `dharma_swarm/runtime_topology.py` and the benchmark case catalogue to `dharma_swarm/langgraph_parity/benchmark_tasks.py`.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `modules_over_500_lines` stayed `207 -> 207`, `boundary_unfrozen_records` stayed `7 -> 7`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 37.48s` after the CI repair extraction.
 
 ## Failing Gates
 

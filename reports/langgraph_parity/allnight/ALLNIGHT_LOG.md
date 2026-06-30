@@ -78,3 +78,17 @@
   - Build closeout remains blocked by the aggregate gitleaks gate; findings were not expanded here to avoid exposing secret material.
   - Supervisor final-output restart/resume semantics still need a dedicated live acceptance test.
   - Memory live retrieval isolation, full provider served-model truth, and cockpit/API graph inspection remain pending.
+
+## 2026-06-30T16:48:44Z - PR CI Governance Repair
+
+- Trigger: draft PR #732 first CI run failed `Fourfold Shakti Warrant`, `Rule 10 — module line budget`, and `Quality ratchet - repo-wide fitness function`.
+- Repair changes:
+  - Moved topology helper and persistence glue into `dharma_swarm/runtime_topology.py`, shrinking `dharma_swarm/orchestrator.py` to 3,204 lines and `dharma_swarm/runtime_lifecycle.py` to 497 lines.
+  - Added `TopologyStateRecord.schema_version` so the assurance-boundary unfrozen-record ratchet does not grow.
+  - Moved the 26 deterministic benchmark case catalogue into `dharma_swarm/langgraph_parity/benchmark_tasks.py`, shrinking `benchmark_runner.py` to 390 lines.
+- Verification:
+  - `.venv/bin/python -m compileall -q dharma_swarm/langgraph_parity/benchmark_runner.py dharma_swarm/langgraph_parity/benchmark_tasks.py dharma_swarm/runtime_state.py dharma_swarm/runtime_lifecycle.py dharma_swarm/runtime_topology.py dharma_swarm/orchestrator.py` -> pass.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`, `modules_over_500_lines` stayed `207 -> 207`, and `boundary_unfrozen_records` stayed `7 -> 7`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 37.48s`.
+  - `make agent-build-preflight` -> pass; compileall clean, F821 clean, 12,328 tests collected, onboard OK, hygiene integrity OK.
+- Current blockers remain unchanged: A2A strict readiness, full-history closeout gitleaks aggregate, supervisor restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection.
