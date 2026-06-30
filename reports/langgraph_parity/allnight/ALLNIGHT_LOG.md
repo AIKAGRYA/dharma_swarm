@@ -295,3 +295,30 @@
   - Phase 7 remains partial: assistants/configurations, threads/session API, full checkpoint history, streaming runtime events, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
+
+## 2026-06-30T20:39:45Z - Phase 7 Runtime Platform API Surfaces
+
+- Target gate: extend the RuntimeStateStore-backed operator/API platform surface beyond graph inspection to sessions/threads, runs, run detail, checkpoint snapshots, and runtime events.
+- Code changes landed locally:
+  - Added `dharma_swarm/runtime_platform_views.py`, a sub-500-line read model over `sessions`, `delegation_runs`, `topology_states`, `runtime_receipts`, and `session_events`.
+  - Added `OperatorViews` facades for `runtime_sessions`, `runtime_runs`, `runtime_run_detail`, `runtime_checkpoints`, and `runtime_events`.
+  - Added FastAPI routes: `GET /api/runtime/sessions`, `/api/runtime/runs`, `/api/runtime/runs/{run_id}`, `/api/runtime/checkpoints`, and `/api/runtime/events`.
+  - Extended `tests/test_runtime_graph_api.py` to seed a canonical runtime DB with session state, parent/child runs, topology checkpoint state, receipt, and event history, then prove both operator views and API handlers read that DB through `DHARMA_RUNTIME_DB`.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_platform_surfaces_20260630T203945Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `5 passed in 0.68s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `57 passed in 34.45s`.
+  - `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py` -> `25 passed in 1.10s`.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `65/100`, still explicitly not 100/100.
+- Current blockers:
+  - Phase 7 remains partial: sessions/runs/run-detail/checkpoint snapshots/runtime events are API-visible, but assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.

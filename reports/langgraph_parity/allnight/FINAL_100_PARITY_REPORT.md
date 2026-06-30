@@ -2,7 +2,7 @@
 
 Status: **not 100/100**.
 
-Current score: **62/100**.
+Current score: **65/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
@@ -23,6 +23,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `MemoryKernel` now supports `MemoryQuery.text_query`, and the default live `ContextCompiler` Memory Kernel section passes `recall_query` into that lane. A live bundle test proves a matching witness atom is admitted while an unrelated witness atom is excluded.
 - Live topology context now derives agent memory isolation from `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. `MemoryContextBudget.allowed_agent_ids` blocks cross-agent `AGENT`-scoped atoms, and orchestrator dispatch metadata mirrors the isolation policy for operator inspection.
 - Runtime topology graph state is now inspectable through `GET /api/runtime/graph` and `/dashboard/runtime`, backed by `RuntimeStateStore` rather than a parallel store. The graph snapshot includes active agents, checkpoints, topology states, runs, receipts, handoffs, parent/child edges, active-agent edges, and checkpoint edges.
+- Runtime platform state is now inspectable through `GET /api/runtime/sessions`, `/api/runtime/runs`, `/api/runtime/runs/{run_id}`, `/api/runtime/checkpoints`, and `/api/runtime/events`, backed by the same `RuntimeStateStore`. The API surfaces session/thread state, run listings, run ledger detail via `describe_run`, checkpoint/topology snapshots, and session/runtime event history.
 
 ## Verification
 
@@ -89,6 +90,17 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `npm run build` -> pass; `/dashboard/runtime` prerenders successfully.
 - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`, `modules_over_500_lines` remained `207 -> 207`.
 - Phase 7 receipt: `reports/langgraph_parity/allnight/runtime_graph_api_cockpit_20260630T194846Z.json`.
+- Phase 7 runtime platform API surface slice: added `dharma_swarm/runtime_platform_views.py`, `OperatorViews` facades, and API routes for sessions, runs, run detail, checkpoints, and events.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `5 passed in 0.68s`.
+- `.venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `.venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `57 passed in 34.45s`.
+- `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py` -> `25 passed in 1.10s`.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+- `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+- Phase 7 platform receipt: `reports/langgraph_parity/allnight/runtime_platform_surfaces_20260630T203945Z.json`.
 
 ## Failing Gates
 
@@ -99,16 +111,16 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Live topology restart/resume: SWARM accepted handoff and SUBAGENTS_AS_TOOLS parent/child run records now have restart-readable `RuntimeStateStore` tests. Supervisor final-output restart semantics still need a dedicated live acceptance test.
 - Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, and topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. Stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
 - Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
-- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts. Assistants/configurations, threads/session API, full checkpoint history, streaming runtime events, background/cron runs, and interrupt/resume/human approval state remain incomplete or unproven.
+- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, and runtime event history are API-visible through `RuntimeStateStore`. Assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval state remain incomplete or unproven.
 
 ## Next Patch Sequence
 
 1. Add supervisor restart/resume acceptance for final-output-only semantics and delegated-agent state.
-2. Extend topology persistence to streaming/interrupt/checkpoint history once those cockpit/API surfaces exist.
+2. Extend topology persistence and API proof to streaming runtime event transport, interrupts, and human approval state.
 3. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
 4. Extend the MemoryKernel live context tests to stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation.
 5. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
-6. Extend the new runtime graph API/cockpit lane to assistants, threads/session state, full checkpoint history, streaming events, background/cron runs, and interrupt/resume state.
+6. Extend the runtime API/cockpit lane to assistants/configurations, streaming events, background/cron runs, and interrupt/resume state.
 
 ## Residual Risk
 

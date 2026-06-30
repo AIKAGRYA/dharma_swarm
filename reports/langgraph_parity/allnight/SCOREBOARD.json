@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T19:48:46Z",
+  "updated_at": "2026-06-30T20:39:45Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 62,
+    "current": 65,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a Phase 7 runtime graph API/cockpit slice: persisted topology states, runs, handoffs, checkpoints, and receipts are now inspectable through GET /api/runtime/graph and /dashboard/runtime. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and the full assistants/threads/runs/checkpoint-history/streaming/interrupt platform surface remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, and runtime events are inspectable through RuntimeStateStore-backed operator/API views. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and the full assistants/configurations/streaming/background/interrupt platform surface remain failing or unproven."
   },
   "rounds": [
     {
@@ -349,6 +349,39 @@
         "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
         "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending."
       ]
+    },
+    {
+      "id": "phase-7-runtime-platform-api-surfaces",
+      "timestamp": "2026-06-30T20:39:45Z",
+      "status": "completed_partial",
+      "target_gate": "Expose RuntimeStateStore-backed sessions, runs, run detail, checkpoint snapshots, and runtime events through operator API surfaces",
+      "files_touched": [
+        "dharma_swarm/runtime_platform_views.py",
+        "dharma_swarm/operator_views.py",
+        "api/routers/runtime.py",
+        "tests/test_runtime_graph_api.py",
+        "reports/langgraph_parity/allnight/runtime_platform_surfaces_20260630T203945Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+        ".venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+        ".venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "git diff --check"
+      ],
+      "blockers": [
+        "Phase 7 remains partial: sessions/runs/run-detail/checkpoint snapshots/runtime events are now API-visible, but assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.",
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending."
+      ]
     }
   ],
   "gates": {
@@ -364,7 +397,7 @@
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
-    "phase_7_platform_surface": "partial_runtime_graph_api_cockpit_inspects_active_agent_handoffs_checkpoints_runs_and_receipts"
+    "phase_7_platform_surface": "partial_runtime_graph_plus_sessions_runs_run_detail_checkpoint_snapshots_and_events_api"
   },
   "latest_verification": {
     "benchmark_summary": {
@@ -386,6 +419,7 @@
       "memory_topology_agent_isolation": "MemoryContextBudget.allowed_agent_ids blocks cross-agent AGENT-scoped atoms; ContextCompiler applies topology-derived isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS metadata; orchestrator dispatch metadata mirrors isolation telemetry; focused 4 passed in 0.19s; broader memory/context subset 84 passed in 0.85s; broader runtime/topology/langgraph subset 75 passed in 30.52s",
       "provider_truth_spine_receipt": "AgentRunner now exposes last route request/decision/response/usage; dharma_swarm/provider_truth.py normalizes requested/planned/actual/served provider-model truth; orchestrator spine EvidenceReceipt prefers LLMResponse served provider/model, falls back to ProviderRouteDecision, then runner config; focused spine/provider tests 8 passed in 0.35s; adjacent dispatch/topology tests 2 passed in 7.42s; module budget, hygiene ratchet, focused ruff, compileall, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_graph_api_cockpit": "RuntimeGraphViews projects RuntimeStateStore topology_states, delegation_runs, and runtime_receipts into nodes/edges plus active_agents/checkpoints/topology_states/runs/receipts; GET /api/runtime/graph is registered and honors DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders graph summary/topology rows/recent receipts; focused backend/operator tests 4 passed in 0.95s; broader runtime/API/topology subset 55 passed in 31.54s; LangGraph parity plus runtime graph subset 23 passed in 0.82s; npm lint passed with existing warnings only; npm build passed; hygiene ratchet, module budget, compileall, ruff, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
+      "runtime_platform_surfaces": "RuntimePlatformViews adds RuntimeStateStore-backed session/thread state, run listing, run detail via describe_run, checkpoint snapshots, and session/runtime event history; GET /api/runtime/sessions, /runs, /runs/{run_id}, /checkpoints, and /events are registered and honor DHARMA_RUNTIME_DB; focused runtime API tests 5 passed in 0.68s; broader runtime/API/topology subset 57 passed in 34.45s; LangGraph parity plus runtime API subset 25 passed in 1.10s; compileall, focused ruff, module budget, hygiene ratchet, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",

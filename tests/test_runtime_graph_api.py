@@ -7,11 +7,23 @@ from dharma_swarm.runtime_state import (
     DelegationRun,
     RuntimeReceipt,
     RuntimeStateStore,
+    SessionEventRecord,
+    SessionState,
     TopologyStateRecord,
 )
 
 
 async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
+    await store.upsert_session(
+        SessionState(
+            session_id="sess-graph",
+            operator_id="operator",
+            status="active",
+            current_task_id="task-graph",
+            active_bundle_id="bundle-graph",
+            metadata={"surface": "phase7-runtime-platform"},
+        )
+    )
     await store.record_delegation_run(
         DelegationRun(
             run_id="run-parent",
@@ -66,6 +78,20 @@ async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
             payload={"checkpoint_id": "task-graph:supervisor:checkpoint-1"},
         )
     )
+    await store.record_session_event(
+        SessionEventRecord(
+            event_id="event-runtime-started",
+            session_id="sess-graph",
+            ledger_kind="runtime",
+            event_name="run_started",
+            task_id="task-graph",
+            run_id="run-parent",
+            agent_id="supervisor",
+            summary="Supervisor runtime started",
+            event_text="Supervisor runtime started from seeded runtime graph test.",
+            payload={"checkpoint_id": "task-graph:supervisor:checkpoint-1"},
+        )
+    )
 
 
 @pytest.mark.asyncio
@@ -96,6 +122,45 @@ async def test_operator_views_runtime_graph_surfaces_live_topology_state(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_operator_views_runtime_platform_surfaces_use_runtime_state(tmp_path) -> None:
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    await _seed_runtime_graph(store)
+    views = OperatorViews(store)
+
+    sessions = await views.runtime_sessions(status="active", limit=10)
+    runs = await views.runtime_runs(session_id="sess-graph", limit=10)
+    detail = await views.runtime_run_detail("run-parent")
+    checkpoints = await views.runtime_checkpoints(session_id="sess-graph", limit=10)
+    events = await views.runtime_events(session_id="sess-graph", ledger_kind="runtime")
+
+    assert sessions["schema_version"] == "runtime_sessions_snapshot.v1"
+    assert sessions["summary"]["session_count"] == 1
+    assert sessions["sessions"][0]["current_task_id"] == "task-graph"
+    assert sessions["sessions"][0]["metadata"]["surface"] == "phase7-runtime-platform"
+
+    assert runs["schema_version"] == "runtime_runs_snapshot.v1"
+    assert runs["summary"]["run_count"] == 2
+    parent = next(run for run in runs["runs"] if run["run_id"] == "run-parent")
+    assert parent["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
+    assert parent["active_agent"] == "worker-a"
+
+    assert detail["schema_version"] == "runtime_run_detail.v1"
+    assert detail["found"] is True
+    assert detail["summary"]["receipt_count"] == 1
+    assert detail["summary"]["child_run_count"] == 1
+    assert detail["detail"]["run"]["run_id"] == "run-parent"
+
+    assert checkpoints["schema_version"] == "runtime_checkpoint_history.v1"
+    assert checkpoints["summary"]["checkpoint_count"] == 1
+    assert checkpoints["checkpoints"][0]["current_node"] == "worker-a"
+    assert checkpoints["checkpoints"][0]["state"]["visible_output_policy"] == "supervisor_final"
+
+    assert events["schema_version"] == "runtime_events_snapshot.v1"
+    assert events["summary"]["event_count"] == 1
+    assert events["events"][0]["event_name"] == "run_started"
+
+
+@pytest.mark.asyncio
 async def test_runtime_graph_api_uses_configured_runtime_db(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "runtime.db"
     store = RuntimeStateStore(db_path, include_memory_plane=False)
@@ -118,8 +183,68 @@ async def test_runtime_graph_api_uses_configured_runtime_db(tmp_path, monkeypatc
     assert response.data["topology_states"][0]["active_agent"] == "worker-a"
 
 
+@pytest.mark.asyncio
+async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeypatch) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path, include_memory_plane=False)
+    await _seed_runtime_graph(store)
+    monkeypatch.setenv("DHARMA_RUNTIME_DB", str(db_path))
+
+    from api.routers.runtime import (
+        runtime_checkpoints,
+        runtime_events,
+        runtime_run_detail,
+        runtime_runs,
+        runtime_sessions,
+    )
+
+    sessions = await runtime_sessions(status="active", limit=10)
+    runs = await runtime_runs(
+        session_id="sess-graph",
+        task_id=None,
+        status=None,
+        limit=10,
+    )
+    detail = await runtime_run_detail(run_id="run-parent")
+    checkpoints = await runtime_checkpoints(
+        session_id="sess-graph",
+        task_id=None,
+        topology=None,
+        limit=10,
+    )
+    events = await runtime_events(
+        session_id="sess-graph",
+        ledger_kind="runtime",
+        event_name=None,
+        limit=10,
+    )
+
+    assert sessions.status == "ok"
+    assert sessions.data["runtime_db"] == str(db_path)
+    assert sessions.data["sessions"][0]["session_id"] == "sess-graph"
+
+    assert runs.status == "ok"
+    assert runs.data["summary"]["run_count"] == 2
+    assert {run["run_id"] for run in runs.data["runs"]} == {"run-parent", "run-child"}
+
+    assert detail.status == "ok"
+    assert detail.data["summary"]["child_run_count"] == 1
+    assert detail.data["detail"]["topology_state"]["checkpoint_id"].endswith("checkpoint-1")
+
+    assert checkpoints.status == "ok"
+    assert checkpoints.data["checkpoints"][0]["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
+
+    assert events.status == "ok"
+    assert events.data["events"][0]["payload"]["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
+
+
 def test_runtime_graph_router_is_registered() -> None:
     from api.main import app
 
     paths = set(app.openapi().get("paths", {}))
     assert "/api/runtime/graph" in paths
+    assert "/api/runtime/sessions" in paths
+    assert "/api/runtime/runs" in paths
+    assert "/api/runtime/runs/{run_id}" in paths
+    assert "/api/runtime/checkpoints" in paths
+    assert "/api/runtime/events" in paths

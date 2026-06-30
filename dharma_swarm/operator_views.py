@@ -9,6 +9,7 @@ from typing import Any
 
 from dharma_swarm.operator_bridge import OperatorBridge
 from dharma_swarm.runtime_graph_views import RuntimeGraphViews
+from dharma_swarm.runtime_platform_views import RuntimePlatformViews
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
 
 
@@ -142,6 +143,70 @@ class OperatorViews:
             topology=topology,
             limit=limit,
             receipt_limit=receipt_limit,
+        )
+
+    async def runtime_sessions(
+        self,
+        *,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted runtime session/thread state for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_sessions(
+            status=status,
+            limit=limit,
+        )
+
+    async def runtime_runs(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted delegation runs for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_runs(
+            session_id=session_id,
+            task_id=task_id,
+            status=status,
+            limit=limit,
+        )
+
+    async def runtime_run_detail(self, run_id: str) -> dict[str, Any]:
+        """Return the canonical ledger detail for a single runtime run."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_run_detail(run_id)
+
+    async def runtime_checkpoints(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted checkpoint/topology snapshots for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_checkpoints(
+            session_id=session_id,
+            task_id=task_id,
+            topology=topology,
+            limit=limit,
+        )
+
+    async def runtime_events(
+        self,
+        *,
+        session_id: str | None = None,
+        ledger_kind: str | None = None,
+        event_name: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return persisted session/runtime event history for operator APIs."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_events(
+            session_id=session_id,
+            ledger_kind=ledger_kind,
+            event_name=event_name,
+            limit=limit,
         )
 
     async def recent_operator_actions(
