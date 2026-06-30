@@ -16,6 +16,8 @@ import type {
   OntologyTypeOut,
   RuntimeAssistantsSnapshot,
   RuntimeBackgroundJobsSnapshot,
+  RuntimeControlActionRequest,
+  RuntimeControlActionResult,
   ProvenanceOut,
   RuntimeGraphSnapshot,
   RuntimeInterruptsSnapshot,
@@ -219,6 +221,34 @@ export function fetchRuntimeInterrupts(params?: {
   if (params?.limit != null) sp.set("limit", String(params.limit));
   const qs = sp.toString();
   return apiGet<RuntimeInterruptsSnapshot>(`/api/runtime/interrupts${qs ? `?${qs}` : ""}`);
+}
+
+export function postRuntimeControlAction(
+  action: RuntimeControlActionResult["action"],
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return apiPost<RuntimeControlActionResult>(
+    `/api/runtime/interrupts/${encodeURIComponent(action)}`,
+    body,
+  );
+}
+
+export function approveRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("approve", body);
+}
+
+export function rejectRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("reject", body);
+}
+
+export function resumeRuntimeInterrupt(
+  body: RuntimeControlActionRequest,
+): Promise<ApiResponse<RuntimeControlActionResult>> {
+  return postRuntimeControlAction("resume", body);
 }
 
 export function fetchRuntimeAssistants(params?: {

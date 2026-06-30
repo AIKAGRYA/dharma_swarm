@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from dharma_swarm import cron_scheduler
+from dharma_swarm import checkpoint, cron_scheduler
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -347,6 +347,51 @@ async def test_operator_views_runtime_agent_server_surfaces(tmp_path, monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_operator_views_runtime_control_actions_record_canonical_state(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(checkpoint, "INTERRUPT_DIR", tmp_path / "interrupts")
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    await _seed_runtime_graph(store)
+    views = OperatorViews(store)
+
+    result = await views.runtime_control_action(
+        action="approve",
+        session_id="sess-graph",
+        approval_id="approval-1",
+        interrupt_id="interrupt-1",
+        actor="operator",
+        reason="Approved through runtime API",
+        payload={"note": "continue"},
+    )
+
+    assert result["schema_version"] == "runtime_control_action_result.v1"
+    assert result["action"] == "approve"
+    assert result["status"] == "approved"
+    assert result["target_found"] is True
+    assert result["target_control_event"]["event_id"] == "event-interrupt-requested"
+    assert result["operator_action"]["action_name"] == "runtime_control.approve"
+    assert result["event"]["event_name"] == "human_approval_approved"
+    assert result["event"]["payload"]["runtime_action_id"] == result["operator_action"]["action_id"]
+    assert result["interrupt_transport"]["attempted"] is True
+    assert result["interrupt_transport"]["response_path"].endswith(
+        "interrupt-1.response.json"
+    )
+
+    response = checkpoint.read_interrupt_response("interrupt-1")
+    assert response is not None
+    assert response.decision.value == "approve"
+
+    actions = await store.list_operator_actions(session_id="sess-graph", limit=10)
+    assert actions[0].action_name == "runtime_control.approve"
+    interrupts = await views.runtime_interrupts(session_id="sess-graph", limit=10)
+    assert interrupts["summary"]["control_event_count"] == 3
+    assert interrupts["summary"]["approved_count"] == 2
+    assert interrupts["control_events"][0]["event_name"] == "human_approval_approved"
+
+
+@pytest.mark.asyncio
 async def test_runtime_graph_api_uses_configured_runtime_db(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "runtime.db"
     store = RuntimeStateStore(db_path, include_memory_plane=False)
@@ -377,11 +422,15 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     monkeypatch.setenv("DHARMA_RUNTIME_DB", str(db_path))
 
     from api.routers.runtime import (
+        RuntimeControlActionRequest,
         runtime_assistants,
         runtime_background_jobs,
         runtime_checkpoints,
         runtime_events,
         runtime_events_stream,
+        runtime_interrupt_approve,
+        runtime_interrupt_reject,
+        runtime_interrupt_resume,
         runtime_interrupts,
         runtime_run_detail,
         runtime_runs,
@@ -426,6 +475,32 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     )
     assistants = await runtime_assistants(limit=10)
     background = await runtime_background_jobs(limit=10)
+    approval = await runtime_interrupt_approve(
+        RuntimeControlActionRequest(
+            session_id="sess-graph",
+            approval_id="approval-1",
+            interrupt_id="interrupt-1",
+            actor="operator",
+            reason="approved from api test",
+        )
+    )
+    rejection = await runtime_interrupt_reject(
+        RuntimeControlActionRequest(
+            session_id="sess-graph",
+            run_id="run-parent",
+            actor="operator",
+            reason="rejected from api test",
+        )
+    )
+    resume = await runtime_interrupt_resume(
+        RuntimeControlActionRequest(
+            session_id="sess-graph",
+            run_id="run-parent",
+            resume_token="resume-run-parent",
+            actor="operator",
+            reason="resume from api test",
+        )
+    )
 
     assert sessions.status == "ok"
     assert sessions.data["runtime_db"] == str(db_path)
@@ -471,6 +546,14 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     assert background.data["summary"]["cron_job_count"] == 1
     assert background.data["background_runs"][0]["run_id"] == "run-background"
 
+    assert approval.status == "ok"
+    assert approval.data["action"] == "approve"
+    assert approval.data["operator_action"]["action_name"] == "runtime_control.approve"
+    assert rejection.status == "ok"
+    assert rejection.data["status"] == "rejected"
+    assert resume.status == "ok"
+    assert resume.data["event"]["event_name"] == "runtime_resume_requested"
+
 
 def test_runtime_graph_router_is_registered() -> None:
     from api.main import app
@@ -484,5 +567,8 @@ def test_runtime_graph_router_is_registered() -> None:
     assert "/api/runtime/events" in paths
     assert "/api/runtime/events/stream" in paths
     assert "/api/runtime/interrupts" in paths
+    assert "/api/runtime/interrupts/approve" in paths
+    assert "/api/runtime/interrupts/reject" in paths
+    assert "/api/runtime/interrupts/resume" in paths
     assert "/api/runtime/assistants" in paths
     assert "/api/runtime/background-jobs" in paths

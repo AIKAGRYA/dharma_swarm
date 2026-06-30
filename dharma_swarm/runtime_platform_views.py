@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.runtime_control_actions import RuntimeControlActions
 from dharma_swarm.runtime_state import (
     DelegationRun,
     RuntimeStateStore,
@@ -296,6 +297,34 @@ class RuntimePlatformViews:
             },
             "control_events": controls,
         }
+
+    async def runtime_control_action(
+        self,
+        *,
+        action: str,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        run_id: str | None = None,
+        approval_id: str | None = None,
+        interrupt_id: str | None = None,
+        resume_token: str | None = None,
+        actor: str = "operator",
+        reason: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record an operator control action and its resulting runtime event."""
+        return await RuntimeControlActions(self.runtime_state).runtime_control_action(
+            action=action,
+            session_id=session_id,
+            task_id=task_id,
+            run_id=run_id,
+            approval_id=approval_id,
+            interrupt_id=interrupt_id,
+            resume_token=resume_token,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        )
 
     async def _run_summary(self, run: DelegationRun) -> dict[str, Any]:
         run_view = _serialize_value(run)

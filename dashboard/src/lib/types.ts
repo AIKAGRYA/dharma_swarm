@@ -484,6 +484,32 @@ export interface RuntimeInterruptsSnapshot {
   control_events: RuntimeInterruptControlEvent[];
 }
 
+export interface RuntimeControlActionRequest {
+  session_id?: string;
+  task_id?: string;
+  run_id?: string;
+  approval_id?: string;
+  interrupt_id?: string;
+  resume_token?: string;
+  actor?: string;
+  reason?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface RuntimeControlActionResult {
+  schema_version: string;
+  generated_at: string;
+  runtime_db: string;
+  action: "approve" | "reject" | "resume";
+  status: string;
+  target_found: boolean;
+  target_control_event: RuntimeInterruptControlEvent | null;
+  operator_action: Record<string, unknown>;
+  event: RuntimeEvent;
+  interrupt_transport: Record<string, unknown>;
+  interrupts: RuntimeInterruptsSnapshot;
+}
+
 // ---------------------------------------------------------------------------
 // Runtime Agent Server surfaces
 // ---------------------------------------------------------------------------

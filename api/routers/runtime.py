@@ -6,15 +6,31 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from api.models import ApiResponse
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import DEFAULT_RUNTIME_DB, RuntimeStateStore
 
 router = APIRouter(prefix="/api/runtime", tags=["runtime"])
+
+
+class RuntimeControlActionRequest(BaseModel):
+    """Body for approve/reject/resume runtime control actions."""
+
+    session_id: str | None = None
+    task_id: str | None = None
+    run_id: str | None = None
+    approval_id: str | None = None
+    interrupt_id: str | None = None
+    resume_token: str | None = None
+    actor: str = "operator"
+    reason: str = ""
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 def _runtime_db_path() -> Path:
@@ -24,6 +40,32 @@ def _runtime_db_path() -> Path:
 
 def _operator_views() -> OperatorViews:
     return OperatorViews(RuntimeStateStore(_runtime_db_path()))
+
+
+async def _runtime_control_action_response(
+    action: str,
+    request: RuntimeControlActionRequest,
+) -> ApiResponse:
+    try:
+        snapshot = await _operator_views().runtime_control_action(
+            action=action,
+            session_id=request.session_id,
+            task_id=request.task_id,
+            run_id=request.run_id,
+            approval_id=request.approval_id,
+            interrupt_id=request.interrupt_id,
+            resume_token=request.resume_token,
+            actor=request.actor,
+            reason=request.reason,
+            payload=request.payload,
+        )
+        return ApiResponse(data=snapshot)
+    except Exception as exc:
+        return ApiResponse(
+            status="error",
+            data=None,
+            error=f"runtime control action unavailable: {exc}",
+        )
 
 
 @router.get("/graph")
@@ -222,6 +264,24 @@ async def runtime_interrupts(
             data=None,
             error=f"runtime interrupts unavailable: {exc}",
         )
+
+
+@router.post("/interrupts/approve")
+async def runtime_interrupt_approve(request: RuntimeControlActionRequest) -> ApiResponse:
+    """Approve a pending runtime interrupt or human-approval request."""
+    return await _runtime_control_action_response("approve", request)
+
+
+@router.post("/interrupts/reject")
+async def runtime_interrupt_reject(request: RuntimeControlActionRequest) -> ApiResponse:
+    """Reject a pending runtime interrupt or human-approval request."""
+    return await _runtime_control_action_response("reject", request)
+
+
+@router.post("/interrupts/resume")
+async def runtime_interrupt_resume(request: RuntimeControlActionRequest) -> ApiResponse:
+    """Record a resume action for a paused runtime run."""
+    return await _runtime_control_action_response("resume", request)
 
 
 @router.get("/assistants")

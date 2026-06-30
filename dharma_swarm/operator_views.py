@@ -224,6 +224,34 @@ class OperatorViews:
             limit=limit,
         )
 
+    async def runtime_control_action(
+        self,
+        *,
+        action: str,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        run_id: str | None = None,
+        approval_id: str | None = None,
+        interrupt_id: str | None = None,
+        resume_token: str | None = None,
+        actor: str = "operator",
+        reason: str = "",
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record an auditable approve/reject/resume runtime control action."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_control_action(
+            action=action,
+            session_id=session_id,
+            task_id=task_id,
+            run_id=run_id,
+            approval_id=approval_id,
+            interrupt_id=interrupt_id,
+            resume_token=resume_token,
+            actor=actor,
+            reason=reason,
+            payload=payload,
+        )
+
     async def runtime_assistants(self, *, limit: int = 50) -> dict[str, Any]:
         """Return assistants/configurations projected from runtime state."""
         return await RuntimeAgentServerViews(self.runtime_state).runtime_assistants(
