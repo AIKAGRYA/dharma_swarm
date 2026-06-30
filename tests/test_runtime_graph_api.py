@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import importlib
 import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from dharma_swarm import checkpoint, cron_scheduler
+from dharma_swarm import cron_scheduler
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -351,6 +352,7 @@ async def test_operator_views_runtime_control_actions_record_canonical_state(
     tmp_path,
     monkeypatch,
 ) -> None:
+    checkpoint = importlib.import_module("dharma_swarm.checkpoint")
     monkeypatch.setattr(checkpoint, "INTERRUPT_DIR", tmp_path / "interrupts")
     store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
     await _seed_runtime_graph(store)
