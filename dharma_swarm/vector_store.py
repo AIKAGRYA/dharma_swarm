@@ -652,18 +652,42 @@ class VectorStore:
         finally:
             conn.close()
 
-    def gc(self, min_confidence: float = 0.01) -> int:
-        """Remove documents below confidence threshold. Returns removed count."""
+    def gc(
+        self,
+        min_confidence: float = 0.01,
+        dry_run: bool = False,
+    ) -> int | dict[str, Any]:
+        """Remove documents below confidence threshold.
+
+        When ``dry_run=False`` (default, backward-compatible): executes the
+        DELETEs (FTS sync, embeddings, documents) and returns the removed
+        count as an int — existing callers expecting an int still work.
+
+        When ``dry_run=True``: computes the would-remove row counts BY LAYER
+        (grouping on the ``layer`` column of vec_documents) WITHOUT executing
+        any DELETE / FTS-sync / trigger-drop, and returns a dict::
+
+            {"would_remove": int, "by_layer": {<layer>: int, ...}}
+
+        Nothing is mutated in dry-run mode.
+        """
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT id FROM vec_documents WHERE confidence < ?",
+                "SELECT id, layer FROM vec_documents WHERE confidence < ?",
                 (min_confidence,),
             ).fetchall()
-            ids = [r["id"] for r in rows]
-            if not ids:
-                return 0
+            if not rows:
+                return 0 if not dry_run else {"would_remove": 0, "by_layer": {}}
 
+            if dry_run:
+                by_layer: dict[str, int] = {}
+                for r in rows:
+                    layer = r["layer"] if r["layer"] is not None else "<null>"
+                    by_layer[layer] = by_layer.get(layer, 0) + 1
+                return {"would_remove": len(rows), "by_layer": by_layer}
+
+            ids = [r["id"] for r in rows]
             placeholders = ",".join("?" * len(ids))
 
             # Drop the FTS delete trigger temporarily so the trigger doesn't
@@ -716,7 +740,7 @@ class VectorStore:
             return len(ids)
         except Exception as exc:
             logger.debug("VectorStore.gc failed: %s", exc)
-            return 0
+            return 0 if not dry_run else {"would_remove": 0, "by_layer": {}}
         finally:
             conn.close()
 
