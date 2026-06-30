@@ -515,19 +515,19 @@ Do not inject machine-readable YAML frontmatter into governance or architecture 
 
 ---
 
-## VERIFIED NUMBERS (2026-06-24 COUNT REFRESH)
+## VERIFIED NUMBERS (2026-06-30 COUNT REFRESH)
 
 These are the ground-truth metrics. All other documents citing different numbers are stale.
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **803** | find dharma_swarm -name "*.py" -type f |
-| Top-level (flat) modules | **416 (53.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
-| Total Python LOC | **319,298** | wc -l across dharma_swarm Python modules |
-| Test files | **774** | find tests -name "*.py" -type f |
-| Test functions | **12,070 `def test_` occurrences under tests/** | rg "def test_" tests |
-| Test files | **774** | find tests -name "*.py" -type f |
-| Test functions | **12,070 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Total Python modules | **807** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **420 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
+| Test files | **776** | find tests -name "*.py" -type f |
+| Test functions | **12,144 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **776** | find tests -name "*.py" -type f |
+| Test functions | **12,144 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
 | Markdown files | **1170** | find . -name "*.md" -type f |
