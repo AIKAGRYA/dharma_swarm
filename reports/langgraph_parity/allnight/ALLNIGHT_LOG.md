@@ -92,3 +92,13 @@
   - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 37.48s`.
   - `make agent-build-preflight` -> pass; compileall clean, F821 clean, 12,328 tests collected, onboard OK, hygiene integrity OK.
 - Current blockers remain unchanged: A2A strict readiness, full-history closeout gitleaks aggregate, supervisor restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection.
+
+## 2026-06-30T16:58:31Z - PR CI Pytest Enum Repair
+
+- Trigger: draft PR #732 second CI run passed the repaired governance gates, but `pytest (3.12)` failed in `tests/test_models.py::test_all_enums`.
+- Root cause: the model enum test still asserted the old `TopologyType` count of 4 after this branch intentionally added `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS`.
+- Repair change:
+  - Replaced the brittle `len(TopologyType) == 4` assertion with an explicit set of expected topology values covering all 7 current modes.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_models.py` -> `16 passed in 0.13s`.
+- Current blockers remain unchanged: A2A strict readiness, full-history closeout gitleaks aggregate, supervisor restart semantics, memory retrieval isolation, provider truth, and cockpit/API inspection.

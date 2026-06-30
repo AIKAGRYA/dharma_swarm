@@ -34,6 +34,8 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - CI repair after draft PR #732 first run: extracted topology helpers to `dharma_swarm/runtime_topology.py` and the benchmark case catalogue to `dharma_swarm/langgraph_parity/benchmark_tasks.py`.
 - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `modules_over_500_lines` stayed `207 -> 207`, `boundary_unfrozen_records` stayed `7 -> 7`.
 - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 37.48s` after the CI repair extraction.
+- CI repair after draft PR #732 second run: `pytest (3.12)` found a stale `TopologyType` enum count assertion in `tests/test_models.py`; it now asserts the explicit 7 topology values.
+- `.venv/bin/python -m pytest -q tests/test_models.py` -> `16 passed in 0.13s`.
 
 ## Failing Gates
 

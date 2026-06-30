@@ -120,7 +120,15 @@ def test_all_enums():
     assert len(TaskStatus) == 6
     assert len(AgentRole) == 19  # 6 base + 6 PSMV cognitive + 6 constitutional + WORKER
     assert len(MemoryLayer) == 5
-    assert len(TopologyType) == 4
+    assert {topology.value for topology in TopologyType} == {
+        "fan_out",
+        "fan_in",
+        "pipeline",
+        "broadcast",
+        "swarm",
+        "supervisor",
+        "subagents_as_tools",
+    }
 
 
 def test_provider_type_has_claude_code():

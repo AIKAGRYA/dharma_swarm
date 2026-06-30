@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T16:48:44Z",
+  "updated_at": "2026-06-30T16:58:31Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -129,6 +129,26 @@
         "make agent-build-closeout remains documented as blocked by aggregate full-history gitleaks findings.",
         "PR CI must be re-run after this repair commit."
       ]
+    },
+    {
+      "id": "ci-pytest-enum-repair",
+      "timestamp": "2026-06-30T16:58:31Z",
+      "status": "completed",
+      "target_gate": "Repair stale full-suite enum assertion after topology expansion",
+      "files_touched": [
+        "tests/test_models.py",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_models.py"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red from the same live queue state.",
+        "make agent-build-closeout remains documented as blocked by aggregate full-history gitleaks findings.",
+        "PR CI must be re-run after this repair commit."
+      ]
     }
   ],
   "gates": {
@@ -158,6 +178,7 @@
       "focused_runtime_topology_new": "4 passed in 2.35s",
       "runtime_orchestrator_topology_langgraph_combined": "75 passed in 30.44s",
       "runtime_orchestrator_topology_langgraph_combined_after_ci_repair": "75 passed in 37.48s",
+      "models_after_ci_pytest_enum_repair": "16 passed in 0.13s",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
