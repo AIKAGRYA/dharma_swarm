@@ -121,5 +121,5 @@ async def test_runtime_graph_api_uses_configured_runtime_db(tmp_path, monkeypatc
 def test_runtime_graph_router_is_registered() -> None:
     from api.main import app
 
-    paths = {getattr(route, "path", "") for route in app.routes}
+    paths = set(app.openapi().get("paths", {}))
     assert "/api/runtime/graph" in paths
