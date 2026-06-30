@@ -1,125 +1,90 @@
 {
-  "generated_at": "2026-06-26T10:44:18+09:00",
+  "generated_at": "2026-07-01T07:27:23+09:00",
   "schema_version": 2,
-  "active_track_id": "runtime-truth-reconciliation-2026-06",
-  "shippable": true,
+  "active_track_id": "runtime-truth-spine-adoption-2026-06",
+  "shippable": false,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 12,
-    "total": 12
+    "passed": 7,
+    "total": 8
   },
   "criteria": [
     {
-      "id": "runtime_spine_package_exists",
+      "id": "spine_package_exists",
       "kind": "file_exists",
       "passed": true,
       "detail": "dharma_swarm/spine/__init__.py present",
       "executed": true
     },
     {
-      "id": "receipt_equivalence_matrix_exists",
+      "id": "invoke_agent_defined",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
+      "executed": true
+    },
+    {
+      "id": "a2a_bridge_calls_spine",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/a2a/a2a_bridge.py",
+      "executed": true
+    },
+    {
+      "id": "orchestrator_calls_spine",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/orchestrator.py",
+      "executed": true
+    },
+    {
+      "id": "agent_runner_calls_spine",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern '(?m)^\\\\s*from dharma_swarm\\\\.spine' found in dharma_swarm/agent_runner.py",
+      "executed": true
+    },
+    {
+      "id": "dispatch_emits_evidence_receipt",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_every_dispatch_emits_exactly_one_evidence_receipt' found in tests/test_spine_adoption_dispatch.py",
+      "executed": true
+    },
+    {
+      "id": "zero_dropoff_sources",
+      "kind": "file_contains",
+      "passed": true,
+      "detail": "pattern 'test_no_dropoff_sources_remain' found in tests/test_spine_adoption_dispatch.py",
+      "executed": true
+    },
+    {
+      "id": "bypass_allowlist_empty",
+      "kind": "file_contains",
+      "passed": false,
+      "detail": "pattern '(?m)^_INTENTIONAL_BYPASS: dict\\\\[tuple\\\\[str, int\\\\], str\\\\] = \\\\{\\\\s*\\\\}' NOT FOUND in scripts/governance/spine_bypass_report.py",
+      "executed": true
+    },
+    {
+      "id": "adoption_narrative_docs",
       "kind": "file_exists",
       "passed": true,
-      "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
+      "detail": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md present",
       "executed": true
     },
     {
-      "id": "a2a_persistence_invariant_tests_exist",
+      "id": "gate1_witnessed",
       "kind": "file_exists",
       "passed": true,
-      "detail": "tests/test_spine_persistence_invariant.py present",
-      "executed": true
-    },
-    {
-      "id": "runtime_truth_packet_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
-      "executed": true
-    },
-    {
-      "id": "runtime_truth_axes_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
-      "executed": true
-    },
-    {
-      "id": "onboard_runtime_truth_render",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
-      "executed": true
-    },
-    {
-      "id": "onboard_runtime_truth_no_write_test",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
-      "executed": true
-    },
-    {
-      "id": "runtime_truth_packet_axis_test",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
-      "executed": true
-    },
-    {
-      "id": "a2a_single_persistence_invariant",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
-      "executed": true
-    },
-    {
-      "id": "spine_bypass_report_exists",
-      "kind": "file_exists",
-      "passed": true,
-      "detail": "scripts/governance/spine_bypass_report.py present",
-      "executed": true
-    },
-    {
-      "id": "receipt_json_projection_only_doc",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
-      "executed": true
-    },
-    {
-      "id": "correlation_spine_manifest_still_declared",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
-      "executed": true
-    },
-    {
-      "id": "evidence_receipt_still_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
-      "executed": true
-    },
-    {
-      "id": "runtime_receipt_still_defined",
-      "kind": "file_contains",
-      "passed": true,
-      "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
-      "executed": true
-    },
-    {
-      "id": "operator_core_contracts_pass",
-      "kind": "test_passes",
-      "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
+      "detail": "reports/governance/GATE1_WITNESSED.md present",
       "executed": true
     }
   ],
   "portfolio_summary": {
-    "active": 10,
+    "active": 4,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 6
+    "shippable": 0
   },
   "spine_objectives": [
     {
@@ -161,224 +126,12 @@
   },
   "active_tracks": [
     {
-      "id": "runtime-truth-reconciliation-2026-06",
-      "name": "Runtime Truth Reconciliation \u2014 operator-visible truth packets",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-nats-2026-06"
-      ],
-      "depends_on": [],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "dharma_swarm/operator_core/**",
-        "scripts/governance/agent_onboard.py",
-        "dharma_swarm/runtime_state.py"
-      ],
-      "moves_vital_signs": [
-        "quality_gates",
-        "memory_persistence"
-      ],
-      "verified_at": "2026-06-23",
-      "ttl_days": 14,
-      "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 12,
-        "total": 12
-      },
-      "criteria": [
-        {
-          "id": "runtime_spine_package_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/spine/__init__.py present",
-          "executed": true
-        },
-        {
-          "id": "receipt_equivalence_matrix_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md present",
-          "executed": true
-        },
-        {
-          "id": "a2a_persistence_invariant_tests_exist",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "tests/test_spine_persistence_invariant.py present",
-          "executed": true
-        },
-        {
-          "id": "runtime_truth_packet_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class RuntimeTruthPacket' found in dharma_swarm/operator_core/contracts.py",
-          "executed": true
-        },
-        {
-          "id": "runtime_truth_axes_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class RuntimeTruthState' found in dharma_swarm/operator_core/contracts.py",
-          "executed": true
-        },
-        {
-          "id": "onboard_runtime_truth_render",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'render_runtime_truth' found in scripts/governance/agent_onboard.py",
-          "executed": true
-        },
-        {
-          "id": "onboard_runtime_truth_no_write_test",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_runtime_truth_render_is_read_only' found in tests/test_agent_onboard.py",
-          "executed": true
-        },
-        {
-          "id": "runtime_truth_packet_axis_test",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_runtime_truth_packet_keeps_state_axes_separate' found in tests/test_operator_core_contracts.py",
-          "executed": true
-        },
-        {
-          "id": "a2a_single_persistence_invariant",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_submit_via_spine_retry_does_not_create_second_runtime_receipt' found in tests/test_spine_persistence_invariant.py",
-          "executed": true
-        },
-        {
-          "id": "spine_bypass_report_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/governance/spine_bypass_report.py present",
-          "executed": true
-        },
-        {
-          "id": "receipt_json_projection_only_doc",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'projection/cache only' found in docs/research/RECEIPT_AND_VEL_EQUIVALENCE_MATRIX.md",
-          "executed": true
-        },
-        {
-          "id": "correlation_spine_manifest_still_declared",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'correlation_spine:' found in ACTIVE_SURFACE_MANIFEST.yaml",
-          "executed": true
-        },
-        {
-          "id": "evidence_receipt_still_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
-          "executed": true
-        },
-        {
-          "id": "runtime_receipt_still_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class RuntimeReceipt' found in dharma_swarm/runtime_state.py",
-          "executed": true
-        },
-        {
-          "id": "operator_core_contracts_pass",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.41s",
-          "executed": true
-        }
-      ]
-    },
-    {
-      "id": "runtime-truth-nats-2026-06",
-      "name": "Runtime Truth NATS \u2014 internal live transport for A2A dispatch",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-reconciliation-2026-06"
-      ],
-      "depends_on": [],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
-        "dharma_swarm/a2a/a2a_nats_contact.py",
-        "dharma_swarm/a2a/a2a_core_contact.py"
-      ],
-      "moves_vital_signs": [
-        "tool_coverage"
-      ],
-      "verified_at": "2026-06-07",
-      "ttl_days": 21,
-      "owner": "@codex",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 4,
-        "total": 4
-      },
-      "criteria": [
-        {
-          "id": "nats_master_spec_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
-          "executed": true
-        },
-        {
-          "id": "nats_master_spec_present",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present",
-          "executed": true
-        },
-        {
-          "id": "nats_transport_landed",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md",
-          "executed": true
-        },
-        {
-          "id": "nats_transport_tests_pass",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.84s",
-          "executed": true
-        },
-        {
-          "id": "nats_substrate_contract_test_pass",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.28s",
-          "executed": true
-        }
-      ]
-    },
-    {
       "id": "runtime-truth-spine-adoption-2026-06",
       "name": "Runtime Truth Spine \u2014 Adoption (god objects flow through invoke_agent)",
       "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
         "runtime-truth-reconciliation-2026-06",
@@ -407,6 +160,7 @@
         "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
+      "final_boss_blocks": [],
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -494,6 +248,9 @@
       "id": "loop-closure-2026-06",
       "name": "Cybernetic Loop Closure \u2014 wire all 13 loops with receipted closure checks",
       "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
         "runtime-truth-reconciliation-2026-06"
@@ -518,6 +275,7 @@
         "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
+      "final_boss_blocks": [],
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -623,450 +381,12 @@
       ]
     },
     {
-      "id": "truth-graph-platform-2026-06",
-      "name": "Truth Graph Platform v1 \u2014 repo context + receipted A2A presence",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-reconciliation-2026-06",
-        "runtime-truth-nats-2026-06"
-      ],
-      "depends_on": [
-        "orientation-graph-2026-06"
-      ],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "scripts/governance/orientation_graph.py",
-        "scripts/governance/truth_graph_nats_e2e_demo.py",
-        "scripts/governance/run_truth_graph_nats_e2e_demo.sh",
-        "tests/test_orientation_graph.py",
-        "tests/test_truth_graph_repo_context.py",
-        "dharma_swarm/a2a/task_receipt.py",
-        "dharma_swarm/a2a/agent_presence.py",
-        "tests/test_a2a_gate.py",
-        "tests/test_agent_registry_presence.py",
-        "reports/orientation/**"
-      ],
-      "moves_vital_signs": [
-        "quality_gates",
-        "tool_coverage",
-        "memory_persistence"
-      ],
-      "verified_at": "2026-06-23",
-      "ttl_days": 21,
-      "owner": "@codex",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 17,
-        "total": 17
-      },
-      "criteria": [
-        {
-          "id": "identity_owner_on_branch",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "foundations/THE_ORGANISM.md present",
-          "executed": true
-        },
-        {
-          "id": "vision_owner_on_branch",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/vision_maps/NORTH_STAR.md present",
-          "executed": true
-        },
-        {
-          "id": "orientation_graph_owner_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/governance/orientation_graph.py present",
-          "executed": true
-        },
-        {
-          "id": "expanded_orientation_packet_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class OrientationPacket' found in scripts/governance/orientation_graph.py",
-          "executed": true
-        },
-        {
-          "id": "repo_context_writer_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def write_repo_context' found in scripts/governance/orientation_graph.py",
-          "executed": true
-        },
-        {
-          "id": "repo_context_hash_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'context_hash' found in scripts/governance/orientation_graph.py",
-          "executed": true
-        },
-        {
-          "id": "make_orient_writes_context",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern '--write-context' found in Makefile",
-          "executed": true
-        },
-        {
-          "id": "orientation_default_read_only_test",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_orientation_graph_render_is_read_only' found in tests/test_orientation_graph.py",
-          "executed": true
-        },
-        {
-          "id": "repo_context_test_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_truth_graph_repo_context_writes_json_and_markdown' found in tests/test_truth_graph_repo_context.py",
-          "executed": true
-        },
-        {
-          "id": "a2a_receipt_gate_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/a2a/task_receipt.py present",
-          "executed": true
-        },
-        {
-          "id": "a2a_receipt_schema_declared",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'dharma_a2a_task_receipt.v1' found in dharma_swarm/a2a/task_receipt.py",
-          "executed": true
-        },
-        {
-          "id": "a2a_receipted_inbox_reader_defined",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def read_receipted_inbox' found in dharma_swarm/a2a/task_receipt.py",
-          "executed": true
-        },
-        {
-          "id": "agent_presence_projection_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/a2a/agent_presence.py present",
-          "executed": true
-        },
-        {
-          "id": "agent_presence_stale_red",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'age > 2' found in dharma_swarm/a2a/agent_presence.py",
-          "executed": true
-        },
-        {
-          "id": "nats_e2e_demo_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/governance/truth_graph_nats_e2e_demo.py present",
-          "executed": true
-        },
-        {
-          "id": "nats_e2e_shell_wrapper_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "scripts/governance/run_truth_graph_nats_e2e_demo.sh present",
-          "executed": true
-        },
-        {
-          "id": "a2a_gate_tests_exist",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern \"receipt or it didn't happen\" found in tests/test_a2a_gate.py",
-          "executed": true
-        },
-        {
-          "id": "registry_presence_tests_exist",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'heartbeat_status' found in tests/test_agent_registry_presence.py",
-          "executed": true
-        },
-        {
-          "id": "repo_context_projection_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.42s",
-          "executed": true
-        },
-        {
-          "id": "truth_graph_projection_on_main",
-          "kind": "commit_on_main",
-          "passed": true,
-          "detail": "936d365db is an ancestor of origin/main",
-          "executed": true
-        }
-      ]
-    },
-    {
-      "id": "composer-holon-spine-longrun-2026-06",
-      "name": "Composer Holon Spine Longrun \u2014 fable/codex pair over verified command receipts",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-reconciliation-2026-06",
-        "runtime-truth-nats-2026-06"
-      ],
-      "depends_on": [
-        "runtime-truth-spine-adoption-2026-06"
-      ],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "docs/sovereign_holons/**",
-        "reports/sovereign_holons/**",
-        "dharma_swarm/holon_*.py",
-        "scripts/holon_*.py",
-        "tests/test_holon_*.py"
-      ],
-      "moves_vital_signs": [
-        "quality_gates",
-        "tool_coverage",
-        "memory_persistence"
-      ],
-      "verified_at": "2026-06-23",
-      "ttl_days": 14,
-      "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 8,
-        "total": 8
-      },
-      "criteria": [
-        {
-          "id": "evidence_receipt_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class EvidenceReceipt' found in dharma_swarm/spine/receipt.py",
-          "executed": true
-        },
-        {
-          "id": "holon_orchestrator_spec_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/sovereign_holons/HOLON_ORCHESTRATOR_BUILD_SPEC.md present",
-          "executed": true
-        },
-        {
-          "id": "holon_runtime_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/holon_runtime.py present",
-          "executed": true
-        },
-        {
-          "id": "readiness_packet_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md present",
-          "executed": true
-        },
-        {
-          "id": "receipt_profile_documented",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'The command receipt is a profile of `dharma_swarm.spine.receipt.EvidenceReceipt`' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
-          "executed": true
-        },
-        {
-          "id": "frozen_verifier_runbook_present",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'Frozen Non-Implementer Verifier Runbook' found in reports/sovereign_holons/BUILD_A_90_READINESS_PACKET.md",
-          "executed": true
-        },
-        {
-          "id": "holon_bridge_verifier_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "tests/test_holon_bridge.py present",
-          "executed": true
-        },
-        {
-          "id": "holon_runtime_verifier_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "tests/test_holon_runtime.py present",
-          "executed": true
-        },
-        {
-          "id": "composer_wake_witness_pending",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "reports/sovereign_holons/COMPOSER_WAKE_WITNESSED.md present",
-          "executed": true
-        },
-        {
-          "id": "holon_bridge_verifier_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.19s",
-          "executed": true
-        },
-        {
-          "id": "holon_substrate_on_main",
-          "kind": "commit_on_main",
-          "passed": true,
-          "detail": "9c76b210 is an ancestor of origin/main",
-          "executed": true
-        }
-      ]
-    },
-    {
-      "id": "provider-routing-consolidation-2026-06",
-      "name": "Provider Routing Consolidation \u2014 one power-first router, explicit-wins, first-party paths",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "runtime-truth-spine-adoption-2026-06",
-        "loop-closure-2026-06"
-      ],
-      "depends_on": [],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "dharma_swarm/providers.py",
-        "dharma_swarm/provider_policy.py",
-        "dharma_swarm/model_hierarchy.py",
-        "dharma_swarm/model_pool.py",
-        "dharma_swarm/model_defaults.py",
-        "dharma_swarm/runtime_provider.py",
-        "dharma_swarm/router_v1.py",
-        "dharma_swarm/smart_router.py",
-        "dharma_swarm/decision_router.py",
-        "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md"
-      ],
-      "moves_vital_signs": [
-        "quality_gates",
-        "tool_coverage",
-        "cost_efficiency"
-      ],
-      "verified_at": "2026-06-22",
-      "ttl_days": 21,
-      "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 9,
-        "total": 9
-      },
-      "criteria": [
-        {
-          "id": "model_pool_owner_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/model_pool.py present",
-          "executed": true
-        },
-        {
-          "id": "provider_policy_owner_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/provider_policy.py present",
-          "executed": true
-        },
-        {
-          "id": "model_hierarchy_owner_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/model_hierarchy.py present",
-          "executed": true
-        },
-        {
-          "id": "routing_architecture_doc_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md present",
-          "executed": true
-        },
-        {
-          "id": "routing_precedence_documented",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'explicit > capability' found in docs/ops/PROVIDER_ROUTING_ARCHITECTURE.md",
-          "executed": true
-        },
-        {
-          "id": "explicit_provider_honored",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'preferred_provider' found in dharma_swarm/provider_policy.py",
-          "executed": true
-        },
-        {
-          "id": "explicit_wins_test_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'test_explicit_provider_is_selected' found in tests/test_provider_routing_explicit.py",
-          "executed": true
-        },
-        {
-          "id": "power_first_default",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'power_first' found in dharma_swarm/provider_policy.py",
-          "executed": true
-        },
-        {
-          "id": "zhipu_provider_enum",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'ZHIPU' found in dharma_swarm/models.py",
-          "executed": true
-        },
-        {
-          "id": "zhipu_provider_class",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class ZhipuProvider' found in dharma_swarm/providers.py",
-          "executed": true
-        },
-        {
-          "id": "precedence_invariant_test_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.26s",
-          "executed": true
-        },
-        {
-          "id": "stage4_precedence_locked_on_main",
-          "kind": "commit_on_main",
-          "passed": true,
-          "detail": "bc110d84 is an ancestor of origin/main",
-          "executed": true
-        }
-      ]
-    },
-    {
       "id": "orchestration-arena-v1-2026-06",
       "name": "Orchestration Arena v1 \u2014 frozen hermetic fitness + zero-weight orchestrator + DPI",
       "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
         "provider-routing-consolidation-2026-06",
@@ -1098,6 +418,7 @@
         "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
+      "final_boss_blocks": [],
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -1199,6 +520,9 @@
       "id": "merge-master-mike-d4-2026-06",
       "name": "Merge Master Mike \u2014 D4 persistent always-on merge agent",
       "status": "ACTIVE",
+      "closure_kind": null,
+      "target_closure_kind": "VERIFIED_SLICE",
+      "graduation_profile": "generic",
       "serves": "substrate-nativeness",
       "complements": [
         "runtime-truth-reconciliation-2026-06"
@@ -1227,6 +551,7 @@
         "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
+      "final_boss_blocks": [],
       "has_rigorous_evidence": false,
       "strongest_grade": 1,
       "strongest_grade_name": "S1_PRESENT",
@@ -1295,166 +620,9 @@
           "executed": true
         }
       ]
-    },
-    {
-      "id": "filesystem-native-substrate-2026-06",
-      "name": "Filesystem-Native Context Substrate \u2014 folder-as-contract + portable knowledge graph",
-      "status": "ACTIVE",
-      "serves": "substrate-nativeness",
-      "complements": [
-        "truth-graph-platform-2026-06",
-        "runtime-truth-spine-adoption-2026-06"
-      ],
-      "depends_on": [],
-      "conflicts_with": [],
-      "owned_surfaces": [
-        "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
-        "docs/research/FILESYSTEM_SUBSTRATE_SLICE_A_SPEC.md",
-        "docs/research/palantir-ontology/ONTOLOGY_PROPOSAL_LOG.md",
-        "dharma_swarm/fs_substrate/**",
-        "tests/test_stage_contracts.py",
-        "tests/test_okf_projection.py",
-        "tests/test_semantic_fs.py",
-        "tests/test_organizer.py",
-        "tests/test_fs_substrate_e2e.py"
-      ],
-      "moves_vital_signs": [
-        "context_efficiency",
-        "tool_coverage",
-        "memory_persistence"
-      ],
-      "verified_at": "2026-06-24",
-      "ttl_days": 21,
-      "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
-      "min_evidence_grade": 2,
-      "min_evidence_grade_name": "S2_LANDED",
-      "prerequisites_ok": true,
-      "completion_progress": {
-        "passed": 12,
-        "total": 12
-      },
-      "criteria": [
-        {
-          "id": "dossier_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md present",
-          "executed": true
-        },
-        {
-          "id": "spine_invoke_owner_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'async def invoke_agent' found in dharma_swarm/spine/invoke.py",
-          "executed": true
-        },
-        {
-          "id": "handoff_owner_exists",
-          "kind": "file_exists",
-          "passed": true,
-          "detail": "dharma_swarm/handoff.py present",
-          "executed": true
-        },
-        {
-          "id": "dossier_consolidates_four_powers",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'The four powers at a glance' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
-          "executed": true
-        },
-        {
-          "id": "dossier_carries_organism_tie",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'How this serves the organism' found in docs/research/FILESYSTEM_AS_AGENT_SUBSTRATE_RESEARCH.md",
-          "executed": true
-        },
-        {
-          "id": "stage_contract_reader_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'class StageContract' found in dharma_swarm/fs_substrate/stage_contracts.py",
-          "executed": true
-        },
-        {
-          "id": "stage_reader_routes_through_spine",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'invoke_agent' found in dharma_swarm/fs_substrate/stage_executor.py",
-          "executed": true
-        },
-        {
-          "id": "stage_contract_test_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.18s",
-          "executed": true
-        },
-        {
-          "id": "okf_projector_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def project_semantic_objects' found in dharma_swarm/fs_substrate/okf.py",
-          "executed": true
-        },
-        {
-          "id": "okf_roundtrip_test_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.19s",
-          "executed": true
-        },
-        {
-          "id": "semantic_fs_facade_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def semantic_retrieve' found in dharma_swarm/fs_substrate/semantic_fs.py",
-          "executed": true
-        },
-        {
-          "id": "semantic_fs_test_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.19s",
-          "executed": true
-        },
-        {
-          "id": "organizer_dry_run_first_exists",
-          "kind": "file_contains",
-          "passed": true,
-          "detail": "pattern 'def propose_organization' found in dharma_swarm/fs_substrate/organizer.py",
-          "executed": true
-        },
-        {
-          "id": "organizer_test_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.16s",
-          "executed": true
-        },
-        {
-          "id": "fs_substrate_e2e_passes",
-          "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.08s",
-          "executed": true
-        }
-      ]
     }
   ],
   "findings": [
-    {
-      "severity": "WARN",
-      "check": "wip-high",
-      "message": "10 ACTIVE tracks exceed warn_active=5 \u2014 focus is spreading thin.",
-      "criterion_id": null
-    },
     {
       "severity": "WARN",
       "check": "spine-uncovered:research-depth",
@@ -1465,18 +633,6 @@
       "severity": "WARN",
       "check": "spine-uncovered:revenue-external-humans-served",
       "message": "Spine objective 'revenue-external-humans-served' has no ACTIVE track serving it (coverage gap).",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-shippable:runtime-truth-reconciliation-2026-06",
-      "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 4 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     },
     {
@@ -1493,24 +649,6 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:truth-graph-platform-2026-06",
-      "message": "[truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-shippable:provider-routing-consolidation-2026-06",
-      "message": "[provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
       "check": "track-provisional:orchestration-arena-v1-2026-06",
       "message": "[orchestration-arena-v1-2026-06] 9/9 criteria pass but NOT shippable under the rigorous bar: 1 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
@@ -1519,12 +657,6 @@
       "severity": "INFO",
       "check": "track-in-progress:merge-master-mike-d4-2026-06",
       "message": "[merge-master-mike-d4-2026-06] 3/4 completion criteria pass.",
-      "criterion_id": null
-    },
-    {
-      "severity": "INFO",
-      "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
       "criterion_id": null
     }
   ]
