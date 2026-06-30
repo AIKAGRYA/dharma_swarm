@@ -55,6 +55,7 @@ VALID_AUDIT = {
             "failure_class": "GREEN_SUITE_FROM_SKIPS",
             "recommendation": "remove skips",
             "verification": "re-run without skips",
+            "evidence_refs": [0],
         }
     ],
     "not_proven": [],
@@ -123,6 +124,8 @@ def test_cli_valid_audit_exits_zero(tmp_path):
 def test_cli_zero_findings_audit_exits_zero(tmp_path):
     zero = json.loads(json.dumps(VALID_AUDIT))
     zero["findings"] = []
+    zero["summary"]["evidence_floor"] = "E0_none"
+    zero["scope"]["commands_run"] = []
     audit = _write_audit(tmp_path, zero)
     proc = _run_cli(audit)
     assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
@@ -167,6 +170,52 @@ def test_cli_invalid_evidence_level_enum_exits_two(tmp_path):
     assert proc.returncode == 2, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
     out = proc.stdout + proc.stderr
     assert "evidence_level" in out or "E5_imagined" in out, f"error must name the enum field: {out!r}"
+
+
+def test_e2_summary_requires_command_receipt(tmp_path):
+    """E2+ summary floors cannot claim tested evidence without commands_run."""
+    bad = json.loads(json.dumps(VALID_AUDIT))
+    bad["scope"]["commands_run"] = []
+    audit = _write_audit(tmp_path, bad)
+    proc = _run_cli(audit)
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert "commands_run" in out and "evidence_floor" in out
+
+
+def test_e2_finding_requires_evidence_refs(tmp_path):
+    """E2+ findings must bind to replayable command receipts."""
+    bad = json.loads(json.dumps(VALID_AUDIT))
+    bad["findings"][0].pop("evidence_refs")
+    audit = _write_audit(tmp_path, bad)
+    proc = _run_cli(audit)
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert "evidence_refs" in out
+
+
+def test_e2_finding_rejects_out_of_range_evidence_ref(tmp_path):
+    bad = json.loads(json.dumps(VALID_AUDIT))
+    bad["findings"][0]["evidence_refs"] = [99]
+    audit = _write_audit(tmp_path, bad)
+    proc = _run_cli(audit)
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert "evidence_refs" in out or "commands_run" in out
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["confidence", "files", "line_refs", "inferred", "risk", "failure_class", "verification"],
+)
+def test_finding_architecture_fields_required(tmp_path, field):
+    bad = json.loads(json.dumps(VALID_AUDIT))
+    bad["findings"][0].pop(field)
+    audit = _write_audit(tmp_path, bad)
+    proc = _run_cli(audit)
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert field in out
 
 
 def test_cli_missing_file_exits_two(tmp_path):

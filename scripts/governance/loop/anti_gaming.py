@@ -37,6 +37,8 @@ from pathlib import Path
 
 SKIP_PATTERNS: tuple[str, ...] = (
     r"pytest\.skip",
+    r"pytestmark\s*=\s*pytest\.mark\.skip\b",
+    r"pytest\.mark\.skip\b",
     r"@pytest\.mark\.skip\b",
     r"@pytest\.mark\.skipif",
     r"unittest\.skip",
@@ -44,6 +46,7 @@ SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 XFAIL_PATTERNS: tuple[str, ...] = (
+    r"pytestmark\s*=\s*pytest\.mark\.xfail\b",
     r"pytest\.mark\.xfail",
     r"pytest\.xfail",
     r"@unittest\.expectedFailure",
@@ -150,15 +153,30 @@ def _check_no_new_xfails(added: list[str]) -> ChecklistItem:
 
 
 def _check_no_weakened_assertions(added: list[str], removed: list[str]) -> ChecklistItem:
-    removed_asserts = sum(1 for line in removed if ASSERT_RE.search(line))
-    added_asserts = sum(1 for line in added if ASSERT_RE.search(line))
+    removed_assert_lines = [line for line in removed if ASSERT_RE.search(line)]
+    added_assert_lines = [line for line in added if ASSERT_RE.search(line)]
+    removed_asserts = len(removed_assert_lines)
+    added_asserts = len(added_assert_lines)
     if removed_asserts > added_asserts:
         return ChecklistItem(
             "no_weakened_assertions",
             False,
             f"assertions weakened: removed {removed_asserts} assert lines, added {added_asserts}",
         )
+    if removed_assert_lines and added_assert_lines:
+        trivial = [line for line in added_assert_lines if _is_trivial_assert(line)]
+        if trivial:
+            return ChecklistItem(
+                "no_weakened_assertions",
+                False,
+                f"assertions weakened: replaced specific assertion with trivial assertion {trivial[0].strip()!r}",
+            )
     return ChecklistItem("no_weakened_assertions", True)
+
+
+def _is_trivial_assert(line: str) -> bool:
+    text = line.strip()
+    return bool(re.fullmatch(r"assert\s+(True|1|not\s+False)(\s*(,|#).*)?", text))
 
 
 def _check_no_deleted_tests(removed: list[str], added: list[str]) -> ChecklistItem:

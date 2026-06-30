@@ -237,6 +237,7 @@ class StubBackend(AgentBackend):
                     "failure_class": "STUB_FINDING",
                     "recommendation": "stub: replace with real auditor output in M2",
                     "verification": "stub: validate via schema + downstream gates",
+                    "evidence_refs": [0],
                 }
             ],
             "not_proven": ["stub backend — no real audit performed"],
@@ -291,8 +292,13 @@ class DroidBackend(AgentBackend):
         self.auto_level = auto_level or os.environ.get("LOOP_DROID_AUTO_LEVEL", "high")
 
     def _resolve_droid(self) -> str:
-        if self.droid_path.is_file():
+        if self.droid_path.is_file() and os.access(self.droid_path, os.X_OK):
             return str(self.droid_path)
+        if self.droid_path.exists():
+            raise BackendUnavailableError(
+                f"droid CLI path exists but is not executable at {self.droid_path}; "
+                "no silent fallback to stub"
+            )
         if str(self.droid_path) == DEFAULT_DROID_PATH:
             found = shutil.which("droid")
             if found:
@@ -366,6 +372,28 @@ class DroidBackend(AgentBackend):
                     f"droid CLI invocation timed out for role {role!r} "
                     f"after {self.timeout_seconds}s",
                     result=timed_out,
+                ) from exc
+            except OSError as exc:
+                failed = AgentInvocationResult(
+                    invocation_id=invocation_id,
+                    role=role,
+                    model=model,
+                    model_family=_model_family(model),
+                    command=command,
+                    cwd=str(self.cwd),
+                    return_code=-1,
+                    stdout="",
+                    stderr=str(exc),
+                    prompt_sha256=_prompt_hash(prompt),
+                    context_keys=context_keys,
+                    started_utc=started,
+                    ended_utc=_utc_now_iso(),
+                    model_independence=model_independence,
+                    degraded=True,
+                )
+                raise BackendInvocationError(
+                    f"droid CLI could not launch for role {role!r}: {exc}",
+                    result=failed,
                 ) from exc
 
         result = AgentInvocationResult(

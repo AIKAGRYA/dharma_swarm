@@ -36,12 +36,14 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from scripts.governance.loop.agent_backend import (
     ApiBackend,
@@ -80,6 +82,15 @@ _RATIONALE_KEYS = frozenset({
     "write_set_used",
     "anti_gaming_checklist",  # the Verifier runs this independently
 })
+_DETERMINISTIC_RECEIPT_KEYS = frozenset({
+    "command",
+    "exit_code",
+    "key_output",
+    "receipt_ref",
+    "valid",
+    "kind",
+    "value",
+})
 
 
 def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
@@ -91,7 +102,8 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
     remediate stage's own anti-gaming checklist result (the Verifier runs that
     independently).
     """
-    # The claim: only the finding's observable facts, not the recommendation.
+    # The claim: only the finding's observable facts, not the recommendation or
+    # any implementer/session context nested on the record.
     claim = {
         "finding_id": finding.get("finding_id"),
         "title": finding.get("title"),
@@ -104,8 +116,8 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
 
     # The deterministic evidence: red-before/green-after receipts + proof_mode.
     evidence = {
-        "red_before": fix_proposal.get("red_before", {}),
-        "green_after": fix_proposal.get("green_after", {}),
+        "red_before": _deterministic_receipt_subset(fix_proposal.get("red_before", {})),
+        "green_after": _deterministic_receipt_subset(fix_proposal.get("green_after", {})),
         "proof_mode": fix_proposal.get("proof_mode", "none"),
     }
 
@@ -114,6 +126,24 @@ def build_verifier_input(finding: dict, fix_proposal: dict) -> dict:
         "claim": claim,
         "evidence": evidence,
     }
+
+
+def _deterministic_receipt_subset(receipt: object) -> dict:
+    if not isinstance(receipt, dict):
+        return {}
+    return {
+        key: value
+        for key, value in receipt.items()
+        if key in _DETERMINISTIC_RECEIPT_KEYS and _is_json_scalar_or_list(value)
+    }
+
+
+def _is_json_scalar_or_list(value: object) -> bool:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return True
+    if isinstance(value, list):
+        return all(_is_json_scalar_or_list(item) for item in value)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +237,23 @@ class StubVerifier(VerifierBackend):
     as proven, spec §19.2).
     """
 
+    def __init__(self) -> None:
+        self._last_invocation: dict | None = None
+
     def verify(self, finding: dict, evidence: dict, prompt: str) -> VerifierResult:
+        if type(self) is StubVerifier:
+            self._last_invocation = {
+                "invocation_id": f"stub-verifier-{uuid4().hex}",
+                "role": "verifier",
+                "model": "stub",
+                "model_family": "stub",
+                "command": ["stub"],
+                "cwd": "",
+                "return_code": 0,
+                "context_keys": ["claim", "evidence", "finding_id"],
+                "model_independence": "not_proven",
+                "degraded": False,
+            }
         ev = evidence.get("evidence", evidence)
         red = ev.get("red_before", {})
         green = ev.get("green_after", {})
@@ -259,6 +305,9 @@ class StubVerifier(VerifierBackend):
             model_independence="not_proven",
         )
 
+    def invocation_receipt(self) -> dict | None:
+        return self._last_invocation
+
 
 class DroidVerifier(StubVerifier):
     """Verifier wrapper that invokes Droid with verifier-specific model policy."""
@@ -282,7 +331,13 @@ class DroidVerifier(StubVerifier):
                 "evidence_keys": sorted(evidence.keys()),
             },
         )
-        result = super().verify(finding, evidence, prompt)
+        result = _verifier_result_from_stdout(
+            stdout=self._last_invocation.stdout,
+            verifier_model=self._last_invocation.model,
+            model_independence=self._last_invocation.model_independence,
+        )
+        if result is None:
+            result = super().verify(finding, evidence, prompt)
         result.verifier_model = self._last_invocation.model
         result.model_independence = self._last_invocation.model_independence
         result.falsification_attempts.append({
@@ -347,6 +402,58 @@ def get_verifier(name: str | None = None) -> VerifierBackend:
         return ApiVerifier()
     raise NotImplementedError(
         f"unknown verifier backend {vname!r}; expected stub|droid|api"
+    )
+
+
+def _verifier_result_from_stdout(
+    stdout: str,
+    verifier_model: str,
+    model_independence: str,
+) -> VerifierResult | None:
+    text = stdout.strip()
+    if not text:
+        return None
+    try:
+        doc = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start < 0 or end <= start:
+            return None
+        try:
+            doc = json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(doc, dict):
+        return None
+
+    verdict = doc.get("verdict")
+    if verdict not in ("confirmed", "refuted", "inconclusive"):
+        verdict = "inconclusive"
+    attempts = doc.get("falsification_attempts", [])
+    if not isinstance(attempts, list):
+        attempts = []
+    attempts = [a for a in attempts if isinstance(a, dict)]
+    if not attempts:
+        attempts = [{
+            "attempt": "parse structured verifier output",
+            "result": "inconclusive",
+            "evidence": "no falsification_attempts supplied",
+        }]
+    metadata = doc.get("model_metadata")
+    if isinstance(metadata, dict):
+        attempts.append({
+            "attempt": "record verifier model metadata",
+            "result": "observed",
+            "evidence": json.dumps(metadata, sort_keys=True),
+        })
+    return VerifierResult(
+        verdict=verdict,
+        falsification_attempts=attempts,
+        verifier_model=verifier_model,
+        model_independence=model_independence
+        if model_independence in ("proven", "not_proven")
+        else "not_proven",
     )
 
 
@@ -444,6 +551,21 @@ def _reconcile_verdict(
     if proposed not in ("confirmed", "refuted", "inconclusive"):
         return "inconclusive"
     return proposed
+
+
+def _artifact_run_id_mismatch(
+    artifact: dict,
+    expected_run_id: str,
+    artifact_kind: str,
+    finding_id: str,
+) -> str | None:
+    artifact_run_id = artifact.get("run_id")
+    if artifact_run_id is not None and artifact_run_id != expected_run_id:
+        return (
+            f"{artifact_kind} for finding {finding_id!r} has run_id={artifact_run_id!r}; "
+            f"expected {expected_run_id!r}"
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -583,6 +705,14 @@ def run_reaudit(
     findings_map: dict[str, dict] = {}
     if findings_path.is_file():
         for f in run.read_jsonl(findings_path):
+            mismatch = _artifact_run_id_mismatch(
+                f,
+                run.run_id,
+                "accepted finding",
+                f.get("finding_id", "unknown"),
+            )
+            if mismatch is not None:
+                return _emit_error(mismatch)
             fid = f.get("finding_id")
             if fid:
                 findings_map[fid] = f
@@ -601,6 +731,14 @@ def run_reaudit(
         fp_doc = run.read_yaml(fp_path)
         fp = fp_doc.get("fix_proposal", fp_doc)
         finding_id = fp.get("finding_id", "unknown")
+        mismatch = _artifact_run_id_mismatch(
+            fp,
+            run.run_id,
+            "fix proposal",
+            finding_id,
+        )
+        if mismatch is not None:
+            return _emit_error(mismatch)
         finding = findings_map.get(finding_id, {"finding_id": finding_id})
 
         rc, status = _process_finding(finding, fp_doc, run, verifier)

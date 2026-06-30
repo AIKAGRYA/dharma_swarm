@@ -38,10 +38,12 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -69,6 +71,7 @@ CHECKLIST_ITEMS = (
     "no_widened_budgets",
     "fix_addresses_root_cause",
 )
+VALID_PROOF_MODES = ("natural", "synthetic", "none")
 
 
 def _emit_error(message: str) -> int:
@@ -274,6 +277,22 @@ def check_write_set(changed_files: list[str], write_set: list[str]) -> list[str]
     return [f for f in changed_files if not is_in_write_set(f, write_set)]
 
 
+def _estimate_remediation_tokens(finding: dict, write_set: list[str]) -> int:
+    """Conservative deterministic budget estimate before agent/worktree work.
+
+    The loop cannot trust a model to report its own usage, so remediation spends
+    an auditable local estimate derived from the payload handed to the
+    implementer. This makes ``budget.max_tokens`` enforceable even with stub or
+    degraded backends.
+    """
+    payload = json.dumps(
+        {"finding": finding, "write_set": write_set},
+        sort_keys=True,
+        default=str,
+    )
+    return max(1, (len(payload) + 3) // 4)
+
+
 # ---------------------------------------------------------------------------
 # Git-diff path extraction (M2 hardening: replaces self-reported changed_files)
 # ---------------------------------------------------------------------------
@@ -290,12 +309,14 @@ def extract_changed_paths(diff_text: str) -> list[str]:
     be gamed by an LLM implementer misreporting paths.
     """
     paths: list[str] = []
+    seen: set[str] = set()
     for line in diff_text.splitlines():
         m = _DIFF_GIT_RE.match(line)
         if m:
-            b_path = m.group(2)
-            if b_path and b_path != "/dev/null":
-                paths.append(b_path)
+            for path in (m.group(1), m.group(2)):
+                if path and path != "/dev/null" and path not in seen:
+                    paths.append(path)
+                    seen.add(path)
     return paths
 
 
@@ -409,6 +430,34 @@ class FixProposal:
         return {"fix_proposal": payload}
 
 
+def _relative_ref(run: Run, path: Path) -> str:
+    try:
+        return str(path.relative_to(run.run_dir))
+    except ValueError:
+        return str(path)
+
+
+def _write_defer_record(run: Run, finding_id: str, reason: str) -> str:
+    record = {
+        "defer": {
+            "finding_id": finding_id,
+            "reason": reason,
+            "timestamp_utc": _utc_now_iso(),
+        }
+    }
+    path = run.run_dir / f"defer_{finding_id}.yaml"
+    run.write_yaml(path, record)
+    return _relative_ref(run, path)
+
+
+def _find_stale_run_id(records: list[dict], expected_run_id: str) -> tuple[str, str] | None:
+    for record in records:
+        record_run_id = record.get("run_id")
+        if record_run_id is not None and record_run_id != expected_run_id:
+            return record.get("finding_id", "unknown"), str(record_run_id)
+    return None
+
+
 def _process_finding(
     finding: dict,
     warrant: Warrant,
@@ -432,7 +481,18 @@ def _process_finding(
     except BackendError as exc:
         sys.stderr.write(f"finding {finding_id}: implementer backend failed — {exc}\n")
         return 2, "error"
+    if plan.proof_mode not in VALID_PROOF_MODES:
+        sys.stderr.write(
+            f"finding {finding_id}: invalid proof_mode={plan.proof_mode!r}; "
+            f"expected one of {VALID_PROOF_MODES}\n"
+        )
+        return 2, "error"
     if plan.proof_mode == "none":
+        _write_defer_record(
+            run,
+            finding_id,
+            "proof_mode=none — no red-before/green-after achievable",
+        )
         sys.stdout.write(
             f"finding {finding_id}: proof_mode=none — routing to DEFER (no fix attempted)\n"
         )
@@ -513,7 +573,7 @@ def _process_finding(
             run_id=run.run_id,
             finding_id=finding_id,
             write_set_used=write_set,
-            patch_ref=branch_name,
+            patch_ref=_relative_ref(run, diff_path),
             red_before={
                 "command": plan.gate_command,
                 "exit_code": red_result.exit_code,
@@ -570,6 +630,13 @@ def run_remediate(
             f"no accepted_findings.jsonl in {run.run_dir} — run prompt-audit-triage (Stage 2) first"
         )
     findings = run.read_jsonl(findings_path)
+    stale = _find_stale_run_id(findings, run.run_id)
+    if stale is not None:
+        finding_id, stale_run_id = stale
+        return _emit_error(
+            f"accepted finding {finding_id!r} has run_id={stale_run_id!r}; "
+            f"expected {run.run_id!r}"
+        )
 
     # Filter to IMPLEMENT findings only.
     impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
@@ -580,20 +647,79 @@ def run_remediate(
         return 0
 
     # Check budget.
-    used_fixes = sum(1 for f in impl_findings if f.get("routing") == "IMPLEMENT")
-    budget_result = warrant.check_budget(used_fixes=used_fixes)
-    if budget_result.exceeded:
-        sys.stderr.write(f"budget exceeded — {budget_result.reason}\n")
-        return 2
+    write_set = warrant.write_set
+    max_tokens = warrant.budget["max_tokens"]
+    max_wall_clock_min = warrant.budget["max_wall_clock_min"]
+    if max_tokens <= 0:
+        for finding in impl_findings:
+            _write_defer_record(
+                run,
+                finding.get("finding_id", "unknown"),
+                "budget.max_tokens exhausted before remediation",
+            )
+        sys.stdout.write("budget.max_tokens exhausted — all IMPLEMENT findings routed to DEFER\n")
+        return 0
+    if max_wall_clock_min <= 0:
+        for finding in impl_findings:
+            _write_defer_record(
+                run,
+                finding.get("finding_id", "unknown"),
+                "budget.max_wall_clock_min exhausted before remediation",
+            )
+        sys.stdout.write("budget.max_wall_clock_min exhausted — all IMPLEMENT findings routed to DEFER\n")
+        return 0
+
+    max_fixes = int(warrant.budget["max_fixes_per_run"])
+    process_findings = impl_findings[:max_fixes]
+    excess_findings = impl_findings[max_fixes:]
+    for finding in excess_findings:
+        _write_defer_record(
+            run,
+            finding.get("finding_id", "unknown"),
+            f"budget.max_fixes_per_run exceeded: limit {max_fixes}; routed excess IMPLEMENT finding to DEFER",
+        )
+    if excess_findings:
+        sys.stdout.write(
+            f"budget.max_fixes_per_run limit {max_fixes}: "
+            f"{len(excess_findings)} excess IMPLEMENT finding(s) routed to DEFER\n"
+        )
 
     # Create the oracle for gate runs (PYTHONPATH = worktree at run time).
     oracle = CIOracle(python=DEFAULT_PYTHON, repo_root=repo_root)
 
     rejected = 0
     accepted = 0
-    deferred = 0
+    deferred = len(excess_findings)
 
-    for finding in impl_findings:
+    start = time.monotonic()
+    used_tokens = 0
+    for index, finding in enumerate(process_findings):
+        elapsed_min = (time.monotonic() - start) / 60
+        if elapsed_min > max_wall_clock_min:
+            for remaining in process_findings[index:]:
+                _write_defer_record(
+                    run,
+                    remaining.get("finding_id", "unknown"),
+                    f"budget.max_wall_clock_min exceeded: elapsed {elapsed_min:.3f} > limit {max_wall_clock_min}",
+                )
+                deferred += 1
+            break
+        estimated_tokens = _estimate_remediation_tokens(finding, write_set)
+        if used_tokens + estimated_tokens > max_tokens:
+            for remaining in process_findings[index:]:
+                remaining_estimate = _estimate_remediation_tokens(remaining, write_set)
+                _write_defer_record(
+                    run,
+                    remaining.get("finding_id", "unknown"),
+                    "budget.max_tokens exceeded: "
+                    f"used {used_tokens}, next_estimate {remaining_estimate}, limit {max_tokens}",
+                )
+                deferred += 1
+            sys.stdout.write(
+                f"budget.max_tokens limit {max_tokens}: remaining IMPLEMENT finding(s) routed to DEFER\n"
+            )
+            break
+        used_tokens += estimated_tokens
         rc, status = _process_finding(
             finding, warrant, run, implementer, repo_root, worktree_root, oracle,
         )

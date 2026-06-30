@@ -150,6 +150,36 @@ def _make_gate_script(tmp_path: Path, marker_path: Path) -> Path:
     return gate
 
 
+def _green_ratchet_repo(tmp_path: Path, finding_id: str | None = None) -> Path:
+    repo = tmp_path / "green-ratchet-repo"
+    script_dir = repo / "scripts" / "governance" / "hygiene"
+    script_dir.mkdir(parents=True, exist_ok=True)
+    (script_dir / "ratchet.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if '--json' in sys.argv:\n"
+        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
+        "sys.exit(0)\n"
+    )
+    if finding_id is not None:
+        gate_dir = repo / "scripts" / "governance" / "loop"
+        gate_dir.mkdir(parents=True, exist_ok=True)
+        marker = gate_dir / f"fix_marker_{finding_id}.txt"
+        marker.write_text("fix applied\n")
+        gate = gate_dir / f"fix_gate_{finding_id}.py"
+        gate.write_text(
+            "import sys\n"
+            "from pathlib import Path\n\n"
+            f'MARKER = Path(__file__).parent / "fix_marker_{finding_id}.txt"\n'
+            "if MARKER.exists():\n"
+            '    print("OK: marker found - clean tree")\n'
+            "    sys.exit(0)\n"
+            'print("FAIL: marker not found - slop reintroduced")\n'
+            "sys.exit(1)\n"
+        )
+    return repo
+
+
 # ---------------------------------------------------------------------------
 # Fixture: run the full 5-stage chain once
 # ---------------------------------------------------------------------------
@@ -239,29 +269,32 @@ def e2e_run(tmp_path: Path):
     stage_procs["reaudit"] = proc
     assert proc.returncode == 0, f"reaudit failed: {proc.stderr!r}"
 
-    # --- Set up CI gate (marker present = green) ---
-    marker_path = tmp_path / "fix_marker.txt"
-    marker_path.write_text("fix applied\n")
-    gate_script = _make_gate_script(tmp_path, marker_path)
-    ci_gate_cmd = f'"{VENV_PYTHON}" "{gate_script}"'
+    # --- Determine the finding_id before learn so the durable repo gate can
+    # match the exact fix_proposal green_after.command emitted by remediation.
+    run = _open_run(run_id, runs_root)
+    findings = run.read_jsonl(run.accepted_findings_path())
+    impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
+    assert impl_findings, f"no IMPLEMENT findings: {findings}"
+    finding_id = impl_findings[0]["finding_id"]
+
+    # --- Set up durable CI gate in the repo root used by learn. ---
+    ratchet_repo = _green_ratchet_repo(tmp_path, finding_id=finding_id)
+    gate_dir = ratchet_repo / "scripts" / "governance" / "loop"
+    marker_path = gate_dir / f"fix_marker_{finding_id}.txt"
+    gate_script = gate_dir / f"fix_gate_{finding_id}.py"
+    ci_gate_cmd = f'"{VENV_PYTHON}" scripts/governance/loop/fix_gate_{finding_id}.py'
 
     # --- Stage 5: prompt-audit-learn ---
     proc = _run_cli(
         LEARN_CLI, env,
         "--warrant", str(warrant_path),
         "--run-id", run_id,
-        "--ci-gate", ci_gate_cmd,
-        "--repo-root", str(REPO_ROOT),
+        "--repo-root", str(ratchet_repo),
+        "--wire-ci",
+        "--ci-workflow", str(tmp_path / "loop-ratchet-gates.yml"),
     )
     stage_procs["learn"] = proc
     assert proc.returncode == 0, f"learn failed: {proc.stderr!r}"
-
-    # --- Determine the finding_id from accepted_findings ---
-    run = _open_run(run_id, runs_root)
-    findings = run.read_jsonl(run.accepted_findings_path())
-    impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
-    assert impl_findings, f"no IMPLEMENT findings: {findings}"
-    finding_id = impl_findings[0]["finding_id"]
 
     return {
         "run_id": run_id,
@@ -953,3 +986,25 @@ class TestPostRatchetReaudit:
         assert "command" in receipt, (
             "CI receipt has no command — not replayable"
         )
+
+        post_ref = ledger.get("post_ratchet_reaudit_ref", "")
+        assert post_ref, "ledger does not reference post-ratchet re-audit evidence"
+        post_receipt_path = run.run_dir / post_ref
+        assert post_receipt_path.is_file(), (
+            f"post-ratchet receipt_ref points to non-existent file: {post_ref}"
+        )
+        post_receipt = run.read_json(post_receipt_path)
+        assert post_receipt.get("kind") == "post_ratchet_reaudit"
+        assert post_receipt.get("reintroduction_attempted") is True
+        assert post_receipt.get("red_exit_code") != 0, (
+            "post-ratchet re-audit did not prove reintroduced slop fails"
+        )
+        assert post_receipt.get("green_exit_code") == 0, (
+            "post-ratchet re-audit did not prove the restored clean gate passes"
+        )
+        assert post_receipt.get("prevented_reintroduction") is True
+
+        post_ledger_path = run.ledger_dir / f"ledger_entry_{fid}_post_reaudit.yaml"
+        assert post_ledger_path.is_file(), "post-ratchet result was not appended to ledger"
+        post_ledger = run.read_yaml(post_ledger_path).get("ledger_entry", {})
+        assert post_ledger.get("receipt_ref") == post_ref

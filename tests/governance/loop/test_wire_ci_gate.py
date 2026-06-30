@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
 import yaml
 
 from scripts.governance.loop.runs import Run
@@ -37,6 +38,33 @@ def _load_yaml(path: Path) -> dict:
 
 def _workflow_steps(doc: dict) -> list[dict]:
     return doc["jobs"]["loop-ratchet-gates"]["steps"]
+
+
+def _green_ratchet_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "green-ratchet-repo"
+    script_dir = repo / "scripts" / "governance" / "hygiene"
+    script_dir.mkdir(parents=True, exist_ok=True)
+    (script_dir / "ratchet.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if '--json' in sys.argv:\n"
+        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
+        "sys.exit(0)\n"
+    )
+    gate_dir = repo / "scripts" / "governance" / "loop"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    (gate_dir / "fix_marker_F-WIRE-CI.txt").write_text("fix applied\n")
+    (gate_dir / "fix_gate_F-WIRE-CI.py").write_text(
+        "import sys\n"
+        "from pathlib import Path\n\n"
+        'MARKER = Path(__file__).parent / "fix_marker_F-WIRE-CI.txt"\n'
+        "if MARKER.exists():\n"
+        '    print("OK: marker found - clean tree")\n'
+        "    sys.exit(0)\n"
+        'print("FAIL: marker not found - slop reintroduced")\n'
+        "sys.exit(1)\n"
+    )
+    return repo
 
 
 def test_default_workflow_file_is_valid_and_has_required_triggers():
@@ -186,6 +214,33 @@ def test_wire_ci_gate_validates_yaml_after_write_and_fails_on_malformed(tmp_path
     assert "YAML" in proc.stderr or "yaml" in proc.stderr
 
 
+def test_validate_workflow_rejects_missing_runs_on():
+    from scripts.governance.loop.wire_ci_gate import WorkflowError, validate_workflow
+
+    workflow = {
+        "on": {"push": {}, "pull_request": {}, "merge_group": None},
+        "jobs": {"loop-ratchet-gates": {"steps": [{"name": "Gate", "run": "true"}]}},
+    }
+    with pytest.raises(WorkflowError, match="runs-on"):
+        validate_workflow(workflow)
+
+
+def test_validate_workflow_rejects_step_without_run_or_uses():
+    from scripts.governance.loop.wire_ci_gate import WorkflowError, validate_workflow
+
+    workflow = {
+        "on": {"push": {}, "pull_request": {}, "merge_group": None},
+        "jobs": {
+            "loop-ratchet-gates": {
+                "runs-on": "ubuntu-latest",
+                "steps": [{"name": "Missing command"}],
+            }
+        },
+    }
+    with pytest.raises(WorkflowError, match="run.*uses|uses.*run"):
+        validate_workflow(workflow)
+
+
 def _make_warrant_dict() -> dict:
     return {
         "id": "wire-learn-test",
@@ -226,14 +281,15 @@ def _make_finding() -> dict:
 
 
 def _make_fix_proposal(run_id: str) -> dict:
+    command = f'"{VENV_PYTHON}" scripts/governance/loop/fix_gate_F-WIRE-CI.py'
     return {
         "fix_proposal": {
             "run_id": run_id,
             "finding_id": "F-WIRE-CI",
             "write_set_used": ["scripts/governance/loop/**"],
             "patch_ref": "fix/F-WIRE-CI",
-            "red_before": {"command": "true", "exit_code": 1, "key_output": "red"},
-            "green_after": {"command": "true", "exit_code": 0, "key_output": "green"},
+            "red_before": {"command": command, "exit_code": 1, "key_output": "red"},
+            "green_after": {"command": command, "exit_code": 0, "key_output": "green"},
             "proof_mode": "synthetic",
             "anti_gaming_checklist": {
                 "no_new_skips": "pass",
@@ -299,11 +355,11 @@ def test_prompt_audit_learn_wire_ci_flag_updates_workflow(tmp_path):
             str(warrant),
             "--run-id",
             run_id,
-            "--ci-gate",
-            "true",
             "--wire-ci",
             "--ci-workflow",
             str(workflow),
+            "--repo-root",
+            str(_green_ratchet_repo(tmp_path)),
         ],
         capture_output=True,
         text=True,

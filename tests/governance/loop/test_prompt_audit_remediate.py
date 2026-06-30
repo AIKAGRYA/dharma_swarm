@@ -230,6 +230,7 @@ def test_stub_produces_fix_proposal_and_cleans_up(tmp_path):
         assert fp["finding_id"] == "F-STUB-001"
         assert "write_set_used" in fp
         assert "patch_ref" in fp
+        assert (run.run_dir / fp["patch_ref"]).is_file(), "patch_ref must be durable after worktree cleanup"
         assert "red_before" in fp
         assert "green_after" in fp
         assert "proof_mode" in fp
@@ -429,8 +430,42 @@ def test_proof_mode_none_routes_to_defer(tmp_path):
         assert rc == 0, f"proof_mode=none should route to DEFER cleanly, got exit {rc}"
         # No fix_proposal written
         assert not run.fix_proposal_path("F-DEFER-001").exists()
-        # DEFER record should exist (check accepted_findings updated or a defer record)
-        # The finding should be marked as DEFER in some artifact
+        defer_path = run.run_dir / "defer_F-DEFER-001.yaml"
+        assert defer_path.is_file(), "proof_mode=none must write a durable DEFER artifact"
+        defer = yaml.safe_load(defer_path.read_text())["defer"]
+        assert defer["finding_id"] == "F-DEFER-001"
+        assert defer["reason"]
+    finally:
+        os.environ.pop("LOOP_RUNS_DIR", None)
+
+
+def test_invalid_proof_mode_rejected_before_worktree(tmp_path):
+    """Invalid proof_mode values fail immediately and write no fix_proposal."""
+    from scripts.governance.loop.prompt_audit_remediate import ImplementerBackend, ImplementerPlan
+    from scripts.governance.loop.runs import RunManager
+
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    finding = _make_finding(fid="F-BADPROOF-001")
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding])
+
+    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
+    try:
+        run = RunManager.open_run(run_id)
+
+        class BadProofImplementer(ImplementerBackend):
+            def plan(self, finding, write_set):
+                return ImplementerPlan(proof_mode="trust_me", gate_command="")
+            def setup_proof(self, worktree_path, finding):
+                raise AssertionError("worktree should not be created")
+            def apply_fix(self, worktree_path, finding):
+                return []
+
+        rc = _run_remediate_api(warrant_path, run, BadProofImplementer(), repo, wt_root)
+        assert rc == 2
+        assert not run.fix_proposal_path("F-BADPROOF-001").exists()
+        assert list(wt_root.glob("ds_loop_fix_*")) == []
     finally:
         os.environ.pop("LOOP_RUNS_DIR", None)
 
@@ -536,6 +571,22 @@ def test_misreported_write_set_caught_by_git_diff(tmp_path):
         assert not run.fix_proposal_path("F-GITDIFF-001").exists()
     finally:
         os.environ.pop("LOOP_RUNS_DIR", None)
+
+
+def test_rename_from_outside_write_set_into_allowed_path_rejected():
+    """Rename/copy diffs must enforce both a/ and b/ paths, not only b/."""
+    from scripts.governance.loop.prompt_audit_remediate import check_write_set, extract_changed_paths
+
+    diff = (
+        "diff --git a/secret/seed.txt b/scripts/governance/loop/allowed/seed.txt\n"
+        "similarity index 100%\n"
+        "rename from secret/seed.txt\n"
+        "rename to scripts/governance/loop/allowed/seed.txt\n"
+    )
+    changed = extract_changed_paths(diff)
+    assert "secret/seed.txt" in changed
+    assert "scripts/governance/loop/allowed/seed.txt" in changed
+    assert check_write_set(changed, ["scripts/governance/loop/allowed/**"]) == ["secret/seed.txt"]
 
 
 def test_honest_in_write_set_accepted_by_git_diff(tmp_path):
@@ -836,6 +887,59 @@ def test_all_deferred_no_fix_proposals(tmp_path):
         os.environ.pop("LOOP_RUNS_DIR", None)
 
 
+def test_max_fixes_budget_defers_excess_findings(tmp_path):
+    """Excess IMPLEMENT findings over max_fixes_per_run are durably deferred."""
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    findings = [_make_finding(fid="F-BUDGET-1"), _make_finding(fid="F-BUDGET-2")]
+    warrant = _make_warrant_dict()
+    warrant["budget"] = {**warrant["budget"], "max_fixes_per_run": 1}
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, findings, warrant=warrant)
+
+    proc = _run_remediate_cli(warrant_path, run_id, runs_root, repo, wt_root)
+    assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+    from scripts.governance.loop.runs import RunManager
+    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
+    try:
+        run = RunManager.open_run(run_id)
+        assert run.fix_proposal_path("F-BUDGET-1").is_file()
+        assert not run.fix_proposal_path("F-BUDGET-2").exists()
+        defer_path = run.run_dir / "defer_F-BUDGET-2.yaml"
+        assert defer_path.is_file(), "excess finding must be durably routed to DEFER"
+        defer = yaml.safe_load(defer_path.read_text())["defer"]
+        assert "max_fixes_per_run" in defer["reason"]
+    finally:
+        os.environ.pop("LOOP_RUNS_DIR", None)
+
+
+def test_max_tokens_budget_defers_before_worktree(tmp_path):
+    """A positive but exhausted token budget defers findings before fix work."""
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    finding = _make_finding(fid="F-TOKEN-BUDGET")
+    warrant = _make_warrant_dict()
+    warrant["budget"] = {**warrant["budget"], "max_tokens": 1}
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding], warrant=warrant)
+
+    proc = _run_remediate_cli(warrant_path, run_id, runs_root, repo, wt_root)
+    assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+    from scripts.governance.loop.runs import RunManager
+    os.environ["LOOP_RUNS_DIR"] = str(runs_root)
+    try:
+        run = RunManager.open_run(run_id)
+        assert not run.fix_proposal_path("F-TOKEN-BUDGET").exists()
+        defer_path = run.run_dir / "defer_F-TOKEN-BUDGET.yaml"
+        assert defer_path.is_file(), "token-exhausted finding must be durably routed to DEFER"
+        defer = yaml.safe_load(defer_path.read_text())["defer"]
+        assert "max_tokens" in defer["reason"]
+    finally:
+        os.environ.pop("LOOP_RUNS_DIR", None)
+
+
 # ---------------------------------------------------------------------------
 # Warrant re-validation on stage entry
 # ---------------------------------------------------------------------------
@@ -855,6 +959,60 @@ def test_expired_warrant_aborts_stage_entry(tmp_path):
     assert proc.returncode != 0
     output = proc.stdout + proc.stderr
     assert "expired" in output.lower()
+
+
+# ---------------------------------------------------------------------------
+# VAL-AUDIT-011: Remediate estimates token budget deterministically
+# ---------------------------------------------------------------------------
+
+
+def test_estimate_remediation_tokens_deterministic_from_payload():
+    """VAL-AUDIT-011: _estimate_remediation_tokens returns a deterministic token
+    estimate derived from the finding payload size (not from LLM self-report),
+    enabling budget.max_tokens enforcement even with stub backends."""
+    from scripts.governance.loop.prompt_audit_remediate import _estimate_remediation_tokens
+
+    finding = _make_finding(fid="F-TOKEN-EST-001")
+    write_set = ["scripts/governance/loop/**"]
+    estimate_a = _estimate_remediation_tokens(finding, write_set)
+    estimate_b = _estimate_remediation_tokens(finding, write_set)
+    # Deterministic: same input -> same output
+    assert estimate_a == estimate_b, (
+        "token estimate must be deterministic for the same finding payload"
+    )
+    # Positive integer
+    assert isinstance(estimate_a, int) and estimate_a >= 1
+
+
+def test_estimate_remediation_tokens_grows_with_payload_size():
+    """VAL-AUDIT-011: a larger finding payload yields a larger (or equal) token
+    estimate, confirming the estimate is derived from payload size."""
+    from scripts.governance.loop.prompt_audit_remediate import _estimate_remediation_tokens
+
+    small = _make_finding(fid="F-S")
+    large = _make_finding(fid="F-L")
+    large["observed"] = "x" * 2000  # much larger payload
+    write_set = ["scripts/governance/loop/**"]
+    small_est = _estimate_remediation_tokens(small, write_set)
+    large_est = _estimate_remediation_tokens(large, write_set)
+    assert large_est > small_est, (
+        f"larger payload must yield larger estimate: small={small_est} large={large_est}"
+    )
+
+
+def test_estimate_remediation_tokens_does_not_depend_on_llm():
+    """VAL-AUDIT-011: the estimate is a pure function of (finding, write_set) —
+    no LLM/network call, no env dependency. Derived purely from json payload length."""
+    from scripts.governance.loop.prompt_audit_remediate import _estimate_remediation_tokens
+    import json
+
+    finding = _make_finding(fid="F-PURE-001")
+    write_set = ["scripts/governance/loop/**"]
+    estimate = _estimate_remediation_tokens(finding, write_set)
+    expected = max(1, (len(json.dumps({"finding": finding, "write_set": write_set}, sort_keys=True, default=str)) + 3) // 4)
+    assert estimate == expected, (
+        f"estimate must equal the deterministic payload-derived value: got {estimate}, expected {expected}"
+    )
 
 
 if __name__ == "__main__":

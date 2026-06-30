@@ -91,7 +91,7 @@ def run_audit(
         "warrant_id": warrant.id,
     }
 
-    written = 0
+    pending: list[tuple[str, dict]] = []
     for prompt_id in selected:
         council_id = prompt_to_council(prompt_id)
         if council_id is None:
@@ -117,6 +117,10 @@ def run_audit(
                 f"Errors: {errs}"
             )
 
+        pending.append((prompt_id, audit_doc))
+
+    written = 0
+    for prompt_id, audit_doc in pending:
         audit_path = run.audit_path(prompt_id)
         run.write_json(audit_path, audit_doc)
         written += 1

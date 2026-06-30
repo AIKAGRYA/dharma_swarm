@@ -130,6 +130,22 @@ def test_new_skipif_fails():
     assert not skip_item.passed
 
 
+def test_module_level_pytestmark_skip_fails():
+    """Adding pytestmark = pytest.mark.skip(...) fails no_new_skips."""
+    diff = textwrap.dedent("""\
+        diff --git a/tests/test_foo.py b/tests/test_foo.py
+        --- a/tests/test_foo.py
+        +++ b/tests/test_foo.py
+        @@ -1,2 +1,3 @@
+         import pytest
+        +pytestmark = pytest.mark.skip(reason="not now")
+         def test_a():
+        """)
+    result = _run_check(diff)
+    skip_item = next(i for i in result.items if i.name == "no_new_skips")
+    assert not skip_item.passed
+
+
 # ---------------------------------------------------------------------------
 # no_new_xfails
 # ---------------------------------------------------------------------------
@@ -187,6 +203,23 @@ def test_replaced_assert_passes():
     result = _run_check(diff)
     weak_item = next(i for i in result.items if i.name == "no_weakened_assertions")
     assert weak_item.passed, f"replaced assert should pass: {weak_item.detail}"
+
+
+def test_replaced_specific_assert_with_assert_true_fails():
+    """Replacing a specific assertion with assert True is a weakened assertion."""
+    diff = textwrap.dedent("""\
+        diff --git a/tests/test_foo.py b/tests/test_foo.py
+        --- a/tests/test_foo.py
+        +++ b/tests/test_foo.py
+        @@ -1,3 +1,3 @@
+         def test_a():
+        -    assert result == 42
+        +    assert True
+             pass
+        """)
+    result = _run_check(diff)
+    weak_item = next(i for i in result.items if i.name == "no_weakened_assertions")
+    assert not weak_item.passed
 
 
 # ---------------------------------------------------------------------------

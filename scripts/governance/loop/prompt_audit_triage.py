@@ -195,12 +195,28 @@ def triage_findings(
         must_gate = recurrence_score >= MUST_GATE_THRESHOLD
         routing = route_finding(survivor["finding"])
 
-        accepted.append(_build_record(survivor, routing, must_gate, recurrence_score, recurrence_within_run))
+        accepted.append(
+            _build_record(
+                survivor,
+                routing,
+                must_gate,
+                recurrence_score,
+                recurrence_within_run,
+                current_run_id,
+            )
+        )
 
     for entry in ambiguous:
         recurrence_score = 0
         accepted.append(
-            _build_record(entry, "NEEDS_HUMAN", False, recurrence_score, False)
+            _build_record(
+                entry,
+                "NEEDS_HUMAN",
+                False,
+                recurrence_score,
+                False,
+                current_run_id,
+            )
         )
 
     return accepted
@@ -212,9 +228,11 @@ def _build_record(
     must_gate: bool,
     recurrence_score: int,
     recurrence_within_run: bool,
+    current_run_id: str,
 ) -> dict:
     finding = entry["finding"]
     return {
+        "run_id": current_run_id,
         "finding_id": finding.get("id", ""),
         "prompt_id": entry.get("prompt_id", ""),
         "council_id": entry.get("council_id", ""),
@@ -247,6 +265,12 @@ def _load_all_findings(run: Run) -> list[dict]:
             doc = run.read_json(audit_path)
         except (json.JSONDecodeError, OSError) as exc:
             raise ValueError(f"cannot read audit JSON {audit_path}: {exc}") from exc
+        doc_run_id = doc.get("run_id")
+        if doc_run_id is not None and doc_run_id != run.run_id:
+            raise ValueError(
+                f"audit artifact {audit_path} has run_id={doc_run_id!r}; "
+                f"expected {run.run_id!r}"
+            )
         prompt_id = doc.get("prompt_id", audit_path.stem)
         council_id = doc.get("council_id", "")
         for finding in doc.get("findings", []):

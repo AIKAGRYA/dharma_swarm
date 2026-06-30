@@ -9,6 +9,7 @@ import pytest
 
 from scripts.governance.loop.agent_backend import (
     ApiBackend,
+    BackendInvocationError,
     BackendUnavailableError,
     DroidBackend,
     StubBackend,
@@ -100,6 +101,28 @@ def test_droid_backend_missing_cli_fails_clear_no_stub(tmp_path):
         backend.invoke("auditor", "prompt", {})
 
 
+def test_droid_backend_non_executable_file_fails_unavailable(tmp_path):
+    fake = tmp_path / "droid"
+    fake.write_text("#!/bin/sh\necho no\n")
+    fake.chmod(0o644)
+    backend = DroidBackend(droid_path=fake)
+
+    with pytest.raises(BackendUnavailableError, match="executable"):
+        backend.invoke("auditor", "prompt", {})
+
+
+def test_droid_backend_oserror_wrapped(monkeypatch, tmp_path):
+    fake = _write_fake_droid(tmp_path)
+    backend = DroidBackend(droid_path=fake, cwd=REPO_ROOT)
+
+    def boom(*args, **kwargs):
+        raise PermissionError("cannot execute")
+
+    monkeypatch.setattr("subprocess.run", boom)
+    with pytest.raises(BackendInvocationError, match="could not launch"):
+        backend.invoke("auditor", "prompt", {})
+
+
 def test_backend_selection_env(monkeypatch):
     monkeypatch.setenv("LOOP_AGENT_BACKEND", "api")
     assert isinstance(get_backend(), ApiBackend)
@@ -174,3 +197,35 @@ def test_stage_wrappers_record_agent_invocation_receipts(tmp_path):
     assert impl_receipt and impl_receipt["role"] == "implementer"
     assert verdict.verifier_model
     assert verifier_receipt and verifier_receipt["role"] == "verifier"
+
+
+def test_droid_verifier_parses_structured_output(tmp_path, monkeypatch):
+    fake_output = json.dumps({
+        "verdict": "refuted",
+        "falsification_attempts": [
+            {"attempt": "replay failing gate", "result": "fail", "evidence": "exit=1"}
+        ],
+        "verifier_model": "custom-verifier",
+        "model_metadata": {"provider": "fake"},
+    })
+    fake = _write_fake_droid(tmp_path, stdout_text=fake_output)
+    verifier = DroidVerifier(droid_path=fake, cwd=REPO_ROOT)
+
+    result = verifier.verify(
+        {"finding_id": "F-STRUCT", "severity": "critical"},
+        {
+            "finding_id": "F-STRUCT",
+            "claim": {"finding_id": "F-STRUCT", "severity": "critical"},
+            "evidence": {
+                "red_before": {"exit_code": 1},
+                "green_after": {"exit_code": 0},
+                "proof_mode": "synthetic",
+            },
+        },
+        build_falsification_prompt(),
+    )
+
+    assert result.verdict == "refuted"
+    assert result.falsification_attempts[0]["attempt"] == "replay failing gate"
+    assert result.verifier_model == "gpt-5.2"
+    assert verifier.invocation_receipt()["stdout_excerpt"].startswith("{")

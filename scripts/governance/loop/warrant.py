@@ -24,6 +24,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -156,6 +157,21 @@ class Warrant:
         for key in REQUIRED_BUDGET_KEYS:
             if key not in budget:
                 raise WarrantValidationError(f"missing required budget field: budget.{key}")
+            value = budget[key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise WarrantValidationError(
+                    f"budget.{key} must be a non-negative numeric value, got {value!r}"
+                )
+            if value < 0:
+                raise WarrantValidationError(
+                    f"budget.{key} must be a non-negative numeric value, got {value!r}"
+                )
+        if not isinstance(budget["max_fixes_per_run"], int) or isinstance(
+            budget["max_fixes_per_run"], bool
+        ):
+            raise WarrantValidationError(
+                "budget.max_fixes_per_run must be a non-negative integer"
+            )
 
         expires_at = _parse_expires_at(str(data["expires_at"]))
 
@@ -215,8 +231,9 @@ class Warrant:
         A file the Implementer touches must be in the write_set; a violation is
         a hard abort (the caller maps this to exit 2).
         """
-        if path in self.write_set:
-            return
+        for pattern in self.write_set:
+            if _path_matches_write_pattern(path, pattern):
+                return
         raise WriteSetViolationError(
             f"write-set violation: {path!r} is not in warrant {self.id!r} write_set"
         )
@@ -254,6 +271,18 @@ class Warrant:
                 reason=f"budget.max_wall_clock_min exceeded: used {used_wall_clock_min} > limit {max_wall}",
             )
         return BudgetResult(exceeded=False)
+
+
+def _path_matches_write_pattern(path: str, pattern: str) -> bool:
+    """Glob-aware write-set match shared with remediation semantics."""
+    normalized_path = path.strip("/")
+    normalized_pattern = pattern.strip("/")
+    if fnmatch.fnmatchcase(normalized_path, normalized_pattern):
+        return True
+    if normalized_path == normalized_pattern:
+        return True
+    base = normalized_pattern.rstrip("*/")
+    return bool(base and normalized_path.startswith(base + "/"))
 
 
 # ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -49,6 +50,9 @@ DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
 RATCHET_SCRIPT = "scripts/governance/hygiene/ratchet.py"
 PROMOTE_SCRIPT = "scripts/governance/hygiene/promote.py"
 DEFAULT_CI_WORKFLOW = ".github/workflows/loop-ratchet-gates.yml"
+_NOOP_EXECUTABLES = {"true", "false", ":"}
+_DURABLE_PATH_PREFIXES = ("scripts/", "tests/", ".github/")
+_DURABLE_PATH_SUFFIXES = (".py", ".sh", ".bash", ".zsh", ".yaml", ".yml")
 
 
 def _emit_error(message: str) -> int:
@@ -85,6 +89,7 @@ class RatchetRecord:
     prevents_recurrence: bool = False
     prevents_recurrence_note: str = ""
     ci_receipt_ref: str = ""
+    post_ratchet_reaudit_ref: str = ""
     promote_deferral: str = ""
 
     def to_dict(self) -> dict:
@@ -98,6 +103,7 @@ class RatchetRecord:
                 "prevents_recurrence": self.prevents_recurrence,
                 "prevents_recurrence_note": self.prevents_recurrence_note,
                 "ci_receipt_ref": self.ci_receipt_ref,
+                "post_ratchet_reaudit_ref": self.post_ratchet_reaudit_ref,
                 "promote_deferral": self.promote_deferral,
             }
         }
@@ -125,6 +131,7 @@ class LedgerEntry:
     receipt_ref: str = ""
     human_approver: str = ""
     claim_label: str = "prior_claim"
+    post_ratchet_reaudit_ref: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -137,6 +144,7 @@ class LedgerEntry:
                 "receipt_ref": self.receipt_ref,
                 "human_approver": self.human_approver,
                 "claim_label": self.claim_label,
+                "post_ratchet_reaudit_ref": self.post_ratchet_reaudit_ref,
             }
         }
 
@@ -199,6 +207,79 @@ def _build_new_gate(
     }
 
 
+def _is_disposable_worktree_command(command: str) -> bool:
+    return "ds_loop_fix_" in command
+
+
+def _is_inside_repo(path: Path, repo_root: Path) -> bool:
+    try:
+        path.resolve().relative_to(repo_root.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def _looks_like_repo_path(token: str) -> bool:
+    if token.startswith(_DURABLE_PATH_PREFIXES):
+        return True
+    if "/" in token or "\\" in token:
+        return True
+    return token.endswith(_DURABLE_PATH_SUFFIXES)
+
+
+def _validate_repo_durable_gate(command: str, repo_root: Path) -> tuple[bool, str]:
+    """Require a replayable gate command backed by repo files.
+
+    Learned gates are standing CI assertions. A degenerate command such as
+    ``true`` or an inline ``python -c`` snippet can turn a proposal into a
+    ratchet without leaving a durable artifact that future agents/CI can replay.
+    """
+    try:
+        tokens = shlex.split(command)
+    except ValueError as exc:
+        return False, f"gate command is not shell-parseable: {exc}"
+    if not tokens:
+        return False, "gate command is empty"
+
+    executable = Path(tokens[0]).name
+    if executable in _NOOP_EXECUTABLES:
+        return False, f"degenerate gate command {executable!r} is not a durable CI gate"
+    if _is_disposable_worktree_command(command):
+        return False, f"gate command points at disposable worktree path: {command}"
+    if any(token in {"&&", "||", ";", "|"} for token in tokens):
+        return False, "gate command contains shell control operators; use a direct replayable command"
+    if executable.startswith("python") or executable in {"python3", "python"}:
+        if "-c" in tokens:
+            return False, "inline python -c gate has no durable repo artifact"
+
+    checked_path = False
+    for index, token in enumerate(tokens[1:], start=1):
+        if token.startswith("-") or token.startswith(("http://", "https://")):
+            continue
+        if not _looks_like_repo_path(token):
+            continue
+
+        candidate = Path(token)
+        if candidate.is_absolute():
+            if not _is_inside_repo(candidate, repo_root):
+                return False, f"gate artifact path is outside repo root: {token}"
+        else:
+            candidate = repo_root / token
+        checked_path = True
+        if not candidate.exists():
+            return False, f"gate artifact is missing from repo root: {token}"
+
+    if checked_path:
+        return True, ""
+    if executable == "make":
+        if (repo_root / "Makefile").exists():
+            return True, ""
+        return False, "make gate has no Makefile in repo root"
+    if "-m" in tokens and "pytest" in tokens:
+        return True, ""
+    return False, "gate command does not name a durable repo artifact"
+
+
 # ---------------------------------------------------------------------------
 # CI gate + ratchet engine driving
 # ---------------------------------------------------------------------------
@@ -220,9 +301,9 @@ def _drive_ratchet_engine(oracle: CIOracle, repo_root: Path) -> dict:
     engine's state as evidence. This does NOT build a parallel ratchet — it
     invokes the existing engine and records its output as a receipt.
 
-    The ratchet engine may exit 2 (BROKEN — e.g. baselines file missing). This
-    is recorded honestly as evidence; it does not block the finding from being
-    ratcheted (the CI gate being green is the advance condition, VAL-LEARN-001).
+    The ratchet engine may exit non-zero (BROKEN — e.g. baselines file missing).
+    The learn stage records that receipt honestly and defers the finding; a red
+    ratchet engine is not treated as successful learning.
     """
     command = f'"{oracle.python}" {RATCHET_SCRIPT} --json'
     result = oracle.run_gate(command, cwd=str(repo_root))
@@ -272,24 +353,28 @@ def _assess_prevents_recurrence(
     return True, "red_before_ref shows non-zero (slop existed), green_after_ref shows zero (gate passes after fix)"
 
 
-def _promote_deferral_note(finding: dict, fix_proposal: dict) -> str:
+def _promote_deferral_note(
+    finding: dict,
+    fix_proposal: dict,
+    ratchet_receipt_ref: str,
+) -> str:
     """Document concretely why promote.py is deferred for this finding (VAL-LEARN-002).
 
     promote.py moves a hygiene pattern through the lifecycle (advisory -> enforced).
-    In M1 stub mode the finding is synthetic — there is no real hygiene pattern
-    in ``docs/governance/hygiene/patterns/`` to promote. An advisory->enforced
-    promotion is therefore not warranted. The ratchet engine (ratchet.py) IS
+    Promotion is deferred unless the finding/fix proposal supplies an
+    evidence-backed hygiene pattern input. The ratchet engine (ratchet.py) IS
     driven via subprocess (see ``_drive_ratchet_engine``); promote.py is deferred
-    until a real hygiene pattern exists to promote.
+    until a concrete pattern_ref/advisory lifecycle artifact exists to promote.
     """
     failure_class = finding.get("failure_class", "UNKNOWN")
+    patch_ref = fix_proposal.get("patch_ref", "")
     return (
-        f"promote.py deferred: no real hygiene pattern for {failure_class} in "
-        f"docs/governance/hygiene/patterns/ (M1 stub mode — synthetic finding). "
-        f"ratchet.py was driven via subprocess for a state receipt; "
-        f"promote.py (advisory->enforced promotion) is not warranted until a "
-        f"real pattern exists. PROMOTE_SCRIPT={PROMOTE_SCRIPT} available for "
-        f"subprocess invocation when a promotion is warranted."
+        f"promote.py deferred with evidence: ratchet engine receipt {ratchet_receipt_ref} "
+        f"was captured for {failure_class}, and fix_patch_ref={patch_ref!r}. "
+        "No promote.py input pattern_ref/advisory lifecycle artifact was present "
+        "in the finding or fix proposal, so an advisory->enforced promotion is "
+        f"not warranted. PROMOTE_SCRIPT={PROMOTE_SCRIPT} remains the required "
+        "subprocess path when such an evidence-backed promotion input exists."
     )
 
 
@@ -407,6 +492,130 @@ def _write_ci_wire_receipt(
     return _relative_ref(run, path)
 
 
+def _synthetic_marker_path(command: str, repo_root: Path, finding_id: str) -> Path | None:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+    expected_gate = f"fix_gate_{finding_id}.py"
+    expected_marker = f"fix_marker_{finding_id}.txt"
+    for token in tokens[1:]:
+        if not token.endswith(expected_gate):
+            continue
+        gate_path = Path(token)
+        if not gate_path.is_absolute():
+            gate_path = repo_root / gate_path
+        if not _is_inside_repo(gate_path, repo_root):
+            return None
+        return gate_path.parent / expected_marker
+    return None
+
+
+def _write_post_ratchet_reaudit_receipt(
+    run: Run,
+    finding_id: str,
+    receipt: dict,
+) -> str:
+    path = run.receipt_path(f"post_ratchet_reaudit_{finding_id}.json")
+    run.write_json(path, receipt)
+    return _relative_ref(run, path)
+
+
+def _run_post_ratchet_reaudit(
+    run: Run,
+    finding_id: str,
+    new_gate: dict,
+    oracle: CIOracle,
+    repo_root: Path,
+) -> tuple[str, dict]:
+    """Attempt a fresh post-ratchet reintroduction and record exit-code proof."""
+    command = new_gate.get("location", "")
+    marker_path = _synthetic_marker_path(command, repo_root, finding_id)
+    marker_existed = marker_path is not None and marker_path.is_file()
+    marker_backup: bytes | None = None
+    if marker_existed and marker_path is not None:
+        marker_backup = marker_path.read_bytes()
+        marker_path.unlink()
+
+    try:
+        red_result = oracle.run_gate(command, cwd=str(repo_root))
+    finally:
+        if marker_backup is not None and marker_path is not None:
+            marker_path.write_bytes(marker_backup)
+
+    green_result = oracle.run_gate(command, cwd=str(repo_root))
+    receipt = {
+        "kind": "post_ratchet_reaudit",
+        "finding_id": finding_id,
+        "gate_command": command,
+        "reintroduction_strategy": (
+            "removed synthetic fix marker" if marker_existed else "no synthetic marker available"
+        ),
+        "reintroduction_attempted": bool(marker_existed),
+        "marker_path": (
+            str(marker_path.relative_to(repo_root))
+            if marker_path is not None and _is_inside_repo(marker_path, repo_root)
+            else ""
+        ),
+        "red_exit_code": red_result.exit_code,
+        "red_stdout": red_result.stdout[:1000],
+        "red_stderr": red_result.stderr[:1000],
+        "green_exit_code": green_result.exit_code,
+        "green_stdout": green_result.stdout[:1000],
+        "green_stderr": green_result.stderr[:1000],
+        "prevented_reintroduction": (
+            bool(marker_existed)
+            and red_result.exit_code != 0
+            and green_result.exit_code == 0
+        ),
+        "timestamp_utc": _utc_now_iso(),
+    }
+    return _write_post_ratchet_reaudit_receipt(run, finding_id, receipt), receipt
+
+
+def _write_post_ratchet_ledger_entry(
+    run: Run,
+    finding_id: str,
+    commit: str,
+    failure_class: str,
+    ratchet_ref: str,
+    post_reaudit_ref: str,
+    receipt: dict,
+) -> str:
+    entry = {
+        "ledger_entry": {
+            "timestamp_utc": _utc_now_iso(),
+            "commit": commit,
+            "finding_class": failure_class,
+            "status": "post_ratchet_reaudit",
+            "gate_ref": ratchet_ref,
+            "receipt_ref": post_reaudit_ref,
+            "human_approver": "",
+            "claim_label": "prior_claim",
+            "reintroduction_attempted": receipt.get("reintroduction_attempted", False),
+            "prevented_reintroduction": receipt.get("prevented_reintroduction", False),
+        }
+    }
+    path = run.ledger_dir / f"ledger_entry_{finding_id}_post_reaudit.yaml"
+    run.write_yaml(path, entry)
+    return _relative_ref(run, path)
+
+
+def _artifact_run_id_mismatch(
+    artifact: dict,
+    expected_run_id: str,
+    artifact_kind: str,
+    finding_id: str,
+) -> str | None:
+    artifact_run_id = artifact.get("run_id")
+    if artifact_run_id is not None and artifact_run_id != expected_run_id:
+        return (
+            f"{artifact_kind} for finding {finding_id!r} has run_id={artifact_run_id!r}; "
+            f"expected {expected_run_id!r}"
+        )
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Stage core
 # ---------------------------------------------------------------------------
@@ -431,23 +640,22 @@ def _process_finding(
     finding_id = finding.get("finding_id", "unknown")
     fp = fix_proposal.get("fix_proposal", fix_proposal)
     failure_class = finding.get("failure_class", "UNKNOWN")
+    proposal_gate_command = fp.get("green_after", {}).get("command", "")
 
-    # 1. Run the FORGE/CI gate via the oracle (exit code = verdict).
-    ci_result = _run_ci_gate(oracle, ci_gate_command)
-
-    # 2. Write the CI receipt (VAL-LEARN-011).
-    ci_receipt_ref = _write_ci_receipt(run, finding_id, ci_result)
-
-    # 3. Non-green CI = rejection (VAL-LEARN-001, VAL-LEARN-012).
-    if not ci_result.passed:
-        _write_rejection_record(run, finding_id, ci_result, ci_receipt_ref)
-        sys.stderr.write(
-            f"finding {finding_id}: CI REJECTED — exit code {ci_result.exit_code}. "
-            f"Rejection recorded, no ratchet.\n"
+    # 1. A ratchet gate must come from the verified fix proposal, not from an
+    # unrelated CLI override, and it must be durable enough for future CI replay.
+    if ci_gate_command != proposal_gate_command:
+        _write_defer_record(
+            run,
+            finding_id,
+            "ci_gate command differs from fix_proposal.green_after.command; "
+            "refusing to ratchet unproven override",
         )
-        return 1, "rejected"
+        sys.stdout.write(
+            f"finding {finding_id}: DEFER — CI gate override does not match fix proposal\n"
+        )
+        return 0, "deferred"
 
-    # 4. Green CI. Check gate producibility (ratchet-or-nothing).
     can_produce, reason = _can_produce_gate(fp)
     if not can_produce:
         _write_defer_record(run, finding_id, reason)
@@ -456,20 +664,81 @@ def _process_finding(
         )
         return 0, "deferred"
 
-    # 5. Drive the existing ratchet engine (VAL-LEARN-002).
+    durable, durability_reason = _validate_repo_durable_gate(ci_gate_command, repo_root)
+    if not durable:
+        _write_defer_record(
+            run,
+            finding_id,
+            f"gate command is not repo-durable: {durability_reason}",
+        )
+        sys.stdout.write(
+            f"finding {finding_id}: DEFER — gate command is not repo-durable\n"
+        )
+        return 0, "deferred"
+
+    # 2. Run the FORGE/CI gate via the oracle (exit code = verdict).
+    ci_result = _run_ci_gate(oracle, ci_gate_command)
+
+    # 3. Write the CI receipt (VAL-LEARN-011).
+    ci_receipt_ref = _write_ci_receipt(run, finding_id, ci_result)
+
+    # 4. Non-green CI = rejection (VAL-LEARN-001, VAL-LEARN-012).
+    if not ci_result.passed:
+        _write_rejection_record(run, finding_id, ci_result, ci_receipt_ref)
+        sys.stderr.write(
+            f"finding {finding_id}: CI REJECTED — exit code {ci_result.exit_code}. "
+            f"Rejection recorded, no ratchet.\n"
+        )
+        return 1, "rejected"
+
+    # 5. Green CI. Check gate producibility (ratchet-or-nothing).
+    if not wire_ci:
+        _write_defer_record(
+            run,
+            finding_id,
+            "--wire-ci disabled — learned gates require a durable standing CI gate",
+        )
+        sys.stdout.write(
+            f"finding {finding_id}: DEFER — --wire-ci disabled; no durable standing gate wired\n"
+        )
+        return 0, "deferred"
+
+    # 6. Drive the existing ratchet engine (VAL-LEARN-002).
     ratchet_receipt = _drive_ratchet_engine(oracle, repo_root)
     ratchet_receipt_ref = _write_ratchet_engine_receipt(run, finding_id, ratchet_receipt)
+    if ratchet_receipt.get("exit_code") != 0:
+        _write_defer_record(
+            run,
+            finding_id,
+            f"existing ratchet engine failed with exit {ratchet_receipt.get('exit_code')}; "
+            f"receipt={ratchet_receipt_ref}",
+        )
+        sys.stdout.write(
+            f"finding {finding_id}: DEFER — existing ratchet engine red; receipt {ratchet_receipt_ref}\n"
+        )
+        return 0, "deferred"
 
-    # 6. Write the red_before receipt (evidence-linked).
+    # 7. Write the red_before receipt (evidence-linked).
     red_before_ref = _write_red_before_receipt(run, finding_id, fp)
 
-    # 7. Construct the new_gate (spec §6.4).
+    # 8. Construct the new_gate (spec §6.4).
     new_gate = _build_new_gate(
         finding=finding,
         fix_proposal=fp,
         red_before_ref=red_before_ref,
         green_after_ref=ci_receipt_ref,
     )
+    durable, durability_reason = _validate_repo_durable_gate(new_gate["location"], repo_root)
+    if not durable:
+        _write_defer_record(
+            run,
+            finding_id,
+            f"gate command is not repo-durable: {durability_reason}",
+        )
+        sys.stdout.write(
+            f"finding {finding_id}: DEFER — gate command is not repo-durable\n"
+        )
+        return 0, "deferred"
 
     # 8. Honestly assess prevents_recurrence from receipt evidence (VAL-LEARN-008).
     prevents, prevents_note = _assess_prevents_recurrence(
@@ -477,7 +746,42 @@ def _process_finding(
     )
 
     # 9. Document promote.py deferral concretely (VAL-LEARN-002).
-    promote_note = _promote_deferral_note(finding, fp)
+    promote_note = _promote_deferral_note(finding, fp, ratchet_receipt_ref)
+
+    ci_wire_ref = ""
+    from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
+
+    workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
+    gate_name = f"{finding_id}: {failure_class}"
+    try:
+        added = wire_gate(
+            workflow_path,
+            gate_id=finding_id,
+            name=gate_name,
+            command=new_gate["location"] or ci_gate_command,
+        )
+    except WorkflowError as exc:
+        sys.stderr.write(f"finding {finding_id}: CI workflow wiring failed — {exc}\n")
+        return 2, "error"
+    ci_wire_ref = _write_ci_wire_receipt(
+        run=run,
+        finding_id=finding_id,
+        workflow_path=workflow_path,
+        gate_id=finding_id,
+        gate_name=gate_name,
+        gate_command=new_gate["location"] or ci_gate_command,
+        added=added,
+    )
+
+    # 10. Fresh post-ratchet re-audit: try to reintroduce the slop class and
+    # record whether the standing gate catches it.
+    post_reaudit_ref, post_reaudit_receipt = _run_post_ratchet_reaudit(
+        run=run,
+        finding_id=finding_id,
+        new_gate=new_gate,
+        oracle=oracle,
+        repo_root=repo_root,
+    )
 
     # 10. Build the ratchet record (§6.4).
     root_cause = finding.get("observed", finding.get("title", ""))
@@ -490,10 +794,12 @@ def _process_finding(
         prevents_recurrence=prevents,
         prevents_recurrence_note=prevents_note,
         ci_receipt_ref=ci_receipt_ref,
+        post_ratchet_reaudit_ref=post_reaudit_ref,
         promote_deferral=promote_note,
     )
     ratchet_path = run.ratchet_path(finding_id)
     run.write_yaml(ratchet_path, ratchet.to_dict())
+    ratchet_ref = _relative_ref(run, ratchet_path)
 
     # 11. Build the ledger entry (§6.5).
     commit = _git_commit(repo_root)
@@ -502,52 +808,37 @@ def _process_finding(
         commit=commit,
         finding_class=failure_class,
         status="gated",
-        gate_ref=_relative_ref(run, ratchet_path),
+        gate_ref=ratchet_ref,
         receipt_ref=ci_receipt_ref,
         human_approver="",
         claim_label="prior_claim",
+        post_ratchet_reaudit_ref=post_reaudit_ref,
     )
     ledger_path = run.ledger_entry_path(finding_id)
     run.write_yaml(ledger_path, ledger.to_dict())
-
-    ci_wire_ref = ""
-    if wire_ci:
-        from scripts.governance.loop.wire_ci_gate import WorkflowError, wire_gate
-
-        workflow_path = ci_workflow or (repo_root / DEFAULT_CI_WORKFLOW)
-        gate_name = f"{finding_id}: {failure_class}"
-        try:
-            added = wire_gate(
-                workflow_path,
-                gate_id=finding_id,
-                name=gate_name,
-                command=new_gate["location"] or ci_gate_command,
-            )
-        except WorkflowError as exc:
-            sys.stderr.write(f"finding {finding_id}: CI workflow wiring failed — {exc}\n")
-            return 2, "error"
-        ci_wire_ref = _write_ci_wire_receipt(
-            run=run,
-            finding_id=finding_id,
-            workflow_path=workflow_path,
-            gate_id=finding_id,
-            gate_name=gate_name,
-            gate_command=new_gate["location"] or ci_gate_command,
-            added=added,
-        )
+    post_reaudit_ledger_ref = _write_post_ratchet_ledger_entry(
+        run=run,
+        finding_id=finding_id,
+        commit=commit,
+        failure_class=failure_class,
+        ratchet_ref=ratchet_ref,
+        post_reaudit_ref=post_reaudit_ref,
+        receipt=post_reaudit_receipt,
+    )
 
     # 12. Update the run manifest.
     gate_manifest = {
         "finding_id": finding_id,
         "kind": new_gate["kind"],
         "location": new_gate["location"],
-        "ratchet_ref": _relative_ref(run, ratchet_path),
+        "ratchet_ref": ratchet_ref,
         "ledger_ref": _relative_ref(run, ledger_path),
+        "post_ratchet_ledger_ref": post_reaudit_ledger_ref,
         "ci_receipt_ref": ci_receipt_ref,
         "ratchet_engine_receipt_ref": ratchet_receipt_ref,
+        "post_ratchet_reaudit_ref": post_reaudit_ref,
     }
-    if ci_wire_ref:
-        gate_manifest["ci_wire_receipt_ref"] = ci_wire_ref
+    gate_manifest["ci_wire_receipt_ref"] = ci_wire_ref
     run.add_gate(gate_manifest)
 
     sys.stdout.write(
@@ -582,6 +873,14 @@ def run_learn(
     findings_map: dict[str, dict] = {}
     if findings_path.is_file():
         for f in run.read_jsonl(findings_path):
+            mismatch = _artifact_run_id_mismatch(
+                f,
+                run.run_id,
+                "accepted finding",
+                f.get("finding_id", "unknown"),
+            )
+            if mismatch is not None:
+                return _emit_error(mismatch)
             fid = f.get("finding_id")
             if fid:
                 findings_map[fid] = f
@@ -597,9 +896,17 @@ def run_learn(
     for vpath in verdicts:
         vdoc = run.read_yaml(vpath)
         vv = vdoc.get("verifier_verdict", vdoc)
-        if vv.get("verdict") != "confirmed":
-            continue
         finding_id = vv.get("finding_id", "unknown")
+        mismatch = _artifact_run_id_mismatch(
+            vv,
+            run.run_id,
+            "verifier verdict",
+            finding_id,
+        )
+        if mismatch is not None:
+            return _emit_error(mismatch)
+        if vv.get("verdict") != "confirmed" or vv.get("routing") != "ADVANCE":
+            continue
         finding = findings_map.get(finding_id, {"finding_id": finding_id})
         fp_path = run.fix_proposal_path(finding_id)
         if not fp_path.is_file():
@@ -608,6 +915,15 @@ def run_learn(
             )
             continue
         fp_doc = run.read_yaml(fp_path)
+        fp = fp_doc.get("fix_proposal", fp_doc)
+        mismatch = _artifact_run_id_mismatch(
+            fp,
+            run.run_id,
+            "fix proposal",
+            finding_id,
+        )
+        if mismatch is not None:
+            return _emit_error(mismatch)
         confirmed.append((vv, finding, fp_doc))
 
     if not confirmed:
@@ -625,7 +941,7 @@ def run_learn(
         # Determine the CI gate command: explicit arg > fix_proposal green_after.
         gate_cmd = ci_gate_command
         if gate_cmd is None:
-            gate_cmd = fp.get("green_after", {}).get("command", "true")
+            gate_cmd = fp.get("green_after", {}).get("command", "")
 
         rc, status = _process_finding(
             finding, fp_doc, vv, run, oracle, repo_root, gate_cmd,

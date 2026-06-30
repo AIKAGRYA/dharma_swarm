@@ -57,7 +57,21 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "title", "severity", "evidence_level", "observed", "recommendation"],
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "evidence_level",
+          "confidence",
+          "files",
+          "line_refs",
+          "observed",
+          "inferred",
+          "risk",
+          "failure_class",
+          "recommendation",
+          "verification"
+        ],
         "properties": {
           "id": {"type": "string"},
           "title": {"type": "string"},
@@ -71,7 +85,12 @@
           "risk": {"type": "string"},
           "failure_class": {"type": "string"},
           "recommendation": {"type": "string"},
-          "verification": {"type": "string"}
+          "verification": {"type": "string"},
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "integer", "minimum": 0},
+            "uniqueItems": true
+          }
         }
       }
     },

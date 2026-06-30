@@ -43,6 +43,14 @@ ALL_COUNCILS = [
 USER_REPO = "/Users/dhyana/dharma_swarm"
 
 
+def _durable_gate_command(script_name: str = "durable_gate.py") -> str:
+    return f'"{VENV_PYTHON}" scripts/governance/loop/{script_name}'
+
+
+def _durable_fail_gate_command() -> str:
+    return _durable_gate_command("durable_fail_gate.py")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -105,7 +113,7 @@ def _make_fix_proposal(
     green_exit: int = 0,
     gate_command: str | None = None,
 ) -> dict:
-    cmd = gate_command or f'"{VENV_PYTHON}" -c "import sys; sys.exit(0)"'
+    cmd = gate_command or _durable_gate_command()
     return {
         "fix_proposal": {
             "run_id": run_id,
@@ -203,13 +211,44 @@ def _setup_run(
     return warrant_path, run_id, runs_root
 
 
+def _green_ratchet_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "green-ratchet-repo"
+    script_dir = repo / "scripts" / "governance" / "hygiene"
+    script_dir.mkdir(parents=True, exist_ok=True)
+    (script_dir / "ratchet.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if '--json' in sys.argv:\n"
+        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
+        "sys.exit(0)\n"
+    )
+    gate_dir = repo / "scripts" / "governance" / "loop"
+    gate_dir.mkdir(parents=True, exist_ok=True)
+    (gate_dir / "durable_gate.py").write_text(
+        "import sys\n"
+        "print('OK: durable gate passed')\n"
+        "sys.exit(0)\n"
+    )
+    (gate_dir / "durable_fail_gate.py").write_text(
+        "import sys\n"
+        "print('FAIL: durable gate failed')\n"
+        "sys.exit(1)\n"
+    )
+    return repo
+
+
+def _has_repo_root_arg(args: list[str] | None) -> bool:
+    return args is not None and "--repo-root" in args
+
+
 def _run_learn_cli(
     warrant: Path,
     run_id: str,
     runs_root: Path,
-    ci_gate: str = "true",
+    ci_gate: str | None = None,
     extra_args: list[str] | None = None,
     extra_env: dict | None = None,
+    wire_ci: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(REPO_ROOT)
@@ -221,8 +260,16 @@ def _run_learn_cli(
         VENV_PYTHON, str(LEARN_CLI),
         "--warrant", str(warrant),
         "--run-id", run_id,
-        "--ci-gate", ci_gate,
     ]
+    if ci_gate is not None:
+        cmd.extend(["--ci-gate", ci_gate])
+    if wire_ci:
+        cmd.extend([
+            "--wire-ci",
+            "--ci-workflow", str(runs_root.parent / "loop-ratchet-gates.yml"),
+        ])
+    if not _has_repo_root_arg(extra_args):
+        cmd.extend(["--repo-root", str(_green_ratchet_repo(runs_root.parent))])
     if extra_args:
         cmd.extend(extra_args)
     return subprocess.run(cmd, capture_output=True, text=True, env=env)
@@ -262,7 +309,7 @@ class TestLearnGreenAdvances:
         vv = _make_verifier_verdict("learn-test-001", "F-GREEN", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
 
         run = _open_run_search(run_id, runs_root)
@@ -273,11 +320,15 @@ class TestLearnGreenAdvances:
 
     def test_non_green_ci_no_ratchet(self, tmp_path):
         finding = _make_finding(fid="F-RED")
-        fp = _make_fix_proposal("learn-test-001", "F-RED")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-RED",
+            gate_command=_durable_fail_gate_command(),
+        )
         vv = _make_verifier_verdict("learn-test-001", "F-RED", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="false")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         # non-green = rejection (exit 1)
         assert proc.returncode == 1, f"expected exit 1 for non-green, got {proc.returncode}: {proc.stdout!r}"
 
@@ -288,21 +339,41 @@ class TestLearnGreenAdvances:
     def test_non_green_rejection_recorded(self, tmp_path):
         """VAL-LEARN-012: rejection reason (exit code + failing gate) recorded."""
         finding = _make_finding(fid="F-REJ")
-        fp = _make_fix_proposal("learn-test-001", "F-REJ")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-REJ",
+            gate_command=_durable_fail_gate_command(),
+        )
         vv = _make_verifier_verdict("learn-test-001", "F-REJ", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="false")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 1
 
         run = _open_run_search(run_id, runs_root)
         # A rejection record should exist in the run dir
         rejection_files = list(run.run_dir.glob("*reject*")) + list(run.run_dir.glob("*rejection*"))
         # Also check the receipts dir for a ci_receipt with non-green exit
-        receipt_files = list(run.receipts_dir.glob("*ci*"))
+        receipt_files = list(run.receipts_dir.glob("ci_receipt_*.json"))
         assert receipt_files, "CI receipt must be written even on non-green"
         receipt = json.loads(receipt_files[0].read_text())
         assert receipt["exit_code"] != 0, "non-green receipt must have non-zero exit_code"
+
+    def test_wire_ci_disabled_routes_to_defer_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-NOWIRE")
+        fp = _make_fix_proposal("learn-test-001", "F-NOWIRE")
+        vv = _make_verifier_verdict("learn-test-001", "F-NOWIRE", verdict="confirmed", routing="ADVANCE")
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root, wire_ci=False)
+        assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-NOWIRE").exists()
+        assert not run.ledger_entry_path("F-NOWIRE").exists()
+        defer_path = run.run_dir / "defer_F-NOWIRE.yaml"
+        assert defer_path.is_file()
+        assert "wire-ci" in defer_path.read_text().lower()
 
 
 class TestLearnDrivesRatchetEngine:
@@ -328,7 +399,7 @@ class TestLearnDrivesRatchetEngine:
         vv = _make_verifier_verdict("learn-test-001", "F-RATCHET", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
 
         run = _open_run_search(run_id, runs_root)
@@ -336,6 +407,211 @@ class TestLearnDrivesRatchetEngine:
         assert ratchet_receipts, (
             "a ratchet engine receipt must be produced showing the existing engine was driven"
         )
+
+    def test_red_ratchet_engine_defers_learning(self, tmp_path):
+        finding = _make_finding(fid="F-ENGINE-RED")
+        fp = _make_fix_proposal("learn-test-001", "F-ENGINE-RED")
+        vv = _make_verifier_verdict("learn-test-001", "F-ENGINE-RED", verdict="confirmed", routing="ADVANCE")
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+        empty_repo = tmp_path / "empty-repo"
+        empty_repo.mkdir()
+        gate_dir = empty_repo / "scripts" / "governance" / "loop"
+        gate_dir.mkdir(parents=True)
+        (gate_dir / "durable_gate.py").write_text(
+            "import sys\n"
+            "print('OK: durable gate passed')\n"
+            "sys.exit(0)\n"
+        )
+
+        proc = _run_learn_cli(
+            warrant,
+            run_id,
+            runs_root,
+            extra_args=["--repo-root", str(empty_repo)],
+        )
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-ENGINE-RED").exists()
+        assert not run.ledger_entry_path("F-ENGINE-RED").exists()
+        defer_path = run.run_dir / "defer_F-ENGINE-RED.yaml"
+        assert defer_path.is_file()
+        assert "ratchet" in defer_path.read_text().lower()
+
+    def test_temp_worktree_gate_command_defers_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-TEMP-GATE")
+        temp_gate = '"/tmp/ds_loop_fix_F-TEMP-GATE/scripts/governance/loop/fix_gate.py"'
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-TEMP-GATE",
+            gate_command=f"{VENV_PYTHON} {temp_gate}",
+        )
+        vv = _make_verifier_verdict(
+            "learn-test-001",
+            "F-TEMP-GATE",
+            verdict="confirmed",
+            routing="ADVANCE",
+        )
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root)
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-TEMP-GATE").exists()
+        assert not run.ledger_entry_path("F-TEMP-GATE").exists()
+        defer_path = run.run_dir / "defer_F-TEMP-GATE.yaml"
+        assert defer_path.is_file()
+        assert "disposable worktree" in defer_path.read_text()
+
+    def test_noop_gate_command_defers_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-NOOP-GATE")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-NOOP-GATE",
+            gate_command="true",
+        )
+        vv = _make_verifier_verdict(
+            "learn-test-001",
+            "F-NOOP-GATE",
+            verdict="confirmed",
+            routing="ADVANCE",
+        )
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root)
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-NOOP-GATE").exists()
+        defer_path = run.run_dir / "defer_F-NOOP-GATE.yaml"
+        assert defer_path.is_file()
+        assert "repo-durable" in defer_path.read_text()
+
+    def test_inline_python_gate_defers_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-INLINE-GATE")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-INLINE-GATE",
+            gate_command=f'"{VENV_PYTHON}" -c "import sys; sys.exit(0)"',
+        )
+        vv = _make_verifier_verdict(
+            "learn-test-001",
+            "F-INLINE-GATE",
+            verdict="confirmed",
+            routing="ADVANCE",
+        )
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root)
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-INLINE-GATE").exists()
+        defer_path = run.run_dir / "defer_F-INLINE-GATE.yaml"
+        assert defer_path.is_file()
+        assert "repo-durable" in defer_path.read_text()
+
+    def test_shell_control_operator_gate_defers_not_gated(self, tmp_path):
+        """VAL-AUDIT-012: a gate command containing shell control operators
+        (&&, ||, ;, |) is rejected by the learn stage — the command must be a
+        direct replayable command that behaves identically under shell=False."""
+        for operator, fid_suffix in (("&&", "AND"), ("||", "OR"), (";", "SEMI"), ("|", "PIPE")):
+            iter_tmp = tmp_path / f"iter-{fid_suffix}"
+            iter_tmp.mkdir()
+            finding = _make_finding(fid=f"F-CTRL-{fid_suffix}")
+            gate_cmd = (
+                f'"{VENV_PYTHON}" scripts/governance/loop/durable_gate.py '
+                f'{operator} echo done'
+            )
+            fp = _make_fix_proposal(
+                "learn-test-001",
+                f"F-CTRL-{fid_suffix}",
+                gate_command=gate_cmd,
+            )
+            vv = _make_verifier_verdict(
+                "learn-test-001",
+                f"F-CTRL-{fid_suffix}",
+                verdict="confirmed",
+                routing="ADVANCE",
+            )
+            warrant, run_id, runs_root = _setup_run(iter_tmp, finding, fp, vv)
+
+            proc = _run_learn_cli(warrant, run_id, runs_root)
+            assert proc.returncode == 0, f"{operator}: stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+            run = _open_run_search(run_id, runs_root)
+            assert not run.ratchet_path(f"F-CTRL-{fid_suffix}").exists(), (
+                f"gate with {operator!r} control operator must not be ratcheted"
+            )
+            defer_path = run.run_dir / f"defer_F-CTRL-{fid_suffix}.yaml"
+            assert defer_path.is_file(), f"defer record must exist for {operator!r} gate"
+            defer_text = defer_path.read_text()
+            assert "repo-durable" in defer_text or "control operator" in defer_text, (
+                f"defer reason must mention durability/control operators for {operator!r}: {defer_text!r}"
+            )
+
+    def test_validate_repo_durable_gate_rejects_control_operators_directly(self):
+        """VAL-AUDIT-012: _validate_repo_durable_gate rejects each control operator."""
+        from scripts.governance.loop.prompt_audit_learn import _validate_repo_durable_gate
+
+        repo_root = Path("/tmp/ds_loop")
+        for operator in ("&&", "||", ";", "|"):
+            cmd = f'python3 scripts/governance/loop/durable_gate.py {operator} echo ok'
+            ok, reason = _validate_repo_durable_gate(cmd, repo_root)
+            assert not ok, f"gate with {operator!r} must be rejected, got ok={ok}"
+            assert "control operator" in reason, (
+                f"rejection reason must mention control operators for {operator!r}: {reason!r}"
+            )
+
+    def test_missing_repo_gate_artifact_defers_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-MISSING-GATE")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-MISSING-GATE",
+            gate_command=f'"{VENV_PYTHON}" scripts/governance/loop/missing_gate.py',
+        )
+        vv = _make_verifier_verdict(
+            "learn-test-001",
+            "F-MISSING-GATE",
+            verdict="confirmed",
+            routing="ADVANCE",
+        )
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root)
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-MISSING-GATE").exists()
+        defer_path = run.run_dir / "defer_F-MISSING-GATE.yaml"
+        assert defer_path.is_file()
+        assert "missing" in defer_path.read_text()
+
+    def test_ci_gate_override_mismatch_defers_not_gated(self, tmp_path):
+        finding = _make_finding(fid="F-OVERRIDE-GATE")
+        fp = _make_fix_proposal("learn-test-001", "F-OVERRIDE-GATE")
+        vv = _make_verifier_verdict(
+            "learn-test-001",
+            "F-OVERRIDE-GATE",
+            verdict="confirmed",
+            routing="ADVANCE",
+        )
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(
+            warrant,
+            run_id,
+            runs_root,
+            ci_gate=_durable_fail_gate_command(),
+        )
+        assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-OVERRIDE-GATE").exists()
+        defer_path = run.run_dir / "defer_F-OVERRIDE-GATE.yaml"
+        assert defer_path.is_file()
+        assert "differs" in defer_path.read_text()
 
 
 class TestLearnRatchetRecord:
@@ -348,7 +624,7 @@ class TestLearnRatchetRecord:
         vv = _make_verifier_verdict("learn-test-001", "F-GATE", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
 
         run = _open_run_search(run_id, runs_root)
@@ -366,7 +642,7 @@ class TestLearnRatchetRecord:
         vv = _make_verifier_verdict("learn-test-001", "F-PREV", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -381,7 +657,7 @@ class TestLearnRatchetRecord:
         vv = _make_verifier_verdict("learn-test-001", "F-RC", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -400,7 +676,7 @@ class TestLearnLedgerEntry:
         vv = _make_verifier_verdict("learn-test-001", "F-LED", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -417,7 +693,7 @@ class TestLearnLedgerEntry:
         vv = _make_verifier_verdict("learn-test-001", "F-EV", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -436,7 +712,7 @@ class TestLearnLedgerEntry:
         vv = _make_verifier_verdict("learn-test-001", "F-CLAIM", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -458,7 +734,7 @@ class TestLearnDeferOnNoGate:
         vv = _make_verifier_verdict("learn-test-001", "F-NOGATE", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         # DEFER = clean exit 0 (not rejected, just deferred)
         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
 
@@ -484,11 +760,11 @@ class TestLearnCIReceipt:
         vv = _make_verifier_verdict("learn-test-001", "F-CIR", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
 
         run = _open_run_search(run_id, runs_root)
-        ci_receipts = list(run.receipts_dir.glob("*ci*"))
+        ci_receipts = list(run.receipts_dir.glob("ci_receipt_*.json"))
         assert ci_receipts, "CI receipt must be written to receipts/"
         receipt = json.loads(ci_receipts[0].read_text())
         assert receipt["exit_code"] == 0, "green CI receipt must have exit_code 0"
@@ -514,11 +790,23 @@ class TestLearnRefutedNoRatchet:
         vv = _make_verifier_verdict("learn-test-001", "F-REF", verdict="refuted", routing="REJECTED")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0, f"{proc.stdout!r} {proc.stderr!r}"
 
         run = _open_run_search(run_id, runs_root)
         assert not run.ratchet_path("F-REF").is_file(), "refuted verdict must not produce a ratchet"
+
+    def test_confirmed_without_advance_routing_no_ratchet(self, tmp_path):
+        finding = _make_finding(fid="F-CONF-DEFER")
+        fp = _make_fix_proposal("learn-test-001", "F-CONF-DEFER")
+        vv = _make_verifier_verdict("learn-test-001", "F-CONF-DEFER", verdict="confirmed", routing="DEFER")
+        warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
+
+        proc = _run_learn_cli(warrant, run_id, runs_root)
+        assert proc.returncode == 0
+
+        run = _open_run_search(run_id, runs_root)
+        assert not run.ratchet_path("F-CONF-DEFER").is_file()
 
     def test_inconclusive_verdict_no_ratchet(self, tmp_path):
         finding = _make_finding(fid="F-INCON")
@@ -526,7 +814,7 @@ class TestLearnRefutedNoRatchet:
         vv = _make_verifier_verdict("learn-test-001", "F-INCON", verdict="inconclusive", routing="DEFER")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 0
 
         run = _open_run_search(run_id, runs_root)
@@ -553,7 +841,7 @@ class TestLearnNoConfirmedVerdicts:
         )
         assert proc.returncode == 0
 
-        proc = _run_learn_cli(warrant_path, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant_path, run_id, runs_root)
         assert proc.returncode == 0
         assert "nothing to learn" in proc.stdout.lower() or "no confirmed" in proc.stdout.lower()
 
@@ -572,7 +860,7 @@ class TestLearnWarrantRevalidation:
         w["expires_at"] = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         warrant.write_text(yaml.safe_dump(w, sort_keys=False))
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="true")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 2, "expired warrant must be refused (exit 2)"
         assert "expired" in proc.stderr.lower() or "refused" in proc.stderr.lower()
 
@@ -582,11 +870,15 @@ class TestLearnNonGreenRejectionDetail:
 
     def test_rejection_record_has_exit_code_and_gate(self, tmp_path):
         finding = _make_finding(fid="F-REJ2")
-        fp = _make_fix_proposal("learn-test-001", "F-REJ2")
+        fp = _make_fix_proposal(
+            "learn-test-001",
+            "F-REJ2",
+            gate_command=_durable_fail_gate_command(),
+        )
         vv = _make_verifier_verdict("learn-test-001", "F-REJ2", verdict="confirmed", routing="ADVANCE")
         warrant, run_id, runs_root = _setup_run(tmp_path, finding, fp, vv)
 
-        proc = _run_learn_cli(warrant, run_id, runs_root, ci_gate="false")
+        proc = _run_learn_cli(warrant, run_id, runs_root)
         assert proc.returncode == 1
 
         run = _open_run_search(run_id, runs_root)

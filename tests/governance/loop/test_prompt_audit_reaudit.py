@@ -250,6 +250,9 @@ def test_verifier_verdict_produced(tmp_path):
         assert isinstance(vv["falsification_attempts"], list)
         assert len(vv["falsification_attempts"]) > 0
         assert "evidence" in vv
+        receipt = vv.get("verifier_invocation")
+        assert receipt and receipt["role"] == "verifier"
+        assert receipt["invocation_id"].startswith("stub-verifier-")
     finally:
         os.environ.pop("LOOP_RUNS_DIR", None)
 
@@ -286,6 +289,28 @@ def test_verifier_input_excludes_implementer_rationale(tmp_path):
     # No rationale-like keys leak through
     for key in ("rationale", "implementer_notes", "summary", "recommendation", "inferred"):
         assert key not in verifier_input, f"Verifier input leaks {key!r}"
+
+
+def test_verifier_input_recursively_strips_session_context():
+    from scripts.governance.loop.prompt_audit_reaudit import build_verifier_input
+
+    finding = _make_finding(fid="F-NESTED-ISO")
+    finding["session_context"] = {"implementer_rationale": "SECRET_RATIONALE"}
+    finding["nested"] = [{"rationale": "SECRET_NESTED"}]
+    fix_proposal = _make_fix_proposal("reaudit-test-001", "F-NESTED-ISO")
+    fp = fix_proposal["fix_proposal"]
+    fp["implementer_invocation"] = {
+        "invocation_id": "impl-secret",
+        "stdout_excerpt": "SECRET_STDOUT",
+        "session_context": {"notes": "SECRET_NOTES"},
+    }
+    fp["red_before"]["session_context"] = {"rationale": "SECRET_RECEIPT_CONTEXT"}
+
+    verifier_input = build_verifier_input(finding, fp)
+    serialized = json.dumps(verifier_input, sort_keys=True)
+    assert "SECRET_" not in serialized
+    assert "implementer_invocation" not in serialized
+    assert "session_context" not in serialized
 
 
 # ---------------------------------------------------------------------------
@@ -801,6 +826,146 @@ def test_user_working_tree_untouched(tmp_path):
 
     assert before.stdout == after.stdout, "user working tree status changed!"
     assert before_branch.stdout == after_branch.stdout, "user working tree branch changed!"
+
+
+# ---------------------------------------------------------------------------
+# VAL-AUDIT-004: Verifier evidence filtered to deterministic keys
+# ---------------------------------------------------------------------------
+
+
+def test_deterministic_receipt_subset_keeps_only_whitelisted_keys():
+    """VAL-AUDIT-004: _deterministic_receipt_subset keeps only the deterministic
+    receipt keys (command, exit_code, key_output, receipt_ref, valid, kind, value)
+    and strips non-deterministic keys (rationale, session_context, recommendations)."""
+    from scripts.governance.loop.prompt_audit_reaudit import (
+        _DETERMINISTIC_RECEIPT_KEYS,
+        _deterministic_receipt_subset,
+    )
+
+    expected_keys = {"command", "exit_code", "key_output", "receipt_ref", "valid", "kind", "value"}
+    assert _DETERMINISTIC_RECEIPT_KEYS == expected_keys, (
+        f"deterministic key set must be exactly {expected_keys}, got {_DETERMINISTIC_RECEIPT_KEYS}"
+    )
+
+    receipt = {
+        "command": "pytest tests/x.py",
+        "exit_code": 1,
+        "key_output": "FAIL: ...",
+        "receipt_ref": "receipts/red_before.json",
+        "valid": True,
+        "kind": "red_before",
+        "value": 42,
+        # non-deterministic keys that must be stripped
+        "rationale": "the fix is good because I said so",
+        "session_context": {"notes": "SECRET"},
+        "recommendations": ["trust me"],
+        "implementer_notes": "I fixed it",
+        "inferred": "probably works",
+    }
+    subset = _deterministic_receipt_subset(receipt)
+    # Only deterministic keys retained
+    assert set(subset.keys()) == expected_keys, (
+        f"subset must contain only deterministic keys, got {set(subset.keys())}"
+    )
+    # Non-deterministic keys stripped
+    for bad_key in ("rationale", "session_context", "recommendations", "implementer_notes", "inferred"):
+        assert bad_key not in subset, f"non-deterministic key {bad_key!r} leaked into subset"
+    # Deterministic values preserved
+    assert subset["command"] == "pytest tests/x.py"
+    assert subset["exit_code"] == 1
+    assert subset["kind"] == "red_before"
+
+
+def test_deterministic_receipt_subset_non_dict_returns_empty():
+    """VAL-AUDIT-004: a non-dict receipt yields an empty dict (no crash)."""
+    from scripts.governance.loop.prompt_audit_reaudit import _deterministic_receipt_subset
+
+    assert _deterministic_receipt_subset(None) == {}
+    assert _deterministic_receipt_subset("not a dict") == {}
+    assert _deterministic_receipt_subset([]) == {}
+
+
+def test_verifier_input_evidence_contains_only_deterministic_keys(tmp_path):
+    """VAL-AUDIT-004: the constructed verifier input's evidence receipts contain
+    ONLY deterministic keys (end-to-end via build_verifier_input)."""
+    from scripts.governance.loop.prompt_audit_reaudit import build_verifier_input
+
+    finding = _make_finding(fid="F-DETKEYS-001")
+    fp = _make_fix_proposal("reaudit-test-001", "F-DETKEYS-001")
+    fp_inner = fp["fix_proposal"]
+    # Inject non-deterministic keys into the receipts
+    fp_inner["red_before"]["rationale"] = "SECRET_RATIONALE"
+    fp_inner["red_before"]["session_context"] = {"notes": "SECRET"}
+    fp_inner["green_after"]["recommendations"] = ["trust me"]
+
+    verifier_input = build_verifier_input(finding, fp_inner)
+    red = verifier_input["evidence"]["red_before"]
+    green = verifier_input["evidence"]["green_after"]
+    allowed = {"command", "exit_code", "key_output", "receipt_ref", "valid", "kind", "value"}
+    assert set(red.keys()) <= allowed, f"red_before leaked non-deterministic keys: {set(red.keys()) - allowed}"
+    assert set(green.keys()) <= allowed, f"green_after leaked non-deterministic keys: {set(green.keys()) - allowed}"
+    assert "rationale" not in red
+    assert "session_context" not in red
+    assert "recommendations" not in green
+
+
+# ---------------------------------------------------------------------------
+# VAL-AUDIT-005: Verifier generates unique invocation receipts (uuid4-based)
+# ---------------------------------------------------------------------------
+
+
+def test_consecutive_verifier_invocations_have_distinct_invocation_ids():
+    """VAL-AUDIT-005: two consecutive Verifier invocations generate different
+    uuid4-based invocation_ids, proving fresh context is distinguishable across runs."""
+    from scripts.governance.loop.prompt_audit_reaudit import StubVerifier
+
+    verifier = StubVerifier()
+    finding = _make_finding(fid="F-UUID-001")
+    evidence = {
+        "finding_id": "F-UUID-001",
+        "claim": {"finding_id": "F-UUID-001"},
+        "evidence": {
+            "red_before": {"exit_code": 1},
+            "green_after": {"exit_code": 0},
+            "proof_mode": "synthetic",
+        },
+    }
+    prompt = "falsification-first"
+
+    verifier.verify(finding, evidence, prompt)
+    first_receipt = verifier.invocation_receipt()
+    verifier.verify(finding, evidence, prompt)
+    second_receipt = verifier.invocation_receipt()
+
+    assert first_receipt is not None and second_receipt is not None
+    assert first_receipt["invocation_id"] != second_receipt["invocation_id"], (
+        "two consecutive verifier invocations must have distinct invocation_ids"
+    )
+    assert first_receipt["invocation_id"].startswith("stub-verifier-")
+    assert second_receipt["invocation_id"].startswith("stub-verifier-")
+
+
+def test_invocation_id_is_uuid4_hex_format():
+    """VAL-AUDIT-005: the invocation_id suffix is a uuid4 hex (32 hex chars)."""
+    from scripts.governance.loop.prompt_audit_reaudit import StubVerifier
+
+    verifier = StubVerifier()
+    finding = _make_finding(fid="F-UUIDFMT-001")
+    evidence = {
+        "finding_id": "F-UUIDFMT-001",
+        "claim": {"finding_id": "F-UUIDFMT-001"},
+        "evidence": {
+            "red_before": {"exit_code": 1},
+            "green_after": {"exit_code": 0},
+            "proof_mode": "synthetic",
+        },
+    }
+    verifier.verify(finding, evidence, "prompt")
+    receipt = verifier.invocation_receipt()
+    suffix = receipt["invocation_id"].replace("stub-verifier-", "")
+    # uuid4 hex is 32 hex characters
+    assert len(suffix) == 32, f"uuid4 hex suffix must be 32 chars, got {len(suffix)}: {suffix!r}"
+    assert all(c in "0123456789abcdef" for c in suffix), f"suffix must be hex: {suffix!r}"
 
 
 if __name__ == "__main__":

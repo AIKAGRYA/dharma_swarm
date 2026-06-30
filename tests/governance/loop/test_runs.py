@@ -114,15 +114,24 @@ class TestRunDirStructure:
         assert week_bucket == runs.current_week_bucket()
         assert run.run_dir.parent.parent == tmp_path
 
-    def test_create_run_idempotent_subdirs_exist(self, tmp_path, monkeypatch):
+    def test_create_run_id_single_use_by_default(self, tmp_path, monkeypatch):
         monkeypatch.setenv("LOOP_RUNS_DIR", str(tmp_path))
         runs = _import_runs()
         run = runs.RunManager.create_run(run_id="test-run-003")
-        # creating the same run again should not error and subdirs remain
-        run2 = runs.RunManager.create_run(run_id="test-run-003")
-        assert run2.run_dir == run.run_dir
+        with pytest.raises(FileExistsError):
+            runs.RunManager.create_run(run_id="test-run-003")
         for sub in REQUIRED_SUBDIRS:
-            assert (run2.run_dir / sub).is_dir()
+            assert (run.run_dir / sub).is_dir()
+
+    def test_create_run_resume_existing_requires_explicit_flag(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("LOOP_RUNS_DIR", str(tmp_path))
+        runs = _import_runs()
+        run = runs.RunManager.create_run(run_id="test-run-resume")
+        marker = run.audit_dir / "stale.json"
+        marker.write_text("{}\n")
+        resumed = runs.RunManager.create_run(run_id="test-run-resume", resume=True)
+        assert resumed.run_dir == run.run_dir
+        assert marker.exists(), "resume mode may keep existing artifacts"
 
     def test_cli_create_subdirs(self, tmp_path):
         env = {"LOOP_RUNS_DIR": str(tmp_path)}
@@ -139,6 +148,16 @@ class TestRunDirStructure:
         assert found, f"run dir not created under {tmp_path}"
         for sub in REQUIRED_SUBDIRS:
             assert (found[0] / sub).is_dir(), f"CLI missing subdir: {sub}"
+
+    def test_cli_create_duplicate_requires_resume(self, tmp_path):
+        env = {"LOOP_RUNS_DIR": str(tmp_path)}
+        first = _run_cli("create", "--run-id", "cli-run-dupe", env=env)
+        assert first.returncode == 0, first.stderr
+        second = _run_cli("create", "--run-id", "cli-run-dupe", env=env)
+        assert second.returncode == 2
+        assert "already exists" in second.stderr
+        resumed = _run_cli("create", "--run-id", "cli-run-dupe", "--resume", env=env)
+        assert resumed.returncode == 0, resumed.stderr
 
 
 # ---------------------------------------------------------------------------

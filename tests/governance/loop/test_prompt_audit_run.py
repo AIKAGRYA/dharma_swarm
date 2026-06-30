@@ -253,7 +253,10 @@ def test_invalid_output_aborts_no_partial_for_invalid_prompt(tmp_path):
         rc = run_audit(warrant_path, run, scope, backend=MixedBackend())
         assert rc == 2, f"expected exit 2, got {rc}"
 
-        # The first (valid) prompt's audit may exist; the second (invalid) must NOT.
+        # Stage 1 is atomic: once any prompt is invalid, no audit artifacts from
+        # that stage may remain, including earlier valid prompt outputs.
+        assert list(run.audit_dir.glob("*.json")) == []
+        assert not (run.audit_dir / "TV-01.json").exists()
         assert not (run.audit_dir / "TV-08.json").exists(), (
             "no partial artifact for the invalid prompt (TV-08)"
         )

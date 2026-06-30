@@ -193,6 +193,17 @@ def test_scope_filtered_by_warrant_councils(scoper):
         assert council in restricted, f"prompt {pid} (council {council}) outside warrant scope"
 
 
+def test_council_filter_applies_before_diff_cap(scoper):
+    """Out-of-scope prompts must not consume the diff cap before filtering."""
+    scope = scoper.select_prompts(
+        changed_files=["dharma_swarm/providers.py"],
+        warrant_councils=["runtime_distributed_reliability"],
+        diff_mapped_cap=1,
+    )
+    assert scope["diff_mapped_prompt_ids"] == ["RDR-06"]
+    assert "RDR-06" in scope["selected_prompt_ids"]
+
+
 def test_sentinels_filtered_when_council_excluded(scoper):
     """VAL-SCOPE-006 (edge): a sentinel whose council is excluded is filtered out.
 
@@ -291,3 +302,44 @@ def test_cli_deterministic_two_runs(tmp_path):
     assert res1.returncode == 0
     assert res2.returncode == 0
     assert out1.read_text() == out2.read_text()
+
+
+def test_cli_refuses_expired_warrant(tmp_path):
+    bad = dict(VALID_WARRANT)
+    bad["expires_at"] = "2000-01-01T00:00:00Z"
+    warrant = _write_warrant(tmp_path, bad)
+    out = tmp_path / "scope.json"
+    res = _run_cli([
+        "--warrant", str(warrant),
+        "--output", str(out),
+        "--changed-files", "dharma_swarm/providers.py",
+    ])
+    assert res.returncode == 2
+    assert "expired" in (res.stdout + res.stderr).lower()
+    assert not out.exists()
+
+
+def test_cli_clamps_diff_mapped_cap_to_five(tmp_path):
+    warrant = _write_warrant(tmp_path, VALID_WARRANT)
+    out = tmp_path / "scope.json"
+    res = _run_cli([
+        "--warrant", str(warrant),
+        "--output", str(out),
+        "--diff-mapped-cap", "99",
+        "--changed-files",
+        "dharma_swarm/providers.py",
+        "dharma_swarm/a2a/a2a_bridge.py",
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/evolution.py",
+        "dharma_swarm/memory_kernel/kernel.py",
+        "dharma_swarm/telos_gates.py",
+        "dharma_swarm/handoff.py",
+        "dharma_swarm/vsm_channels.py",
+        "dharma_swarm/stigmergy.py",
+        "tests/test_cascade.py",
+        ".github/workflows/ci.yml",
+    ])
+    assert res.returncode == 0, res.stderr
+    data = json.loads(out.read_text())
+    assert data["diff_mapped_cap"] == 5
+    assert len(data["diff_mapped_prompt_ids"]) <= 5

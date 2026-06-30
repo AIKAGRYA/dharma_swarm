@@ -101,8 +101,9 @@ def _make_audit_doc(
     prompt_id: str = "TV-01",
     council_id: str = "testing_verification",
     findings: list[dict] | None = None,
+    run_id: str | None = None,
 ) -> dict:
-    return {
+    doc = {
         "prompt_id": prompt_id,
         "council_id": council_id,
         "repo_path": "/tmp/ds_loop",
@@ -116,6 +117,9 @@ def _make_audit_doc(
         "findings": findings if findings is not None else [_make_finding()],
         "not_proven": [],
     }
+    if run_id is not None:
+        doc["run_id"] = run_id
+    return doc
 
 
 def _setup_run(
@@ -205,6 +209,18 @@ def test_e2plus_findings_routed_to_implement(tmp_path, ev):
     records = [json.loads(line) for line in findings_path.read_text().splitlines() if line.strip()]
     assert len(records) == 1
     assert records[0]["routing"] == "IMPLEMENT", f"E2+ finding must route to IMPLEMENT, got {records[0]['routing']}"
+
+
+def test_triage_rejects_audit_artifact_from_different_run_id(tmp_path):
+    finding = _make_finding(evidence_level="E2_tested", failure_class="RUN_ID_MISMATCH")
+    audit = _make_audit_doc(findings=[finding], run_id="other-run")
+    warrant, run_id, run_dir = _setup_run(tmp_path, run_id="triage-current", audits={"TV-01": audit})
+
+    proc = _run_triage_cli(warrant, run_id, tmp_path / "runs")
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert "run_id" in out and "other-run" in out
+    assert not (run_dir / "accepted_findings.jsonl").exists()
 
 
 # ---------------------------------------------------------------------------

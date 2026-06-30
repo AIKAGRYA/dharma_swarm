@@ -196,6 +196,17 @@ def test_assert_write_set_rejects_out_of_set_path(tmp_path):
     assert "dharma_swarm/secret.py" in str(exc.value), "must name the violating path"
 
 
+def test_assert_write_set_accepts_glob_semantics(tmp_path):
+    """Warrant.assert_write_set must use the same glob-aware semantics as remediation."""
+    from scripts.governance.loop.warrant import Warrant
+
+    doc = {**VALID_WARRANT, "write_set": ["scripts/governance/loop/**", "docs/governance"]}
+    p = _write_warrant(tmp_path, doc)
+    w = Warrant.from_yaml(p)
+    w.assert_write_set("scripts/governance/loop/nested/fix.py")
+    w.assert_write_set("docs/governance/README.md")
+
+
 # ---------------------------------------------------------------------------
 # Budget enforcement
 # ---------------------------------------------------------------------------
@@ -238,6 +249,28 @@ def test_check_budget_max_wall_clock_exceeded(tmp_path):
     res = w.check_budget(used_fixes=0, used_tokens=0, used_wall_clock_min=31)
     assert res.exceeded is True
     assert "max_wall_clock_min" in res.reason or "wall" in res.reason.lower()
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("max_tokens", "a lot"),
+        ("max_wall_clock_min", "soon"),
+        ("max_fixes_per_run", "many"),
+        ("max_tokens", -1),
+        ("max_wall_clock_min", -0.5),
+        ("max_fixes_per_run", -2),
+    ],
+)
+def test_budget_values_must_be_non_negative_numbers(tmp_path, key, value):
+    from scripts.governance.loop.warrant import Warrant, WarrantValidationError
+
+    bad = {**VALID_WARRANT, "budget": {**VALID_WARRANT["budget"], key: value}}
+    p = _write_warrant(tmp_path, bad)
+    with pytest.raises(WarrantValidationError) as exc:
+        Warrant.from_yaml(p)
+    msg = str(exc.value)
+    assert f"budget.{key}" in msg
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +373,16 @@ def test_cli_budget_under_limit_exits_zero(tmp_path):
     p = _write_warrant(tmp_path, VALID_WARRANT)
     proc = _run_cli(["check-budget", str(p), "--used-fixes", "3", "--used-tokens", "1000", "--used-wall-clock-min", "10"])
     assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+
+def test_cli_malformed_budget_yaml_exits_two_without_traceback(tmp_path):
+    bad = {**VALID_WARRANT, "budget": {**VALID_WARRANT["budget"], "max_tokens": "many"}}
+    p = _write_warrant(tmp_path, bad)
+    proc = _run_cli(["check-budget", str(p), "--used-tokens", "1"])
+    assert proc.returncode == 2
+    out = proc.stdout + proc.stderr
+    assert "budget.max_tokens" in out
+    assert "Traceback" not in out
 
 
 def test_cli_stage_entry_expired_refused_nonzero(tmp_path):

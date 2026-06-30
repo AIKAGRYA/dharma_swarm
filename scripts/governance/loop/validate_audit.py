@@ -25,6 +25,7 @@ from pathlib import Path
 import jsonschema
 
 SCHEMA_REL = Path("schemas") / "expert_audit_output.schema.json"
+E2_PLUS = {"E2_tested", "E3_cross_checked", "E4_regression_proven"}
 
 
 def _schema_path(repo_root: Path | None = None) -> Path:
@@ -77,9 +78,75 @@ def validate_audit_doc(doc: object, repo_root: Path | None = None) -> Validation
     schema = _load_schema(_schema_path(repo_root))
     validator = jsonschema.Draft202012Validator(schema)
     collected = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
-    if not collected:
+    semantic_errors = _semantic_evidence_errors(doc)
+    if not collected and not semantic_errors:
         return ValidationResult(valid=True, errors=[])
-    return ValidationResult(valid=False, errors=_structured_errors_from_list(collected))
+    return ValidationResult(
+        valid=False,
+        errors=[*_structured_errors_from_list(collected), *semantic_errors],
+    )
+
+
+def _semantic_evidence_errors(doc: object) -> list[dict]:
+    """Cross-field evidence binding checks beyond JSON Schema.
+
+    E2+ claims are only valid when backed by deterministic command receipts.
+    The summary evidence floor gates the whole document, and each E2+ finding
+    must bind to one or more indexes in ``scope.commands_run``.
+    """
+    if not isinstance(doc, dict):
+        return []
+
+    scope = doc.get("scope", {})
+    commands_run = scope.get("commands_run", []) if isinstance(scope, dict) else []
+    command_count = len(commands_run) if isinstance(commands_run, list) else 0
+    errors: list[dict] = []
+
+    summary = doc.get("summary", {})
+    evidence_floor = summary.get("evidence_floor") if isinstance(summary, dict) else None
+    if evidence_floor in E2_PLUS and command_count == 0:
+        errors.append({
+            "path": "summary/evidence_floor",
+            "message": f"summary.evidence_floor={evidence_floor} requires at least one scope.commands_run receipt",
+            "validator": "deterministic_evidence",
+            "validator_value": "scope.commands_run minItems 1 for E2+",
+        })
+
+    findings = doc.get("findings", [])
+    if not isinstance(findings, list):
+        return errors
+    for idx, finding in enumerate(findings):
+        if not isinstance(finding, dict):
+            continue
+        evidence_level = finding.get("evidence_level")
+        if evidence_level not in E2_PLUS:
+            continue
+        refs = finding.get("evidence_refs")
+        if command_count == 0:
+            errors.append({
+                "path": f"findings/{idx}/evidence_refs",
+                "message": f"finding evidence_level={evidence_level} requires scope.commands_run receipts",
+                "validator": "deterministic_evidence",
+                "validator_value": "scope.commands_run minItems 1 for E2+ findings",
+            })
+            continue
+        if not isinstance(refs, list) or not refs:
+            errors.append({
+                "path": f"findings/{idx}/evidence_refs",
+                "message": f"finding evidence_level={evidence_level} requires non-empty evidence_refs",
+                "validator": "deterministic_evidence",
+                "validator_value": "non-empty indexes into scope.commands_run",
+            })
+            continue
+        bad_refs = [ref for ref in refs if not isinstance(ref, int) or ref < 0 or ref >= command_count]
+        if bad_refs:
+            errors.append({
+                "path": f"findings/{idx}/evidence_refs",
+                "message": f"evidence_refs {bad_refs} do not point to existing scope.commands_run receipts",
+                "validator": "deterministic_evidence",
+                "validator_value": f"0..{command_count - 1}",
+            })
+    return errors
 
 
 def _structured_errors_from_list(errs: list[jsonschema.ValidationError]) -> list[dict]:

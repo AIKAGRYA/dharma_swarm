@@ -236,10 +236,19 @@ class RunManager:
         warrant: dict | None = None,
         scope: dict | None = None,
         week: str | None = None,
+        resume: bool = False,
     ) -> Run:
         """Create the run dir tree + initial manifest and return the ``Run``."""
         week_root = RunManager._week_root(week)
         run_dir = week_root / run_id
+        if run_dir.exists():
+            if not resume:
+                raise FileExistsError(
+                    f"run already exists: {run_dir}; pass --resume to reuse it"
+                )
+            for sub in RUN_SUBDIRS:
+                (run_dir / sub).mkdir(parents=True, exist_ok=True)
+            return Run(run_dir)
         for sub in RUN_SUBDIRS:
             (run_dir / sub).mkdir(parents=True, exist_ok=True)
 
@@ -341,7 +350,16 @@ def _cmd_create(args) -> int:
             scope = _load_scope(Path(args.scope))
         except (FileNotFoundError, json.JSONDecodeError) as exc:
             return _emit_error(f"scope load failed: {exc}")
-    run = RunManager.create_run(run_id=args.run_id, warrant=warrant, scope=scope, week=args.week)
+    try:
+        run = RunManager.create_run(
+            run_id=args.run_id,
+            warrant=warrant,
+            scope=scope,
+            week=args.week,
+            resume=args.resume,
+        )
+    except FileExistsError as exc:
+        return _emit_error(str(exc))
     sys.stdout.write(str(run.run_dir) + "\n")
     return 0
 
@@ -372,6 +390,7 @@ def main(argv: list[str] | None = None) -> int:
     p_create.add_argument("--warrant", default=None, help="path to a warrant YAML (recorded in manifest)")
     p_create.add_argument("--scope", default=None, help="path to a scope.json (recorded in manifest)")
     p_create.add_argument("--week", default=None, help="override the YYYY-WW bucket (default: current week)")
+    p_create.add_argument("--resume", action="store_true", help="reuse an existing run dir explicitly")
 
     p_path = sub.add_parser("path", help="print the run dir path for an existing run id")
     p_path.add_argument("--run-id", required=True)

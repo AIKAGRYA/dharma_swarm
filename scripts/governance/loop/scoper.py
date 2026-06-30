@@ -17,7 +17,7 @@ Selection rules:
 
 Output (``scope.json``):
   - ``sentinel_prompt_ids``: the 6 sentinel ids
-  - ``diff_mapped_prompt_ids``: the capped diff-mapped ids (pre-filter)
+  - ``diff_mapped_prompt_ids``: the in-scope capped diff-mapped ids
   - ``selected_prompt_ids``: sentinels + diff-mapped, after council filter
   - ``council_paths``: prompt_id -> ported PROMPTS.md path
   - ``changed_files``: the diff file list
@@ -48,7 +48,7 @@ import sys
 from pathlib import Path
 
 from scripts.governance.loop.councils import resolve_prompt_path
-from scripts.governance.loop.warrant import Warrant, WarrantValidationError
+from scripts.governance.loop.warrant import Warrant, WarrantError
 
 # --- sentinel set (spec §9.1) ---
 SENTINEL_PROMPT_IDS: tuple[str, ...] = (
@@ -163,6 +163,7 @@ def select_prompts(
     """
     root = repo_root or Path(__file__).resolve().parents[3]
     allowed = set(warrant_councils)
+    effective_cap = max(0, min(DEFAULT_DIFF_MAPPED_CAP, int(diff_mapped_cap)))
 
     # 1. sentinels (diff-independent candidates)
     sentinel_set = list(SENTINEL_PROMPT_IDS)
@@ -176,19 +177,18 @@ def select_prompts(
         matched.update(pids)
     rationale.sort(key=lambda e: e["file"])
 
-    diff_mapped_all = sorted(matched)
-    diff_mapped_capped = diff_mapped_all[:diff_mapped_cap]
-
     # 3. council filter: drop any candidate whose council is not in warrant scope
     def _in_scope(pid: str) -> bool:
         council = prompt_to_council(pid)
         return council is not None and council in allowed
 
+    diff_mapped_all = sorted(pid for pid in matched if _in_scope(pid))
+    diff_mapped_capped = diff_mapped_all[:effective_cap]
+
     sentinel_in_scope = [pid for pid in sentinel_set if _in_scope(pid)]
-    diff_mapped_in_scope = [pid for pid in diff_mapped_capped if _in_scope(pid)]
 
     # selected = sentinels + diff-mapped, deduped, sorted (deterministic order)
-    selected = sorted(set(sentinel_in_scope) | set(diff_mapped_in_scope))
+    selected = sorted(set(sentinel_in_scope) | set(diff_mapped_capped))
 
     # 4. council paths for every selected prompt
     council_paths: dict[str, str] = {}
@@ -208,7 +208,7 @@ def select_prompts(
         "changed_files": sorted(changed_files),
         "rationale": rationale,
         "warrant_councils": sorted(allowed),
-        "diff_mapped_cap": diff_mapped_cap,
+        "diff_mapped_cap": effective_cap,
     }
 
 
@@ -248,8 +248,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Load + validate the warrant (re-uses the warrant module).
     try:
-        warrant = Warrant.from_yaml(Path(args.warrant))
-    except WarrantValidationError as exc:
+        warrant = Warrant.load_and_check(Path(args.warrant))
+    except WarrantError as exc:
         return _emit_error(f"warrant validation failed: {exc}")
 
     scope_dict = warrant.scope

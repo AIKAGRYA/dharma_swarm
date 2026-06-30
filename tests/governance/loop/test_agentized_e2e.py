@@ -149,6 +149,7 @@ def _high_severity_audit_json(run_id: str) -> dict:
                 "failure_class": "HIGH_SLOP_AGENTIZED",
                 "recommendation": "fix via isolated worktree + deterministic gate",
                 "verification": "red-before/green-after on a deterministic gate",
+                "evidence_refs": [0],
             }
         ],
         "not_proven": ["agentized e2e — canned finding for role-separation proof"],
@@ -178,11 +179,50 @@ def _write_fake_droid(tmp_path: Path, stdout_text: str) -> Path:
         "if log_path:\n"
         "    with open(log_path, 'a') as fh:\n"
         "        fh.write(json.dumps({'argv': sys.argv[1:], 'prompt': prompt_text}) + '\\n')\n"
-        "sys.stdout.write(os.environ.get('DROID_FAKE_STDOUT', " + repr(stdout_text) + "))\n"
+        "if 'FRESH Verifier' in prompt_text:\n"
+        "    sys.stdout.write(json.dumps({\n"
+        "        'verdict': 'confirmed',\n"
+        "        'falsification_attempts': [\n"
+        "            {'attempt': 'verify deterministic receipts', 'result': 'pass', 'evidence': 'red nonzero and green zero'},\n"
+        "        ],\n"
+        "        'model_metadata': {'fake_droid': True},\n"
+        "    }))\n"
+        "else:\n"
+        "    sys.stdout.write(os.environ.get('DROID_FAKE_STDOUT', " + repr(stdout_text) + "))\n"
         "sys.exit(int(os.environ.get('DROID_FAKE_EXIT', '0')))\n"
     )
     fake.chmod(0o755)
     return fake
+
+
+def _green_ratchet_repo(tmp_path: Path, finding_id: str | None = None) -> Path:
+    repo = tmp_path / "green-ratchet-repo"
+    script_dir = repo / "scripts" / "governance" / "hygiene"
+    script_dir.mkdir(parents=True, exist_ok=True)
+    (script_dir / "ratchet.py").write_text(
+        "import json\n"
+        "import sys\n"
+        "if '--json' in sys.argv:\n"
+        "    print(json.dumps({'status': 'ok', 'stub': True}))\n"
+        "sys.exit(0)\n"
+    )
+    if finding_id is not None:
+        gate_dir = repo / "scripts" / "governance" / "loop"
+        gate_dir.mkdir(parents=True, exist_ok=True)
+        marker = gate_dir / f"fix_marker_{finding_id}.txt"
+        marker.write_text("fix applied\n")
+        gate = gate_dir / f"fix_gate_{finding_id}.py"
+        gate.write_text(
+            "import sys\n"
+            "from pathlib import Path\n\n"
+            f'MARKER = Path(__file__).parent / "fix_marker_{finding_id}.txt"\n'
+            "if MARKER.exists():\n"
+            '    print("OK: marker found - clean tree")\n'
+            "    sys.exit(0)\n"
+            'print("FAIL: marker not found - slop reintroduced")\n'
+            "sys.exit(1)\n"
+        )
+    return repo
 
 
 def _base_env(runs_root: Path, fake_droid: Path, audit_stdout: str) -> dict:
@@ -291,36 +331,23 @@ def agentized_run(tmp_path: Path):
     stage_procs["reaudit"] = proc
     assert proc.returncode == 0, f"reaudit failed: {proc.stderr!r}"
 
-    marker_path = tmp_path / "fix_marker.txt"
-    marker_path.write_text("fix applied\n")
-    gate_script = tmp_path / "ci_gate.py"
-    gate_script.write_text(
-        "import sys\n"
-        "from pathlib import Path\n"
-        f"MARKER = Path({str(marker_path)!r})\n"
-        "if MARKER.exists():\n"
-        '    print("OK: ci green")\n'
-        "    sys.exit(0)\n"
-        'print("FAIL: ci red")\n'
-        "sys.exit(1)\n"
-    )
-    ci_gate_cmd = f'"{VENV_PYTHON}" "{gate_script}"'
-
-    proc = _run_cli(
-        LEARN_CLI, env,
-        "--warrant", str(warrant_path),
-        "--run-id", run_id,
-        "--ci-gate", ci_gate_cmd,
-        "--repo-root", str(REPO_ROOT),
-    )
-    stage_procs["learn"] = proc
-    assert proc.returncode == 0, f"learn failed: {proc.stderr!r}"
-
     run = _open_run(run_id, runs_root)
     findings = run.read_jsonl(run.accepted_findings_path())
     impl_findings = [f for f in findings if f.get("routing") == "IMPLEMENT"]
     assert impl_findings, f"no IMPLEMENT findings: {findings}"
     finding_id = impl_findings[0]["finding_id"]
+    ratchet_repo = _green_ratchet_repo(tmp_path, finding_id=finding_id)
+
+    proc = _run_cli(
+        LEARN_CLI, env,
+        "--warrant", str(warrant_path),
+        "--run-id", run_id,
+        "--repo-root", str(ratchet_repo),
+        "--wire-ci",
+        "--ci-workflow", str(tmp_path / "loop-ratchet-gates.yml"),
+    )
+    stage_procs["learn"] = proc
+    assert proc.returncode == 0, f"learn failed: {proc.stderr!r}"
 
     invocations = []
     if droid_log.is_file():

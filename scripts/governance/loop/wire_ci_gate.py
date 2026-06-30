@@ -166,9 +166,21 @@ def validate_workflow(workflow: dict) -> None:
     jobs = workflow.get("jobs")
     if not isinstance(jobs, dict) or JOB_ID not in jobs:
         raise WorkflowError(f"workflow missing jobs.{JOB_ID}")
-    steps = jobs[JOB_ID].get("steps")
+    job = jobs[JOB_ID]
+    if not isinstance(job, dict):
+        raise WorkflowError(f"workflow jobs.{JOB_ID} must be a mapping")
+    if not job.get("runs-on"):
+        raise WorkflowError(f"workflow jobs.{JOB_ID} missing runs-on")
+    steps = job.get("steps")
     if not isinstance(steps, list):
         raise WorkflowError(f"workflow jobs.{JOB_ID}.steps must be a list")
+    for idx, step in enumerate(steps):
+        if not isinstance(step, dict):
+            raise WorkflowError(f"workflow jobs.{JOB_ID}.steps[{idx}] must be a mapping")
+        if "run" not in step and "uses" not in step:
+            raise WorkflowError(
+                f"workflow jobs.{JOB_ID}.steps[{idx}] must define run or uses"
+            )
 
 
 def add_gate_step(workflow: dict, gate_id: str, name: str, command: str) -> bool:
