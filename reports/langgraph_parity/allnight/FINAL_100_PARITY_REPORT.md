@@ -4,6 +4,12 @@ Status: **not 100/100**.
 
 Current score: **36/100**.
 
+Branch: `codex/langgraph-orchestration-parity-20260701`.
+
+Implementation commit: `d2bbd30ac` (`feat: advance langgraph orchestration parity slice [impact-checked]`).
+
+Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
+
 This branch made real progress but does not satisfy the definition of 100/100. The strongest evidence is:
 
 - `reports/langgraph_parity/benchmark/benchmark_report.json` now contains 26 deterministic benchmark cases, 12 multi-hop cases, and complete coverage for all required Phase 1 tags.
