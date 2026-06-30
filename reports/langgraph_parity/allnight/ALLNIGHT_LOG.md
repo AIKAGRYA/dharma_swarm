@@ -322,3 +322,31 @@
   - Phase 7 remains partial: sessions/runs/run-detail/checkpoint snapshots/runtime events are API-visible, but assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
+
+## 2026-06-30T21:05:49Z - Supervisor Restart Final-Output Proof
+
+- Target gate: prove `SUPERVISOR` topology restart/readback semantics for delegated-agent state and final-output-only policy.
+- Code changes landed locally:
+  - Persisted `supervisor_final_output_only: true` inside the supervisor `topology_state`, alongside delegated agent IDs and `user_visible_output: supervisor_final`.
+  - Extended topology-state runtime receipts to include the persisted `state` payload, so operator/API receipt views can inspect the same policy that is stored in `topology_states`.
+  - Added a restart-readable orchestrator acceptance test that dispatches a supervisor run, drains execution, reopens a fresh `RuntimeStateStore`, and verifies the supervisor `DelegationRun`, `TopologyStateRecord`, `describe_run()` detail, and `topology_state` receipt.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/supervisor_restart_final_output_20260630T210549Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_orchestrator.py::test_supervisor_persists_restartable_final_output_policy_and_delegated_state tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state` -> `4 passed in 2.30s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/orchestrator.py dharma_swarm/runtime_topology.py tests/test_orchestrator.py tests/test_topology_execution.py tests/test_runtime_state.py` -> pass.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `51 passed in 46.26s`.
+  - `.venv/bin/ruff check dharma_swarm/runtime_topology.py tests/test_orchestrator.py` -> pass.
+  - `.venv/bin/ruff check --select F821 dharma_swarm/orchestrator.py` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings; `orchestrator.py` is 3206 lines against ceiling 3215.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `make onboard` -> pass; known governance projection churn restored.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `67/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
+  - Runtime platform parity remains partial: assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

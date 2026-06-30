@@ -353,6 +353,7 @@ class Orchestrator:
                     "mode": TopologyType.SUPERVISOR.value,
                     "active_agent": supervisor.id,
                     "delegated_agent_ids": list(delegated),
+                    "supervisor_final_output_only": True,
                     "user_visible_output": "supervisor_final",
                 },
             },

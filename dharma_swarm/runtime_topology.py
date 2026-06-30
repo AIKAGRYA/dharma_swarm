@@ -321,6 +321,7 @@ async def _record_topology_state_receipt(
                 "child_run_ids": record.child_run_ids,
                 "allowed_handoffs": record.allowed_handoffs,
                 "handoff_count": len(record.handoff_receipts),
+                "state": record.state,
                 "receipt_status": status,
             },
         )

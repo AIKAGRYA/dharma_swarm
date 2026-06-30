@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T20:39:45Z",
+  "updated_at": "2026-06-30T21:05:49Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 65,
+    "current": 67,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, and runtime events are inspectable through RuntimeStateStore-backed operator/API views. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and the full assistants/configurations/streaming/background/interrupt platform surface remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, and runtime events are inspectable through RuntimeStateStore-backed operator/API views. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and the full assistants/configurations/streaming/background/interrupt platform surface remain failing or unproven."
   },
   "rounds": [
     {
@@ -382,6 +382,40 @@
         "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
         "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending."
       ]
+    },
+    {
+      "id": "supervisor-restart-final-output-proof",
+      "timestamp": "2026-06-30T21:05:49Z",
+      "status": "completed",
+      "target_gate": "Prove SUPERVISOR restart-readable final-output-only policy and delegated-agent state",
+      "files_touched": [
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/runtime_topology.py",
+        "tests/test_orchestrator.py",
+        "reports/langgraph_parity/allnight/supervisor_restart_final_output_20260630T210549Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_orchestrator.py::test_supervisor_persists_restartable_final_output_policy_and_delegated_state tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state",
+        ".venv/bin/python -m compileall -q dharma_swarm/orchestrator.py dharma_swarm/runtime_topology.py tests/test_orchestrator.py tests/test_topology_execution.py tests/test_runtime_state.py",
+        ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+        ".venv/bin/ruff check dharma_swarm/runtime_topology.py tests/test_orchestrator.py",
+        ".venv/bin/ruff check --select F821 dharma_swarm/orchestrator.py",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "make onboard",
+        "git diff --check"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.",
+        "Runtime platform parity remains partial: assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -392,8 +426,8 @@
     "phase_0_spine_dispatch_report": "passed_after_script_added",
     "phase_1_25_case_oracle": "passed_26_cases_all_required_tags_covered",
     "phase_2_default_spine_dispatch": "passed_slice_default_on_and_receipt_persisted",
-    "phase_3_live_topologies": "partial_plus_runtime_state_swarm_handoff_restart_and_subagents_child_parent_run_proofs_pass",
-    "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
+    "phase_3_live_topologies": "passed_dispatch_metadata_plus_restart_readable_swarm_supervisor_and_subagents_proofs",
+    "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_supervisor_final_output_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
@@ -420,6 +454,7 @@
       "provider_truth_spine_receipt": "AgentRunner now exposes last route request/decision/response/usage; dharma_swarm/provider_truth.py normalizes requested/planned/actual/served provider-model truth; orchestrator spine EvidenceReceipt prefers LLMResponse served provider/model, falls back to ProviderRouteDecision, then runner config; focused spine/provider tests 8 passed in 0.35s; adjacent dispatch/topology tests 2 passed in 7.42s; module budget, hygiene ratchet, focused ruff, compileall, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_graph_api_cockpit": "RuntimeGraphViews projects RuntimeStateStore topology_states, delegation_runs, and runtime_receipts into nodes/edges plus active_agents/checkpoints/topology_states/runs/receipts; GET /api/runtime/graph is registered and honors DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders graph summary/topology rows/recent receipts; focused backend/operator tests 4 passed in 0.95s; broader runtime/API/topology subset 55 passed in 31.54s; LangGraph parity plus runtime graph subset 23 passed in 0.82s; npm lint passed with existing warnings only; npm build passed; hygiene ratchet, module budget, compileall, ruff, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_platform_surfaces": "RuntimePlatformViews adds RuntimeStateStore-backed session/thread state, run listing, run detail via describe_run, checkpoint snapshots, and session/runtime event history; GET /api/runtime/sessions, /runs, /runs/{run_id}, /checkpoints, and /events are registered and honor DHARMA_RUNTIME_DB; focused runtime API tests 5 passed in 0.68s; broader runtime/API/topology subset 57 passed in 34.45s; LangGraph parity plus runtime API subset 25 passed in 1.10s; compileall, focused ruff, module budget, hygiene ratchet, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
+      "supervisor_restart_final_output": "SUPERVISOR topology persists delegated_agent_ids, supervisor_final_output_only=true, and user_visible_output=supervisor_final in topology_states.state; topology_state receipts include persisted state; fresh RuntimeStateStore readback, describe_run(), and receipt assertions pass; focused topology acceptance 4 passed in 2.30s; compileall pass; adjacent runtime/orchestrator/topology subset 51 passed in 46.26s; focused ruff and orchestrator F821 pass; module budget, hygiene ratchet, diff-check, onboard, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",

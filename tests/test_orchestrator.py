@@ -468,6 +468,73 @@ async def test_swarm_handoff_persists_restartable_topology_state(
 
 
 @pytest.mark.asyncio
+async def test_supervisor_persists_restartable_final_output_policy_and_delegated_state(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-supervisor-final-output",
+        title="Supervisor final output",
+        description="safe",
+        metadata={"active_agent": "lead"},
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="lead", name="lead", role=AgentRole.GENERAL),
+            AgentState(id="child-a", name="child-a", role=AgentRole.CODER),
+            AgentState(id="child-b", name="child-b", role=AgentRole.TESTER),
+        ]
+    )
+    pool.set_runner("lead", DummyRunner(result="supervisor final answer"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_supervisor_final_output",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SUPERVISOR)
+    await _drain_running_tasks(orch)
+
+    supervisor_dispatch = dispatches[0]
+    supervisor_run_id = str(supervisor_dispatch.metadata["runtime_run_id"])
+    store = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    supervisor_run = await store.get_delegation_run(supervisor_run_id)
+    topology_state = await store.get_topology_state(supervisor_run_id)
+    detail = await store.describe_run(supervisor_run_id)
+
+    assert supervisor_run is not None
+    assert supervisor_run.assigned_to == "lead"
+    assert topology_state is not None
+    assert topology_state.topology == "supervisor"
+    assert topology_state.active_agent == "lead"
+    assert topology_state.current_node == "supervisor"
+    assert topology_state.state["delegated_agent_ids"] == ["child-a", "child-b"]
+    assert topology_state.state["supervisor_final_output_only"] is True
+    assert topology_state.state["user_visible_output"] == "supervisor_final"
+    assert detail is not None
+    assert detail["topology_state"].state["supervisor_final_output_only"] is True
+    assert detail["topology_state"].state["user_visible_output"] == "supervisor_final"
+
+    receipts = await store.list_runtime_receipts(
+        run_id=supervisor_run_id,
+        receipt_type="topology_state",
+        limit=10,
+    )
+    assert any(
+        receipt.payload.get("topology") == "supervisor"
+        and receipt.payload.get("state", {}).get("supervisor_final_output_only") is True
+        for receipt in receipts
+    )
+
+
+@pytest.mark.asyncio
 async def test_subagents_as_tools_persists_parent_and_child_runs(
     tmp_path,
     monkeypatch,
