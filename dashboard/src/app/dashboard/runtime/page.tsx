@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { ControlPlanePageSummary } from "@/components/dashboard/ControlPlanePageSummary";
 import { ControlPlaneSurfaceGrid } from "@/components/dashboard/ControlPlaneSurfaceGrid";
 import { ControlPlaneStrip } from "@/components/dashboard/ControlPlaneStrip";
-import { API_TRANSPORT_MODE, BASE_URL } from "@/lib/api";
+import { API_TRANSPORT_MODE, BASE_URL, runtimeEventsStreamPath } from "@/lib/api";
 import { buildControlPlanePageMeta } from "@/lib/controlPlanePageMeta";
 import {
   buildControlPlaneSyncState,
@@ -15,7 +15,11 @@ import { buildRuntimeOperatorHandbook } from "@/lib/runtimeOperatorHandbook";
 import { buildControlPlaneSurfaces } from "@/lib/controlPlaneSurfaces";
 import { colors, glowText } from "@/lib/theme";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
-import type { ChatProfileOut, RuntimeGraphSnapshot } from "@/lib/types";
+import type {
+  ChatProfileOut,
+  RuntimeGraphSnapshot,
+  RuntimeInterruptsSnapshot,
+} from "@/lib/types";
 
 const PAGE_META = buildControlPlanePageMeta("runtime");
 const PAGE_ACCENT = colors[PAGE_META.accent];
@@ -72,6 +76,7 @@ export default function RuntimePage() {
     chatStatus,
     health,
     runtimeGraph,
+    runtimeInterrupts,
     error,
     snapshot,
     isLoading,
@@ -176,8 +181,11 @@ export default function RuntimePage() {
         <>
           <RuntimeGraphPanel
             graph={runtimeGraph}
+            interrupts={runtimeInterrupts}
             statusLabel={snapshot.runtimeGraphStatusLabel}
             detail={snapshot.runtimeGraphDetail}
+            controlStatusLabel={snapshot.runtimeInterruptStatusLabel}
+            controlDetail={snapshot.runtimeInterruptDetail}
           />
 
           <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
@@ -343,15 +351,23 @@ export default function RuntimePage() {
 
 function RuntimeGraphPanel({
   graph,
+  interrupts,
   statusLabel,
   detail,
+  controlStatusLabel,
+  controlDetail,
 }: {
   graph: RuntimeGraphSnapshot | null;
+  interrupts: RuntimeInterruptsSnapshot | null;
   statusLabel: string;
   detail: string;
+  controlStatusLabel: string;
+  controlDetail: string;
 }) {
   const topologies = graph?.topology_states.slice(0, 6) ?? [];
   const receipts = graph?.receipts.slice(0, 6) ?? [];
+  const controlEvents = interrupts?.control_events.slice(0, 6) ?? [];
+  const streamPath = runtimeEventsStreamPath({ ledger_kind: "runtime", limit: 20 });
 
   return (
     <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5">
@@ -360,9 +376,14 @@ function RuntimeGraphPanel({
           <h2 className="font-heading text-lg text-sumi-100">Runtime Graph</h2>
           <p className="text-sm text-sumi-400">{detail}</p>
         </div>
-        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(graph ? "ok" : "muted")}`}>
-          {statusLabel}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(graph ? "ok" : "muted")}`}>
+            {statusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(interrupts ? "ok" : "muted")}`}>
+            {controlStatusLabel}
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -370,6 +391,19 @@ function RuntimeGraphPanel({
         <MiniStat label="Active Agents" value={String(graph?.summary.active_agent_count ?? 0)} />
         <MiniStat label="Checkpoints" value={String(graph?.summary.checkpoint_count ?? 0)} />
         <MiniStat label="Receipts" value={String(graph?.summary.receipt_count ?? 0)} />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <MiniStat
+          label="Pending Interrupts"
+          value={String(interrupts?.summary.pending_interrupt_count ?? 0)}
+        />
+        <MiniStat
+          label="Human Approval"
+          value={String(interrupts?.summary.human_approval_required_count ?? 0)}
+        />
+        <MiniStat label="Approved" value={String(interrupts?.summary.approved_count ?? 0)} />
+        <MiniStat label="Resumed" value={String(interrupts?.summary.resumed_count ?? 0)} />
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -419,24 +453,60 @@ function RuntimeGraphPanel({
           )}
         </div>
 
-        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
-          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
-            Recent Receipts
-          </div>
-          <div className="space-y-3">
-            {receipts.length === 0 ? (
-              <div className="text-sm text-sumi-500">No runtime receipts in snapshot.</div>
-            ) : (
-              receipts.map((receipt) => (
-                <div key={receipt.receipt_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
-                  <div className="text-sm text-sumi-200">{receipt.receipt_type}</div>
-                  <div className="font-mono text-xs text-sumi-500">{receipt.receipt_id}</div>
-                  <div className="mt-1 text-xs text-sumi-500">
-                    {receipt.status} · {receipt.agent_id || "no-agent"}
+        <div className="space-y-4">
+          <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+            <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+              Recent Receipts
+            </div>
+            <div className="space-y-3">
+              {receipts.length === 0 ? (
+                <div className="text-sm text-sumi-500">No runtime receipts in snapshot.</div>
+              ) : (
+                receipts.map((receipt) => (
+                  <div key={receipt.receipt_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                    <div className="text-sm text-sumi-200">{receipt.receipt_type}</div>
+                    <div className="font-mono text-xs text-sumi-500">{receipt.receipt_id}</div>
+                    <div className="mt-1 text-xs text-sumi-500">
+                      {receipt.status} · {receipt.agent_id || "no-agent"}
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs uppercase tracking-[0.16em] text-sumi-500">
+                Control Events
+              </div>
+              <div className="max-w-full truncate font-mono text-[11px] text-sumi-600">
+                {streamPath}
+              </div>
+            </div>
+            <p className="mb-3 text-xs text-sumi-500">{controlDetail}</p>
+            <div className="space-y-3">
+              {controlEvents.length === 0 ? (
+                <div className="text-sm text-sumi-500">No interrupts or approvals in snapshot.</div>
+              ) : (
+                controlEvents.map((event) => (
+                  <div key={event.event_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm text-sumi-200">{event.event_name}</div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(event.status === "pending" ? "warn" : "ok")}`}>
+                        {event.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-sumi-500">
+                      {event.interrupt_id || event.approval_id || event.event_id}
+                    </div>
+                    <div className="mt-1 text-xs text-sumi-500">
+                      {event.control_type} · {event.agent_id || "no-agent"}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>

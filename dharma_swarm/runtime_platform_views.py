@@ -37,6 +37,63 @@ def _serialize_value(value: Any) -> Any:
     return value
 
 
+def _event_payload(event: SessionEventRecord) -> dict[str, Any]:
+    return dict(event.payload) if isinstance(event.payload, dict) else {}
+
+
+def _is_control_event(event: SessionEventRecord) -> bool:
+    name = event.event_name.lower()
+    payload = _event_payload(event)
+    keys = {str(key).lower() for key in payload}
+    control_keys = {
+        "approval_id",
+        "approval_status",
+        "human_approval_required",
+        "interrupt_id",
+        "requires_human",
+        "resume_token",
+    }
+    return (
+        "interrupt" in name
+        or "resume" in name
+        or "approval" in name
+        or bool(keys & control_keys)
+    )
+
+
+def _control_type(event: SessionEventRecord) -> str:
+    name = event.event_name.lower()
+    payload = _event_payload(event)
+    if "interrupt" in name:
+        return "interrupt"
+    if "resume" in name:
+        return "resume"
+    if "approval" in name or payload.get("approval_id") or payload.get("approval_status"):
+        return "human_approval"
+    if payload.get("resume_token"):
+        return "resume"
+    return "interrupt"
+
+
+def _control_status(event: SessionEventRecord) -> str:
+    payload = _event_payload(event)
+    explicit = payload.get("approval_status") or payload.get("status") or payload.get("decision")
+    if explicit:
+        return str(explicit)
+    name = event.event_name.lower()
+    if "reject" in name or "denied" in name:
+        return "rejected"
+    if "grant" in name or "approve" in name:
+        return "approved"
+    if "resume" in name:
+        return "resumed"
+    if "resolve" in name:
+        return "resolved"
+    if "request" in name or "required" in name:
+        return "pending"
+    return "unknown"
+
+
 class RuntimePlatformViews:
     """LangGraph-style control-plane projections over persisted runtime state."""
 
@@ -198,6 +255,48 @@ class RuntimePlatformViews:
             "events": event_views,
         }
 
+    async def runtime_interrupts(
+        self,
+        *,
+        session_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        max_items = max(1, limit)
+        scan_limit = min(max_items * 20, 1000)
+        events = await self.runtime_state.list_session_events(
+            session_id=session_id,
+            limit=scan_limit,
+        )
+        controls = [
+            self._control_event_to_dict(event)
+            for event in events
+            if _is_control_event(event)
+        ]
+        if status is not None:
+            controls = [event for event in controls if event["status"] == status]
+        controls = controls[:max_items]
+        return {
+            "schema_version": "runtime_interrupts_snapshot.v1",
+            "generated_at": _utc_now().isoformat(),
+            "runtime_db": str(self.runtime_state.db_path),
+            "filters": {"session_id": session_id, "status": status, "limit": max_items},
+            "summary": {
+                "control_event_count": len(controls),
+                "pending_interrupt_count": sum(
+                    1
+                    for event in controls
+                    if event["control_type"] == "interrupt" and event["status"] == "pending"
+                ),
+                "human_approval_required_count": sum(
+                    1 for event in controls if event["requires_human"]
+                ),
+                "approved_count": sum(1 for event in controls if event["status"] == "approved"),
+                "resumed_count": sum(1 for event in controls if event["status"] == "resumed"),
+            },
+            "control_events": controls,
+        }
+
     async def _run_summary(self, run: DelegationRun) -> dict[str, Any]:
         run_view = _serialize_value(run)
         topology_state = await self.runtime_state.get_topology_state(run.run_id)
@@ -217,6 +316,36 @@ class RuntimePlatformViews:
     @staticmethod
     def _event_to_dict(event: SessionEventRecord) -> dict[str, Any]:
         return _serialize_value(event)
+
+    @staticmethod
+    def _control_event_to_dict(event: SessionEventRecord) -> dict[str, Any]:
+        event_view = _serialize_value(event)
+        payload = event_view.get("payload") or {}
+        control_type = _control_type(event)
+        status = _control_status(event)
+        requires_human = bool(
+            payload.get("requires_human")
+            or payload.get("human_approval_required")
+            or (control_type == "human_approval" and status == "pending")
+        )
+        return {
+            "event_id": event.event_id,
+            "session_id": event.session_id,
+            "task_id": event.task_id,
+            "run_id": event.run_id,
+            "agent_id": event.agent_id,
+            "event_name": event.event_name,
+            "control_type": control_type,
+            "status": status,
+            "requires_human": requires_human,
+            "interrupt_id": str(payload.get("interrupt_id") or ""),
+            "approval_id": str(payload.get("approval_id") or ""),
+            "resume_token": str(payload.get("resume_token") or ""),
+            "checkpoint_id": str(payload.get("checkpoint_id") or ""),
+            "summary": event.summary,
+            "created_at": event.created_at.isoformat(),
+            "event": event_view,
+        }
 
     @staticmethod
     def _checkpoint_to_dict(state: TopologyStateRecord) -> dict[str, Any]:

@@ -6,6 +6,7 @@ import type {
   ChatStatusOut,
   HealthOut,
   RuntimeGraphSnapshot,
+  RuntimeInterruptsSnapshot,
 } from "./types.ts";
 import {
   buildRuntimeControlPlaneSnapshot,
@@ -31,6 +32,17 @@ function healthOk(data: HealthOut): ApiResponse<HealthOut> {
 }
 
 function runtimeGraphOk(data: RuntimeGraphSnapshot): ApiResponse<RuntimeGraphSnapshot> {
+  return {
+    status: "ok",
+    data,
+    error: "",
+    timestamp: "2026-03-20T00:00:00.000Z",
+  };
+}
+
+function runtimeInterruptsOk(
+  data: RuntimeInterruptsSnapshot,
+): ApiResponse<RuntimeInterruptsSnapshot> {
   return {
     status: "ok",
     data,
@@ -180,6 +192,54 @@ test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
       nodes: [],
       edges: [],
     }),
+    runtimeInterruptsOk({
+      schema_version: "runtime_interrupts_snapshot.v1",
+      generated_at: "2026-03-20T00:00:00.000Z",
+      runtime_db: "/tmp/runtime.db",
+      filters: {},
+      summary: {
+        control_event_count: 2,
+        pending_interrupt_count: 1,
+        human_approval_required_count: 1,
+        approved_count: 1,
+        resumed_count: 0,
+      },
+      control_events: [
+        {
+          event_id: "event-interrupt-requested",
+          session_id: "sess-graph",
+          task_id: "task-graph",
+          run_id: "run-parent",
+          agent_id: "supervisor",
+          event_name: "interrupt_requested",
+          control_type: "interrupt",
+          status: "pending",
+          requires_human: true,
+          interrupt_id: "interrupt-1",
+          approval_id: "approval-1",
+          resume_token: "resume-run-parent",
+          checkpoint_id: "task-graph:supervisor:checkpoint-1",
+          summary: "Supervisor paused for human approval",
+          created_at: "2026-03-20T00:00:01.000Z",
+          event: {
+            event_id: "event-interrupt-requested",
+            session_id: "sess-graph",
+            ledger_kind: "runtime",
+            event_name: "interrupt_requested",
+            task_id: "task-graph",
+            run_id: "run-parent",
+            agent_id: "supervisor",
+            summary: "Supervisor paused for human approval",
+            event_text: "Supervisor requested human approval before resuming.",
+            payload: {
+              approval_id: "approval-1",
+              resume_token: "resume-run-parent",
+            },
+            created_at: "2026-03-20T00:00:01.000Z",
+          },
+        },
+      ],
+    }),
   );
 
   const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
@@ -191,6 +251,12 @@ test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
   assert.equal(snapshot.runtimeGraphCheckpointCount, 1);
   assert.equal(snapshot.runtimeGraphNodeCount, 6);
   assert.match(snapshot.runtimeGraphDetail, /3 receipts/);
+  assert.equal(snapshot.runtimeInterruptReady, true);
+  assert.equal(snapshot.runtimeInterruptStatusLabel, "1 pending");
+  assert.equal(snapshot.runtimeControlEventCount, 2);
+  assert.equal(snapshot.runtimePendingInterruptCount, 1);
+  assert.equal(snapshot.runtimeHumanApprovalRequiredCount, 1);
+  assert.match(snapshot.runtimeInterruptDetail, /2 control events/);
 });
 
 test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted before runtime data arrives", () => {
@@ -198,9 +264,11 @@ test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted b
     chatStatus: null,
     health: null,
     runtimeGraph: null,
+    runtimeInterrupts: null,
     chatError: null,
     healthError: null,
     runtimeGraphError: null,
+    runtimeInterruptError: null,
     error: null,
   });
 
@@ -529,9 +597,11 @@ test("buildRuntimeControlPlaneSnapshot surfaces transport-level query failures i
     chatStatus: null,
     health: null,
     runtimeGraph: null,
+    runtimeInterrupts: null,
     chatError: null,
     healthError: null,
     runtimeGraphError: null,
+    runtimeInterruptError: null,
     error: "network timeout while loading runtime control plane",
   });
 

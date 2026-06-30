@@ -209,6 +209,20 @@ class OperatorViews:
             limit=limit,
         )
 
+    async def runtime_interrupts(
+        self,
+        *,
+        session_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return interrupt/resume/human-approval state from runtime events."""
+        return await RuntimePlatformViews(self.runtime_state).runtime_interrupts(
+            session_id=session_id,
+            status=status,
+            limit=limit,
+        )
+
     async def recent_operator_actions(
         self,
         *,

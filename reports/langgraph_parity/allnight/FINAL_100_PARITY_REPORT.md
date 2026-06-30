@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **67/100**.
+Current score: **70/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current supervisor restart proof on this branch.
+Implementation commits: branch history through the current runtime interrupts and streaming-event proof on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -24,6 +24,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Live topology context now derives agent memory isolation from `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. `MemoryContextBudget.allowed_agent_ids` blocks cross-agent `AGENT`-scoped atoms, and orchestrator dispatch metadata mirrors the isolation policy for operator inspection.
 - Runtime topology graph state is now inspectable through `GET /api/runtime/graph` and `/dashboard/runtime`, backed by `RuntimeStateStore` rather than a parallel store. The graph snapshot includes active agents, checkpoints, topology states, runs, receipts, handoffs, parent/child edges, active-agent edges, and checkpoint edges.
 - Runtime platform state is now inspectable through `GET /api/runtime/sessions`, `/api/runtime/runs`, `/api/runtime/runs/{run_id}`, `/api/runtime/checkpoints`, and `/api/runtime/events`, backed by the same `RuntimeStateStore`. The API surfaces session/thread state, run listings, run ledger detail via `describe_run`, checkpoint/topology snapshots, and session/runtime event history.
+- Persisted runtime events now have an SSE transport at `GET /api/runtime/events/stream`, and interrupt/resume/human-approval state is projected from `session_events` through `GET /api/runtime/interrupts`, `OperatorViews.runtime_interrupts()`, and `/dashboard/runtime` control-event summaries. This is state/transport proof, not approval action execution.
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
 
 ## Verification
@@ -115,6 +116,18 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `make onboard` -> pass; known governance projection churn restored.
 - `git diff --check` -> pass.
 - Supervisor proof receipt: `reports/langgraph_parity/allnight/supervisor_restart_final_output_20260630T210549Z.json`.
+- Runtime interrupts/streaming receipt: `reports/langgraph_parity/allnight/runtime_interrupts_streaming_20260630T213755Z.json`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py` -> `7 passed in 1.66s`.
+- `.venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `.venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `npm run lint -- --quiet` from `dashboard/` -> pass.
+- `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
+- `.venv/bin/python -m pytest -q tests/test_langgraph_parity_swarm.py tests/test_langgraph_parity_isolation_benchmark.py tests/test_langgraph_parity_readiness.py tests/test_langgraph_parity_supervisor.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_orchestrator.py tests/test_orchestrator_v1.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py` -> `98 passed in 34.54s`.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+- `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+- `make onboard` -> pass; known governance projection churn restored.
 
 ## Failing Gates
 
@@ -124,15 +137,15 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, and topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. Stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
 - Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
-- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, and runtime event history are API-visible through `RuntimeStateStore`. Assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval state remain incomplete or unproven.
+- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, and interrupt/resume/human-approval state are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage for graph and control events. Assistants/configurations, background/cron runs, and approval/reject/resume action endpoints remain incomplete or unproven.
 
 ## Next Patch Sequence
 
-1. Extend topology persistence and API proof to streaming runtime event transport, interrupts, and human approval state.
+1. Extend the runtime API/cockpit lane to assistants/configurations, background/cron runs, and approval/reject/resume action execution.
 2. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
 3. Extend the MemoryKernel live context tests to stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation.
 4. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
-5. Extend the runtime API/cockpit lane to assistants/configurations, streaming events, background/cron runs, and interrupt/resume state.
+5. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources; do not add parallel dashboard-only control state.
 
 ## Residual Risk
 

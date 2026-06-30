@@ -350,3 +350,35 @@
   - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
   - Runtime platform parity remains partial: assistants/configurations, streaming runtime event transport, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-06-30T21:37:55Z - Runtime Interrupts and Streaming Event State
+
+- Target gate: extend the RuntimeStateStore-backed runtime platform surface to streaming runtime event transport plus interrupt/resume/human-approval state.
+- Code changes landed locally:
+  - Added `RuntimePlatformViews.runtime_interrupts()` and `OperatorViews.runtime_interrupts()`, deriving control state from canonical `session_events`.
+  - Added `GET /api/runtime/events/stream` for persisted runtime events over server-sent events, with session, ledger, event-name, limit, poll, and finite-test filters.
+  - Added `GET /api/runtime/interrupts` for interrupt/resume/human-approval snapshots.
+  - Extended `tests/test_runtime_graph_api.py` to seed `interrupt_requested` and `human_approval_granted` runtime events, then prove operator, API, and SSE readback from `DHARMA_RUNTIME_DB`.
+  - Added dashboard runtime interrupt types, `fetchRuntimeInterrupts()`, `runtimeEventsStreamPath()`, control-plane snapshot counts, and `/dashboard/runtime` control-event rendering.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_interrupts_streaming_20260630T213755Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py` -> `7 passed in 1.66s`.
+  - `.venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `npm run lint -- --quiet` from `dashboard/` -> pass.
+  - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
+  - `.venv/bin/python -m pytest -q tests/test_langgraph_parity_swarm.py tests/test_langgraph_parity_isolation_benchmark.py tests/test_langgraph_parity_readiness.py tests/test_langgraph_parity_supervisor.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_orchestrator.py tests/test_orchestrator_v1.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py` -> `98 passed in 34.54s`.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `make onboard` -> pass; known governance projection churn restored.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `70/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Runtime platform parity remains partial: assistants/configurations and background/cron run surfaces are still missing.
+  - Interrupt/resume/human-approval state is visible, but approval/reject/resume action endpoints are not implemented in this slice.
+  - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

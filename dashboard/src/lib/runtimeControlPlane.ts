@@ -4,6 +4,7 @@ import type {
   ChatStatusOut,
   HealthOut,
   RuntimeGraphSnapshot,
+  RuntimeInterruptsSnapshot,
 } from "./types";
 
 export type RuntimeControlPlaneStatusKind = "ok" | "warn" | "error" | "muted";
@@ -12,9 +13,11 @@ export interface RuntimeControlPlaneData {
   chatStatus: ChatStatusOut | null;
   health: HealthOut | null;
   runtimeGraph: RuntimeGraphSnapshot | null;
+  runtimeInterrupts: RuntimeInterruptsSnapshot | null;
   chatError: string | null;
   healthError: string | null;
   runtimeGraphError: string | null;
+  runtimeInterruptError: string | null;
   error: string | null;
 }
 
@@ -42,6 +45,14 @@ export interface RuntimeControlPlaneSnapshot {
   runtimeGraphActiveRunCount: number;
   runtimeGraphCheckpointCount: number;
   runtimeGraphActiveAgentCount: number;
+  runtimeInterruptReady: boolean;
+  runtimeInterruptStatusLabel: string;
+  runtimeInterruptDetail: string;
+  runtimeControlEventCount: number;
+  runtimePendingInterruptCount: number;
+  runtimeHumanApprovalRequiredCount: number;
+  runtimeApprovedCount: number;
+  runtimeResumedCount: number;
   agentCount: number;
   anomalyCount: number;
   tracesLastHour: number;
@@ -77,9 +88,11 @@ function hasRuntimeSignal(data: RuntimeControlPlaneData): boolean {
     data.chatStatus ||
       data.health ||
       data.runtimeGraph ||
+      data.runtimeInterrupts ||
       data.chatError ||
       data.healthError ||
       data.runtimeGraphError ||
+      data.runtimeInterruptError ||
       data.error,
   );
 }
@@ -90,6 +103,7 @@ function hasUnscopedRuntimeQueryFailure(data: RuntimeControlPlaneData): boolean 
       !data.chatStatus &&
       !data.health &&
       !data.runtimeGraph &&
+      !data.runtimeInterrupts &&
       !data.chatError &&
       !data.healthError,
   );
@@ -244,6 +258,7 @@ function runtimeStatusKind(data: RuntimeControlPlaneData): RuntimeControlPlaneSt
   if (data.health?.overall_status === "degraded") return "warn";
   if (hasUnavailableDefaultProfile(data)) return "warn";
   if (!sessionFeedAdvertised(data)) return "warn";
+  if (data.runtimeInterruptError) return "warn";
   return "ok";
 }
 
@@ -256,6 +271,7 @@ function runtimeStatusLabel(data: RuntimeControlPlaneData): string {
   if (data.health?.overall_status === "degraded") return "degraded";
   if (hasUnavailableDefaultProfile(data)) return "default lane unavailable";
   if (!sessionFeedAdvertised(data)) return "session feed unavailable";
+  if (data.runtimeInterruptError) return "controls unavailable";
   return data.health?.overall_status ?? "ok";
 }
 
@@ -295,6 +311,9 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
   }
   if (hasUnavailableDefaultProfile(data)) {
     return appendSessionFeedDetail(unavailableDefaultLaneDetail(data), data);
+  }
+  if (data.runtimeInterruptError) {
+    return `Runtime controls are partially unavailable: ${data.runtimeInterruptError}`;
   }
   return appendSessionFeedDetail(
     "Chat status and backend health agree on the canonical runtime path.",
@@ -348,10 +367,31 @@ function runtimeGraphDetail(data: RuntimeControlPlaneData): string {
   return "Awaiting RuntimeStateStore graph snapshot.";
 }
 
+function runtimeInterruptStatusLabel(data: RuntimeControlPlaneData): string {
+  if (data.runtimeInterrupts) {
+    const pending = data.runtimeInterrupts.summary.pending_interrupt_count;
+    return pending === 1 ? "1 pending" : `${pending} pending`;
+  }
+  if (data.runtimeInterruptError) return "controls unavailable";
+  return "awaiting controls";
+}
+
+function runtimeInterruptDetail(data: RuntimeControlPlaneData): string {
+  if (data.runtimeInterrupts) {
+    const summary = data.runtimeInterrupts.summary;
+    return `${summary.control_event_count} control events, ${summary.human_approval_required_count} human approvals required, ${summary.approved_count} approved, ${summary.resumed_count} resumed.`;
+  }
+  if (data.runtimeInterruptError) {
+    return `Runtime interrupts unavailable: ${data.runtimeInterruptError}`;
+  }
+  return "Awaiting interrupt, resume, and approval state.";
+}
+
 export function normalizeRuntimeControlPlaneResponses(
   chatResponse: ApiResponse<ChatStatusOut>,
   healthResponse: ApiResponse<HealthOut>,
   runtimeGraphResponse?: ApiResponse<RuntimeGraphSnapshot>,
+  runtimeInterruptResponse?: ApiResponse<RuntimeInterruptsSnapshot>,
 ): RuntimeControlPlaneData {
   const chatError =
     chatResponse.status === "ok" ? null : chatResponse.error || "chat status unavailable";
@@ -361,16 +401,28 @@ export function normalizeRuntimeControlPlaneResponses(
     runtimeGraphResponse == null || runtimeGraphResponse.status === "ok"
       ? null
       : runtimeGraphResponse.error || "runtime graph unavailable";
+  const runtimeInterruptError =
+    runtimeInterruptResponse == null || runtimeInterruptResponse.status === "ok"
+      ? null
+      : runtimeInterruptResponse.error || "runtime interrupts unavailable";
 
   return {
     chatStatus: chatResponse.status === "ok" ? chatResponse.data : null,
     health: healthResponse.status === "ok" ? healthResponse.data : null,
     runtimeGraph:
       runtimeGraphResponse?.status === "ok" ? runtimeGraphResponse.data : null,
+    runtimeInterrupts:
+      runtimeInterruptResponse?.status === "ok" ? runtimeInterruptResponse.data : null,
     chatError,
     healthError,
     runtimeGraphError,
-    error: firstNonEmpty([chatError, healthError, runtimeGraphError]),
+    runtimeInterruptError,
+    error: firstNonEmpty([
+      chatError,
+      healthError,
+      runtimeGraphError,
+      runtimeInterruptError,
+    ]),
   };
 }
 
@@ -406,6 +458,15 @@ export function buildRuntimeControlPlaneSnapshot(
     runtimeGraphActiveRunCount: data.runtimeGraph?.summary.active_run_count ?? 0,
     runtimeGraphCheckpointCount: data.runtimeGraph?.summary.checkpoint_count ?? 0,
     runtimeGraphActiveAgentCount: data.runtimeGraph?.summary.active_agent_count ?? 0,
+    runtimeInterruptReady: Boolean(data.runtimeInterrupts),
+    runtimeInterruptStatusLabel: runtimeInterruptStatusLabel(data),
+    runtimeInterruptDetail: runtimeInterruptDetail(data),
+    runtimeControlEventCount: data.runtimeInterrupts?.summary.control_event_count ?? 0,
+    runtimePendingInterruptCount: data.runtimeInterrupts?.summary.pending_interrupt_count ?? 0,
+    runtimeHumanApprovalRequiredCount:
+      data.runtimeInterrupts?.summary.human_approval_required_count ?? 0,
+    runtimeApprovedCount: data.runtimeInterrupts?.summary.approved_count ?? 0,
+    runtimeResumedCount: data.runtimeInterrupts?.summary.resumed_count ?? 0,
     agentCount: data.health?.agent_health.length ?? 0,
     anomalyCount: data.health?.anomalies.length ?? 0,
     tracesLastHour: data.health?.traces_last_hour ?? 0,

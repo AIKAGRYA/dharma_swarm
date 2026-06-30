@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from dharma_swarm.operator_views import OperatorViews
@@ -14,6 +17,7 @@ from dharma_swarm.runtime_state import (
 
 
 async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
+    base_time = datetime(2026, 6, 30, 21, 0, tzinfo=timezone.utc)
     await store.upsert_session(
         SessionState(
             session_id="sess-graph",
@@ -90,6 +94,49 @@ async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
             summary="Supervisor runtime started",
             event_text="Supervisor runtime started from seeded runtime graph test.",
             payload={"checkpoint_id": "task-graph:supervisor:checkpoint-1"},
+            created_at=base_time,
+        )
+    )
+    await store.record_session_event(
+        SessionEventRecord(
+            event_id="event-interrupt-requested",
+            session_id="sess-graph",
+            ledger_kind="runtime",
+            event_name="interrupt_requested",
+            task_id="task-graph",
+            run_id="run-parent",
+            agent_id="supervisor",
+            summary="Supervisor paused for human approval",
+            event_text="Supervisor requested human approval before resuming.",
+            payload={
+                "approval_id": "approval-1",
+                "checkpoint_id": "task-graph:supervisor:checkpoint-1",
+                "interrupt_id": "interrupt-1",
+                "requires_human": True,
+                "resume_token": "resume-run-parent",
+                "status": "pending",
+            },
+            created_at=base_time + timedelta(seconds=1),
+        )
+    )
+    await store.record_session_event(
+        SessionEventRecord(
+            event_id="event-human-approval-granted",
+            session_id="sess-graph",
+            ledger_kind="runtime",
+            event_name="human_approval_granted",
+            task_id="task-graph",
+            run_id="run-parent",
+            agent_id="operator",
+            summary="Human approval granted",
+            event_text="Operator granted approval to resume the supervisor run.",
+            payload={
+                "approval_id": "approval-1",
+                "approval_status": "approved",
+                "checkpoint_id": "task-graph:supervisor:checkpoint-1",
+                "interrupt_id": "interrupt-1",
+            },
+            created_at=base_time + timedelta(seconds=2),
         )
     )
 
@@ -132,6 +179,7 @@ async def test_operator_views_runtime_platform_surfaces_use_runtime_state(tmp_pa
     detail = await views.runtime_run_detail("run-parent")
     checkpoints = await views.runtime_checkpoints(session_id="sess-graph", limit=10)
     events = await views.runtime_events(session_id="sess-graph", ledger_kind="runtime")
+    interrupts = await views.runtime_interrupts(session_id="sess-graph", limit=10)
 
     assert sessions["schema_version"] == "runtime_sessions_snapshot.v1"
     assert sessions["summary"]["session_count"] == 1
@@ -156,8 +204,25 @@ async def test_operator_views_runtime_platform_surfaces_use_runtime_state(tmp_pa
     assert checkpoints["checkpoints"][0]["state"]["visible_output_policy"] == "supervisor_final"
 
     assert events["schema_version"] == "runtime_events_snapshot.v1"
-    assert events["summary"]["event_count"] == 1
-    assert events["events"][0]["event_name"] == "run_started"
+    assert events["summary"]["event_count"] == 3
+    assert {event["event_name"] for event in events["events"]} >= {
+        "run_started",
+        "interrupt_requested",
+        "human_approval_granted",
+    }
+
+    assert interrupts["schema_version"] == "runtime_interrupts_snapshot.v1"
+    assert interrupts["summary"]["control_event_count"] == 2
+    assert interrupts["summary"]["pending_interrupt_count"] == 1
+    assert interrupts["summary"]["human_approval_required_count"] == 1
+    assert interrupts["summary"]["approved_count"] == 1
+    pending = next(
+        event for event in interrupts["control_events"] if event["status"] == "pending"
+    )
+    assert pending["interrupt_id"] == "interrupt-1"
+    assert pending["approval_id"] == "approval-1"
+    assert pending["resume_token"] == "resume-run-parent"
+    assert pending["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
 
 
 @pytest.mark.asyncio
@@ -193,6 +258,8 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     from api.routers.runtime import (
         runtime_checkpoints,
         runtime_events,
+        runtime_events_stream,
+        runtime_interrupts,
         runtime_run_detail,
         runtime_runs,
         runtime_sessions,
@@ -218,6 +285,19 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
         event_name=None,
         limit=10,
     )
+    interrupts = await runtime_interrupts(
+        session_id="sess-graph",
+        status=None,
+        limit=10,
+    )
+    stream = await runtime_events_stream(
+        session_id="sess-graph",
+        ledger_kind="runtime",
+        event_name="interrupt_requested",
+        limit=10,
+        poll_seconds=0.01,
+        max_events=1,
+    )
 
     assert sessions.status == "ok"
     assert sessions.data["runtime_db"] == str(db_path)
@@ -237,6 +317,20 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     assert events.status == "ok"
     assert events.data["events"][0]["payload"]["checkpoint_id"] == "task-graph:supervisor:checkpoint-1"
 
+    assert interrupts.status == "ok"
+    assert interrupts.data["summary"]["control_event_count"] == 2
+    assert interrupts.data["control_events"][0]["event_name"] == "human_approval_granted"
+
+    assert stream.media_type == "text/event-stream"
+    chunks: list[str] = []
+    async for chunk in stream.body_iterator:
+        chunks.append(chunk.decode() if isinstance(chunk, bytes) else chunk)
+    body = "".join(chunks)
+    assert body.startswith("event: runtime_event\n")
+    event_payload = json.loads(body.split("data: ", 1)[1].strip())
+    assert event_payload["event_id"] == "event-interrupt-requested"
+    assert event_payload["payload"]["resume_token"] == "resume-run-parent"
+
 
 def test_runtime_graph_router_is_registered() -> None:
     from api.main import app
@@ -248,3 +342,5 @@ def test_runtime_graph_router_is_registered() -> None:
     assert "/api/runtime/runs/{run_id}" in paths
     assert "/api/runtime/checkpoints" in paths
     assert "/api/runtime/events" in paths
+    assert "/api/runtime/events/stream" in paths
+    assert "/api/runtime/interrupts" in paths

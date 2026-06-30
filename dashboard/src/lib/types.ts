@@ -431,6 +431,60 @@ export interface RuntimeGraphSnapshot {
 }
 
 // ---------------------------------------------------------------------------
+// Runtime interrupts (GET /api/runtime/interrupts)
+// ---------------------------------------------------------------------------
+
+export interface RuntimeEvent {
+  event_id: string;
+  session_id: string;
+  ledger_kind: string;
+  event_name: string;
+  task_id?: string;
+  run_id?: string;
+  agent_id?: string;
+  summary?: string;
+  event_text?: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface RuntimeInterruptSummary {
+  control_event_count: number;
+  pending_interrupt_count: number;
+  human_approval_required_count: number;
+  approved_count: number;
+  resumed_count: number;
+}
+
+export interface RuntimeInterruptControlEvent {
+  event_id: string;
+  session_id: string;
+  task_id: string;
+  run_id: string;
+  agent_id: string;
+  event_name: string;
+  control_type: string;
+  status: string;
+  requires_human: boolean;
+  interrupt_id: string;
+  approval_id: string;
+  resume_token: string;
+  checkpoint_id: string;
+  summary: string;
+  created_at: string;
+  event: RuntimeEvent;
+}
+
+export interface RuntimeInterruptsSnapshot {
+  schema_version: string;
+  generated_at: string;
+  runtime_db: string;
+  filters: Record<string, unknown>;
+  summary: RuntimeInterruptSummary;
+  control_events: RuntimeInterruptControlEvent[];
+}
+
+// ---------------------------------------------------------------------------
 // Evolution (GET /api/evolution/*)
 // ---------------------------------------------------------------------------
 

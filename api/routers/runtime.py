@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 from pathlib import Path
 
 from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 
 from api.models import ApiResponse
 from dharma_swarm.operator_views import OperatorViews
@@ -152,4 +155,70 @@ async def runtime_events(
             status="error",
             data=None,
             error=f"runtime events unavailable: {exc}",
+        )
+
+
+@router.get("/events/stream")
+async def runtime_events_stream(
+    session_id: str | None = Query(None, description="Optional runtime session filter."),
+    ledger_kind: str | None = Query(None, description="Optional ledger kind filter."),
+    event_name: str | None = Query(None, description="Optional event name filter."),
+    limit: int = Query(20, ge=1, le=500, description="Maximum event records per poll."),
+    poll_seconds: float = Query(2.0, ge=0.01, le=30.0, description="SSE polling interval."),
+    max_events: int | None = Query(None, ge=1, le=1000, description="Optional finite stream cap."),
+) -> StreamingResponse:
+    """Stream persisted runtime/session events as server-sent events."""
+
+    async def event_generator():  # noqa: ANN202
+        seen_event_ids: set[str] = set()
+        emitted = 0
+        while True:
+            snapshot = await _operator_views().runtime_events(
+                session_id=session_id,
+                ledger_kind=ledger_kind,
+                event_name=event_name,
+                limit=limit,
+            )
+            events = list(reversed(snapshot["events"]))
+            for event in events:
+                event_id = str(event.get("event_id") or "")
+                if event_id in seen_event_ids:
+                    continue
+                seen_event_ids.add(event_id)
+                payload = json.dumps(event, sort_keys=True)
+                yield f"event: runtime_event\ndata: {payload}\n\n"
+                emitted += 1
+                if max_events is not None and emitted >= max_events:
+                    return
+            await asyncio.sleep(poll_seconds)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/interrupts")
+async def runtime_interrupts(
+    session_id: str | None = Query(None, description="Optional runtime session filter."),
+    status: str | None = Query(None, description="Optional interrupt/control status filter."),
+    limit: int = Query(20, ge=1, le=200, description="Maximum interrupt/control records."),
+) -> ApiResponse:
+    """Return persisted interrupt, resume, and human-approval runtime state."""
+    try:
+        snapshot = await _operator_views().runtime_interrupts(
+            session_id=session_id,
+            status=status,
+            limit=limit,
+        )
+        return ApiResponse(data=snapshot)
+    except Exception as exc:
+        return ApiResponse(
+            status="error",
+            data=None,
+            error=f"runtime interrupts unavailable: {exc}",
         )

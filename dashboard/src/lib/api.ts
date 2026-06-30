@@ -16,6 +16,7 @@ import type {
   OntologyTypeOut,
   ProvenanceOut,
   RuntimeGraphSnapshot,
+  RuntimeInterruptsSnapshot,
   StigmergyMarkOut,
   SwarmOverview,
   TaskOut,
@@ -203,6 +204,34 @@ export function fetchRuntimeGraph(params?: {
   if (params?.receipt_limit != null) sp.set("receipt_limit", String(params.receipt_limit));
   const qs = sp.toString();
   return apiGet<RuntimeGraphSnapshot>(`/api/runtime/graph${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeInterrupts(params?: {
+  session_id?: string;
+  status?: string;
+  limit?: number;
+}): Promise<ApiResponse<RuntimeInterruptsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeInterruptsSnapshot>(`/api/runtime/interrupts${qs ? `?${qs}` : ""}`);
+}
+
+export function runtimeEventsStreamPath(params?: {
+  session_id?: string;
+  ledger_kind?: string;
+  event_name?: string;
+  limit?: number;
+}): string {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.ledger_kind) sp.set("ledger_kind", params.ledger_kind);
+  if (params?.event_name) sp.set("event_name", params.event_name);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiPath(`/api/runtime/events/stream${qs ? `?${qs}` : ""}`);
 }
 
 export function backendLivenessPath(): string {
