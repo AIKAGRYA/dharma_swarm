@@ -718,6 +718,8 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
             assert kwargs.get("memory_kernel") is not None
 
         async def compile_bundle(self, **kwargs):
+            assert kwargs["metadata"]["agent_id"] == "a1"
+            assert kwargs["metadata"]["topology"] == "swarm"
             return ContextBundleRecord(
                 bundle_id="bnd_memory_kernel",
                 session_id=kwargs["session_id"],
@@ -736,6 +738,11 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
                         "admitted_count": 1,
                         "omitted_count": 2,
                         "warnings": ["preview_only_no_runtime_prompt_injection"],
+                        "isolation_applied": True,
+                        "isolation_agent_id": "a1",
+                        "allowed_agent_ids": ["a1"],
+                        "allowed_scopes": ["project", "agent", "swarm"],
+                        "allowed_memory_lanes": ["provenance", "semantic"],
                     }
                 },
             )
@@ -762,7 +769,7 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
         ledger_dir=tmp_path / "ledgers",
         runtime_db_path=tmp_path / "runtime.db",
     )
-    td = TaskDispatch(task_id=task.id, agent_id="a1")
+    td = TaskDispatch(task_id=task.id, agent_id="a1", topology=TopologyType.SWARM)
 
     meta = await orch._attach_context_bundle(task, td, {})
 
@@ -771,7 +778,13 @@ async def test_attach_context_bundle_exposes_memory_kernel_metadata(
     assert meta["memory_kernel_pack_id"] == "memory_context_pack:test"
     assert meta["memory_kernel_admitted_count"] == 1
     assert meta["memory_kernel_omitted_count"] == 2
+    assert meta["memory_kernel_isolation_applied"] is True
+    assert meta["memory_kernel_isolation_agent_id"] == "a1"
+    assert meta["memory_kernel_allowed_agent_ids"] == ["a1"]
+    assert meta["memory_kernel_allowed_scopes"] == ["project", "agent", "swarm"]
+    assert meta["memory_kernel_allowed_memory_lanes"] == ["provenance", "semantic"]
     assert td.metadata["memory_kernel_status"] == "used"
+    assert td.metadata["memory_kernel_isolation_applied"] is True
 
 
 @pytest.mark.asyncio

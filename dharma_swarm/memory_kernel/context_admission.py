@@ -61,6 +61,7 @@ class MemoryContextBudget:
     allow_high_risk: bool = False
     allowed_truth_states: tuple[TruthState, ...] = _DEFAULT_ALLOWED_TRUTH_STATES
     allowed_scopes: tuple[MemoryScope, ...] = ()
+    allowed_agent_ids: tuple[str, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
     allowed_atom_types: tuple[MemoryAtomType, ...] = ()
 
@@ -70,6 +71,7 @@ class MemoryContextBudget:
             item.value for item in self.allowed_truth_states
         )
         payload["allowed_scopes"] = tuple(item.value for item in self.allowed_scopes)
+        payload["allowed_agent_ids"] = tuple(self.allowed_agent_ids)
         payload["allowed_memory_lanes"] = tuple(
             item.value for item in self.allowed_memory_lanes
         )
@@ -309,6 +311,12 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append("atom_type_not_allowed")
     if budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
         reasons.append("scope_not_allowed")
+    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+        atom_agent_ids = _atom_agent_ids(atom)
+        if not atom_agent_ids:
+            reasons.append("agent_owner_unknown")
+        elif not set(atom_agent_ids).intersection(budget.allowed_agent_ids):
+            reasons.append("agent_not_allowed")
     if budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
         reasons.append("memory_lane_not_allowed")
     if budget.require_context_admissible and not atom.context_admissible:
@@ -343,6 +351,8 @@ def _selection_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[s
         reasons.append("bounded_content_included")
     else:
         reasons.append("reference_only")
+    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+        reasons.append("agent_scope_allowed")
     return tuple(reasons)
 
 
@@ -403,3 +413,30 @@ def _stable_pack_id(atom_ids: Iterable[str]) -> str:
     payload = "\n".join(atom_ids)
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"memory_context_pack:{digest[:24]}"
+
+
+def _atom_agent_ids(atom: MemoryAtom) -> tuple[str, ...]:
+    ids: list[str] = []
+    _extend_agent_ids(ids, atom.metadata)
+    for nested_key in ("payload", "row"):
+        nested = atom.metadata.get(nested_key)
+        if isinstance(nested, dict):
+            _extend_agent_ids(ids, nested)
+    return tuple(dict.fromkeys(ids))
+
+
+def _extend_agent_ids(ids: list[str], payload: dict[str, object]) -> None:
+    for key in (
+        "agent_id",
+        "agent",
+        "agent_name",
+        "owner_agent_id",
+        "assigned_to",
+        "assigned_agent_id",
+        "worker_agent_id",
+    ):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            ids.append(value.strip())
+        elif isinstance(value, (list, tuple, set)):
+            ids.extend(str(item).strip() for item in value if str(item).strip())

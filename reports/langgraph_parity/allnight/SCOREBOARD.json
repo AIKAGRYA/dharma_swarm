@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T18:10:38Z",
+  "updated_at": "2026-06-30T18:39:05Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 50,
+    "current": 54,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, and a Phase 5 MemoryKernel text-query lane feeding live ContextCompiler bundles. A2A strict green, full topology-level memory isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof, a small Phase 4 A2A reconciliation plus replayable blocker audit, and Phase 5 MemoryKernel improvements: text-query live ContextCompiler bundles plus topology-derived agent memory isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS compiler metadata. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
   },
   "rounds": [
     {
@@ -238,6 +238,39 @@
         "A2A strict readiness remains red and still blocks any 100/100 claim.",
         "Provider truth and cockpit/API graph inspection remain pending."
       ]
+    },
+    {
+      "id": "phase-5-topology-agent-memory-isolation",
+      "timestamp": "2026-06-30T18:39:05Z",
+      "status": "completed_partial",
+      "target_gate": "Apply live topology agent memory isolation to MemoryKernel context admission and dispatch telemetry",
+      "files_touched": [
+        "dharma_swarm/memory_kernel/context_admission.py",
+        "dharma_swarm/memory_kernel/default_context.py",
+        "dharma_swarm/context_compiler.py",
+        "dharma_swarm/memory_kernel/orchestrator_context.py",
+        "tests/test_context_compiler_memory_kernel.py",
+        "tests/test_orchestrator.py",
+        "reports/langgraph_parity/allnight/memory_topology_agent_isolation_20260630T183905Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "make onboard",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_applies_live_topology_agent_memory_isolation tests/test_orchestrator.py::test_attach_context_bundle_exposes_memory_kernel_metadata",
+        ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_readiness.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py",
+        ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py",
+        ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py"
+      ],
+      "blockers": [
+        "Phase 5 remains partial: topology-derived agent memory isolation now gates agent-scoped MemoryKernel atoms and dispatch telemetry, but stale-memory rejection, curated-source coverage, retrieval telemetry, and tool-exposure isolation are not complete.",
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Provider truth and cockpit/API graph inspection remain pending."
+      ]
     }
   ],
   "gates": {
@@ -251,7 +284,7 @@
     "phase_3_live_topologies": "partial_plus_runtime_state_swarm_handoff_restart_and_subagents_child_parent_run_proofs_pass",
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
-    "phase_5_memory_live_retrieval": "partial_memorykernel_text_query_filters_live_context_bundle",
+    "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
     "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
     "phase_7_platform_surface": "pending"
   },
@@ -272,6 +305,7 @@
       "a2a_embedded_receipt_reconciler_post_apply_dry_run": "candidate_count=0",
       "a2a_readiness_blocker_audit": "4 passed in 0.39s; broader A2A focused suite 23 passed in 0.41s; blocker_count=36 with 11 stale claimed, 6 stale unclaimed, 18 SAB semantic non-A2A, 1 no-pointer completed row",
       "memory_live_retrieval_text_query": "MemoryQuery.text_query filters normalized atoms; ContextCompiler live bundle admitted matching home.witness atom and excluded unrelated witness atom; focused 4 passed in 0.40s; broader memory/context subset 69 passed in 0.48s",
+      "memory_topology_agent_isolation": "MemoryContextBudget.allowed_agent_ids blocks cross-agent AGENT-scoped atoms; ContextCompiler applies topology-derived isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS metadata; orchestrator dispatch metadata mirrors isolation telemetry; focused 4 passed in 0.19s; broader memory/context subset 84 passed in 0.85s; broader runtime/topology/langgraph subset 75 passed in 30.52s",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",

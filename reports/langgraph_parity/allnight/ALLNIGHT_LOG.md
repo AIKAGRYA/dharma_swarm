@@ -191,3 +191,33 @@
   - Phase 5 remains partial: MemoryKernel text-query live context is now proven, but topology-wide memory/tool isolation across live SWARM, SUPERVISOR, and SUBAGENTS_AS_TOOLS remains unproven.
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Full provider served-model truth and cockpit/API graph inspection remain pending.
+
+## 2026-06-30T18:39:05Z - Phase 5 Topology Agent Memory Isolation Slice
+
+- Target gate: enforce topology-derived MemoryKernel agent isolation in the live `ContextCompiler` path and expose the policy on orchestrator dispatch metadata.
+- Baseline/probe state:
+  - `make onboard` -> pass; generated the known governance projection churn, which was inspected and restored before edits.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+- Code changes landed locally:
+  - Added `MemoryContextBudget.allowed_agent_ids` and agent-owner omission reasons for `AGENT` scoped atoms: `agent_not_allowed` and `agent_owner_unknown`.
+  - Added topology-derived MemoryKernel isolation policy metadata in `dharma_swarm/memory_kernel/default_context.py`.
+  - Wired `ContextCompiler.compile_bundle()` to apply the policy for `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` caller metadata.
+  - Extended orchestrator MemoryKernel dispatch metadata with `memory_kernel_isolation_applied`, `memory_kernel_isolation_agent_id`, allowed agent ids, scopes, and memory lanes.
+  - Added a parameterized compiler test proving all three live topology modes admit the active agent's scoped memory, admit shared project memory, and omit another agent's scoped memory.
+  - Extended the orchestrator context-bundle metadata test to prove isolation telemetry reaches `TaskDispatch.metadata`.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/memory_topology_agent_isolation_20260630T183905Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_applies_live_topology_agent_memory_isolation tests/test_orchestrator.py::test_attach_context_bundle_exposes_memory_kernel_metadata` -> `4 passed in 0.19s`.
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_readiness.py tests/test_memory_kernel_prod_bar.py` -> `29 passed in 0.45s`.
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_readiness.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `84 passed in 0.85s`.
+  - `.venv/bin/python -m pytest -q tests/test_orchestrator.py::test_attach_context_bundle_exposes_memory_kernel_metadata tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state` -> `4 passed in 1.75s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py` -> `75 passed in 30.52s`.
+  - `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py` -> pass.
+  - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py` -> pass.
+- Scoreboard: raised conservatively to `54/100`, still explicitly not 100/100.
+- Current blockers:
+  - Phase 5 remains partial: topology agent memory isolation is now proven at compiler/admission/dispatch-metadata level, but stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth and cockpit/API graph inspection remain pending.

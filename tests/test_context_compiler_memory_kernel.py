@@ -8,7 +8,27 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from dharma_swarm.context_compiler import ContextCompiler
-from dharma_swarm.memory_kernel import CensusConfig, MemoryKernel, MemoryKernelConfig
+from dharma_swarm.memory_kernel import (
+    AuthorityLevel,
+    AdapterMode,
+    CensusConfig,
+    MemoryAtom,
+    MemoryAtomType,
+    MemoryKernel,
+    MemoryKernelConfig,
+    MemoryLane,
+    MemoryScope,
+    MemorySurface,
+    MemorySurfaceHealth,
+    MemorySurfaceRole,
+    ReadMode,
+    RiskLevel,
+    SurfaceCategory,
+    SurfaceStatus,
+    TruthState,
+    WriteMode,
+    preview_memory_pack,
+)
 from dharma_swarm.memory_kernel.adapters import ReadOnlyAdapterConfig
 
 
@@ -83,6 +103,62 @@ class _FakeMemoryKernel:
             raise self.error
         assert self.pack is not None
         return self.pack
+
+
+class _AdmissionMemoryKernel:
+    def __init__(self, atoms: tuple[MemoryAtom, ...]) -> None:
+        self.atoms = atoms
+        self.kwargs: dict[str, object] = {}
+
+    def preview_memory_pack(self, **kwargs: object):
+        self.kwargs = kwargs
+        query = kwargs["query"]
+        budget = kwargs["budget"]
+        filtered_atoms = tuple(atom for atom in self.atoms if query.allows_atom(atom))
+        return preview_memory_pack(filtered_atoms, budget=budget)
+
+
+def _memory_surface() -> MemorySurface:
+    return MemorySurface(
+        surface_id="agent.memory",
+        path="/tmp/agent-memory.jsonl",
+        owner_module="tests",
+        role=MemorySurfaceRole.MEMORY_PLANE,
+        category=SurfaceCategory.RAW_EVIDENCE,
+        authority_level=AuthorityLevel.MEDIUM,
+        write_mode=WriteMode.READ_ONLY,
+        adapter_mode=AdapterMode.READ_ONLY,
+        active_status=SurfaceStatus.ACTIVE,
+        health=MemorySurfaceHealth(exists=True, path_type="file"),
+        provenance_quality="test",
+        canon_risk=RiskLevel.LOW,
+        pii_secrets_risk=RiskLevel.LOW,
+    )
+
+
+def _memory_atom(
+    content: str,
+    *,
+    scope: MemoryScope,
+    agent_id: str | None = None,
+) -> MemoryAtom:
+    metadata = {"agent_id": agent_id} if agent_id else {}
+    return MemoryAtom.build(
+        surface=_memory_surface(),
+        atom_type=MemoryAtomType.WITNESS_EVENT,
+        content_ref=f"agent-memory:{content}",
+        content=content,
+        timestamp="2026-05-12T01:00:00Z",
+        source_path="/tmp/agent-memory.jsonl",
+        adapter_name="test",
+        read_mode=ReadMode.READ_ONLY,
+        metadata=metadata,
+        source_row_key=f"row:{content}",
+        memory_lane=MemoryLane.PROVENANCE,
+        scope=scope,
+        truth_state=TruthState.OBSERVED,
+        context_admissible=True,
+    )
 
 
 @pytest.mark.asyncio
@@ -167,6 +243,65 @@ async def test_context_compiler_uses_memory_kernel_text_query_for_live_context(
     assert metadata["status"] == "used"
     assert metadata["text_query_applied"] is True
     assert metadata["admitted_count"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("topology", ["swarm", "supervisor", "subagents_as_tools"])
+async def test_context_compiler_applies_live_topology_agent_memory_isolation(
+    topology: str,
+) -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "alpha governed memory for the active agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-alpha",
+            ),
+            _memory_atom(
+                "beta private memory for another agent",
+                scope=MemoryScope.AGENT,
+                agent_id="agent-beta",
+            ),
+            _memory_atom(
+                "ownerless agent scoped memory",
+                scope=MemoryScope.AGENT,
+            ),
+            _memory_atom(
+                "shared project memory for the graph",
+                scope=MemoryScope.PROJECT,
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id=f"sess_{topology}",
+        task_id=f"task_{topology}",
+        task_description="Use governed memory.",
+        query="memory",
+        token_budget=4000,
+        metadata={"topology": topology, "agent_id": "agent-alpha"},
+    )
+
+    assert "alpha governed memory for the active agent" in bundle.rendered_text
+    assert "shared project memory for the graph" in bundle.rendered_text
+    assert "beta private memory for another agent" not in bundle.rendered_text
+    assert "ownerless agent scoped memory" not in bundle.rendered_text
+    assert "agent_not_allowed" in bundle.rendered_text
+    assert "agent_owner_unknown" in bundle.rendered_text
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["status"] == "used"
+    assert metadata["isolation_applied"] is True
+    assert metadata["isolation_topology"] == topology
+    assert metadata["isolation_agent_id"] == "agent-alpha"
+    assert metadata["allowed_agent_ids"] == ["agent-alpha"]
+    assert "agent" in metadata["allowed_scopes"]
+    assert "project" in metadata["allowed_scopes"]
+    assert metadata["admitted_count"] == 2
+    assert metadata["omitted_count"] == 2
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "allowed_agent_ids") == ("agent-alpha",)
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,81 @@
+{
+  "schema_version": "langgraph_parity_memory_topology_agent_isolation.v1",
+  "generated_at": "2026-06-30T18:39:05Z",
+  "score_after": 54,
+  "claim": "Live topology compiler metadata now drives MemoryKernel agent-memory isolation for SWARM, SUPERVISOR, and SUBAGENTS_AS_TOOLS contexts.",
+  "production_path": {
+    "budget_gate": "dharma_swarm/memory_kernel/context_admission.py::MemoryContextBudget.allowed_agent_ids",
+    "omission_reasons": [
+      "agent_not_allowed",
+      "agent_owner_unknown"
+    ],
+    "policy_derivation": "dharma_swarm/memory_kernel/default_context.py::memory_kernel_isolation_policy_from_metadata",
+    "compiler_entrypoint": "dharma_swarm/context_compiler.py::ContextCompiler.compile_bundle",
+    "dispatch_telemetry": "dharma_swarm/memory_kernel/orchestrator_context.py::memory_kernel_dispatch_metadata"
+  },
+  "coverage": {
+    "topology_modes": [
+      "swarm",
+      "supervisor",
+      "subagents_as_tools"
+    ],
+    "active_agent_memory": "admitted",
+    "shared_project_memory": "admitted",
+    "other_agent_memory": "omitted",
+    "ownerless_agent_memory": "omitted",
+    "dispatch_metadata": [
+      "memory_kernel_isolation_applied",
+      "memory_kernel_isolation_agent_id",
+      "memory_kernel_allowed_agent_ids",
+      "memory_kernel_allowed_scopes",
+      "memory_kernel_allowed_memory_lanes"
+    ]
+  },
+  "verification": [
+    {
+      "command": "make onboard",
+      "result": "pass; generated known governance projection churn that was inspected and restored"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "fail exit 2; ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass; orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_applies_live_topology_agent_memory_isolation tests/test_orchestrator.py::test_attach_context_bundle_exposes_memory_kernel_metadata",
+      "result": "4 passed in 0.19s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_readiness.py tests/test_memory_kernel_prod_bar.py",
+      "result": "29 passed in 0.45s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_readiness.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py",
+      "result": "84 passed in 0.85s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_orchestrator.py::test_attach_context_bundle_exposes_memory_kernel_metadata tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state",
+      "result": "4 passed in 1.75s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py",
+      "result": "75 passed in 30.52s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py",
+      "result": "pass"
+    }
+  ],
+  "remaining_blockers": [
+    "Phase 5 is not fully green: stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.",
+    "A2A strict readiness remains red and blocks any 100/100 claim.",
+    "Provider truth and cockpit/API graph inspection remain pending."
+  ]
+}
