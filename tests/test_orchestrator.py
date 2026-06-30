@@ -20,6 +20,7 @@ from dharma_swarm.models import (
     TopologyType,
 )
 from dharma_swarm.orchestrator import Orchestrator
+from dharma_swarm.runtime_state import RuntimeStateStore
 
 
 class MockTaskBoard:
@@ -393,9 +394,138 @@ class DummyRunner:
         return self._result
 
 
+async def _drain_running_tasks(orch: Orchestrator, *, attempts: int = 50) -> None:
+    for _ in range(attempts):
+        if not orch._running_tasks:
+            break
+        await orch._collect_completed()
+        await asyncio.sleep(0.01)
+    await orch._collect_completed()
+
+
 # ---------------------------------------------------------------------------
 # New tests — coverage expansion
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_swarm_handoff_persists_restartable_topology_state(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-swarm-handoff",
+        title="Swarm handoff",
+        description="safe",
+        metadata={
+            "active_agent": "a1",
+            "allowed_handoffs": {"a1": ["a2"]},
+            "handoff_to_agent": "a2",
+            "handoff_reason": "specialist handoff",
+        },
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL),
+            AgentState(id="a2", name="agent-2", role=AgentRole.CODER),
+        ]
+    )
+    pool.set_runner("a2", DummyRunner(result="handoff ok"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_swarm_handoff",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SWARM)
+    await _drain_running_tasks(orch)
+
+    assert dispatches[0].agent_id == "a2"
+    restarted = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    latest = await restarted.get_latest_topology_state_for_task("t-swarm-handoff")
+    assert latest is not None
+    loaded = await restarted.get_topology_state(latest.run_id)
+    assert loaded is not None
+    assert loaded.topology == "swarm"
+    assert loaded.active_agent == "a2"
+    assert loaded.handoff_receipts[0]["status"] == "accepted"
+    assert loaded.handoff_receipts[0]["from_agent"] == "a1"
+    assert loaded.allowed_handoffs["a1"] == ["a2"]
+
+    receipts = await restarted.list_runtime_receipts(
+        run_id=latest.run_id,
+        receipt_type="topology_handoff",
+        limit=10,
+    )
+    assert any(receipt.payload.get("status") == "accepted" for receipt in receipts)
+
+
+@pytest.mark.asyncio
+async def test_subagents_as_tools_persists_parent_and_child_runs(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv("DHARMA_FAST_BOOT", "1")
+    monkeypatch.setenv("DHARMA_SPINE_DISPATCH", "0")
+    runtime_db = tmp_path / "runtime.db"
+    board = MockTaskBoard()
+    task = Task(
+        id="t-subagent-tools",
+        title="Subagents as tools",
+        description="safe",
+        metadata={"active_agent": "parent"},
+    )
+    board.tasks = [task]
+    pool = MockAgentPool(
+        [
+            AgentState(id="parent", name="parent", role=AgentRole.GENERAL),
+            AgentState(id="child-a", name="child-a", role=AgentRole.CODER),
+            AgentState(id="child-b", name="child-b", role=AgentRole.TESTER),
+        ]
+    )
+    pool.set_runner("parent", DummyRunner(result="parent ok"))
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path / "ledgers",
+        runtime_db_path=runtime_db,
+        session_id="sess_subagent_tools",
+    )
+
+    dispatches = await orch.dispatch(task, topology=TopologyType.SUBAGENTS_AS_TOOLS)
+    await _drain_running_tasks(orch)
+
+    parent_dispatch = dispatches[0]
+    parent_run_id = str(parent_dispatch.metadata["runtime_run_id"])
+    child_run_ids = parent_dispatch.metadata["parent_graph_state"]["child_run_ids"]
+    assert len(child_run_ids) == 2
+
+    store = RuntimeStateStore(runtime_db, include_memory_plane=False)
+    parent_run = await store.get_delegation_run(parent_run_id)
+    children = await store.list_child_runs(parent_run_id)
+    topology_state = await store.get_topology_state(parent_run_id)
+
+    assert parent_run is not None
+    assert parent_run.assigned_to == "parent"
+    assert {child.run_id for child in children} == set(child_run_ids)
+    assert {child.parent_run_id for child in children} == {parent_run_id}
+    assert {child.assigned_to for child in children} == {"child-a", "child-b"}
+    assert topology_state is not None
+    assert topology_state.child_run_ids == child_run_ids
+
+    receipts = await store.list_runtime_receipts(
+        run_id=parent_run_id,
+        receipt_type="child_spawned",
+        limit=10,
+    )
+    assert {receipt.payload["child_run_id"] for receipt in receipts} >= set(child_run_ids)
 
 @pytest.mark.asyncio
 async def test_dispatch_pipeline_assigns_first_idle_only(agents, tasks):

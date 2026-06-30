@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T16:12:53Z",
+  "updated_at": "2026-06-30T16:31:54Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 36,
+    "current": 44,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, topology enum/metadata slice passing, and A2A/memory/cockpit/full restart gates still failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, and a RuntimeStateStore-backed SWARM handoff/subagents-as-tools restart proof. A2A, memory retrieval isolation, full provider served-model truth, and cockpit/API graph inspection remain failing or unproven."
   },
   "rounds": [
     {
@@ -69,6 +69,38 @@
         "Live restart/resume topology persistence is only partially implemented via dispatch metadata; no process-restart acceptance proof yet.",
         "Memory live retrieval lane and cockpit/API graph inspection are not implemented in this slice."
       ]
+    },
+    {
+      "id": "phase-3-runtime-state-topology-proof",
+      "timestamp": "2026-06-30T16:31:54Z",
+      "status": "completed",
+      "target_gate": "Persist live topology state and prove restart-readable SWARM/subagents runtime records",
+      "files_touched": [
+        "dharma_swarm/orchestrator.py",
+        "dharma_swarm/runtime_lifecycle.py",
+        "dharma_swarm/runtime_state.py",
+        "tests/test_orchestrator.py",
+        "tests/test_runtime_state.py",
+        "tests/test_topology_execution.py",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m compileall -q dharma_swarm/runtime_state.py dharma_swarm/runtime_lifecycle.py dharma_swarm/orchestrator.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+        ".venv/bin/python -m pytest -q tests/test_runtime_state.py::test_topology_state_survives_store_restart tests/test_orchestrator.py::test_swarm_handoff_persists_restartable_topology_state tests/test_orchestrator.py::test_subagents_as_tools_persists_parent_and_child_runs tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state",
+        ".venv/bin/python -m pytest -q tests/test_runtime_state.py tests/test_orchestrator.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_langgraph_parity_*.py",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "make agent-build-preflight",
+        "make agent-build-closeout"
+      ],
+      "blockers": [
+        "A2A strict readiness still fails: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19.",
+        "make agent-build-closeout fails at the gitleaks gate: 68 redacted findings after scanning 2720 commits; semgrep was skipped because it is not installed on PATH.",
+        "Supervisor topology has dispatch metadata coverage, but no dedicated restart/resume acceptance test for supervisor final-output semantics yet.",
+        "Memory live retrieval, full provider served-model truth, and cockpit/API graph inspection remain pending."
+      ]
     }
   ],
   "gates": {
@@ -79,7 +111,8 @@
     "phase_0_spine_dispatch_report": "passed_after_script_added",
     "phase_1_25_case_oracle": "passed_26_cases_all_required_tags_covered",
     "phase_2_default_spine_dispatch": "passed_slice_default_on_and_receipt_persisted",
-    "phase_3_live_topologies": "partial_enum_and_dispatch_metadata_added_no_restart_resume_proof",
+    "phase_3_live_topologies": "partial_plus_runtime_state_swarm_handoff_restart_and_subagents_child_parent_run_proofs_pass",
+    "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed",
     "phase_5_memory_live_retrieval": "pending",
     "phase_6_provider_truth": "partial_receipt_attributes_stamp_planned_and_actual_from_runner_config",
@@ -94,9 +127,13 @@
     },
     "tests": {
       "focused_combined": "66 passed in 28.95s",
+      "focused_runtime_topology_new": "4 passed in 2.35s",
+      "runtime_orchestrator_topology_langgraph_combined": "75 passed in 30.44s",
       "langgraph_parity": "20 passed in 0.37s",
       "spine_dispatch_mode_report_strict": "passed",
-      "a2a_readiness_strict": "failed exit 2"
+      "a2a_readiness_strict": "failed exit 2",
+      "agent_build_preflight": "passed; compileall clean, F821 clean, 12328 tests collected, onboard OK, hygiene integrity OK",
+      "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits"
     }
   }
 }

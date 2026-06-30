@@ -219,4 +219,5 @@ async def test_orchestrator_live_langgraph_topologies_stamp_graph_state() -> Non
     assert tools.topology == TopologyType.SUBAGENTS_AS_TOOLS
     assert tools.metadata["child_agent_ids"] == ["agent-2", "agent-3"]
     assert tools.metadata["subagent_tool_names"] == ["call_agent-2", "call_agent-3"]
-    assert tools.metadata["parent_graph_state"]["child_run_ids"] == []
+    assert len(tools.metadata["parent_graph_state"]["child_run_ids"]) == 2
+    assert tools.metadata["child_run_ids"] == tools.metadata["parent_graph_state"]["child_run_ids"]
