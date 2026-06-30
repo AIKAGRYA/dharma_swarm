@@ -382,3 +382,36 @@
   - Interrupt/resume/human-approval state is visible, but approval/reject/resume action endpoints are not implemented in this slice.
   - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-06-30T22:25:17Z - Runtime Agent Server and Background Surfaces
+
+- Target gate: expose Agent Server-style assistants/configurations and background/cron runtime state through canonical runtime views.
+- Code changes landed locally:
+  - Added `dharma_swarm/runtime_agent_server_views.py` with `RuntimeAgentServerViews.runtime_assistants()` and `runtime_background_jobs()`.
+  - Added `OperatorViews.runtime_assistants()` and `OperatorViews.runtime_background_jobs()` facades.
+  - Added FastAPI routes: `GET /api/runtime/assistants` and `GET /api/runtime/background-jobs`.
+  - Extended `tests/test_runtime_graph_api.py` to seed assistant metadata, a background delegation run, a background session event, and a temporary cron job/output, then prove operator and API readback through `DHARMA_RUNTIME_DB`.
+  - Extended dashboard runtime types, API helpers, control-plane normalization, hook fetching, tests, and `/dashboard/runtime` rendering for assistants/configurations plus background/cron state.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_agent_server_background_20260630T222517Z.json`
+- Verification:
+  - `make agent-build-preflight` -> pass; compileall clean, F821 clean, 12,347 tests collected, onboard OK, hygiene integrity OK.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `6 passed in 1.78s`.
+  - `.venv/bin/ruff check dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/python -m compileall -q dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts` from `dashboard/` -> `11 passed`; Node emitted experimental type-stripping warnings only.
+  - `npm run lint -- --quiet` from `dashboard/` -> pass.
+  - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `59 passed in 197.43s`.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `73/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Approval/reject/resume action endpoints are still not implemented; only control-event state is visible.
+  - Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain incomplete or unproven.
+  - Provider truth still lacks exhaustive live-provider served-model matrix proof.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

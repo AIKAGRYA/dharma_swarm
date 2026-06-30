@@ -3,6 +3,8 @@ import type {
   ChatProfileOut,
   ChatStatusOut,
   HealthOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
   RuntimeGraphSnapshot,
   RuntimeInterruptsSnapshot,
 } from "./types";
@@ -14,10 +16,14 @@ export interface RuntimeControlPlaneData {
   health: HealthOut | null;
   runtimeGraph: RuntimeGraphSnapshot | null;
   runtimeInterrupts: RuntimeInterruptsSnapshot | null;
+  runtimeAssistants: RuntimeAssistantsSnapshot | null;
+  runtimeBackgroundJobs: RuntimeBackgroundJobsSnapshot | null;
   chatError: string | null;
   healthError: string | null;
   runtimeGraphError: string | null;
   runtimeInterruptError: string | null;
+  runtimeAssistantsError: string | null;
+  runtimeBackgroundJobsError: string | null;
   error: string | null;
 }
 
@@ -53,6 +59,19 @@ export interface RuntimeControlPlaneSnapshot {
   runtimeHumanApprovalRequiredCount: number;
   runtimeApprovedCount: number;
   runtimeResumedCount: number;
+  runtimeAssistantsReady: boolean;
+  runtimeAssistantsStatusLabel: string;
+  runtimeAssistantsDetail: string;
+  runtimeAssistantCount: number;
+  runtimeConfigurationCount: number;
+  runtimeActiveAssistantCount: number;
+  runtimeBackgroundReady: boolean;
+  runtimeBackgroundStatusLabel: string;
+  runtimeBackgroundDetail: string;
+  runtimeCronJobCount: number;
+  runtimeEnabledCronJobCount: number;
+  runtimeBackgroundRunCount: number;
+  runtimeActiveBackgroundRunCount: number;
   agentCount: number;
   anomalyCount: number;
   tracesLastHour: number;
@@ -89,10 +108,14 @@ function hasRuntimeSignal(data: RuntimeControlPlaneData): boolean {
       data.health ||
       data.runtimeGraph ||
       data.runtimeInterrupts ||
+      data.runtimeAssistants ||
+      data.runtimeBackgroundJobs ||
       data.chatError ||
       data.healthError ||
       data.runtimeGraphError ||
       data.runtimeInterruptError ||
+      data.runtimeAssistantsError ||
+      data.runtimeBackgroundJobsError ||
       data.error,
   );
 }
@@ -104,6 +127,8 @@ function hasUnscopedRuntimeQueryFailure(data: RuntimeControlPlaneData): boolean 
       !data.health &&
       !data.runtimeGraph &&
       !data.runtimeInterrupts &&
+      !data.runtimeAssistants &&
+      !data.runtimeBackgroundJobs &&
       !data.chatError &&
       !data.healthError,
   );
@@ -258,7 +283,13 @@ function runtimeStatusKind(data: RuntimeControlPlaneData): RuntimeControlPlaneSt
   if (data.health?.overall_status === "degraded") return "warn";
   if (hasUnavailableDefaultProfile(data)) return "warn";
   if (!sessionFeedAdvertised(data)) return "warn";
-  if (data.runtimeInterruptError) return "warn";
+  if (
+    data.runtimeInterruptError ||
+    data.runtimeAssistantsError ||
+    data.runtimeBackgroundJobsError
+  ) {
+    return "warn";
+  }
   return "ok";
 }
 
@@ -272,6 +303,8 @@ function runtimeStatusLabel(data: RuntimeControlPlaneData): string {
   if (hasUnavailableDefaultProfile(data)) return "default lane unavailable";
   if (!sessionFeedAdvertised(data)) return "session feed unavailable";
   if (data.runtimeInterruptError) return "controls unavailable";
+  if (data.runtimeAssistantsError) return "assistants unavailable";
+  if (data.runtimeBackgroundJobsError) return "background unavailable";
   return data.health?.overall_status ?? "ok";
 }
 
@@ -314,6 +347,12 @@ function runtimeDetail(data: RuntimeControlPlaneData): string {
   }
   if (data.runtimeInterruptError) {
     return `Runtime controls are partially unavailable: ${data.runtimeInterruptError}`;
+  }
+  if (data.runtimeAssistantsError) {
+    return `Assistant configuration state is partially unavailable: ${data.runtimeAssistantsError}`;
+  }
+  if (data.runtimeBackgroundJobsError) {
+    return `Background runtime state is partially unavailable: ${data.runtimeBackgroundJobsError}`;
   }
   return appendSessionFeedDetail(
     "Chat status and backend health agree on the canonical runtime path.",
@@ -387,11 +426,53 @@ function runtimeInterruptDetail(data: RuntimeControlPlaneData): string {
   return "Awaiting interrupt, resume, and approval state.";
 }
 
+function runtimeAssistantsStatusLabel(data: RuntimeControlPlaneData): string {
+  if (data.runtimeAssistants) {
+    const count = data.runtimeAssistants.summary.assistant_count;
+    return count === 1 ? "1 assistant" : `${count} assistants`;
+  }
+  if (data.runtimeAssistantsError) return "assistants unavailable";
+  return "awaiting assistants";
+}
+
+function runtimeAssistantsDetail(data: RuntimeControlPlaneData): string {
+  if (data.runtimeAssistants) {
+    const summary = data.runtimeAssistants.summary;
+    return `${summary.configuration_count} configurations, ${summary.active_assistant_count} active assistants.`;
+  }
+  if (data.runtimeAssistantsError) {
+    return `Runtime assistants unavailable: ${data.runtimeAssistantsError}`;
+  }
+  return "Awaiting assistant and configuration state.";
+}
+
+function runtimeBackgroundStatusLabel(data: RuntimeControlPlaneData): string {
+  if (data.runtimeBackgroundJobs) {
+    const count = data.runtimeBackgroundJobs.summary.enabled_cron_job_count;
+    return count === 1 ? "1 enabled" : `${count} enabled`;
+  }
+  if (data.runtimeBackgroundJobsError) return "background unavailable";
+  return "awaiting background";
+}
+
+function runtimeBackgroundDetail(data: RuntimeControlPlaneData): string {
+  if (data.runtimeBackgroundJobs) {
+    const summary = data.runtimeBackgroundJobs.summary;
+    return `${summary.cron_job_count} cron jobs, ${summary.background_run_count} background runs, ${summary.background_event_count} events.`;
+  }
+  if (data.runtimeBackgroundJobsError) {
+    return `Runtime background jobs unavailable: ${data.runtimeBackgroundJobsError}`;
+  }
+  return "Awaiting cron and background run state.";
+}
+
 export function normalizeRuntimeControlPlaneResponses(
   chatResponse: ApiResponse<ChatStatusOut>,
   healthResponse: ApiResponse<HealthOut>,
   runtimeGraphResponse?: ApiResponse<RuntimeGraphSnapshot>,
   runtimeInterruptResponse?: ApiResponse<RuntimeInterruptsSnapshot>,
+  runtimeAssistantsResponse?: ApiResponse<RuntimeAssistantsSnapshot>,
+  runtimeBackgroundJobsResponse?: ApiResponse<RuntimeBackgroundJobsSnapshot>,
 ): RuntimeControlPlaneData {
   const chatError =
     chatResponse.status === "ok" ? null : chatResponse.error || "chat status unavailable";
@@ -405,6 +486,14 @@ export function normalizeRuntimeControlPlaneResponses(
     runtimeInterruptResponse == null || runtimeInterruptResponse.status === "ok"
       ? null
       : runtimeInterruptResponse.error || "runtime interrupts unavailable";
+  const runtimeAssistantsError =
+    runtimeAssistantsResponse == null || runtimeAssistantsResponse.status === "ok"
+      ? null
+      : runtimeAssistantsResponse.error || "runtime assistants unavailable";
+  const runtimeBackgroundJobsError =
+    runtimeBackgroundJobsResponse == null || runtimeBackgroundJobsResponse.status === "ok"
+      ? null
+      : runtimeBackgroundJobsResponse.error || "runtime background jobs unavailable";
 
   return {
     chatStatus: chatResponse.status === "ok" ? chatResponse.data : null,
@@ -413,15 +502,25 @@ export function normalizeRuntimeControlPlaneResponses(
       runtimeGraphResponse?.status === "ok" ? runtimeGraphResponse.data : null,
     runtimeInterrupts:
       runtimeInterruptResponse?.status === "ok" ? runtimeInterruptResponse.data : null,
+    runtimeAssistants:
+      runtimeAssistantsResponse?.status === "ok" ? runtimeAssistantsResponse.data : null,
+    runtimeBackgroundJobs:
+      runtimeBackgroundJobsResponse?.status === "ok"
+        ? runtimeBackgroundJobsResponse.data
+        : null,
     chatError,
     healthError,
     runtimeGraphError,
     runtimeInterruptError,
+    runtimeAssistantsError,
+    runtimeBackgroundJobsError,
     error: firstNonEmpty([
       chatError,
       healthError,
       runtimeGraphError,
       runtimeInterruptError,
+      runtimeAssistantsError,
+      runtimeBackgroundJobsError,
     ]),
   };
 }
@@ -467,6 +566,23 @@ export function buildRuntimeControlPlaneSnapshot(
       data.runtimeInterrupts?.summary.human_approval_required_count ?? 0,
     runtimeApprovedCount: data.runtimeInterrupts?.summary.approved_count ?? 0,
     runtimeResumedCount: data.runtimeInterrupts?.summary.resumed_count ?? 0,
+    runtimeAssistantsReady: Boolean(data.runtimeAssistants),
+    runtimeAssistantsStatusLabel: runtimeAssistantsStatusLabel(data),
+    runtimeAssistantsDetail: runtimeAssistantsDetail(data),
+    runtimeAssistantCount: data.runtimeAssistants?.summary.assistant_count ?? 0,
+    runtimeConfigurationCount: data.runtimeAssistants?.summary.configuration_count ?? 0,
+    runtimeActiveAssistantCount:
+      data.runtimeAssistants?.summary.active_assistant_count ?? 0,
+    runtimeBackgroundReady: Boolean(data.runtimeBackgroundJobs),
+    runtimeBackgroundStatusLabel: runtimeBackgroundStatusLabel(data),
+    runtimeBackgroundDetail: runtimeBackgroundDetail(data),
+    runtimeCronJobCount: data.runtimeBackgroundJobs?.summary.cron_job_count ?? 0,
+    runtimeEnabledCronJobCount:
+      data.runtimeBackgroundJobs?.summary.enabled_cron_job_count ?? 0,
+    runtimeBackgroundRunCount:
+      data.runtimeBackgroundJobs?.summary.background_run_count ?? 0,
+    runtimeActiveBackgroundRunCount:
+      data.runtimeBackgroundJobs?.summary.active_background_run_count ?? 0,
     agentCount: data.health?.agent_health.length ?? 0,
     anomalyCount: data.health?.anomalies.length ?? 0,
     tracesLastHour: data.health?.traces_last_hour ?? 0,

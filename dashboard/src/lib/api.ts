@@ -14,6 +14,8 @@ import type {
   LineageEdgeOut,
   ModuleTruthOut,
   OntologyTypeOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
   ProvenanceOut,
   RuntimeGraphSnapshot,
   RuntimeInterruptsSnapshot,
@@ -217,6 +219,26 @@ export function fetchRuntimeInterrupts(params?: {
   if (params?.limit != null) sp.set("limit", String(params.limit));
   const qs = sp.toString();
   return apiGet<RuntimeInterruptsSnapshot>(`/api/runtime/interrupts${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeAssistants(params?: {
+  limit?: number;
+}): Promise<ApiResponse<RuntimeAssistantsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeAssistantsSnapshot>(`/api/runtime/assistants${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRuntimeBackgroundJobs(params?: {
+  limit?: number;
+}): Promise<ApiResponse<RuntimeBackgroundJobsSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeBackgroundJobsSnapshot>(
+    `/api/runtime/background-jobs${qs ? `?${qs}` : ""}`,
+  );
 }
 
 export function runtimeEventsStreamPath(params?: {

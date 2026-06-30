@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T21:37:55Z",
+  "updated_at": "2026-06-30T22:25:17Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 70,
+    "current": 73,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, and interrupt/resume/human-approval state are inspectable through RuntimeStateStore-backed operator/API views, with dashboard visibility for graph and control-event state. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, assistants/configurations, background/cron runs, and approval action execution remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, and background/cron snapshots are inspectable through RuntimeStateStore-backed operator/API/dashboard views. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and approval/reject/resume action execution remain failing or unproven."
   },
   "rounds": [
     {
@@ -459,6 +459,50 @@
         "Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.",
         "Closeout governance remains blocked by aggregate full-history gitleaks findings."
       ]
+    },
+    {
+      "id": "runtime-agent-server-background-surfaces",
+      "timestamp": "2026-06-30T22:25:17Z",
+      "status": "completed_partial",
+      "target_gate": "Expose Agent Server-style assistants/configurations and background/cron runtime state through RuntimeStateStore-backed API and cockpit",
+      "files_touched": [
+        "dharma_swarm/runtime_agent_server_views.py",
+        "dharma_swarm/operator_views.py",
+        "api/routers/runtime.py",
+        "tests/test_runtime_graph_api.py",
+        "dashboard/src/lib/types.ts",
+        "dashboard/src/lib/api.ts",
+        "dashboard/src/lib/runtimeControlPlane.ts",
+        "dashboard/src/lib/runtimeControlPlane.test.ts",
+        "dashboard/src/hooks/useRuntimeControlPlane.ts",
+        "dashboard/src/app/dashboard/runtime/page.tsx",
+        "reports/langgraph_parity/allnight/runtime_agent_server_background_20260630T222517Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "make agent-build-preflight",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py",
+        ".venv/bin/ruff check dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/runtime_agent_server_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+        "node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts (dashboard)",
+        "npm run lint -- --quiet (dashboard)",
+        "npm run build (dashboard)",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+        ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "git diff --check"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Approval/reject/resume action endpoints are still not implemented; only control-event state is visible.",
+        "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain incomplete or unproven.",
+        "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -474,7 +518,7 @@
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
-    "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_and_human_approval_state_api_cockpit"
+    "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_api_cockpit_no_approval_actions"
   },
   "latest_verification": {
     "benchmark_summary": {
@@ -499,11 +543,12 @@
       "runtime_platform_surfaces": "RuntimePlatformViews adds RuntimeStateStore-backed session/thread state, run listing, run detail via describe_run, checkpoint snapshots, and session/runtime event history; GET /api/runtime/sessions, /runs, /runs/{run_id}, /checkpoints, and /events are registered and honor DHARMA_RUNTIME_DB; focused runtime API tests 5 passed in 0.68s; broader runtime/API/topology subset 57 passed in 34.45s; LangGraph parity plus runtime API subset 25 passed in 1.10s; compileall, focused ruff, module budget, hygiene ratchet, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "supervisor_restart_final_output": "SUPERVISOR topology persists delegated_agent_ids, supervisor_final_output_only=true, and user_visible_output=supervisor_final in topology_states.state; topology_state receipts include persisted state; fresh RuntimeStateStore readback, describe_run(), and receipt assertions pass; focused topology acceptance 4 passed in 2.30s; compileall pass; adjacent runtime/orchestrator/topology subset 51 passed in 46.26s; focused ruff and orchestrator F821 pass; module budget, hygiene ratchet, diff-check, onboard, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_interrupts_streaming_state": "RuntimePlatformViews projects interrupt/resume/human-approval state from session_events; GET /api/runtime/events/stream streams persisted runtime events as SSE; GET /api/runtime/interrupts exposes control-event snapshots; /dashboard/runtime fetches and renders interrupt/control summary plus recent control events and stream path; focused runtime API/operator/bootstrap tests 7 passed in 1.66s; broader parity/runtime/orchestrator/API subset 98 passed in 34.54s; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, onboard, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
+      "runtime_agent_server_background_surfaces": "RuntimeAgentServerViews projects Agent Server-style assistant/configuration snapshots from RuntimeStateStore sessions/delegation runs and background/cron snapshots from existing cron scheduler storage plus runtime background events/runs; GET /api/runtime/assistants and /api/runtime/background-jobs are registered and honor DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders assistants/configurations, cron jobs, and background runs; focused runtime API tests 6 passed in 1.78s; broader runtime/API/topology subset 59 passed in 197.43s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
       "a2a_readiness_strict": "failed exit 2 before reconciliation: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19; failed exit 2 after reconciliation: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19",
-      "agent_build_preflight": "passed twice; latest run compileall clean, F821 clean, 12328 tests collected, onboard OK, hygiene integrity OK",
+      "agent_build_preflight": "passed twice; latest run compileall clean, F821 clean, 12347 tests collected, onboard OK, hygiene integrity OK",
       "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits"
     }
   }

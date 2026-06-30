@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from dharma_swarm import cron_scheduler
 from dharma_swarm.operator_views import OperatorViews
 from dharma_swarm.runtime_state import (
     DelegationRun,
@@ -141,6 +142,94 @@ async def _seed_runtime_graph(store: RuntimeStateStore) -> None:
     )
 
 
+def _redirect_cron_storage(tmp_path, monkeypatch) -> None:
+    cron_dir = tmp_path / "cron"
+    monkeypatch.setattr(cron_scheduler, "DHARMA_DIR", tmp_path)
+    monkeypatch.setattr(cron_scheduler, "CRON_DIR", cron_dir)
+    monkeypatch.setattr(cron_scheduler, "JOBS_FILE", cron_dir / "jobs.json")
+    monkeypatch.setattr(cron_scheduler, "OUTPUT_DIR", cron_dir / "output")
+    monkeypatch.setattr(cron_scheduler, "LOCK_FILE", cron_dir / ".tick.lock")
+
+
+async def _seed_agent_server_platform(store: RuntimeStateStore) -> None:
+    base_time = datetime(2026, 6, 30, 22, 0, tzinfo=timezone.utc)
+    await store.upsert_session(
+        SessionState(
+            session_id="sess-agent-server",
+            operator_id="operator",
+            status="active",
+            current_task_id="task-background",
+            metadata={
+                "assistant_id": "ops-assistant",
+                "assistant_name": "Ops Assistant",
+                "configuration_id": "ops-assistant-config",
+                "provider": "openrouter",
+                "model": "openai/gpt-5.4",
+                "tools": ["runtime_graph", "cron_tick"],
+            },
+        )
+    )
+    await store.record_delegation_run(
+        DelegationRun(
+            run_id="run-background",
+            session_id="sess-agent-server",
+            task_id="task-background",
+            assigned_to="ops-assistant",
+            assigned_by="cron_scheduler",
+            status="in_progress",
+            metadata={
+                "assistant_id": "ops-assistant",
+                "assistant_name": "Ops Assistant",
+                "configuration_id": "ops-assistant-config",
+                "provider": "openrouter",
+                "model": "openai/gpt-5.4",
+                "run_kind": "background",
+                "cron_job_id": "cron-nightly",
+                "tools": ["runtime_graph", "cron_tick"],
+            },
+        )
+    )
+    await store.record_session_event(
+        SessionEventRecord(
+            event_id="event-cron-fired",
+            session_id="sess-agent-server",
+            ledger_kind="background",
+            event_name="cron_job_started",
+            task_id="task-background",
+            run_id="run-background",
+            agent_id="ops-assistant",
+            summary="Nightly background job started",
+            event_text="Cron scheduler started the background runtime job.",
+            payload={"cron_job_id": "cron-nightly", "schedule_id": "nightly"},
+            created_at=base_time,
+        )
+    )
+
+
+def _seed_cron_job() -> None:
+    cron_scheduler.save_jobs(
+        [
+            {
+                "id": "cron-nightly",
+                "name": "Nightly runtime sweep",
+                "prompt": "Inspect runtime graph and checkpoint drift.",
+                "schedule": {"kind": "interval", "minutes": 60, "display": "every 60m"},
+                "schedule_display": "every 60m",
+                "repeat": {"times": None, "completed": 3},
+                "enabled": True,
+                "urgent": False,
+                "created_at": "2026-06-30T21:00:00+00:00",
+                "next_run_at": "2026-06-30T23:00:00+00:00",
+                "last_run_at": "2026-06-30T22:00:00+00:00",
+                "last_status": "ok",
+                "last_error": None,
+                "deliver": "local",
+            }
+        ]
+    )
+    cron_scheduler.save_job_output("cron-nightly", "# Nightly runtime sweep\n")
+
+
 @pytest.mark.asyncio
 async def test_operator_views_runtime_graph_surfaces_live_topology_state(tmp_path) -> None:
     store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
@@ -226,6 +315,38 @@ async def test_operator_views_runtime_platform_surfaces_use_runtime_state(tmp_pa
 
 
 @pytest.mark.asyncio
+async def test_operator_views_runtime_agent_server_surfaces(tmp_path, monkeypatch) -> None:
+    _redirect_cron_storage(tmp_path, monkeypatch)
+    _seed_cron_job()
+    store = RuntimeStateStore(tmp_path / "runtime.db", include_memory_plane=False)
+    await _seed_agent_server_platform(store)
+    views = OperatorViews(store)
+
+    assistants = await views.runtime_assistants(limit=10)
+    background = await views.runtime_background_jobs(limit=10)
+
+    assert assistants["schema_version"] == "runtime_assistants_snapshot.v1"
+    assert assistants["summary"]["assistant_count"] == 1
+    assert assistants["summary"]["configuration_count"] == 1
+    assert assistants["summary"]["active_assistant_count"] == 1
+    assert assistants["assistants"][0]["assistant_id"] == "ops-assistant"
+    assert assistants["assistants"][0]["active_run_count"] == 1
+    assert assistants["configurations"][0]["configuration_id"] == "ops-assistant-config"
+    assert assistants["configurations"][0]["tool_count"] == 2
+
+    assert background["schema_version"] == "runtime_background_jobs_snapshot.v1"
+    assert background["summary"]["cron_job_count"] == 1
+    assert background["summary"]["enabled_cron_job_count"] == 1
+    assert background["summary"]["background_run_count"] == 1
+    assert background["summary"]["active_background_run_count"] == 1
+    assert background["summary"]["background_event_count"] == 1
+    assert background["cron_jobs"][0]["job_id"] == "cron-nightly"
+    assert background["cron_jobs"][0]["output_count"] == 1
+    assert background["background_runs"][0]["cron_job_id"] == "cron-nightly"
+    assert background["background_events"][0]["event_id"] == "event-cron-fired"
+
+
+@pytest.mark.asyncio
 async def test_runtime_graph_api_uses_configured_runtime_db(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "runtime.db"
     store = RuntimeStateStore(db_path, include_memory_plane=False)
@@ -256,6 +377,8 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     monkeypatch.setenv("DHARMA_RUNTIME_DB", str(db_path))
 
     from api.routers.runtime import (
+        runtime_assistants,
+        runtime_background_jobs,
         runtime_checkpoints,
         runtime_events,
         runtime_events_stream,
@@ -264,6 +387,9 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
         runtime_runs,
         runtime_sessions,
     )
+    _redirect_cron_storage(tmp_path, monkeypatch)
+    _seed_cron_job()
+    await _seed_agent_server_platform(store)
 
     sessions = await runtime_sessions(status="active", limit=10)
     runs = await runtime_runs(
@@ -298,10 +424,15 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
         poll_seconds=0.01,
         max_events=1,
     )
+    assistants = await runtime_assistants(limit=10)
+    background = await runtime_background_jobs(limit=10)
 
     assert sessions.status == "ok"
     assert sessions.data["runtime_db"] == str(db_path)
-    assert sessions.data["sessions"][0]["session_id"] == "sess-graph"
+    assert {session["session_id"] for session in sessions.data["sessions"]} >= {
+        "sess-graph",
+        "sess-agent-server",
+    }
 
     assert runs.status == "ok"
     assert runs.data["summary"]["run_count"] == 2
@@ -331,6 +462,15 @@ async def test_runtime_platform_api_uses_configured_runtime_db(tmp_path, monkeyp
     assert event_payload["event_id"] == "event-interrupt-requested"
     assert event_payload["payload"]["resume_token"] == "resume-run-parent"
 
+    assert assistants.status == "ok"
+    assert assistants.data["summary"]["assistant_count"] >= 1
+    assert {item["assistant_id"] for item in assistants.data["assistants"]} >= {
+        "ops-assistant"
+    }
+    assert background.status == "ok"
+    assert background.data["summary"]["cron_job_count"] == 1
+    assert background.data["background_runs"][0]["run_id"] == "run-background"
+
 
 def test_runtime_graph_router_is_registered() -> None:
     from api.main import app
@@ -344,3 +484,5 @@ def test_runtime_graph_router_is_registered() -> None:
     assert "/api/runtime/events" in paths
     assert "/api/runtime/events/stream" in paths
     assert "/api/runtime/interrupts" in paths
+    assert "/api/runtime/assistants" in paths
+    assert "/api/runtime/background-jobs" in paths

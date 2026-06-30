@@ -5,6 +5,8 @@ import type {
   ApiResponse,
   ChatStatusOut,
   HealthOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
   RuntimeGraphSnapshot,
   RuntimeInterruptsSnapshot,
 } from "./types.ts";
@@ -43,6 +45,28 @@ function runtimeGraphOk(data: RuntimeGraphSnapshot): ApiResponse<RuntimeGraphSna
 function runtimeInterruptsOk(
   data: RuntimeInterruptsSnapshot,
 ): ApiResponse<RuntimeInterruptsSnapshot> {
+  return {
+    status: "ok",
+    data,
+    error: "",
+    timestamp: "2026-03-20T00:00:00.000Z",
+  };
+}
+
+function runtimeAssistantsOk(
+  data: RuntimeAssistantsSnapshot,
+): ApiResponse<RuntimeAssistantsSnapshot> {
+  return {
+    status: "ok",
+    data,
+    error: "",
+    timestamp: "2026-03-20T00:00:00.000Z",
+  };
+}
+
+function runtimeBackgroundJobsOk(
+  data: RuntimeBackgroundJobsSnapshot,
+): ApiResponse<RuntimeBackgroundJobsSnapshot> {
   return {
     status: "ok",
     data,
@@ -240,6 +264,91 @@ test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
         },
       ],
     }),
+    runtimeAssistantsOk({
+      schema_version: "runtime_assistants_snapshot.v1",
+      generated_at: "2026-03-20T00:00:00.000Z",
+      runtime_db: "/tmp/runtime.db",
+      filters: {},
+      summary: {
+        assistant_count: 1,
+        configuration_count: 1,
+        active_assistant_count: 1,
+      },
+      assistants: [
+        {
+          assistant_id: "ops-assistant",
+          name: "Ops Assistant",
+          configuration_ids: ["ops-config"],
+          session_ids: ["sess-graph"],
+          latest_run_id: "run-background",
+          latest_session_id: "sess-graph",
+          run_count: 2,
+          active_run_count: 1,
+          status: "in_progress",
+          metadata: {},
+        },
+      ],
+      configurations: [
+        {
+          configuration_id: "ops-config",
+          assistant_ids: ["ops-assistant"],
+          provider: "openrouter",
+          model: "openai/gpt-5.4",
+          tool_count: 2,
+          system_prompt_hash: "",
+          run_count: 2,
+          session_count: 1,
+          metadata: {},
+        },
+      ],
+    }),
+    runtimeBackgroundJobsOk({
+      schema_version: "runtime_background_jobs_snapshot.v1",
+      generated_at: "2026-03-20T00:00:00.000Z",
+      runtime_db: "/tmp/runtime.db",
+      cron_jobs_file: "/tmp/cron/jobs.json",
+      filters: {},
+      summary: {
+        cron_job_count: 1,
+        enabled_cron_job_count: 1,
+        background_run_count: 1,
+        active_background_run_count: 1,
+        background_event_count: 1,
+      },
+      cron_jobs: [
+        {
+          job_id: "cron-nightly",
+          name: "Nightly runtime sweep",
+          enabled: true,
+          urgent: false,
+          schedule: {},
+          schedule_display: "every 60m",
+          deliver: "local",
+          next_run_at: "2026-03-20T01:00:00.000Z",
+          last_run_at: "2026-03-20T00:00:00.000Z",
+          last_status: "ok",
+          last_error: "",
+          repeat: {},
+          output_count: 1,
+          output_dir: "/tmp/cron/output/cron-nightly",
+          metadata: {},
+        },
+      ],
+      background_runs: [
+        {
+          run_id: "run-background",
+          session_id: "sess-graph",
+          task_id: "task-background",
+          assigned_to: "ops-assistant",
+          assigned_by: "cron_scheduler",
+          status: "in_progress",
+          cron_job_id: "cron-nightly",
+          run_kind: "background",
+          metadata: {},
+        },
+      ],
+      background_events: [],
+    }),
   );
 
   const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
@@ -257,6 +366,17 @@ test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
   assert.equal(snapshot.runtimePendingInterruptCount, 1);
   assert.equal(snapshot.runtimeHumanApprovalRequiredCount, 1);
   assert.match(snapshot.runtimeInterruptDetail, /2 control events/);
+  assert.equal(snapshot.runtimeAssistantsReady, true);
+  assert.equal(snapshot.runtimeAssistantCount, 1);
+  assert.equal(snapshot.runtimeConfigurationCount, 1);
+  assert.equal(snapshot.runtimeActiveAssistantCount, 1);
+  assert.match(snapshot.runtimeAssistantsDetail, /1 configurations/);
+  assert.equal(snapshot.runtimeBackgroundReady, true);
+  assert.equal(snapshot.runtimeCronJobCount, 1);
+  assert.equal(snapshot.runtimeEnabledCronJobCount, 1);
+  assert.equal(snapshot.runtimeBackgroundRunCount, 1);
+  assert.equal(snapshot.runtimeActiveBackgroundRunCount, 1);
+  assert.match(snapshot.runtimeBackgroundDetail, /1 cron jobs/);
 });
 
 test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted before runtime data arrives", () => {

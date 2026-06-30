@@ -17,6 +17,8 @@ import { colors, glowText } from "@/lib/theme";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
 import type {
   ChatProfileOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
   RuntimeGraphSnapshot,
   RuntimeInterruptsSnapshot,
 } from "@/lib/types";
@@ -77,6 +79,8 @@ export default function RuntimePage() {
     health,
     runtimeGraph,
     runtimeInterrupts,
+    runtimeAssistants,
+    runtimeBackgroundJobs,
     error,
     snapshot,
     isLoading,
@@ -182,10 +186,16 @@ export default function RuntimePage() {
           <RuntimeGraphPanel
             graph={runtimeGraph}
             interrupts={runtimeInterrupts}
+            assistants={runtimeAssistants}
+            background={runtimeBackgroundJobs}
             statusLabel={snapshot.runtimeGraphStatusLabel}
             detail={snapshot.runtimeGraphDetail}
             controlStatusLabel={snapshot.runtimeInterruptStatusLabel}
             controlDetail={snapshot.runtimeInterruptDetail}
+            assistantsStatusLabel={snapshot.runtimeAssistantsStatusLabel}
+            assistantsDetail={snapshot.runtimeAssistantsDetail}
+            backgroundStatusLabel={snapshot.runtimeBackgroundStatusLabel}
+            backgroundDetail={snapshot.runtimeBackgroundDetail}
           />
 
           <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
@@ -352,21 +362,37 @@ export default function RuntimePage() {
 function RuntimeGraphPanel({
   graph,
   interrupts,
+  assistants,
+  background,
   statusLabel,
   detail,
   controlStatusLabel,
   controlDetail,
+  assistantsStatusLabel,
+  assistantsDetail,
+  backgroundStatusLabel,
+  backgroundDetail,
 }: {
   graph: RuntimeGraphSnapshot | null;
   interrupts: RuntimeInterruptsSnapshot | null;
+  assistants: RuntimeAssistantsSnapshot | null;
+  background: RuntimeBackgroundJobsSnapshot | null;
   statusLabel: string;
   detail: string;
   controlStatusLabel: string;
   controlDetail: string;
+  assistantsStatusLabel: string;
+  assistantsDetail: string;
+  backgroundStatusLabel: string;
+  backgroundDetail: string;
 }) {
   const topologies = graph?.topology_states.slice(0, 6) ?? [];
   const receipts = graph?.receipts.slice(0, 6) ?? [];
   const controlEvents = interrupts?.control_events.slice(0, 6) ?? [];
+  const assistantRows = assistants?.assistants.slice(0, 4) ?? [];
+  const configurationRows = assistants?.configurations.slice(0, 4) ?? [];
+  const cronRows = background?.cron_jobs.slice(0, 4) ?? [];
+  const backgroundRuns = background?.background_runs.slice(0, 4) ?? [];
   const streamPath = runtimeEventsStreamPath({ ledger_kind: "runtime", limit: 20 });
 
   return (
@@ -382,6 +408,12 @@ function RuntimeGraphPanel({
           </span>
           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(interrupts ? "ok" : "muted")}`}>
             {controlStatusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(assistants ? "ok" : "muted")}`}>
+            {assistantsStatusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(background ? "ok" : "muted")}`}>
+            {backgroundStatusLabel}
           </span>
         </div>
       </div>
@@ -404,6 +436,25 @@ function RuntimeGraphPanel({
         />
         <MiniStat label="Approved" value={String(interrupts?.summary.approved_count ?? 0)} />
         <MiniStat label="Resumed" value={String(interrupts?.summary.resumed_count ?? 0)} />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <MiniStat
+          label="Assistants"
+          value={String(assistants?.summary.assistant_count ?? 0)}
+        />
+        <MiniStat
+          label="Configurations"
+          value={String(assistants?.summary.configuration_count ?? 0)}
+        />
+        <MiniStat
+          label="Cron Jobs"
+          value={String(background?.summary.cron_job_count ?? 0)}
+        />
+        <MiniStat
+          label="Background Runs"
+          value={String(background?.summary.background_run_count ?? 0)}
+        />
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
@@ -508,6 +559,94 @@ function RuntimeGraphPanel({
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+            Assistants & Configurations
+          </div>
+          <p className="mb-3 text-xs text-sumi-500">{assistantsDetail}</p>
+          <div className="space-y-3">
+            {assistantRows.length === 0 ? (
+              <div className="text-sm text-sumi-500">No assistants in runtime snapshot.</div>
+            ) : (
+              assistantRows.map((assistant) => (
+                <div key={assistant.assistant_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-sumi-200">{assistant.name}</div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(assistant.active_run_count > 0 ? "ok" : "muted")}`}>
+                      {assistant.active_run_count} active
+                    </span>
+                  </div>
+                  <div className="mt-1 font-mono text-xs text-sumi-500">
+                    {assistant.assistant_id}
+                  </div>
+                  <div className="mt-1 text-xs text-sumi-500">
+                    {assistant.configuration_ids.length} configs · {assistant.run_count} runs
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {configurationRows.length > 0 ? (
+            <div className="mt-4 border-t border-sumi-700/40 pt-3">
+              {configurationRows.map((configuration) => (
+                <div key={configuration.configuration_id} className="mb-2 last:mb-0">
+                  <div className="truncate font-mono text-xs text-sumi-400">
+                    {configuration.configuration_id}
+                  </div>
+                  <div className="text-xs text-sumi-600">
+                    {configuration.provider || "provider"} · {configuration.model || "model"} · {configuration.tool_count} tools
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+            Background & Cron
+          </div>
+          <p className="mb-3 text-xs text-sumi-500">{backgroundDetail}</p>
+          <div className="space-y-3">
+            {cronRows.length === 0 ? (
+              <div className="text-sm text-sumi-500">No cron jobs in runtime snapshot.</div>
+            ) : (
+              cronRows.map((job) => (
+                <div key={job.job_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-sumi-200">{job.name}</div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(job.enabled ? "ok" : "muted")}`}>
+                      {job.enabled ? "enabled" : "disabled"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-sumi-500">
+                    {job.schedule_display || "unscheduled"} · {job.output_count} outputs
+                  </div>
+                  <div className="mt-1 truncate font-mono text-xs text-sumi-600">
+                    {job.next_run_at || job.job_id}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {backgroundRuns.length > 0 ? (
+            <div className="mt-4 border-t border-sumi-700/40 pt-3">
+              {backgroundRuns.map((run) => (
+                <div key={run.run_id} className="mb-2 last:mb-0">
+                  <div className="truncate font-mono text-xs text-sumi-400">
+                    {run.run_id}
+                  </div>
+                  <div className="text-xs text-sumi-600">
+                    {run.status} · {run.assigned_to || "unassigned"} · {run.cron_job_id || run.run_kind}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

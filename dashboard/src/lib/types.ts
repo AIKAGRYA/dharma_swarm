@@ -485,6 +485,102 @@ export interface RuntimeInterruptsSnapshot {
 }
 
 // ---------------------------------------------------------------------------
+// Runtime Agent Server surfaces
+// ---------------------------------------------------------------------------
+
+export interface RuntimeAssistantSummary {
+  assistant_count: number;
+  configuration_count: number;
+  active_assistant_count: number;
+}
+
+export interface RuntimeAssistant {
+  assistant_id: string;
+  name: string;
+  configuration_ids: string[];
+  session_ids: string[];
+  latest_run_id: string;
+  latest_session_id: string;
+  run_count: number;
+  active_run_count: number;
+  status: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RuntimeAssistantConfiguration {
+  configuration_id: string;
+  assistant_ids: string[];
+  provider: string;
+  model: string;
+  tool_count: number;
+  system_prompt_hash: string;
+  run_count: number;
+  session_count: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface RuntimeAssistantsSnapshot {
+  schema_version: string;
+  generated_at: string;
+  runtime_db: string;
+  filters: Record<string, unknown>;
+  summary: RuntimeAssistantSummary;
+  assistants: RuntimeAssistant[];
+  configurations: RuntimeAssistantConfiguration[];
+}
+
+export interface RuntimeBackgroundSummary {
+  cron_job_count: number;
+  enabled_cron_job_count: number;
+  background_run_count: number;
+  active_background_run_count: number;
+  background_event_count: number;
+}
+
+export interface RuntimeCronJob {
+  job_id: string;
+  name: string;
+  enabled: boolean;
+  urgent: boolean;
+  schedule: Record<string, unknown>;
+  schedule_display: string;
+  deliver: string;
+  next_run_at: string;
+  last_run_at: string;
+  last_status: string;
+  last_error: string;
+  repeat: Record<string, unknown>;
+  output_count: number;
+  output_dir: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RuntimeBackgroundRun {
+  run_id: string;
+  session_id: string;
+  task_id: string;
+  assigned_to: string;
+  assigned_by: string;
+  status: string;
+  cron_job_id: string;
+  run_kind: string;
+  metadata: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface RuntimeBackgroundJobsSnapshot {
+  schema_version: string;
+  generated_at: string;
+  runtime_db: string;
+  cron_jobs_file: string;
+  filters: Record<string, unknown>;
+  summary: RuntimeBackgroundSummary;
+  cron_jobs: RuntimeCronJob[];
+  background_runs: RuntimeBackgroundRun[];
+  background_events: RuntimeEvent[];
+}
+
+// ---------------------------------------------------------------------------
 // Evolution (GET /api/evolution/*)
 // ---------------------------------------------------------------------------
 

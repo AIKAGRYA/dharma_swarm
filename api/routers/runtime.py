@@ -222,3 +222,35 @@ async def runtime_interrupts(
             data=None,
             error=f"runtime interrupts unavailable: {exc}",
         )
+
+
+@router.get("/assistants")
+async def runtime_assistants(
+    limit: int = Query(50, ge=1, le=200, description="Maximum assistant records."),
+) -> ApiResponse:
+    """Return Agent Server-style assistants and configurations from runtime state."""
+    try:
+        snapshot = await _operator_views().runtime_assistants(limit=limit)
+        return ApiResponse(data=snapshot)
+    except Exception as exc:
+        return ApiResponse(
+            status="error",
+            data=None,
+            error=f"runtime assistants unavailable: {exc}",
+        )
+
+
+@router.get("/background-jobs")
+async def runtime_background_jobs(
+    limit: int = Query(50, ge=1, le=200, description="Maximum background job records."),
+) -> ApiResponse:
+    """Return background/cron jobs and runs from runtime and cron storage."""
+    try:
+        snapshot = await _operator_views().runtime_background_jobs(limit=limit)
+        return ApiResponse(data=snapshot)
+    except Exception as exc:
+        return ApiResponse(
+            status="error",
+            data=None,
+            error=f"runtime background jobs unavailable: {exc}",
+        )

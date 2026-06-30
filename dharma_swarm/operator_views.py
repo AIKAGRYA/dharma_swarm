@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from dharma_swarm.operator_bridge import OperatorBridge
+from dharma_swarm.runtime_agent_server_views import RuntimeAgentServerViews
 from dharma_swarm.runtime_graph_views import RuntimeGraphViews
 from dharma_swarm.runtime_platform_views import RuntimePlatformViews
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
@@ -220,6 +221,18 @@ class OperatorViews:
         return await RuntimePlatformViews(self.runtime_state).runtime_interrupts(
             session_id=session_id,
             status=status,
+            limit=limit,
+        )
+
+    async def runtime_assistants(self, *, limit: int = 50) -> dict[str, Any]:
+        """Return assistants/configurations projected from runtime state."""
+        return await RuntimeAgentServerViews(self.runtime_state).runtime_assistants(
+            limit=limit,
+        )
+
+    async def runtime_background_jobs(self, *, limit: int = 50) -> dict[str, Any]:
+        """Return background/cron job state projected from runtime and cron storage."""
+        return await RuntimeAgentServerViews(self.runtime_state).runtime_background_jobs(
             limit=limit,
         )
 
