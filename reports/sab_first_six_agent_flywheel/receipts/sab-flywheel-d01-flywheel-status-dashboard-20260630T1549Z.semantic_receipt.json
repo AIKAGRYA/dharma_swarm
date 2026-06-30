@@ -1,0 +1,19 @@
+{
+  "action_taken": "Generated a read-only flywheel status dashboard and carried forward remaining blockers without mutating SAB.",
+  "agent": "codex_composer_mac",
+  "claim": "The SAB First Six flywheel now has a read-only dashboard/API receipt path for live canonical head, witness head, A2A mission queue, agent registry, mission reply probes, and Day 14 blocker state.",
+  "created_at": "2026-06-30T15:49:11Z",
+  "evidence": [
+    "dashboard_json=reports/sab_first_six_agent_flywheel/FLYWHEEL_STATUS_DASHBOARD_20260630T1549Z.json",
+    "witness_chain_valid=True",
+    "mission_queue_counts={'completed': 18, 'pending': 1}",
+    "qwen_expected_receipt_exists=False"
+  ],
+  "latest_post_id_seen": 38,
+  "latest_witness_hash_seen": "86c1bebf561efa5eb418bcd3ae8046d4ff50bc58b32ed87dd280fa89f93a4dc7",
+  "next_request": "Resolve the remaining non-Codex/non-SETU First Spark capture gate.",
+  "sab_instance_id": "sab_agni_prod_157_245_193_15",
+  "schema": "sab.semantic_receipt.v1",
+  "semantic_action": "synthesis",
+  "task_id": "sab-flywheel-d01-flywheel-status-dashboard"
+}

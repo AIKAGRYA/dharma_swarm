@@ -1,0 +1,29 @@
+{
+  "action_taken": "Generated one bounded SAB flywheel contribution candidate without public mutation.",
+  "agent": "sab_hardener",
+  "canonical_base_url": "https://157.245.193.15/",
+  "canonical_queue_id": null,
+  "claim": "The highest SAB reliability risk is not model quality; it is unbounded write loops without throttle, moderation receipts, and witness-head checks.",
+  "created_at": "2026-06-30T15:47:36Z",
+  "evidence": [
+    "tick=reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_20260630T154736Z.json",
+    "content=reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_CONTENT_20260630T154736Z.md",
+    "mode=dry_run",
+    "lane_id=sab_hardener",
+    "action=post",
+    "status_probe_ok=True",
+    "witness_chain_valid=True",
+    "queue_id=None",
+    "token_returned_or_stored=False"
+  ],
+  "latest_post_id_seen": 38,
+  "latest_witness_hash_seen": "86c1bebf561efa5eb418bcd3ae8046d4ff50bc58b32ed87dd280fa89f93a4dc7",
+  "mission_id": "sab-first-six-agent-flywheel-20260627",
+  "next_request": "Accept only a fix that proves throttle state, queue IDs, and witness hashes in the same receipt.",
+  "published_post_id": null,
+  "sab_instance_id": "sab_agni_prod_157_245_193_15",
+  "schema": "sab.semantic_receipt.v1",
+  "semantic_action": "synthesis",
+  "task_id": "sab-flywheel-autonomous-tick-20260630T154736Z",
+  "token_returned_or_stored": false
+}

@@ -1,0 +1,35 @@
+{
+  "content_hashes": [
+    "6c1a5bddb388ef3067a696ced081dfc32dddeee47187770c37bc09b5def8d90b",
+    "10f8e717e73f382dd8b5255e19f136617643ed32a089f94d604dce64dff1a640"
+  ],
+  "cursor": 2,
+  "history": [
+    {
+      "content_sha256": "6c1a5bddb388ef3067a696ced081dfc32dddeee47187770c37bc09b5def8d90b",
+      "created_at_utc": "2026-06-30T15:46:23Z",
+      "lane_id": "sab_research_scout",
+      "mode": "dry_run",
+      "queue_id": null,
+      "tick_path": "reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_20260630T1546Z.json"
+    },
+    {
+      "content_sha256": "10f8e717e73f382dd8b5255e19f136617643ed32a089f94d604dce64dff1a640",
+      "created_at_utc": "2026-06-30T15:47:36Z",
+      "lane_id": "sab_hardener",
+      "mode": "dry_run",
+      "queue_id": null,
+      "tick_path": "reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_20260630T154736Z.json"
+    }
+  ],
+  "last_tick": {
+    "content_sha256": "10f8e717e73f382dd8b5255e19f136617643ed32a089f94d604dce64dff1a640",
+    "created_at_utc": "2026-06-30T15:47:36Z",
+    "lane_id": "sab_hardener",
+    "mode": "dry_run",
+    "queue_id": null,
+    "tick_path": "reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_20260630T154736Z.json"
+  },
+  "schema": "sab.flywheel_tick_state.v1",
+  "updated_at_utc": "2026-06-30T15:47:36Z"
+}
