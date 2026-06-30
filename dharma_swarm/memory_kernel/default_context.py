@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
 from dharma_swarm.context_compiler_utils import (
     ContextSection,
@@ -138,6 +138,7 @@ def build_memory_kernel_default_context(
                 require_context_admissible=False,
                 allow_projections=False,
                 allow_high_risk=False,
+                reject_stale=True,
                 allowed_scopes=resolved_isolation.allowed_scopes,
                 allowed_agent_ids=resolved_isolation.allowed_agent_ids,
                 allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
@@ -182,6 +183,29 @@ def memory_kernel_pack_metadata(pack: MemoryContextPack) -> dict[str, Any]:
         "omitted_count": pack.omitted_count,
         "candidate_truncated": pack.candidate_truncated,
         "warnings": list(pack.warnings),
+        "retrieval_telemetry": memory_kernel_retrieval_telemetry(pack),
+    }
+
+
+def memory_kernel_retrieval_telemetry(pack: MemoryContextPack) -> dict[str, Any]:
+    admitted = [item for item in pack.items if item.admitted]
+    omitted = [item for item in pack.items if not item.admitted]
+    return {
+        "candidate_count": pack.candidate_count,
+        "admitted_count": pack.admitted_count,
+        "omitted_count": pack.omitted_count,
+        "candidate_truncated": pack.candidate_truncated,
+        "admitted_surface_ids": _dedupe(item.surface_id for item in admitted),
+        "omitted_surface_ids": _dedupe(item.surface_id for item in omitted),
+        "selection_reason_counts": _count_reasons(
+            reason for item in admitted for reason in item.selection_reasons
+        ),
+        "omission_reason_counts": _count_reasons(
+            reason for item in omitted for reason in item.omission_reasons
+        ),
+        "warning_counts": _count_reasons(
+            warning for item in pack.items for warning in getattr(item, "warnings", ())
+        ),
     }
 
 
@@ -244,6 +268,16 @@ def _inline_context(value: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max(0, max_chars - 14)].rstrip() + "...<truncated>"
+
+
+def _count_reasons(values: Iterable[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = str(value).strip()
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def _clean_text(value: Any) -> str:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.atoms import (
@@ -45,6 +46,7 @@ _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.CURATED,
     TruthState.CANONICAL,
 )
+_STALE_FRESHNESS_VALUES = {"snapshot", "dormant", "missing", "unknown"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,7 @@ class MemoryContextBudget:
     require_context_admissible: bool = True
     allow_projections: bool = False
     allow_high_risk: bool = False
+    reject_stale: bool = False
     allowed_truth_states: tuple[TruthState, ...] = _DEFAULT_ALLOWED_TRUTH_STATES
     allowed_scopes: tuple[MemoryScope, ...] = ()
     allowed_agent_ids: tuple[str, ...] = ()
@@ -325,6 +328,11 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append(f"truth_state_{atom.truth_state.value}")
     elif budget.allowed_truth_states and atom.truth_state not in budget.allowed_truth_states:
         reasons.append("truth_state_not_allowed")
+    if budget.reject_stale:
+        if str(atom.freshness or "").lower() in _STALE_FRESHNESS_VALUES:
+            reasons.append("stale_memory_rejected")
+        if _is_expired(atom.valid_until):
+            reasons.append("valid_until_expired")
     if (
         not budget.allow_projections
         and (
@@ -407,6 +415,18 @@ def _is_local_path(value: str) -> bool:
         or "/Users/" in stripped
         or "/private/" in stripped
     )
+
+
+def _is_expired(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed <= datetime.now(timezone.utc)
 
 
 def _stable_pack_id(atom_ids: Iterable[str]) -> str:

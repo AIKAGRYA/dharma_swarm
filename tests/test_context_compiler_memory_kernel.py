@@ -141,6 +141,8 @@ def _memory_atom(
     *,
     scope: MemoryScope,
     agent_id: str | None = None,
+    freshness: str = "current_or_live_snapshot",
+    valid_until: str | None = None,
 ) -> MemoryAtom:
     metadata = {"agent_id": agent_id} if agent_id else {}
     return MemoryAtom.build(
@@ -157,6 +159,8 @@ def _memory_atom(
         memory_lane=MemoryLane.PROVENANCE,
         scope=scope,
         truth_state=TruthState.OBSERVED,
+        freshness=freshness,
+        valid_until=valid_until,
         context_admissible=True,
     )
 
@@ -302,6 +306,56 @@ async def test_context_compiler_applies_live_topology_agent_memory_isolation(
     assert metadata["omitted_count"] == 2
     budget = kernel.kwargs["budget"]
     assert getattr(budget, "allowed_agent_ids") == ("agent-alpha",)
+
+
+@pytest.mark.asyncio
+async def test_context_compiler_rejects_stale_memory_with_retrieval_telemetry() -> None:
+    kernel = _AdmissionMemoryKernel(
+        (
+            _memory_atom(
+                "alpha governed memory current enough for live graph context",
+                scope=MemoryScope.PROJECT,
+            ),
+            _memory_atom(
+                "alpha governed memory stale snapshot from old context",
+                scope=MemoryScope.PROJECT,
+                freshness="snapshot",
+            ),
+            _memory_atom(
+                "alpha governed memory expired operational note",
+                scope=MemoryScope.PROJECT,
+                valid_until="2000-01-01T00:00:00Z",
+            ),
+        )
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_memory_kernel_stale",
+        task_id="task_memory_kernel_stale",
+        task_description="Use governed memory.",
+        query="alpha governed memory",
+        token_budget=4000,
+        metadata={"topology": "swarm", "agent_id": "agent-alpha"},
+    )
+
+    assert "alpha governed memory current enough for live graph context" in bundle.rendered_text
+    assert "alpha governed memory stale snapshot from old context" not in bundle.rendered_text
+    assert "alpha governed memory expired operational note" not in bundle.rendered_text
+    assert "stale_memory_rejected" in bundle.rendered_text
+    assert "valid_until_expired" in bundle.rendered_text
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["admitted_count"] == 1
+    assert metadata["omitted_count"] == 2
+    assert metadata["retrieval_telemetry"]["candidate_count"] == 3
+    assert metadata["retrieval_telemetry"]["omission_reason_counts"] == {
+        "stale_memory_rejected": 1,
+        "valid_until_expired": 1,
+    }
+    assert metadata["retrieval_telemetry"]["admitted_surface_ids"] == ["agent.memory"]
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "reject_stale") is True
 
 
 @pytest.mark.asyncio

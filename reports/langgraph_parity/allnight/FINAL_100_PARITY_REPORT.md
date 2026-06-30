@@ -2,7 +2,7 @@
 
 Status: **not 100/100**.
 
-Current score: **75/100**.
+Current score: **77/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
@@ -22,6 +22,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Orchestrator spine `EvidenceReceipt` provider/model fields now prefer actual `LLMResponse` served provider/model, fall back to `ProviderRouteDecision`, then runner config. Receipt attributes also preserve requested/planned/actual/served provider-model values, route path, route confidence, route reasons, fallback plan, and normalized token counts.
 - `MemoryKernel` now supports `MemoryQuery.text_query`, and the default live `ContextCompiler` Memory Kernel section passes `recall_query` into that lane. A live bundle test proves a matching witness atom is admitted while an unrelated witness atom is excluded.
 - Live topology context now derives agent memory isolation from `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. `MemoryContextBudget.allowed_agent_ids` blocks cross-agent `AGENT`-scoped atoms, and orchestrator dispatch metadata mirrors the isolation policy for operator inspection.
+- Live Memory Kernel context now rejects stale memory by policy: `MemoryContextBudget.reject_stale` blocks snapshot/dormant/missing/unknown freshness values and expired `valid_until` atoms. Default `ContextCompiler` Memory Kernel metadata now includes retrieval telemetry with admitted/omitted surface IDs and selection/omission/warning reason counts.
 - Runtime topology graph state is now inspectable through `GET /api/runtime/graph` and `/dashboard/runtime`, backed by `RuntimeStateStore` rather than a parallel store. The graph snapshot includes active agents, checkpoints, topology states, runs, receipts, handoffs, parent/child edges, active-agent edges, and checkpoint edges.
 - Runtime platform state is now inspectable through `GET /api/runtime/sessions`, `/api/runtime/runs`, `/api/runtime/runs/{run_id}`, `/api/runtime/checkpoints`, and `/api/runtime/events`, backed by the same `RuntimeStateStore`. The API surfaces session/thread state, run listings, run ledger detail via `describe_run`, checkpoint/topology snapshots, and session/runtime event history.
 - Persisted runtime events now have an SSE transport at `GET /api/runtime/events/stream`, and interrupt/resume/human-approval state is projected from `session_events` through `GET /api/runtime/interrupts`, `OperatorViews.runtime_interrupts()`, and `/dashboard/runtime` control-event summaries. This is state/transport proof, not approval action execution.
@@ -72,6 +73,14 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py` -> pass.
 - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/context_compiler.py dharma_swarm/memory_kernel/orchestrator_context.py tests/test_context_compiler_memory_kernel.py tests/test_orchestrator.py` -> pass.
 - Phase 5 isolation receipt: `reports/langgraph_parity/allnight/memory_topology_agent_isolation_20260630T183905Z.json`.
+- Phase 5 stale-memory/retrieval-telemetry slice: default live Memory Kernel context packs now reject stale/expired atoms and expose retrieval telemetry in `memory_kernel_default` metadata.
+- `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_rejects_stale_memory_with_retrieval_telemetry --tb=short` -> `1 passed in 0.38s`.
+- `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `30 passed in 0.63s`.
+- `.venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `55 passed in 0.80s`.
+- `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- `git diff --check` -> pass.
+- Phase 5 stale-memory/retrieval-telemetry receipt: `reports/langgraph_parity/allnight/memory_stale_rejection_telemetry_20260630T234621Z.json`.
 - Phase 6 provider-truth spine receipt slice: added `AgentRunner` last-dispatch route/response telemetry, `dharma_swarm/provider_truth.py`, and updated orchestrator spine receipts to bind requested, planned, actual, and served provider/model truth.
 - `.venv/bin/python -m pytest tests/test_orchestrator_spine_dispatch.py tests/test_loop1_spine_provider_model.py -q` -> `8 passed in 0.35s`.
 - `.venv/bin/python -m pytest tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_topology_execution.py::test_orchestrator_live_langgraph_topologies_stamp_graph_state -q` -> `2 passed in 7.42s`.
@@ -164,7 +173,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A remaining blocker receipt: `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`; replayable JSON audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`.
 - A2A blocker audit classification: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, 18 valid SAB semantic receipts that are still non-A2A evidence, and 1 completed `ts-converge-0611` row with no receipt pointer.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
-- Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, and topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. Stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
+- Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, and retrieval telemetry is emitted. Curated-source coverage and full tool-exposure isolation remain unproven.
 - Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
 - Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, and approve/reject/resume action endpoints are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers. Full live multi-process resume semantics remain unproven.
 
@@ -172,7 +181,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 
 1. Prove live multi-process resume semantics for the runtime control endpoints and add dashboard action UI only once the backend contract is accepted.
 2. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
-3. Extend the MemoryKernel live context tests to stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation.
+3. Extend the MemoryKernel live context tests to curated-source coverage and full tool-exposure isolation.
 4. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
 5. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources; do not add parallel dashboard-only control state.
 

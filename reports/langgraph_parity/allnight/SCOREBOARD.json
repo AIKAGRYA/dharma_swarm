@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-30T22:54:00Z",
+  "updated_at": "2026-06-30T23:46:21Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 75,
+    "current": 77,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, and auditable approve/reject/resume runtime control actions are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, stale-memory rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, exhaustive live-provider served-model proof, and full live multi-process resume semantics remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, and retrieval telemetry, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, and auditable approve/reject/resume runtime control actions are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, curated-source coverage, full tool-exposure isolation, exhaustive live-provider served-model proof, and full live multi-process resume semantics remain failing or unproven."
   },
   "rounds": [
     {
@@ -544,6 +544,38 @@
         "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
         "Closeout governance remains blocked by aggregate full-history gitleaks findings."
       ]
+    },
+    {
+      "id": "phase-5-memory-live-retrieval-hardening",
+      "timestamp": "2026-06-30T23:40:15Z",
+      "status": "completed_partial",
+      "target_gate": "Make stale-memory rejection and retrieval telemetry executable in live MemoryKernel context packs",
+      "files_touched": [
+        "dharma_swarm/memory_kernel/context_admission.py",
+        "dharma_swarm/memory_kernel/default_context.py",
+        "tests/test_context_compiler_memory_kernel.py",
+        "reports/langgraph_parity/allnight/memory_stale_rejection_telemetry_20260630T234621Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "git status --short --branch",
+        "gh pr checks 732",
+        ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_rejects_stale_memory_with_retrieval_telemetry --tb=short",
+        ".venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py",
+        ".venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+        ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+        "git diff --check"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Memory curated-source coverage and full tool-exposure isolation remain incomplete or unproven.",
+        "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+        "Full live multi-process resume semantics remain unproven.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -557,7 +589,7 @@
     "phase_3_live_topologies": "passed_dispatch_metadata_plus_restart_readable_swarm_supervisor_and_subagents_proofs",
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_supervisor_final_output_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
-    "phase_5_memory_live_retrieval": "partial_text_query_plus_topology_agent_memory_isolation",
+    "phase_5_memory_live_retrieval": "partial_text_query_topology_agent_memory_isolation_stale_rejection_retrieval_telemetry; curated_source_coverage_and_full_tool_exposure_isolation_pending",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
     "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_and_control_action_endpoints_api_cockpit_partial_live_resume"
   },
@@ -579,6 +611,7 @@
       "a2a_readiness_blocker_audit": "4 passed in 0.39s; broader A2A focused suite 23 passed in 0.41s; blocker_count=36 with 11 stale claimed, 6 stale unclaimed, 18 SAB semantic non-A2A, 1 no-pointer completed row",
       "memory_live_retrieval_text_query": "MemoryQuery.text_query filters normalized atoms; ContextCompiler live bundle admitted matching home.witness atom and excluded unrelated witness atom; focused 4 passed in 0.40s; broader memory/context subset 69 passed in 0.48s",
       "memory_topology_agent_isolation": "MemoryContextBudget.allowed_agent_ids blocks cross-agent AGENT-scoped atoms; ContextCompiler applies topology-derived isolation for SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS metadata; orchestrator dispatch metadata mirrors isolation telemetry; focused 4 passed in 0.19s; broader memory/context subset 84 passed in 0.85s; broader runtime/topology/langgraph subset 75 passed in 30.52s",
+      "memory_stale_rejection_telemetry": "MemoryContextBudget.reject_stale blocks snapshot/dormant/missing/unknown freshness and expired valid_until atoms from default live ContextCompiler Memory Kernel packs; metadata now includes retrieval_telemetry with admitted/omitted surface IDs and selection/omission/warning reason counts; focused acceptance 1 passed in 0.38s; memory subset 30 passed in 0.63s; context compiler subset 55 passed in 0.80s; focused ruff, compileall, and diff-check pass",
       "provider_truth_spine_receipt": "AgentRunner now exposes last route request/decision/response/usage; dharma_swarm/provider_truth.py normalizes requested/planned/actual/served provider-model truth; orchestrator spine EvidenceReceipt prefers LLMResponse served provider/model, falls back to ProviderRouteDecision, then runner config; focused spine/provider tests 8 passed in 0.35s; adjacent dispatch/topology tests 2 passed in 7.42s; module budget, hygiene ratchet, focused ruff, compileall, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_graph_api_cockpit": "RuntimeGraphViews projects RuntimeStateStore topology_states, delegation_runs, and runtime_receipts into nodes/edges plus active_agents/checkpoints/topology_states/runs/receipts; GET /api/runtime/graph is registered and honors DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders graph summary/topology rows/recent receipts; focused backend/operator tests 4 passed in 0.95s; broader runtime/API/topology subset 55 passed in 31.54s; LangGraph parity plus runtime graph subset 23 passed in 0.82s; npm lint passed with existing warnings only; npm build passed; hygiene ratchet, module budget, compileall, ruff, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_platform_surfaces": "RuntimePlatformViews adds RuntimeStateStore-backed session/thread state, run listing, run detail via describe_run, checkpoint snapshots, and session/runtime event history; GET /api/runtime/sessions, /runs, /runs/{run_id}, /checkpoints, and /events are registered and honor DHARMA_RUNTIME_DB; focused runtime API tests 5 passed in 0.68s; broader runtime/API/topology subset 57 passed in 34.45s; LangGraph parity plus runtime API subset 25 passed in 1.10s; compileall, focused ruff, module budget, hygiene ratchet, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
