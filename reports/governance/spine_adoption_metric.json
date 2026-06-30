@@ -1,5 +1,5 @@
 {
-  "audit_sha": "48e965c1be5341d4e0c5f8aec57bdd338ed816c7",
+  "audit_sha": "f84f40344cbdfab9d236239b0d3ec00718e10bf9",
   "classification_rule": "joined requires all joined evidence patterns; adapter-ready requires all adapter evidence patterns when joined is incomplete; quarantine and legacy require explicit source markers; missing means no tracked surface or insufficient evidence.",
   "classification_vocabulary": [
     "joined",
@@ -189,7 +189,7 @@
           "description": "run ledger query exists",
           "hits": [
             {
-              "line": 3475,
+              "line": 3478,
               "path": "dharma_swarm/runtime_state.py",
               "text": "async def get_run_ledger(self, run_id: str) -> dict[str, Any]:"
             }
@@ -229,7 +229,7 @@
           "description": "identity imported",
           "hits": [
             {
-              "line": 18,
+              "line": 26,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity"
             }
@@ -249,7 +249,7 @@
           "description": "lifecycle can create/require identity",
           "hits": [
             {
-              "line": 76,
+              "line": 84,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "def ensure_execution_identity("
             }
@@ -262,7 +262,7 @@
           "description": "task claim lifecycle path exists",
           "hits": [
             {
-              "line": 211,
+              "line": 101,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_task_claim("
             }
@@ -275,7 +275,7 @@
           "description": "delegation run lifecycle path exists",
           "hits": [
             {
-              "line": 290,
+              "line": 223,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_delegation_run("
             }
@@ -288,7 +288,7 @@
           "description": "artifact lifecycle path exists",
           "hits": [
             {
-              "line": 399,
+              "line": 385,
               "path": "dharma_swarm/runtime_lifecycle.py",
               "text": "async def record_artifact("
             }
@@ -432,7 +432,7 @@
           "description": "dispatch attaches identity",
           "hits": [
             {
-              "line": 2027,
+              "line": 2092,
               "path": "dharma_swarm/orchestrator.py",
               "text": "self._runtime_lifecycle.ensure_execution_identity(td, task=task_for_gate)"
             }
@@ -445,7 +445,7 @@
           "description": "dispatch records task claims",
           "hits": [
             {
-              "line": 1777,
+              "line": 1831,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_task_claim("
             }
@@ -458,7 +458,7 @@
           "description": "dispatch records delegation runs",
           "hits": [
             {
-              "line": 1784,
+              "line": 1838,
               "path": "dharma_swarm/orchestrator.py",
               "text": "await self._runtime_lifecycle.record_delegation_run("
             }
@@ -1759,5 +1759,5 @@
       "status": "legacy"
     }
   ],
-  "tracked_file_count": 3802
+  "tracked_file_count": 4073
 }
