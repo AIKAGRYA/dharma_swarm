@@ -271,40 +271,103 @@ class TFIDFEmbedder:
             logger.debug("TFIDFEmbedder._fit failed: %s", exc)
 
     def _save_state(self) -> None:
-        """Persist fitted state to disk."""
+        """Persist fitted state to disk.
+
+        Primary path: joblib.dump the fitted TfidfVectorizer + TruncatedSVD
+        (sklearn estimators pickle fine via joblib) plus corpus metadata to a
+        deterministic sibling path ``<state_path>.joblib``. This keeps the SVD
+        basis stable across restarts so embeddings from different times stay
+        in the same basis and cosine similarity remains meaningful.
+
+        Fallback path: if joblib persistence fails for any reason, fall back
+        to the legacy JSON-corpus-only behaviour (vectorizer/svd not saved,
+        next load must refit).
+        """
         if self._state_path is None:
             return
+        # Legacy JSON corpus snapshot (kept as fallback + human-readable meta).
         try:
             import json as _json
             state = {
-                # vectorizer/svd are sklearn objects — not JSON-serializable
-                # persist only the corpus and metadata; refit on next load
                 "corpus": self._corpus[-2000:],
                 "corpus_hash": self._corpus_hash,
                 "dim": self._dim,
-                "fitted": False,
+                "fitted": self._fitted,
             }
             with open(self._state_path, "w", encoding="utf-8") as fh:
                 _json.dump(state, fh)
         except Exception as exc:
-            logger.debug("TFIDFEmbedder._save_state failed: %s", exc)
+            logger.debug("TFIDFEmbedder._save_state (json fallback) failed: %s", exc)
+
+        # Primary: joblib-persist the fitted sklearn estimators.
+        try:
+            import joblib
+            joblib_path = self._joblib_path()
+            payload = {
+                "vectorizer": self._vectorizer,
+                "svd": self._svd,
+                "corpus": self._corpus[-2000:],
+                "corpus_hash": self._corpus_hash,
+                "dim": self._dim,
+            }
+            joblib.dump(payload, joblib_path)
+        except Exception as exc:
+            logger.debug("TFIDFEmbedder._save_state (joblib) failed: %s", exc)
+
+    def _joblib_path(self) -> Path:
+        """Deterministic joblib sibling of state_path."""
+        return Path(str(self._state_path) + ".joblib")
 
     def _load_state(self) -> None:
-        """Load persisted state from disk."""
-        if self._state_path is None or not Path(self._state_path).exists():
+        """Load persisted state from disk.
+
+        Primary path: joblib-load the fitted vectorizer + svd so embeddings
+        stay in the persisted basis without a refit.
+
+        Fallback path: on ANY load failure (missing file, corrupt pickle,
+        sklearn-version mismatch caught when the loaded object is used) fall
+        back to the legacy JSON-corpus-only behaviour and mark ``_fitted``
+        False so the next embed/fit_add rebuilds from the corpus.
+        """
+        if self._state_path is None:
+            return
+
+        # Try joblib first (primary path).
+        try:
+            import joblib
+            joblib_path = self._joblib_path()
+            if joblib_path.exists():
+                payload = joblib.load(joblib_path)
+                vec = payload.get("vectorizer")
+                svd = payload.get("svd")
+                # Validate the loaded estimators are usable: a sklearn-version
+                # mismatch can produce objects that load but fail on transform.
+                if vec is not None and svd is not None:
+                    # Smoke-test: transform needs a fitted vocabulary.
+                    _ = vec.transform(["__load_probe__"])
+                    self._vectorizer = vec
+                    self._svd = svd
+                    self._corpus = payload.get("corpus", [])
+                    self._corpus_hash = payload.get("corpus_hash", "")
+                    self._fitted = True
+                    return
+        except Exception as exc:
+            logger.debug("TFIDFEmbedder._load_state (joblib) failed: %s", exc)
+
+        # Fallback: legacy JSON corpus-only.
+        self._vectorizer = None
+        self._svd = None
+        self._fitted = False
+        if not Path(self._state_path).exists():
             return
         try:
             import json as _json
             with open(self._state_path, "r", encoding="utf-8") as fh:
                 state = _json.load(fh)
-            # vectorizer and svd cannot be serialized to JSON — rebuild on next fit
-            self._vectorizer = None
-            self._svd = None
             self._corpus = state.get("corpus", [])
             self._corpus_hash = state.get("corpus_hash", "")
-            self._fitted = False  # must refit since models aren't persisted
         except Exception as exc:
-            logger.debug("TFIDFEmbedder._load_state failed: %s", exc)
+            logger.debug("TFIDFEmbedder._load_state (json fallback) failed: %s", exc)
 
 
 # ---------------------------------------------------------------------------
@@ -553,9 +616,18 @@ class VectorStore:
             event_iso = event_time.isoformat() if event_time else now_iso
             meta_json = json.dumps(metadata or {})
 
-            # Fit embedder on new content (incremental vocabulary expansion)
+            # Fit embedder on the FIRST upsert only (bootstrap the basis).
+            # We deliberately do NOT call fit_add on every upsert: TFIDFEmbedder
+            # rebuilds TfidfVectorizer + TruncatedSVD from scratch on each
+            # fit_add, which slides the SVD basis so embeddings from different
+            # times live in incompatible bases (cosine similarity meaningless).
+            # Once fitted (incl. cold-loaded from the persisted joblib basis),
+            # embeddings stay in that basis; the corpus is persisted for
+            # operator inspection. This is the conservative correct change —
+            # embed() already handles the not-yet-fitted bootstrap path.
             try:
-                self._embedder.fit_add([content])
+                if not getattr(self._embedder, "_fitted", False):
+                    self._embedder.fit_add([content])
             except Exception:
                 pass
 
