@@ -570,17 +570,40 @@ class VectorStore:
         finally:
             conn.close()
 
-    def gc(self, min_confidence: float = 0.01) -> int:
-        """Remove documents below confidence threshold. Returns removed count."""
+    def gc(
+        self,
+        min_confidence: float = 0.01,
+        dry_run: bool = False,
+    ) -> int | dict[str, Any]:
+        """Remove documents below confidence threshold.
+
+        When ``dry_run`` is False (default, backward-compatible): executes the
+        deletions (FTS sync, embeddings, documents, trigger drop/recreate) and
+        returns the integer count of removed rows.
+
+        When ``dry_run`` is True: computes the same candidate set WITHOUT
+        executing any DELETE / FTS-sync / trigger-drop, and returns a dict
+        ``{"would_remove": N, "by_layer": {layer: count, ...}}``. No rows are
+        modified and no transaction is committed.
+        """
         conn = self._connect()
         try:
             rows = conn.execute(
-                "SELECT id FROM vec_documents WHERE confidence < ?",
+                "SELECT id, layer FROM vec_documents WHERE confidence < ?",
                 (min_confidence,),
             ).fetchall()
             ids = [r["id"] for r in rows]
             if not ids:
+                if dry_run:
+                    return {"would_remove": 0, "by_layer": {}}
                 return 0
+
+            if dry_run:
+                by_layer: dict[str, int] = {}
+                for r in rows:
+                    layer = r["layer"]
+                    by_layer[layer] = by_layer.get(layer, 0) + 1
+                return {"would_remove": len(ids), "by_layer": by_layer}
 
             placeholders = ",".join("?" * len(ids))
 
@@ -634,6 +657,8 @@ class VectorStore:
             return len(ids)
         except Exception as exc:
             logger.debug("VectorStore.gc failed: %s", exc)
+            if dry_run:
+                return {"would_remove": 0, "by_layer": {}, "error": str(exc)}
             return 0
         finally:
             conn.close()
