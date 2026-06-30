@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -56,10 +58,50 @@ def load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
 def write_jsonl(path: Path, entries: dict[str, dict[str, Any]]) -> None:
     ordered = sorted(entries.values(), key=lambda item: (item["kind"], item["path_or_name"]))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "".join(json.dumps(item, sort_keys=True) + "\n" for item in ordered),
-        encoding="utf-8",
+    if path.exists():
+        path.chmod(0o644)
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        text=True,
     )
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            for item in ordered:
+                handle.write(json.dumps(item, sort_keys=True) + "\n")
+        os.replace(tmp_path, path)
+        path.chmod(0o444)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def validate_ledger_file(path: Path) -> dict[str, Any]:
+    ids: list[str] = []
+    invalid_status_ids: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        item = json.loads(line)
+        ids.append(item["id"])
+        if item.get("status") not in TERMINAL_STATUSES:
+            invalid_status_ids.append(item["id"])
+    seen: set[str] = set()
+    duplicate_ids: list[str] = []
+    for item_id in ids:
+        if item_id in seen and item_id not in duplicate_ids:
+            duplicate_ids.append(item_id)
+        seen.add(item_id)
+    return {
+        "line_count": len(ids),
+        "unique_id_count": len(seen),
+        "duplicate_count": len(duplicate_ids),
+        "duplicate_ids": duplicate_ids[:50],
+        "invalid_status_count": len(invalid_status_ids),
+        "invalid_status_ids": invalid_status_ids[:50],
+    }
 
 
 def ensure_entry(
@@ -659,8 +701,14 @@ def main() -> int:
     summary = summarize(entries, seen_worktrees, seen_branches, magpie_gap, origin_main, updated_at)
     if not args.verify_only:
         write_jsonl(ledger, entries)
+        summary["ledger_file_check"] = validate_ledger_file(ledger)
     print(json.dumps(summary, indent=2, sort_keys=True))
-    return 1 if summary["nonterminal_count"] else 0
+    file_check = summary.get("ledger_file_check", {})
+    return 1 if (
+        summary["nonterminal_count"]
+        or file_check.get("duplicate_count")
+        or file_check.get("invalid_status_count")
+    ) else 0
 
 
 if __name__ == "__main__":
