@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { ApiResponse, ChatStatusOut, HealthOut } from "./types.ts";
+import type {
+  ApiResponse,
+  ChatStatusOut,
+  HealthOut,
+  RuntimeGraphSnapshot,
+} from "./types.ts";
 import {
   buildRuntimeControlPlaneSnapshot,
   normalizeRuntimeControlPlaneResponses,
@@ -17,6 +22,15 @@ function chatOk(data: ChatStatusOut): ApiResponse<ChatStatusOut> {
 }
 
 function healthOk(data: HealthOut): ApiResponse<HealthOut> {
+  return {
+    status: "ok",
+    data,
+    error: "",
+    timestamp: "2026-03-20T00:00:00.000Z",
+  };
+}
+
+function runtimeGraphOk(data: RuntimeGraphSnapshot): ApiResponse<RuntimeGraphSnapshot> {
   return {
     status: "ok",
     data,
@@ -105,12 +119,88 @@ test("buildRuntimeControlPlaneSnapshot reflects degraded runtime using the adver
   assert.equal(snapshot.meanFitnessLabel, "0.77");
 });
 
+test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
+  const normalized = normalizeRuntimeControlPlaneResponses(
+    chatOk({
+      ready: true,
+      model: "openai/gpt-5.4",
+      provider: "openai",
+      tools: 9,
+      max_tool_rounds: 2,
+      max_tokens: 4096,
+      timeout_seconds: 120,
+      tool_result_max_chars: 4000,
+      history_message_limit: 120,
+      temperature: 0,
+      persistent_sessions: true,
+      chat_contract_version: "2026-03-20.control-plane",
+      chat_ws_path_template: "/ws/chat/session/{session_id}",
+      default_profile_id: "codex_operator",
+      profiles: [
+        {
+          id: "codex_operator",
+          label: "Codex Operator",
+          provider: "openai",
+          model: "gpt-5.4",
+          accent: "aozora",
+          summary: "Canonical operator lane.",
+          available: true,
+        },
+      ],
+    }),
+    healthOk({
+      overall_status: "ok",
+      agent_health: [],
+      anomalies: [],
+      total_traces: 0,
+      traces_last_hour: 0,
+      failure_rate: 0,
+      mean_fitness: null,
+    }),
+    runtimeGraphOk({
+      schema_version: "runtime_graph_snapshot.v1",
+      generated_at: "2026-03-20T00:00:00.000Z",
+      runtime_db: "/tmp/runtime.db",
+      filters: {},
+      summary: {
+        topology_state_count: 1,
+        run_count: 2,
+        active_run_count: 1,
+        receipt_count: 3,
+        node_count: 6,
+        edge_count: 5,
+        checkpoint_count: 1,
+        active_agent_count: 1,
+      },
+      active_agents: ["worker-a"],
+      checkpoints: [],
+      topology_states: [],
+      runs: [],
+      receipts: [],
+      nodes: [],
+      edges: [],
+    }),
+  );
+
+  const snapshot = buildRuntimeControlPlaneSnapshot(normalized);
+
+  assert.equal(snapshot.runtimeGraphReady, true);
+  assert.equal(snapshot.runtimeGraphStatusLabel, "1 graph");
+  assert.equal(snapshot.runtimeGraphActiveRunCount, 1);
+  assert.equal(snapshot.runtimeGraphActiveAgentCount, 1);
+  assert.equal(snapshot.runtimeGraphCheckpointCount, 1);
+  assert.equal(snapshot.runtimeGraphNodeCount, 6);
+  assert.match(snapshot.runtimeGraphDetail, /3 receipts/);
+});
+
 test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted before runtime data arrives", () => {
   const snapshot = buildRuntimeControlPlaneSnapshot({
     chatStatus: null,
     health: null,
+    runtimeGraph: null,
     chatError: null,
     healthError: null,
+    runtimeGraphError: null,
     error: null,
   });
 
@@ -438,8 +528,10 @@ test("buildRuntimeControlPlaneSnapshot surfaces transport-level query failures i
   const snapshot = buildRuntimeControlPlaneSnapshot({
     chatStatus: null,
     health: null,
+    runtimeGraph: null,
     chatError: null,
     healthError: null,
+    runtimeGraphError: null,
     error: "network timeout while loading runtime control plane",
   });
 

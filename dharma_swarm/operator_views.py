@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from dharma_swarm.operator_bridge import OperatorBridge
+from dharma_swarm.runtime_graph_views import RuntimeGraphViews
 from dharma_swarm.runtime_state import DelegationRun, RuntimeStateStore
 
 
@@ -124,6 +125,24 @@ class OperatorViews:
             for run in runs
             if run.status not in {"completed", "failed", "stale_recovered"}
         ][: max(1, limit)]
+
+    async def runtime_graph(
+        self,
+        *,
+        session_id: str | None = None,
+        task_id: str | None = None,
+        topology: str | None = None,
+        limit: int = 20,
+        receipt_limit: int = 50,
+    ) -> dict[str, Any]:
+        """Return an operator graph snapshot from canonical runtime state."""
+        return await RuntimeGraphViews(self.runtime_state).runtime_graph(
+            session_id=session_id,
+            task_id=task_id,
+            topology=topology,
+            limit=limit,
+            receipt_limit=receipt_limit,
+        )
 
     async def recent_operator_actions(
         self,

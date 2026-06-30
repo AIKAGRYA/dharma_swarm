@@ -251,3 +251,47 @@
   - Phase 6 remains partial: routed orchestrator dispatch receipts now bind actual served provider/model when `AgentRunner` has route/response telemetry, but there is no exhaustive live-provider matrix proof.
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Cockpit/API graph inspection remains pending.
+
+## 2026-06-30T19:33:04Z - Phase 7 Runtime Graph API/Cockpit Slice Start
+
+- Target gate: expose live graph state, active agent, handoffs, checkpoints, runs, and receipts through an operator-facing API/cockpit read model backed by `RuntimeStateStore`.
+- Current branch: `codex/langgraph-orchestration-parity-20260701` at `ad080cc3d`.
+- Worktree status at round start: clean and pushed; PR #732 is draft/open with `mergeStateStatus=CLEAN` and all listed checks green.
+- Current implementation probe:
+  - `dharma_swarm.operator_views.OperatorViews` already exposes runtime overview, active runs, actions, and bridge queue from canonical runtime state.
+  - `RuntimeStateStore` already persists `topology_states`, `delegation_runs`, and `runtime_receipts`.
+  - The dashboard runtime page currently reads `/api/chat/status` and `/api/health`, but not topology graph state, active agent, checkpoints, or receipts.
+- Next target gate: add a scoped runtime graph read model and FastAPI route, then wire the dashboard runtime control-plane summary to consume it without introducing a parallel truth store.
+- Current blockers remain: A2A strict readiness red, deeper memory retrieval/tool-isolation gates, exhaustive live-provider served-model proof, and complete cockpit/API coverage beyond this first graph inspection slice.
+
+## 2026-06-30T19:48:46Z - Phase 7 Runtime Graph API/Cockpit Slice
+
+- Target gate: expose persisted live topology graph state through an operator API/cockpit surface backed by `RuntimeStateStore`.
+- Code changes landed locally:
+  - Added `dharma_swarm/runtime_graph_views.py`, a sub-500-line graph read model over `topology_states`, `delegation_runs`, and `runtime_receipts`.
+  - Kept `OperatorViews.runtime_graph()` as a thin facade over the graph read model.
+  - Added `api/routers/runtime.py` with `GET /api/runtime/graph`, using `DHARMA_RUNTIME_DB` when set and `DEFAULT_RUNTIME_DB` otherwise.
+  - Registered the runtime router in `api/main.py`.
+  - Added dashboard runtime graph types, `fetchRuntimeGraph()`, runtime-control-plane graph summary fields, and a `/dashboard/runtime` graph panel showing active runs, active agents, checkpoints, topology rows, and recent receipts.
+  - Added `tests/test_runtime_graph_api.py` proving a seeded runtime DB exposes active agent, checkpoint, parent/child run edges, handoff edges, and receipts through both `OperatorViews` and the API route.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_graph_api_cockpit_20260630T194846Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py` -> `4 passed in 0.95s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `55 passed in 31.54s`.
+  - `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py` -> `23 passed in 0.82s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/ruff check dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+  - `npm run lint` -> pass with existing warnings only: 0 errors, 19 warnings.
+  - `npm run build` -> pass; `/dashboard/runtime` prerenders successfully.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`, `modules_over_500_lines` remained `207 -> 207` after extracting the graph view module.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `make onboard` -> pass; generated known governance projection churn, which was restored as unrelated.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `62/100`, still explicitly not 100/100.
+- Current blockers:
+  - Phase 7 remains partial: assistants/configurations, threads/session API, full checkpoint history, streaming runtime events, background/cron runs, and interrupt/resume/human approval surfaces remain incomplete or unproven.
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Memory stale rejection, curated-source coverage, retrieval telemetry, full tool-exposure isolation, and exhaustive live-provider proof remain pending.

@@ -15,6 +15,7 @@ import type {
   ModuleTruthOut,
   OntologyTypeOut,
   ProvenanceOut,
+  RuntimeGraphSnapshot,
   StigmergyMarkOut,
   SwarmOverview,
   TaskOut,
@@ -185,6 +186,23 @@ export function createTask(body: {
 
 export function fetchHealth(): Promise<ApiResponse<HealthOut>> {
   return apiGet<HealthOut>("/api/health");
+}
+
+export function fetchRuntimeGraph(params?: {
+  session_id?: string;
+  task_id?: string;
+  topology?: string;
+  limit?: number;
+  receipt_limit?: number;
+}): Promise<ApiResponse<RuntimeGraphSnapshot>> {
+  const sp = new URLSearchParams();
+  if (params?.session_id) sp.set("session_id", params.session_id);
+  if (params?.task_id) sp.set("task_id", params.task_id);
+  if (params?.topology) sp.set("topology", params.topology);
+  if (params?.limit != null) sp.set("limit", String(params.limit));
+  if (params?.receipt_limit != null) sp.set("receipt_limit", String(params.receipt_limit));
+  const qs = sp.toString();
+  return apiGet<RuntimeGraphSnapshot>(`/api/runtime/graph${qs ? `?${qs}` : ""}`);
 }
 
 export function backendLivenessPath(): string {

@@ -2,7 +2,7 @@
 
 Status: **not 100/100**.
 
-Current score: **58/100**.
+Current score: **62/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
@@ -22,6 +22,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Orchestrator spine `EvidenceReceipt` provider/model fields now prefer actual `LLMResponse` served provider/model, fall back to `ProviderRouteDecision`, then runner config. Receipt attributes also preserve requested/planned/actual/served provider-model values, route path, route confidence, route reasons, fallback plan, and normalized token counts.
 - `MemoryKernel` now supports `MemoryQuery.text_query`, and the default live `ContextCompiler` Memory Kernel section passes `recall_query` into that lane. A live bundle test proves a matching witness atom is admitted while an unrelated witness atom is excluded.
 - Live topology context now derives agent memory isolation from `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. `MemoryContextBudget.allowed_agent_ids` blocks cross-agent `AGENT`-scoped atoms, and orchestrator dispatch metadata mirrors the isolation policy for operator inspection.
+- Runtime topology graph state is now inspectable through `GET /api/runtime/graph` and `/dashboard/runtime`, backed by `RuntimeStateStore` rather than a parallel store. The graph snapshot includes active agents, checkpoints, topology states, runs, receipts, handoffs, parent/child edges, active-agent edges, and checkpoint edges.
 
 ## Verification
 
@@ -78,6 +79,16 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `git diff --check` -> pass.
 - `.venv/bin/python -m ruff check dharma_swarm/agent_runner.py dharma_swarm/orchestrator.py dharma_swarm/provider_truth.py tests/test_orchestrator_spine_dispatch.py` -> fail on pre-existing lint debt outside this diff: unused legacy imports, semicolon statements, unused locals, and one ambiguous variable name.
 - Phase 6 receipt: `reports/langgraph_parity/allnight/provider_truth_spine_receipt_20260630T190422Z.json`.
+- Phase 7 runtime graph API/cockpit slice: added `dharma_swarm/runtime_graph_views.py`, `api/routers/runtime.py`, dashboard runtime graph types/fetch/control-plane fields, and a `/dashboard/runtime` graph panel.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py` -> `4 passed in 0.95s`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_orchestrator.py tests/test_topology_execution.py` -> `55 passed in 31.54s`.
+- `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_graph_api.py` -> `23 passed in 0.82s`.
+- `.venv/bin/python -m compileall -q dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `.venv/bin/ruff check dharma_swarm/operator_views.py dharma_swarm/runtime_graph_views.py api/routers/runtime.py tests/test_runtime_graph_api.py` -> pass.
+- `npm run lint` -> pass with existing warnings only: 0 errors, 19 warnings.
+- `npm run build` -> pass; `/dashboard/runtime` prerenders successfully.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `green=true`, `modules_over_500_lines` remained `207 -> 207`.
+- Phase 7 receipt: `reports/langgraph_parity/allnight/runtime_graph_api_cockpit_20260630T194846Z.json`.
 
 ## Failing Gates
 
@@ -88,7 +99,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Live topology restart/resume: SWARM accepted handoff and SUBAGENTS_AS_TOOLS parent/child run records now have restart-readable `RuntimeStateStore` tests. Supervisor final-output restart semantics still need a dedicated live acceptance test.
 - Memory live retrieval: partial. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, and topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata. Stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.
 - Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
-- Cockpit/API: not wired for assistants, threads, runs, checkpoints/history, streaming events, interrupts, and active graph inspection.
+- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts. Assistants/configurations, threads/session API, full checkpoint history, streaming runtime events, background/cron runs, and interrupt/resume/human approval state remain incomplete or unproven.
 
 ## Next Patch Sequence
 
@@ -97,7 +108,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 3. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
 4. Extend the MemoryKernel live context tests to stale-memory rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation.
 5. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
-6. Add API/cockpit endpoints for assistants, threads, runs, checkpoints/history, streaming events, interrupt state, and active topology graph.
+6. Extend the new runtime graph API/cockpit lane to assistants, threads/session state, full checkpoint history, streaming events, background/cron runs, and interrupt/resume state.
 
 ## Residual Risk
 

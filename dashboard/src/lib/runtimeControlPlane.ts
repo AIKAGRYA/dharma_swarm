@@ -1,12 +1,20 @@
-import type { ApiResponse, ChatProfileOut, ChatStatusOut, HealthOut } from "./types";
+import type {
+  ApiResponse,
+  ChatProfileOut,
+  ChatStatusOut,
+  HealthOut,
+  RuntimeGraphSnapshot,
+} from "./types";
 
 export type RuntimeControlPlaneStatusKind = "ok" | "warn" | "error" | "muted";
 
 export interface RuntimeControlPlaneData {
   chatStatus: ChatStatusOut | null;
   health: HealthOut | null;
+  runtimeGraph: RuntimeGraphSnapshot | null;
   chatError: string | null;
   healthError: string | null;
+  runtimeGraphError: string | null;
   error: string | null;
 }
 
@@ -26,6 +34,14 @@ export interface RuntimeControlPlaneSnapshot {
   sessionFeedReady: boolean;
   sessionFeedLabel: string;
   sessionFeedPathTemplate: string | null;
+  runtimeGraphReady: boolean;
+  runtimeGraphStatusLabel: string;
+  runtimeGraphDetail: string;
+  runtimeGraphNodeCount: number;
+  runtimeGraphEdgeCount: number;
+  runtimeGraphActiveRunCount: number;
+  runtimeGraphCheckpointCount: number;
+  runtimeGraphActiveAgentCount: number;
   agentCount: number;
   anomalyCount: number;
   tracesLastHour: number;
@@ -58,7 +74,13 @@ function sessionFeedPathTemplate(chatStatus: ChatStatusOut | null): string | nul
 
 function hasRuntimeSignal(data: RuntimeControlPlaneData): boolean {
   return Boolean(
-    data.chatStatus || data.health || data.chatError || data.healthError || data.error,
+    data.chatStatus ||
+      data.health ||
+      data.runtimeGraph ||
+      data.chatError ||
+      data.healthError ||
+      data.runtimeGraphError ||
+      data.error,
   );
 }
 
@@ -67,6 +89,7 @@ function hasUnscopedRuntimeQueryFailure(data: RuntimeControlPlaneData): boolean 
     data.error &&
       !data.chatStatus &&
       !data.health &&
+      !data.runtimeGraph &&
       !data.chatError &&
       !data.healthError,
   );
@@ -103,6 +126,7 @@ function hasMirroredTransportQueryFailure(data: RuntimeControlPlaneData): boolea
   return Boolean(
     !data.chatStatus &&
       !data.health &&
+      !data.runtimeGraph &&
       isTransportFailureError(data.chatError) &&
       isTransportFailureError(data.healthError),
   );
@@ -304,21 +328,49 @@ function sessionFeedLabel(data: RuntimeControlPlaneData): string {
   return sessionFeedPathTemplate(data.chatStatus) ?? "not advertised";
 }
 
+function runtimeGraphStatusLabel(data: RuntimeControlPlaneData): string {
+  if (data.runtimeGraph) {
+    const count = data.runtimeGraph.summary.topology_state_count;
+    return count === 1 ? "1 graph" : `${count} graphs`;
+  }
+  if (data.runtimeGraphError) return "graph unavailable";
+  return "awaiting graph";
+}
+
+function runtimeGraphDetail(data: RuntimeControlPlaneData): string {
+  if (data.runtimeGraph) {
+    const summary = data.runtimeGraph.summary;
+    return `${summary.active_run_count} active runs, ${summary.active_agent_count} active agents, ${summary.checkpoint_count} checkpoints, ${summary.receipt_count} receipts.`;
+  }
+  if (data.runtimeGraphError) {
+    return `Runtime graph unavailable: ${data.runtimeGraphError}`;
+  }
+  return "Awaiting RuntimeStateStore graph snapshot.";
+}
+
 export function normalizeRuntimeControlPlaneResponses(
   chatResponse: ApiResponse<ChatStatusOut>,
   healthResponse: ApiResponse<HealthOut>,
+  runtimeGraphResponse?: ApiResponse<RuntimeGraphSnapshot>,
 ): RuntimeControlPlaneData {
   const chatError =
     chatResponse.status === "ok" ? null : chatResponse.error || "chat status unavailable";
   const healthError =
     healthResponse.status === "ok" ? null : healthResponse.error || "health unavailable";
+  const runtimeGraphError =
+    runtimeGraphResponse == null || runtimeGraphResponse.status === "ok"
+      ? null
+      : runtimeGraphResponse.error || "runtime graph unavailable";
 
   return {
     chatStatus: chatResponse.status === "ok" ? chatResponse.data : null,
     health: healthResponse.status === "ok" ? healthResponse.data : null,
+    runtimeGraph:
+      runtimeGraphResponse?.status === "ok" ? runtimeGraphResponse.data : null,
     chatError,
     healthError,
-    error: firstNonEmpty([chatError, healthError]),
+    runtimeGraphError,
+    error: firstNonEmpty([chatError, healthError, runtimeGraphError]),
   };
 }
 
@@ -346,6 +398,14 @@ export function buildRuntimeControlPlaneSnapshot(
     sessionFeedReady: Boolean(data.chatStatus?.ready) && Boolean(advertisedSessionFeedPathTemplate),
     sessionFeedLabel: sessionFeedLabel(data),
     sessionFeedPathTemplate: advertisedSessionFeedPathTemplate,
+    runtimeGraphReady: Boolean(data.runtimeGraph),
+    runtimeGraphStatusLabel: runtimeGraphStatusLabel(data),
+    runtimeGraphDetail: runtimeGraphDetail(data),
+    runtimeGraphNodeCount: data.runtimeGraph?.summary.node_count ?? 0,
+    runtimeGraphEdgeCount: data.runtimeGraph?.summary.edge_count ?? 0,
+    runtimeGraphActiveRunCount: data.runtimeGraph?.summary.active_run_count ?? 0,
+    runtimeGraphCheckpointCount: data.runtimeGraph?.summary.checkpoint_count ?? 0,
+    runtimeGraphActiveAgentCount: data.runtimeGraph?.summary.active_agent_count ?? 0,
     agentCount: data.health?.agent_health.length ?? 0,
     anomalyCount: data.health?.anomalies.length ?? 0,
     tracesLastHour: data.health?.traces_last_hour ?? 0,

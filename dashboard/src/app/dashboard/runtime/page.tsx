@@ -15,7 +15,7 @@ import { buildRuntimeOperatorHandbook } from "@/lib/runtimeOperatorHandbook";
 import { buildControlPlaneSurfaces } from "@/lib/controlPlaneSurfaces";
 import { colors, glowText } from "@/lib/theme";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
-import type { ChatProfileOut } from "@/lib/types";
+import type { ChatProfileOut, RuntimeGraphSnapshot } from "@/lib/types";
 
 const PAGE_META = buildControlPlanePageMeta("runtime");
 const PAGE_ACCENT = colors[PAGE_META.accent];
@@ -71,6 +71,7 @@ export default function RuntimePage() {
   const {
     chatStatus,
     health,
+    runtimeGraph,
     error,
     snapshot,
     isLoading,
@@ -173,6 +174,12 @@ export default function RuntimePage() {
         <div className="py-12 text-center text-sumi-500">Loading runtime status...</div>
       ) : (
         <>
+          <RuntimeGraphPanel
+            graph={runtimeGraph}
+            statusLabel={snapshot.runtimeGraphStatusLabel}
+            detail={snapshot.runtimeGraphDetail}
+          />
+
           <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -331,6 +338,109 @@ export default function RuntimePage() {
         </>
       )}
     </motion.div>
+  );
+}
+
+function RuntimeGraphPanel({
+  graph,
+  statusLabel,
+  detail,
+}: {
+  graph: RuntimeGraphSnapshot | null;
+  statusLabel: string;
+  detail: string;
+}) {
+  const topologies = graph?.topology_states.slice(0, 6) ?? [];
+  const receipts = graph?.receipts.slice(0, 6) ?? [];
+
+  return (
+    <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-lg text-sumi-100">Runtime Graph</h2>
+          <p className="text-sm text-sumi-400">{detail}</p>
+        </div>
+        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(graph ? "ok" : "muted")}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <MiniStat label="Active Runs" value={String(graph?.summary.active_run_count ?? 0)} />
+        <MiniStat label="Active Agents" value={String(graph?.summary.active_agent_count ?? 0)} />
+        <MiniStat label="Checkpoints" value={String(graph?.summary.checkpoint_count ?? 0)} />
+        <MiniStat label="Receipts" value={String(graph?.summary.receipt_count ?? 0)} />
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-3">
+          {topologies.length === 0 ? (
+            <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4 text-sm text-sumi-500">
+              No topology states in the selected runtime snapshot.
+            </div>
+          ) : (
+            topologies.map((state) => (
+              <div
+                key={state.run_id}
+                className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-sumi-100">
+                      {state.topology}
+                    </div>
+                    <div className="font-mono text-xs text-sumi-500">{state.run_id}</div>
+                  </div>
+                  <span className="rounded-full border border-aozora/30 bg-aozora/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-aozora">
+                    {state.active_agent || "no active agent"}
+                  </span>
+                </div>
+                <div className="grid gap-2 text-xs text-sumi-400 md:grid-cols-3">
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Task</div>
+                    <div className="font-mono text-sumi-300">{state.task_id}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Node</div>
+                    <div className="font-mono text-sumi-300">{state.current_node || "none"}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Children</div>
+                    <div className="font-mono text-sumi-300">{state.child_run_ids.length}</div>
+                  </div>
+                </div>
+                {state.checkpoint_id ? (
+                  <div className="mt-3 truncate font-mono text-xs text-sumi-500">
+                    {state.checkpoint_id}
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+            Recent Receipts
+          </div>
+          <div className="space-y-3">
+            {receipts.length === 0 ? (
+              <div className="text-sm text-sumi-500">No runtime receipts in snapshot.</div>
+            ) : (
+              receipts.map((receipt) => (
+                <div key={receipt.receipt_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                  <div className="text-sm text-sumi-200">{receipt.receipt_type}</div>
+                  <div className="font-mono text-xs text-sumi-500">{receipt.receipt_id}</div>
+                  <div className="mt-1 text-xs text-sumi-500">
+                    {receipt.status} · {receipt.agent_id || "no-agent"}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

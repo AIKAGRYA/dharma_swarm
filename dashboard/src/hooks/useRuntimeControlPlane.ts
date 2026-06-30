@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { fetchChatStatus, fetchHealth } from "@/lib/api";
+import { fetchChatStatus, fetchHealth, fetchRuntimeGraph } from "@/lib/api";
 import {
   buildRuntimeControlPlaneSnapshot,
   normalizeRuntimeControlPlaneResponses,
@@ -11,11 +11,16 @@ import {
 const DEFAULT_REFRESH_INTERVAL_MS = 30_000;
 
 async function loadRuntimeControlPlane(): Promise<RuntimeControlPlaneData> {
-  const [chatResponse, healthResponse] = await Promise.all([
+  const [chatResponse, healthResponse, runtimeGraphResponse] = await Promise.all([
     fetchChatStatus(),
     fetchHealth(),
+    fetchRuntimeGraph({ limit: 20, receipt_limit: 50 }),
   ]);
-  return normalizeRuntimeControlPlaneResponses(chatResponse, healthResponse);
+  return normalizeRuntimeControlPlaneResponses(
+    chatResponse,
+    healthResponse,
+    runtimeGraphResponse,
+  );
 }
 
 export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
@@ -28,8 +33,10 @@ export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
   const data = query.data ?? {
     chatStatus: null,
     health: null,
+    runtimeGraph: null,
     chatError: null,
     healthError: null,
+    runtimeGraphError: null,
     error: null,
   };
   const error =
@@ -40,12 +47,16 @@ export function useRuntimeControlPlane(options?: { refetchInterval?: number }) {
     ...query,
     chatStatus: data.chatStatus,
     health: data.health,
+    runtimeGraph: data.runtimeGraph,
+    runtimeGraphError: data.runtimeGraphError,
     error,
     snapshot: buildRuntimeControlPlaneSnapshot({
       chatStatus: data.chatStatus,
       health: data.health,
+      runtimeGraph: data.runtimeGraph,
       chatError: data.chatError,
       healthError: data.healthError,
+      runtimeGraphError: data.runtimeGraphError,
       error,
     }),
     refresh: query.refetch,

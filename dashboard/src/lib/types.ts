@@ -311,6 +311,126 @@ export interface HealthOut {
 }
 
 // ---------------------------------------------------------------------------
+// Runtime graph (GET /api/runtime/graph)
+// ---------------------------------------------------------------------------
+
+export interface RuntimeGraphSummary {
+  topology_state_count: number;
+  run_count: number;
+  active_run_count: number;
+  receipt_count: number;
+  node_count: number;
+  edge_count: number;
+  checkpoint_count: number;
+  active_agent_count: number;
+}
+
+export interface RuntimeGraphNode {
+  id: string;
+  kind: string;
+  label: string;
+  run_id?: string;
+  task_id?: string;
+  session_id?: string;
+  status?: string;
+  agent_id?: string;
+  topology?: string;
+  checkpoint_id?: string;
+  active?: boolean;
+  [key: string]: unknown;
+}
+
+export interface RuntimeGraphEdge {
+  id: string;
+  kind: string;
+  source: string;
+  target: string;
+  label: string;
+  run_id?: string;
+  receipt_id?: string;
+  parent_run_id?: string;
+  child_run_id?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeGraphCheckpoint {
+  checkpoint_id: string;
+  run_id: string;
+  task_id: string;
+  topology: string;
+  active_agent: string;
+  current_node: string;
+  updated_at: string | null;
+}
+
+export interface RuntimeGraphTopologyState {
+  schema_version: string;
+  run_id: string;
+  session_id: string;
+  task_id: string;
+  topology: string;
+  active_agent: string;
+  current_node: string;
+  checkpoint_id: string;
+  parent_run_id: string;
+  child_run_ids: string[];
+  allowed_handoffs: Record<string, string[]>;
+  handoff_receipts: Record<string, unknown>[];
+  state: Record<string, unknown>;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface RuntimeGraphRun {
+  run_id: string;
+  session_id: string;
+  task_id: string;
+  claim_id: string;
+  parent_run_id: string;
+  assigned_by: string;
+  assigned_to: string;
+  requested_output: string[];
+  current_artifact_id: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  failure_code: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface RuntimeGraphReceipt {
+  receipt_id: string;
+  receipt_type: string;
+  run_id: string;
+  task_id: string;
+  trace_id: string;
+  correlation_id: string;
+  causation_id: string;
+  parent_run_id: string;
+  agent_id: string;
+  idempotency_key: string;
+  side_effect_key: string;
+  status: string;
+  payload: Record<string, unknown>;
+  created_at: string | null;
+}
+
+export interface RuntimeGraphSnapshot {
+  schema_version: string;
+  generated_at: string;
+  runtime_db: string;
+  filters: Record<string, unknown>;
+  summary: RuntimeGraphSummary;
+  active_agents: string[];
+  checkpoints: RuntimeGraphCheckpoint[];
+  topology_states: RuntimeGraphTopologyState[];
+  runs: RuntimeGraphRun[];
+  receipts: RuntimeGraphReceipt[];
+  nodes: RuntimeGraphNode[];
+  edges: RuntimeGraphEdge[];
+}
+
+// ---------------------------------------------------------------------------
 // Evolution (GET /api/evolution/*)
 // ---------------------------------------------------------------------------
 
