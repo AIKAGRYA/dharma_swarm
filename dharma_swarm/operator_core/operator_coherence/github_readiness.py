@@ -293,5 +293,3 @@ def _definition_answers(payload: dict[str, Any]) -> dict[str, Any]:
         "what_should_i_do_next": payload["executive"]["next_3_actions"],
         "prod_readiness": payload["readiness"],
     }
-
-

@@ -431,5 +431,3 @@ def record_query_packet_to_memory_plane(
         "retrieval_log_rows": stats["retrieval_log"],
         "storage_boundary": "query text, result metadata, and short snippets only",
     }
-
-

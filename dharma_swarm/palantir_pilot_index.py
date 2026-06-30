@@ -439,5 +439,3 @@ def query_wiki_notes(
         )
     hits.sort(key=lambda item: (-int(item["score"]), item["path"]))
     return hits[: max(0, limit)]
-
-
