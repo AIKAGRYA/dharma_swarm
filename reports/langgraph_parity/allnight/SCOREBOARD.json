@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T07:48:10Z",
+  "updated_at": "2026-07-01T08:02:04Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 99,
+    "current": 100,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on, RuntimeStateStore-backed SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A strict green, Phase 5 MemoryKernel live retrieval/isolation/stale rejection/tool-exposure controls, Phase 6 provider truth with automatic fresh live-matrix discovery and failed-route quarantine, Phase 7 RuntimeStateStore-backed platform/cockpit surfaces, and a passing local agent-build-closeout governance bundle. This is still not 100/100 because Phase 7 platform/cockpit evidence is explicitly partial and final full acceptance still needs a complete end-to-end cockpit proof."
+    "claim": "100/100 against current executable local gates. Score reflects Phase 1 complete, runtime spine default-on, RuntimeStateStore-backed SWARM/SUPERVISOR/SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A strict green, Phase 5 MemoryKernel live retrieval/isolation/stale rejection/tool-exposure controls, Phase 6 provider truth with automatic fresh live-matrix discovery and failed-route quarantine, Phase 7 RuntimeStateStore-backed platform/cockpit surfaces including a live running graph proof, and a passing local agent-build-closeout governance bundle. Residual operational notes remain: local semgrep is skipped when absent by the repo wrapper, GitHub reports no check runs for the draft PR branch, and the live cockpit proof calls FastAPI route handlers directly rather than launching a browser dashboard server."
   },
   "rounds": [
     {
@@ -1085,6 +1085,37 @@
         "This completes dashboard action UI over the existing RuntimeStateStore-backed approve/reject/resume API contract.",
         "Full 100/100 remains blocked by the missing complete end-to-end cockpit proof over a live running multi-agent graph observed in real time through the dashboard/API."
       ]
+    },
+    {
+      "id": "phase-7-live-cockpit-api-proof",
+      "timestamp": "2026-07-01T08:02:04Z",
+      "status": "completed",
+      "target_gate": "Prove the cockpit/API can inspect a live running multi-agent graph in real time from canonical RuntimeStateStore sources",
+      "files_touched": [
+        "scripts/verify/runtime_live_cockpit_probe.py",
+        "tests/test_runtime_live_cockpit_probe.py",
+        "reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_runtime_live_cockpit_probe.py --tb=short",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_runtime_live_cockpit_probe.py --tb=short",
+        ".venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_live_cockpit_probe.py tests/test_runtime_graph_api.py --tb=short",
+        ".venv/bin/ruff check scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py",
+        ".venv/bin/python -m compileall -q scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py",
+        ".venv/bin/python scripts/verify/runtime_live_cockpit_probe.py --runtime-db /private/tmp/dharma-runtime-live-cockpit-20260701T080204Z/runtime.db --output reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json",
+        "node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts",
+        "npm run lint -- --quiet",
+        "npm run build",
+        ".venv/bin/python scripts/docops/check_docops_integrity.py --write-auto-sections --write-manifest-counts",
+        "make agent-build-closeout"
+      ],
+      "blockers": [
+        "No remaining LangGraph parity acceptance blocker found in current focused verification.",
+        "Residual operational notes: local semgrep is skipped when absent by the repo wrapper, GitHub currently reports no check runs for the draft PR branch, and the live cockpit proof calls FastAPI route handlers directly rather than launching a browser dashboard server."
+      ]
     }
   ],
   "gates": {
@@ -1100,7 +1131,7 @@
     "phase_4_a2a_strict_green": "passed_ready_true_open_0_unknown_0_unverified_0_after_forge_v01_supervisor_block",
     "phase_5_memory_live_retrieval": "passed_current_executable_lane_text_query_topology_agent_isolation_stale_rejection_retrieval_telemetry_curated_source_coverage_tool_exposure_metadata_isolation",
     "phase_6_provider_truth": "passed_spine_receipts_actual_provider_model_plus_auto_fresh_live_matrix_discovery_stale_expiry_and_failed_route_quarantine",
-    "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_dashboard_action_ui_and_fresh_process_resume_api_cockpit_partial_pending_live_dashboard_proof",
+    "phase_7_platform_surface": "passed_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_dashboard_action_ui_fresh_process_resume_and_live_running_cockpit_api_proof",
     "final_closeout_governance": "passed_agent_build_closeout_gitleaks_clean_uplift_guards_venv_docops_refreshed_claim_evidence_advisory"
   },
   "latest_verification": {
@@ -1138,18 +1169,19 @@
       "runtime_interrupts_streaming_state": "RuntimePlatformViews projects interrupt/resume/human-approval state from session_events; GET /api/runtime/events/stream streams persisted runtime events as SSE; GET /api/runtime/interrupts exposes control-event snapshots; /dashboard/runtime fetches and renders interrupt/control summary plus recent control events and stream path; focused runtime API/operator/bootstrap tests 7 passed in 1.66s; broader parity/runtime/orchestrator/API subset 98 passed in 34.54s; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, onboard, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_agent_server_background_surfaces": "RuntimeAgentServerViews projects Agent Server-style assistant/configuration snapshots from RuntimeStateStore sessions/delegation runs and background/cron snapshots from existing cron scheduler storage plus runtime background events/runs; GET /api/runtime/assistants and /api/runtime/background-jobs are registered and honor DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders assistants/configurations, cron jobs, and background runs; focused runtime API tests 6 passed in 1.78s; broader runtime/API/topology subset 59 passed in 197.43s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_control_action_endpoints": "RuntimeControlActions records runtime_control approve/reject/resume OperatorAction rows, emits operator_control session_events, returns refreshed interrupt snapshots, and best-effort writes checkpoint interrupt responses; POST /api/runtime/interrupts/approve, /reject, and /resume are registered and honor DHARMA_RUNTIME_DB; dashboard has typed request/result helpers; focused runtime API tests 7 passed in 1.23s; broader runtime/API/topology subset 60 passed in 29.29s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
-      "runtime_dashboard_control_actions": "Dashboard runtime panel now derives approve/reject/resume icon actions from pending RuntimeInterruptControlEvent rows, builds canonical RuntimeControlActionRequest payloads with session/task/run/approval/interrupt/resume identifiers, posts through existing typed API helpers, and refreshes canonical snapshots without adding dashboard-only control state. Focused dashboard control-plane test passed 14/14; dashboard lint --quiet passed; dashboard build passed; tests/test_runtime_graph_api.py passed 8/8. Score remains 99/100 because the final live-running multi-agent cockpit proof is still not recorded.",
+      "runtime_dashboard_control_actions": "Dashboard runtime panel now derives approve/reject/resume icon actions from pending RuntimeInterruptControlEvent rows, builds canonical RuntimeControlActionRequest payloads with session/task/run/approval/interrupt/resume identifiers, posts through existing typed API helpers, and refreshes canonical snapshots without adding dashboard-only control state. Focused dashboard control-plane test passed 14/14; dashboard lint --quiet passed; dashboard build passed; tests/test_runtime_graph_api.py passed 8/8.",
+      "runtime_live_cockpit_probe": "Real Orchestrator SUPERVISOR dispatch held in progress by BlockingRunner; OperatorViews and RuntimeStateStore-backed FastAPI runtime route handlers observed active_run_count=1, active_agent=lead, topology_state_status=running, run_detail.status=running, checkpoint present, and event_count=2 before release. After release the run completed with active_run_count=0. Focused proof test passed 1/1 in 1.13s; runtime API/proof subset passed 9/9 in 2.73s; parity/runtime API subset passed 29/29 in 3.01s; explicit proof script run passed with a non-blocking optional lancedb warning; ruff, compileall, DocOps, and make agent-build-closeout passed; receipt reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json.",
       "runtime_multiprocess_resume": "Fresh Python subprocess calls the configured runtime_interrupt_resume API route against DHARMA_RUNTIME_DB; parent process reopens the same RuntimeStateStore and verifies runtime_resume_requested control event, runtime_control.resume OperatorAction row, resume token, and persisted topology checkpoint detail; focused acceptance 1 passed in 0.68s; broader runtime/API/state subset 24 passed in 3.60s; focused ruff, compileall, jq, diff-check, and working-tree sync_in_async detector pass",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
       "a2a_readiness_strict": "passed after Forge v0.1 supervisor block: ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0; blocker_task_ids={}; fresh blocker audit count=0.",
       "agent_build_preflight": "passed three times; latest run compileall clean, F821 clean, 12349 tests collected, onboard OK, hygiene integrity OK",
-      "agent_build_closeout": "passed after closeout governance repair: semgrep wrapper skipped absent semgrep by repo policy; gitleaks scanned 2825 commits with no leaks; test hygiene warned only on a known offender; contract tests 22 passed; NATS tests 55 passed; uplift guards passed under repo venv; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory with undergraded active-track warnings",
+      "agent_build_closeout": "passed after live cockpit proof closeout: semgrep wrapper skipped absent semgrep by repo policy; gitleaks scanned 2828 commits with no leaks; test hygiene warned only on a known offender; contract tests 22 passed; NATS tests 55 passed; uplift guards passed under repo venv; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory with undergraded active-track warnings",
       "a2a_tam_darshan_publication_completion": "Created reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md from 8 existing Darshan wiki/source atoms; wrote validated receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json; backed up live queue to /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-tam-darshan-complete-20260701T061529Z.bak; claimed and completed tam-wp-wp_dfa4e1134277 as codex_composer; check_a2a_readiness.py --strict still fails with open_tasks=8, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit reports 5 stale claimed and 3 stale unclaimed rows.",
       "a2a_stale_forge_v01_blocker": "Dry-run found exactly 1 stale Forge v0.1 row and 0 skips; apply supervisor-blocked forge-v0.1-001 as blocked_verified with embedded dharma_a2a_task_receipt.v1 receipt, backup at /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak; focused test 5 passed in 0.40s; ruff and compileall passed; strict A2A readiness passed with ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit count=0.",
       "provider_auto_live_matrix_policy": "model_status auto-discovers fresh provider_live_matrix_*.json closeout receipts from reports/langgraph_parity/allnight when DHARMA_MODEL_LIVE_CALL_MATRIX_PATH is unset, expires stale auto-discovered receipts, and lets fresh live receipt evidence set model-level live_routable/unavailable even when key_oracle is stale. Focused tests 12 passed in 20.20s; ruff and compileall passed; live projection smoke without explicit matrix env marks claude-opus-4.8 unavailable due timeout, kimi-k2.6 live_routable through ollama, and gpt-5.5 live_routable through codex.",
-      "gitleaks_full_history": "passed after adding narrow quality-reports/ historical audit-output allowlist: 2825 commits scanned, no leaks found",
+      "gitleaks_full_history": "passed after adding narrow quality-reports/ historical audit-output allowlist; latest closeout run scanned 2828 commits with no leaks found",
       "uplift_guards_repo_python": "passed via PYTHONPATH=. .venv/bin/python scripts/uplift_guards/run_pre_commit.py; Makefile uplift-guards now uses $(REPO_PYTHON)",
       "docops_integrity": "passed after refreshing docs/docops/AUTO_INVENTORY.md and generated SOVEREIGN_MANIFEST count tokens",
       "precommit_uplift_guards": "passed after hook now prefers .venv/bin/python and falls back to python3"

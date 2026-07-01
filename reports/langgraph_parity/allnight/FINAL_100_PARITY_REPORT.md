@@ -1,16 +1,16 @@
 # Final 100 Parity Report
 
-Status: **not 100/100**.
+Status: **100/100 verified against current executable gates**.
 
-Current score: **99/100**.
+Current score: **100/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime multi-process resume proof, Phase 6 live-provider matrix closeout, model-status overlay artifacts, Phase 4 A2A strict-green work, provider auto freshness/quarantine policy, and closeout-governance repair on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof, Phase 6 live-provider matrix closeout, model-status overlay artifacts, Phase 4 A2A strict-green work, provider auto freshness/quarantine policy, closeout-governance repair, dashboard runtime control actions, and the live cockpit/API running-graph proof on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
-This branch made real progress but does not satisfy the definition of 100/100. The strongest evidence is:
+This branch satisfies the current executable 100/100 parity gate locally. The strongest evidence is:
 
 - `reports/langgraph_parity/benchmark/benchmark_report.json` now contains 26 deterministic benchmark cases, 12 multi-hop cases, and complete coverage for all required Phase 1 tags.
 - Runtime orchestrator dispatch is default-on through `invoke_agent`; `DHARMA_SPINE_DISPATCH` is now an explicit false-like opt-out.
@@ -31,11 +31,12 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Runtime approve/reject/resume actions are now exposed through `POST /api/runtime/interrupts/approve`, `/reject`, and `/resume`. They write canonical `OperatorAction` audit rows, emit `operator_control` `SessionEventRecord` rows, return refreshed interrupt snapshots, and best-effort write checkpoint interrupt responses when an `interrupt_id` is supplied.
 - `/dashboard/runtime` now renders pending runtime control events as approve/reject/resume icon actions, builds canonical runtime control request payloads from `session_id`, `task_id`, `run_id`, `approval_id`, `interrupt_id`, and `resume_token`, calls the existing typed API helpers, and refreshes canonical runtime snapshots. This adds operator action UI without introducing dashboard-only control truth.
 - Runtime resume now has fresh-process proof: a child Python process calls the configured `runtime_interrupt_resume` API route against `DHARMA_RUNTIME_DB`, then the parent process reopens the same `RuntimeStateStore` and verifies the `runtime_resume_requested` event, `runtime_control.resume` action row, resume token, and checkpoint detail.
+- Live cockpit/API proof now exists: `scripts/verify/runtime_live_cockpit_probe.py` dispatches a real `Orchestrator` `SUPERVISOR` graph, holds the runner in progress, observes the same canonical `RuntimeStateStore` through `OperatorViews` and the FastAPI runtime route handlers while the runner is still blocked, then releases the runner and verifies completion.
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
 - Provider truth now has direct live-matrix falsification evidence plus automatic quarantine. Earlier live probes showed Claude Code timeout failures and NVIDIA NIM `moonshotai/kimi-k2.6` schema failures; current `model_status.py` automatically discovers fresh `provider_live_matrix_*.json` receipts, expires stale auto-discovered receipts, and does not advertise failed fresh-probed routes as live.
 - Model-status projection supports legacy provider-matrix receipts, direct `dharma.model_routing_live_probe.v1` top-level `results`, and provider-live-matrix closeout receipts that reference child artifacts. Without `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`, the live projection smoke marks `claude-opus-4.8` unavailable due timeout, keeps `kimi-k2.6` live via Ollama only, and keeps `gpt-5.5` live via Codex.
 - A2A terminal receipt adaptation, operator-gated stale row blocking, verified-duplicate blocking, SAB-Qwen runtime-blocking, TAM Darshan completion, stale Hermes claim supervisor-blocking, Holon stale-review target blocking, and Forge v0.1 supervisor-blocking together drove A2A strict readiness green. Current strict evidence is `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
-- Closeout governance now passes locally. `make agent-build-closeout` completes with full-history gitleaks clean over 2,825 commits, contract tests passing, NATS tests passing, uplift guards passing under the repo venv, DocOps generated counts refreshed, and claim/evidence binding remaining advisory. The matching pre-commit uplift hook also prefers the repo venv and passes.
+- Closeout governance now passes locally. `make agent-build-closeout` completes with full-history gitleaks clean over 2,828 commits, contract tests passing, NATS tests passing, uplift guards passing under the repo venv, DocOps generated counts refreshed, and claim/evidence binding remaining advisory. The matching pre-commit uplift hook also prefers the repo venv and passes.
 
 ## Verification
 
@@ -47,7 +48,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass.
 - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> fail exit 2.
 - `make agent-build-preflight` -> pass; compileall clean, F821 clean, 12,328 tests collected, onboard OK, hygiene integrity OK.
-- `make agent-build-closeout` -> current pass after closeout-governance repair. Semgrep is absent and skipped by the repo wrapper; gitleaks scanned 2,825 commits with no leaks; contract tests reported `22 passed`; NATS tests reported `55 passed`; uplift guards passed; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory.
+- `make agent-build-closeout` -> current pass after live cockpit proof closeout. Semgrep is absent and skipped by the repo wrapper; gitleaks scanned 2,828 commits with no leaks; contract tests reported `22 passed`; NATS tests reported `55 passed`; uplift guards passed; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory.
 - `pre-commit run dharma-uplift-guards --all-files` -> pass after the hook was aligned to prefer `.venv/bin/python`.
 - CI repair after draft PR #732 first run: extracted topology helpers to `dharma_swarm/runtime_topology.py` and the benchmark case catalogue to `dharma_swarm/langgraph_parity/benchmark_tasks.py`.
 - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `modules_over_500_lines` stayed `207 -> 207`, `boundary_unfrozen_records` stayed `7 -> 7`.
@@ -178,6 +179,14 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
 - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `8 passed in 1.41s`.
 - Phase 7 dashboard-action receipt: `reports/langgraph_parity/allnight/runtime_dashboard_control_actions_20260701T074810Z.json`.
+- Phase 7 live cockpit/API proof: `scripts/verify/runtime_live_cockpit_probe.py` and `tests/test_runtime_live_cockpit_probe.py` prove an in-progress `SUPERVISOR` dispatch is visible through canonical runtime graph/run/detail/checkpoint/event/session API surfaces before release.
+- `.venv/bin/python -m pytest -q tests/test_runtime_live_cockpit_probe.py --tb=short` -> `1 passed in 1.13s`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_runtime_live_cockpit_probe.py --tb=short` -> `9 passed in 2.73s`.
+- `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_live_cockpit_probe.py tests/test_runtime_graph_api.py --tb=short` -> `29 passed in 3.01s`.
+- `.venv/bin/ruff check scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py` -> pass.
+- `.venv/bin/python -m compileall -q scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py` -> pass.
+- `.venv/bin/python scripts/verify/runtime_live_cockpit_probe.py --runtime-db /private/tmp/dharma-runtime-live-cockpit-20260701T080204Z/runtime.db --output reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json` -> pass; emitted a non-blocking optional `lancedb not installed` warning.
+- Phase 7 live cockpit/API receipt: `reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json`.
 - Supervisor proof receipt: `reports/langgraph_parity/allnight/supervisor_restart_final_output_20260630T210549Z.json`.
 - Runtime interrupts/streaming receipt: `reports/langgraph_parity/allnight/runtime_interrupts_streaming_20260630T213755Z.json`.
 - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py` -> `7 passed in 1.66s`.
@@ -325,14 +334,14 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Closeout governance: passed after `reports/langgraph_parity/allnight/closeout_governance_repair_20260701T072931Z.json`. The previous full-history gitleaks blocker was narrowed to historical `quality-reports/` audit output, and the rerun scanned 2,825 commits with no leaks. `uplift-guards` now runs through `$(REPO_PYTHON)` in the Makefile, the pre-commit hook prefers `.venv/bin/python`, and both pass under the repo venv. DocOps generated counts were refreshed.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
 - Provider truth: passed for the current executable gate. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback; model-status now automatically consumes fresh live-probe closeout receipts, expires stale auto-discovered receipts, and quarantines failed probed routes without an operator-selected matrix env var. Claude Code timeout routes are quarantined by the fresh receipt rather than advertised live.
-- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, dashboard action UI, and fresh-process resume persistence are visible through `RuntimeStateStore`-backed API/operator views. The missing proof is still a complete dashboard/API observation of a live running multi-agent graph in real time.
+- Cockpit/API: passed for the current executable gate. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, dashboard action UI, fresh-process resume persistence, and a live running multi-agent graph proof are visible through `RuntimeStateStore`-backed API/operator views.
 
 ## Next Patch Sequence
 
-1. Produce a complete end-to-end cockpit proof that inspects a live running multi-agent graph in real time from canonical `RuntimeStateStore` sources.
-2. Refresh the all-night artifacts and rerun closeout checks after that proof.
-3. Monitor CI for semgrep behavior, since local `make agent-build-closeout` uses the repo wrapper and skips semgrep when it is not installed on PATH.
+1. Monitor PR checks. GitHub currently reports no check runs for the draft PR branch.
+2. Monitor CI semgrep behavior, since local `make agent-build-closeout` uses the repo wrapper and skips semgrep when it is not installed on PATH.
+3. If desired before undrafting, add a browser-driven Playwright smoke for `/dashboard/runtime`; the current acceptance proof exercises the FastAPI route handlers and dashboard build/unit surface over the same runtime contract.
 
 ## Residual Risk
 
-The conformance oracle is stronger now, but it is still not the live runtime backbone. The branch should not claim production-grade LangGraph parity until the remaining Phase 7 cockpit/API evidence has direct end-to-end runtime proof.
+The current 100/100 claim is bounded to executable local gates and PR #732's current draft state. Residual operational risk remains because local semgrep is skipped when absent, GitHub reports no check runs for the branch at closeout time, and the live cockpit proof drives the runtime route handlers directly rather than launching a browser against a running dashboard server.

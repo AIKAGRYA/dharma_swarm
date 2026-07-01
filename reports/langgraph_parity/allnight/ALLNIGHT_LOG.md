@@ -1135,3 +1135,28 @@
   - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
   - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `8 passed in 1.41s`.
 - Scoreboard: remains `99/100`. This round completes the previous next-patch item for dashboard action UI, but 100/100 remains blocked until a complete dashboard/API proof observes a live running multi-agent graph in real time from canonical `RuntimeStateStore` sources.
+
+## 2026-07-01T08:02:04Z - Phase 7 Live Cockpit API Proof
+
+- Target gate result: success for the remaining Phase 7 cockpit/API proof.
+- What changed:
+  - Added `scripts/verify/runtime_live_cockpit_probe.py`.
+  - Added `tests/test_runtime_live_cockpit_probe.py`.
+  - The probe dispatches a real `Orchestrator` `SUPERVISOR` graph with a local blocking runner, waits until the runner is in progress, and inspects the active graph before release.
+  - The proof reads canonical `RuntimeStateStore` state through both `OperatorViews.runtime_graph()` and FastAPI runtime route handlers using the same `DHARMA_RUNTIME_DB`.
+  - No dashboard-only truth store was added; the API observes active runs, active agent, topology state, run detail, checkpoints, events, and sessions from the canonical runtime store.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_runtime_live_cockpit_probe.py --tb=short` -> `1 passed in 1.13s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_runtime_live_cockpit_probe.py --tb=short` -> `9 passed in 2.73s`.
+  - `.venv/bin/python -m pytest -q tests/test_langgraph_parity_*.py tests/test_runtime_live_cockpit_probe.py tests/test_runtime_graph_api.py --tb=short` -> `29 passed in 3.01s`.
+  - `.venv/bin/ruff check scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py` -> pass.
+  - `.venv/bin/python -m compileall -q scripts/verify/runtime_live_cockpit_probe.py tests/test_runtime_live_cockpit_probe.py` -> pass.
+  - `.venv/bin/python scripts/verify/runtime_live_cockpit_probe.py --runtime-db /private/tmp/dharma-runtime-live-cockpit-20260701T080204Z/runtime.db --output reports/langgraph_parity/allnight/runtime_live_cockpit_probe_20260701T080204Z.json` -> pass; emitted a non-blocking optional `lancedb not installed` warning.
+  - `node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts` from `dashboard/` -> `14 passed`; Node emitted experimental type-stripping warnings only.
+  - `npm run lint -- --quiet` from `dashboard/` -> pass.
+  - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
+  - `.venv/bin/python scripts/docops/check_docops_integrity.py --write-auto-sections --write-manifest-counts` -> pass and refreshed generated counts.
+  - `make agent-build-closeout` -> pass. Semgrep was absent and skipped by the repo wrapper; gitleaks scanned 2,828 commits with no leaks; contract tests reported `22 passed`; NATS tests reported `55 passed`; uplift guards passed; module budget passed with existing warnings; DocOps and hygiene integrity passed; claim/evidence binding remained advisory with undergraded active-track warnings.
+- Scoreboard: raised to `100/100` for the current executable gates. Residual operational notes remain: local semgrep is skipped when absent by the repo wrapper, GitHub currently reports no check runs for the draft PR branch, and the live cockpit proof calls FastAPI route handlers directly rather than launching a browser against a running dashboard server.
