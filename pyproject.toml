@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn>=0.24",
     "numpy>=1.24",
     "pyyaml>=6.0",
+    "jsonschema>=4.0",
     "croniter>=2.0",
 ]
 

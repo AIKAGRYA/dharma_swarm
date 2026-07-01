@@ -265,7 +265,12 @@
       "docs/ops/LIVE_OPS_COCKPIT_PR_PACKET.md",
       "docs/ops/TMUX_AGENT_SUBSTRATE.md",
       "docs/ontology/SEMANTIC_COMMONS.md",
-      "spec-forge/living-agent-kernel/MASTER_SPEC.md"
+      "spec-forge/living-agent-kernel/MASTER_SPEC.md",
+      "councils/01_testing_verification/PROMPTS.md",
+      "councils/02_architecture_complexity/PROMPTS.md",
+      "councils/03_runtime_distributed_reliability/PROMPTS.md",
+      "councils/04_ai_slop_prompt_security/PROMPTS.md",
+      "councils/05_governance_evidence_fitness/PROMPTS.md"
     ]
   },
   "auto_sections": {

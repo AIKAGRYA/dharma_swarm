@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from scripts.governance.loop.runs import Run
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
 LEARN_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "prompt_audit_learn.py"

@@ -1035,12 +1035,12 @@ def test_estimate_remediation_tokens_does_not_depend_on_llm():
     """VAL-AUDIT-011: the estimate is a pure function of (finding, write_set) —
     no LLM/network call, no env dependency. Derived purely from json payload length."""
     from scripts.governance.loop.prompt_audit_remediate import _estimate_remediation_tokens
-    import json
 
     finding = _make_finding(fid="F-PURE-001")
     write_set = ["scripts/governance/loop/**"]
     estimate = _estimate_remediation_tokens(finding, write_set)
-    expected = max(1, (len(json.dumps({"finding": finding, "write_set": write_set}, sort_keys=True, default=str)) + 3) // 4)
+    payload = {"finding": finding, "write_set": write_set}
+    expected = max(1, (len(json.dumps(payload, sort_keys=True, default=str)) + 3) // 4)
     assert estimate == expected, (
         f"estimate must equal the deterministic payload-derived value: got {estimate}, expected {expected}"
     )
