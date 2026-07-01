@@ -31,6 +31,16 @@ next strategic `active_track:` once two conditions hold:
 
 ## Current proposals
 
+- `agentic-design-patterns-cognition-2026-07.yaml` — makes the intra-agent
+  reasoning loop first-class. Deep-read of Antonio Gulli's *Agentic Design
+  Patterns* (21 chapters) mapped against the substrate: 13 patterns already
+  STRONG (the multi-agent/infrastructure layer), 2 deliberately out of scope
+  (Learning/Adaptation is zero-weight by design → arena track; MCP → A2A/NATS
+  lanes), and one coherent PARTIAL cluster remaining — Reflection, Reasoning
+  (CoT/self-consistency), Planning, Prompt-Chaining. Ships a new surface-disjoint
+  `dharma_swarm/cognition/` package + a Slot-4 patterns atlas, benchmarked under
+  budget parity. DRAFT (not a 5th ACTIVE substrate track) pending the three
+  promotion preconditions in the file. Authored by claude-code, 2026-07-01.
 - `spine-adoption-2026-06.yaml` — successor to `runtime-truth-spine-2026-06`
   (which shipped 13/13 by the letter but has zero callers outside the spine
   package and tests as of 2026-05-31). Migrates the five god objects
