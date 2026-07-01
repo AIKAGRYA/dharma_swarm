@@ -552,17 +552,30 @@ def update_branches(
             continue
         if entry["path_or_name"] in seen_branches:
             continue
+        remote_shadow = f"origin/{entry['path_or_name']}"
         evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
         evidence["present_in_latest_branch_scan"] = False
         evidence["latest_scan"] = updated_at
         entry["evidence"] = evidence
+        if not entry["path_or_name"].startswith("origin/") and remote_shadow in seen_branches:
+            set_terminal(
+                entry,
+                "keep_active",
+                "stale_local_shadow_remote_live",
+                "local branch ref is absent, but matching origin remote-tracking ref is present and retained",
+                updated_at,
+                entry.get("pr_url_or_tag"),
+                {"remote_tracking_ref": remote_shadow},
+            )
+            continue
+        tag = create_archive_tag(clone, entry["path_or_name"], entry.get("head_sha"))
         set_terminal(
             entry,
             "archived",
             "stale_branch_entry",
             "ledger branch item is not present in the latest full branch scan",
             updated_at,
-            entry.get("pr_url_or_tag"),
+            tag or entry.get("pr_url_or_tag"),
         )
     return seen_branches
 
@@ -629,6 +642,8 @@ def summarize(
     status_counts: dict[str, int] = {}
     kind_status_counts: dict[str, int] = {}
     nonterminal: list[str] = []
+    archived_without_artifact: list[str] = []
+    archived_remote_live_shadows: list[str] = []
     for item in entries.values():
         status = item.get("status")
         status_counts[status] = status_counts.get(status, 0) + 1
@@ -636,6 +651,11 @@ def summarize(
         kind_status_counts[key] = kind_status_counts.get(key, 0) + 1
         if status not in TERMINAL_STATUSES:
             nonterminal.append(item["id"])
+        if status == "archived" and not item.get("pr_url_or_tag"):
+            archived_without_artifact.append(item["id"])
+            name = item.get("path_or_name", "")
+            if item.get("kind") == "branch" and f"origin/{name}" in seen_branches:
+                archived_remote_live_shadows.append(item["id"])
     new_worktrees = [
         f"worktree::{path}"
         for path in seen_worktrees
@@ -657,6 +677,10 @@ def summarize(
         "new_branches_not_in_ledger": new_branches,
         "nonterminal_count": len(nonterminal),
         "nonterminal_ids": nonterminal[:50],
+        "archived_without_artifact_count": len(archived_without_artifact),
+        "archived_without_artifact_ids": archived_without_artifact[:50],
+        "archived_remote_live_shadow_count": len(archived_remote_live_shadows),
+        "archived_remote_live_shadow_ids": archived_remote_live_shadows[:50],
         "agent_magpie_seed_gap": magpie_gap,
         "origin_main_sha": origin_main,
     }
@@ -706,6 +730,8 @@ def main() -> int:
     file_check = summary.get("ledger_file_check", {})
     return 1 if (
         summary["nonterminal_count"]
+        or summary["archived_without_artifact_count"]
+        or summary["archived_remote_live_shadow_count"]
         or file_check.get("duplicate_count")
         or file_check.get("invalid_status_count")
     ) else 0

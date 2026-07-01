@@ -109,12 +109,14 @@ The terminal statuses in `metabolization_sweep_ledger.jsonl` use conservative
 rules:
 
 - `pr_opened`: an open GitHub PR exists for the branch head.
-- `keep_active`: a remote tracking ref, the primary live checkout, the current
-  sweep branch before PR publication, or an active local worktree/branch that
-  should not be archived silently.
+- `keep_active`: a remote tracking ref, a stale local branch shadow whose
+  matching `origin/<branch>` ref is still live, the primary live checkout, the
+  current sweep branch before PR publication, or an active local
+  worktree/branch that should not be archived silently.
 - `archived`: a local branch has no unique commits relative to `origin/main`, or
-  a stale ledger item is no longer present in the latest full scan. Local archive
-  tags are used where the commit object is available in the isolated clone.
+  a stale ledger item is no longer present in the latest full scan and has no
+  matching live remote-tracking ref. Archived rows must carry either an archive
+  tag or a PR artifact; the verifier fails on artifact-free archived rows.
 - `flagged_for_operator`: unique unmerged local branch tips, dirty worktrees,
   detached scratch checkouts with local edits, DarwinEngine reconciliation, and
   Forge consolidation states that need human choice.
