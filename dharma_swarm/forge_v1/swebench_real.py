@@ -140,6 +140,7 @@ def verify_prediction(
     force_rebuild: bool = False,
     run_id: str | None = None,
     keep_logs: bool = True,
+    max_workers: int = 1,
 ) -> bool:
     """Run the OFFICIAL swebench Docker evaluation for ONE (instance, patch) and
     return the real resolved verdict.
@@ -156,30 +157,65 @@ def verify_prediction(
     for this instance (image build/pull failure, infra error) — we never fake a
     verdict in that case.
     """
+    results = verify_predictions(
+        [(instance, model_patch)],
+        namespace=namespace,
+        timeout=timeout,
+        force_rebuild=force_rebuild,
+        run_id=run_id,
+        keep_logs=keep_logs,
+        max_workers=max_workers,
+    )
+    return bool(results[instance["instance_id"]])
+
+
+def verify_predictions(
+    predictions: list[tuple[dict[str, Any], str]],
+    *,
+    namespace: str | None = DEFAULT_NAMESPACE,
+    timeout: int = 1800,
+    force_rebuild: bool = False,
+    run_id: str | None = None,
+    keep_logs: bool = True,
+    max_workers: int = 1,
+) -> dict[str, bool]:
+    """Run official SWE-bench Docker evaluation for a batch of predictions.
+
+    This is the throughput seam used by the RSI Lab grade queue: one predictions
+    file, one swebench harness invocation, and ``max_workers`` controls the
+    harness' internal parallelism.  Verdicts still come only from per-instance
+    official ``report.json`` files.
+    """
+    if not predictions:
+        return {}
+    instance_ids = [instance["instance_id"] for instance, _patch in predictions]
+    if len(set(instance_ids)) != len(instance_ids):
+        raise ValueError("verify_predictions requires unique instance_id values per batch")
     # Import here so the module imports cleanly even without Docker/swebench env.
     from swebench.harness.run_evaluation import main as swebench_main
     from swebench.harness.constants import RUN_EVALUATION_LOG_DIR
 
     _ensure_docker_host()
 
-    instance_id = instance["instance_id"]
     if run_id is None:
-        run_id = f"forge_v1_{instance_id}_{int(time.time())}"
-    model_name = "gold" if model_patch else "empty"
+        first_id = predictions[0][0]["instance_id"]
+        run_id = f"forge_v1_batch_{first_id}_{int(time.time())}"
+    model_name = "forge_batch"
 
     SCRATCH_ROOT.mkdir(parents=True, exist_ok=True)
     work_dir = SCRATCH_ROOT / run_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    predictions = [
+    prediction_rows = [
         {
-            "instance_id": instance_id,
+            "instance_id": instance["instance_id"],
             "model_patch": model_patch,
             "model_name_or_path": model_name,
         }
+        for instance, model_patch in predictions
     ]
     preds_path = work_dir / "predictions.json"
-    preds_path.write_text(json.dumps(predictions))
+    preds_path.write_text(json.dumps(prediction_rows))
 
     # swebench writes logs/ relative to CWD; run from the scratch dir so nothing
     # touches the repo, then restore CWD no matter what.
@@ -193,9 +229,9 @@ def verify_prediction(
         swebench_main(
             dataset_name=DATASET_NAME,
             split=SPLIT,
-            instance_ids=[instance_id],
+            instance_ids=instance_ids,
             predictions_path=str(preds_path),
-            max_workers=1,
+            max_workers=max(1, int(max_workers)),
             force_rebuild=eff_force_rebuild,
             cache_level="env",         # keep env images, drop instance layers after
             clean=False,
@@ -207,15 +243,22 @@ def verify_prediction(
             modal=False,
             report_dir=str(work_dir),
         )
-        # Per-instance report: logs/run_evaluation/<run_id>/<model>/<iid>/report.json
-        report_file = (
-            Path(RUN_EVALUATION_LOG_DIR)
-            / run_id
-            / model_name.replace("/", "__")
-            / instance_id
-            / "report.json"
-        )
-        resolved = _resolved_from_report(report_file, instance_id, empty_ok=(model_patch == ""))
+        resolved: dict[str, bool] = {}
+        for instance, model_patch in predictions:
+            instance_id = instance["instance_id"]
+            # Per-instance report: logs/run_evaluation/<run_id>/<model>/<iid>/report.json
+            report_file = (
+                Path(RUN_EVALUATION_LOG_DIR)
+                / run_id
+                / model_name.replace("/", "__")
+                / instance_id
+                / "report.json"
+            )
+            resolved[instance_id] = _resolved_from_report(
+                report_file,
+                instance_id,
+                empty_ok=(model_patch == ""),
+            )
     finally:
         os.chdir(prev_cwd)
         if not keep_logs:
