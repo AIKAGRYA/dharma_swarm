@@ -263,10 +263,23 @@ These are the ground-truth metrics. All other documents citing different numbers
 | Test functions | **12,144 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
 | Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
-| Markdown files | **1170** | find . -name "*.md" -type f |
-| Markdown total lines | **259,962** | wc -l across all .md |
-| Markdown files | **1170** | find . -name "*.md" -type f |
-| Markdown total lines | **259,962** | wc -l across all .md |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **263,581** | wc -l across all .md |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **263,581** | wc -l across all .md |
+| Total Python modules | **807** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **420 (53.1%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python LOC | **319,298** | wc -l across dharma_swarm Python modules |
+| Test files | **776** | find tests -name "*.py" -type f |
+| Test functions | **12,144 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **776** | find tests -name "*.py" -type f |
+| Test functions | **12,144 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **263,581** | wc -l across all .md |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **263,581** | wc -l across all .md |
 | Bridge files | **26** | find dharma_swarm -name "*bridge*.py" -type f |
 | Adapter files | **25** | find dharma_swarm -type f | rg -i "adapter" |
 | Router files | **16** | find dharma_swarm -type f | rg -i "rout" |
