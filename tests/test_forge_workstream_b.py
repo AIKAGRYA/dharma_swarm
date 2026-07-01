@@ -261,6 +261,7 @@ def _receipt_ready_signal() -> dict:
         "null_survived": False,
         "evidence_strength": 0.9,
         "packet_guard_review": _passing_packet_guard_review(),
+        "e4_discrimination_receipt": _passing_e4_discrimination_receipt(),
         "promotion_blockers": [],
     }
 
@@ -281,6 +282,24 @@ def _passing_packet_guard_review() -> dict:
                 "pre_registered_mde": 0.056,
             },
         }
+    }
+
+
+def _passing_e4_discrimination_receipt() -> dict:
+    return {
+        "schema": "forge_v2.e4_discrimination_receipt.v1",
+        "decision": "pass",
+        "promotion_gate_satisfied": True,
+        "good_id": "candidate",
+        "bad_id": "known_bad_scaffold",
+        "min_confirm_n": 500,
+        "min_effect": 0.05,
+        "pre_registered_mde": 0.056,
+        "good": {"n": 500, "mean": 0.10, "lower": 0.08, "upper": 0.12, "ci_half_width": 0.02},
+        "bad": {"n": 500, "mean": 0.02, "lower": 0.0, "upper": 0.03, "ci_half_width": 0.015},
+        "delta_mean": 0.08,
+        "ci_gap": 0.05,
+        "blockers": [],
     }
 
 
@@ -347,6 +366,39 @@ def test_promotion_accepts_passing_packet_guard_predicate_before_receipts() -> N
     assert predicate["packet_guard_passed"] is True
     assert not any(b.startswith("packet_guard:") for b in verdict["promotion_packet"]["blockers"])
     assert verdict["decision"] == "refused"  # signed receipt predicates still fail closed.
+
+
+def test_promotion_requires_e4_discrimination_receipt_before_receipts() -> None:
+    signal = _receipt_ready_signal()
+    signal.pop("e4_discrimination_receipt")
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["e4_discrimination_receipt_present"] is False
+    assert predicate["e4_discrimination_passed"] is False
+    assert "missing:e4_discrimination_receipt" in verdict["promotion_packet"]["blockers"]
+    assert "promotion_packet:e4_discrimination_receipt_present" in verdict["blockers"]
+    assert verdict["decision"] == "refused"
+
+
+def test_promotion_refuses_failed_e4_discrimination_receipt_before_receipts() -> None:
+    signal = _receipt_ready_signal()
+    signal["e4_discrimination_receipt"] = {
+        "schema": "forge_v2.e4_discrimination_receipt.v1",
+        "decision": "refused",
+        "promotion_gate_satisfied": False,
+        "blockers": ["confirm_cis_overlap", "good_confirm_n<500"],
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["e4_discrimination_receipt_present"] is True
+    assert predicate["e4_discrimination_passed"] is False
+    assert "e4_discrimination:confirm_cis_overlap" in verdict["promotion_packet"]["blockers"]
+    assert "promotion_packet:e4_discrimination_passed" in verdict["blockers"]
+    assert verdict["decision"] == "refused"
 
 
 def test_verify_promotion_rejects_self_signed_receipts_without_trusted_key(monkeypatch) -> None:

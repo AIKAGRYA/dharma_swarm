@@ -104,6 +104,19 @@ def _packet_guard_review(signal: dict) -> dict:
     return candidate
 
 
+def _e4_discrimination_receipt(signal: dict) -> dict:
+    candidate = (
+        signal.get("e4_discrimination_receipt")
+        or signal.get("e4_discrimination")
+        or {}
+    )
+    return dict(candidate) if isinstance(candidate, dict) else {}
+
+
+def _e4_discrimination_passed(receipt: dict) -> bool:
+    return bool(receipt.get("promotion_gate_satisfied")) or receipt.get("decision") == "pass"
+
+
 def _evidence_predicate(signal: dict) -> dict:
     """The substantive checks computable from the signal itself."""
     overall = signal.get("overall_ci", {}) or {}
@@ -116,6 +129,7 @@ def _evidence_predicate(signal: dict) -> dict:
     overall_n = _int(overall.get("n"))
     preregistered_mde = _preregistered_mde(signal)
     guard = _packet_guard_review(signal)
+    e4_discrimination = _e4_discrimination_receipt(signal)
     return {
         "receipt_core_present": bool(overall) and bool(confirm),
         "stats_confirm_gate": positive_claim_gate(
@@ -136,6 +150,8 @@ def _evidence_predicate(signal: dict) -> dict:
         "evidence_strength_positive": float(signal.get("evidence_strength", 0.0)) > 0.0,
         "packet_guard_review_present": bool(guard),
         "packet_guard_passed": guard.get("verdict") == PASSING_PACKET_GUARD_VERDICT,
+        "e4_discrimination_receipt_present": bool(e4_discrimination),
+        "e4_discrimination_passed": _e4_discrimination_passed(e4_discrimination),
     }
 
 
@@ -166,6 +182,14 @@ def evaluate_promotion(signal: dict) -> dict:
         blockers.extend(f"packet_guard:{code}" for code in guard_codes)
         if not guard_codes:
             blockers.append(f"packet_guard:verdict_{guard.get('verdict', 'missing')}")
+    e4_discrimination = _e4_discrimination_receipt(signal)
+    if not e4_discrimination:
+        blockers.append("missing:e4_discrimination_receipt")
+    elif not _e4_discrimination_passed(e4_discrimination):
+        e4_blockers = [str(item) for item in e4_discrimination.get("blockers", []) or [] if item]
+        blockers.extend(f"e4_discrimination:{blocker}" for blocker in e4_blockers)
+        if not e4_blockers:
+            blockers.append(f"e4_discrimination:decision_{e4_discrimination.get('decision', 'missing')}")
     blockers = sorted(set(blockers))
 
     promotion_allowed = len(failed) == 0
