@@ -206,6 +206,10 @@ class A2ABridge:
         )
 
         result_task = self._server.get_task(task.id) or task
+        if receipt.status != "ok" and result_task.status not in A2ATaskStatus.terminal_states():
+            result_task.status = A2ATaskStatus.FAILED
+            result_task.error = receipt.error_detail or f"invoke_agent ended {receipt.status}"
+            result_task.updated_at = datetime.now(timezone.utc).isoformat()
         return result_task, receipt
 
     def _submit_via_spine_sync(self, task: A2ATask) -> tuple[A2ATask, EvidenceReceipt]:

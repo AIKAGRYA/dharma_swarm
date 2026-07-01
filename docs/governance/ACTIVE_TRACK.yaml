@@ -244,7 +244,7 @@ active_tracks:
     name: Runtime Truth NATS — internal live transport for A2A dispatch
     status: ACTIVE
     opened_at: "2026-06-06"
-    verified_at: "2026-06-07"
+    verified_at: "2026-07-01"
     ttl_days: 21
     owner: "@codex"
     serves: substrate-nativeness
@@ -252,10 +252,29 @@ active_tracks:
       - runtime-truth-reconciliation-2026-06
     owned_surfaces:
       - docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-      - dharma_swarm/a2a/a2a_nats_contact.py
-      - dharma_swarm/a2a/a2a_core_contact.py
+      - dharma_swarm/a2a/nats_transport.py
+      - dharma_swarm/a2a/a2a_server.py
+      - dharma_swarm/operator_core/nats_live_contact.py
+      - dharma_swarm/operator_core/nats_substrate_status.py
+      - scripts/runtime/a2a_send.py
+      - scripts/runtime/a2a_inbox_bridge.py
+      - scripts/runtime/a2a_domain_reply_worker.py
+      - scripts/runtime/a2a_reply_capture.py
+      - scripts/governance/check_nats_substrate_contract.py
+      - scripts/governance/run_nats_live_production_matrix.py
+      - scripts/governance/check_nats_live_production_evidence.py
+      - tests/test_nats_transport.py
+      - tests/test_nats_substrate_contract.py
+      - reports/governance/nats_live_production_matrix/**
+      - reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md
+      - reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json
+      - reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md
+    touched_complementary_surfaces:
+      - dharma_swarm/a2a/a2a_bridge.py
+      - dharma_swarm/runtime_state.py
     moves_vital_signs:
       - tool_coverage
+      - quality_gates
 
     description: |
       The concurrent Codex transport lane. NATS was scoped out of the global
@@ -265,31 +284,51 @@ active_tracks:
       broker speed, distinct from the reconciliation lane's read-model surfaces.
 
       Surface separation is the safety boundary: this track owns the NATS
-      transport contact modules and the master spec; it does not touch the
-      operator_core read models the reconciliation lane owns.
+      transport, handler idempotency, proof probes, contract checker, and
+      focused tests. The cloud-agent bridge owns its ingress module; this track's
+      checker verifies that module delegates to A2ANatsTransport. It may touch
+      operator_core only for NATS-specific live-contact/status probes; the
+      reconciliation lane's broader read models remain projection-only.
 
     prerequisites:
       - id: nats_master_spec_exists
         kind: file_exists
         file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+      - id: nats_transport_owner_exists
+        kind: file_exists
+        file: dharma_swarm/a2a/nats_transport.py
+      - id: nats_contract_checker_exists
+        kind: file_exists
+        file: scripts/governance/check_nats_substrate_contract.py
+      - id: nats_transport_tests_exist
+        kind: file_exists
+        file: tests/test_nats_transport.py
+      - id: nats_contract_tests_exist
+        kind: file_exists
+        file: tests/test_nats_substrate_contract.py
 
     completion_criteria:
-      - id: nats_master_spec_present
-        kind: file_exists
-        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-      - id: nats_transport_landed
-        kind: file_contains
-        file: docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
-        pattern: "NATS"
+      - id: nats_substrate_contract_checker_passes
+        kind: command_passes
+        command: ["./.venv/bin/python", "scripts/governance/check_nats_substrate_contract.py"]
+        timeout_s: 60
+      - id: nats_transport_regression_tests_pass
+        kind: command_passes
+        command: ["pytest", "-q", "tests/test_nats_transport.py", "tests/test_nats_substrate_contract.py"]
+        timeout_s: 180
+      - id: nats_live_production_evidence_fresh
+        kind: command_passes
+        command: ["./.venv/bin/python", "scripts/governance/check_nats_live_production_evidence.py", "--max-age-hours", "24"]
+        timeout_s: 60
 
     non_goals:
       - Do not introduce Redis or gRPC as part of this track.
-      - Do not touch the operator_core read-model surfaces owned by the reconciliation lane.
+      - Do not broaden operator_core beyond NATS-specific live-contact/status probes.
       - Do not add a parallel spine-check CI workflow.
 
     next_items:
       - id: 1
-        what: "Confirm NATS transport contact modules are wired and receipted end-to-end."
+        what: "Collect fresh live broker evidence with current HANDLER_ACKED or DOMAIN_RECEIPTED proof, or explicitly close this slice as local/offline substrate evidence."
         kind: code
         blocker: false
 

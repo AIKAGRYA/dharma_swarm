@@ -1,0 +1,16 @@
+{
+  "content": "{\"run_id\":\"nats-live-20260701T033809Z-456ba995\",\"task_id\":\"nats_live_20260701T033809Z_456ba995_happy_path_474a05a9\",\"label\":\"happy_path\",\"status\":\"confirmed\",\"mode\":\"live_semantic_execution\"}",
+  "provider": "ollama",
+  "requested_model": "glm-5.2:cloud",
+  "response_model": "glm-5.2",
+  "schema": "dharma.nats.live_matrix.semantic_receipt.v1",
+  "started_at": "2026-07-01T03:38:09Z",
+  "task_id": "nats_live_20260701T033809Z_456ba995_happy_path_474a05a9",
+  "timestamp": "2026-07-01T03:38:13Z",
+  "trace_id": "nats-live-20260701T033809Z-456ba995:happy_path:nats_live_20260701T033809Z_456ba995_happy_path_474a05a9",
+  "usage": {
+    "completion_tokens": 99,
+    "prompt_tokens": 98,
+    "total_tokens": 197
+  }
+}

@@ -1,6 +1,6 @@
 # Track Portfolio Evidence
 
-Generated: 2026-06-28T01:21:08+09:00 (schema v2)
+Generated: 2026-07-01T12:40:51+09:00 (schema v2)
 Active tracks: **11** (warn 11, max 11) — shippable 7
 
 ## Spine coverage
@@ -33,12 +33,17 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
 ## `runtime-truth-nats-2026-06` — SHIPPABLE
 
 - serves: `substrate-nativeness` · complements: ['runtime-truth-reconciliation-2026-06'] · depends_on: [] · conflicts_with: []
-- owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/a2a_nats_contact.py', 'dharma_swarm/a2a/a2a_core_contact.py']
-- moves_vital_signs: ['tool_coverage']
+- owned_surfaces: ['docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md', 'dharma_swarm/a2a/nats_transport.py', 'dharma_swarm/a2a/a2a_server.py', 'dharma_swarm/operator_core/nats_live_contact.py', 'dharma_swarm/operator_core/nats_substrate_status.py', 'scripts/runtime/a2a_send.py', 'scripts/runtime/a2a_inbox_bridge.py', 'scripts/runtime/a2a_domain_reply_worker.py', 'scripts/runtime/a2a_reply_capture.py', 'scripts/governance/check_nats_substrate_contract.py', 'scripts/governance/run_nats_live_production_matrix.py', 'scripts/governance/check_nats_live_production_evidence.py', 'tests/test_nats_transport.py', 'tests/test_nats_substrate_contract.py', 'reports/governance/nats_live_production_matrix/**', 'reports/governance/runtime_truth_nats_final_evidence_2026-07-01.md', 'reports/governance/runtime_truth_nats_compact_raw_evidence_2026-07-01.json', 'reports/governance/runtime_truth_nats_remedial_evidence_2026-07-01.md']
+- moves_vital_signs: ['tool_coverage', 'quality_gates']
 
   - ✓ `nats_master_spec_exists` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
-  - ✓ `nats_master_spec_present` (file_exists) — docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md present
-  - ✓ `nats_transport_landed` (file_contains) — pattern 'NATS' found in docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+  - ✓ `nats_transport_owner_exists` (file_exists) — dharma_swarm/a2a/nats_transport.py present
+  - ✓ `nats_contract_checker_exists` (file_exists) — scripts/governance/check_nats_substrate_contract.py present
+  - ✓ `nats_transport_tests_exist` (file_exists) — tests/test_nats_transport.py present
+  - ✓ `nats_contract_tests_exist` (file_exists) — tests/test_nats_substrate_contract.py present
+  - ✓ `nats_substrate_contract_checker_passes` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/check_nats_substrate_contract.py exited 0 (resolved from ./.venv/bin/python scripts/governance/check_nats_substrate_contract.py); output: NATS_CONTRACT_OK docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md
+  - ✓ `nats_transport_regression_tests_pass` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python -m pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py exited 0 (resolved from pytest -q tests/test_nats_transport.py tests/test_nats_substrate_contract.py); output: ...................                                                      [100%] | 19 passed in 3.27s
+  - ✓ `nats_live_production_evidence_fresh` (command_passes) — /Users/dhyana/dharma_swarm/.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24 exited 0 (resolved from ./.venv/bin/python scripts/governance/check_nats_live_production_evidence.py --max-age-hours 24); output: NATS_LIVE_PRODUCTION_EVIDENCE_OK /Users/dhyana/ds_runtime_truth_nats_clean_20260701/reports/governance/nats_live_production_matrix/latest.json
 
 ## `runtime-truth-spine-adoption-2026-06` — SHIPPABLE
 
@@ -199,16 +204,21 @@ Active tracks: **11** (warn 11, max 11) — shippable 7
 
 ## Findings
 
-- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 24 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] verified_at is 27 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:runtime-truth-reconciliation-2026-06`: [runtime-truth-reconciliation-2026-06] all 11 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 2 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
+- **INFO** `track-shippable:runtime-truth-nats-2026-06`: [runtime-truth-nats-2026-06] all 3 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-shippable:runtime-truth-spine-adoption-2026-06`: [runtime-truth-spine-adoption-2026-06] all 9 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
 - **INFO** `track-in-progress:loop-closure-2026-06`: [loop-closure-2026-06] 3/5 completion criteria pass.
 - **INFO** `track-shippable:orientation-graph-2026-06`: [orientation-graph-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
-- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
+- **ERROR** `track-stale:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] verified_at is 20 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:composer-holon-spine-longrun-2026-06`: [composer-holon-spine-longrun-2026-06] all 6 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
+- **ERROR** `track-stale:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:agent-admission-semantic-commons-2026-06`: [agent-admission-semantic-commons-2026-06] all 16 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.
+- **ERROR** `track-stale:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:cybernetics-codex-stewardship-2026-06`: [cybernetics-codex-stewardship-2026-06] 10/12 completion criteria pass.
+- **ERROR** `track-stale:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:telos-ai-morning-refinery-2026-06`: [telos-ai-morning-refinery-2026-06] 6/7 completion criteria pass.
+- **ERROR** `track-stale:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-in-progress:helm-worldclass-terminal-2026-06`: [helm-worldclass-terminal-2026-06] 1/7 completion criteria pass.
+- **ERROR** `track-stale:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] verified_at is 17 days old (ttl_days=14). Re-verify and bump verified_at, or retire the track.
 - **INFO** `track-shippable:a2a-cloud-agent-bridge-2026-06`: [a2a-cloud-agent-bridge-2026-06] all 7 completion criteria pass — SHIPPABLE; operator lifecycle review required. Do not close an active track solely from gate output.

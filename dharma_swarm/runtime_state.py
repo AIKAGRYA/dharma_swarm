@@ -359,6 +359,23 @@ SELF_MOD_RECEIPT_TYPES = frozenset(
     }
 )
 
+_EXECUTION_IDENTITY_CONFLICT_FIELDS = (
+    "trace_id",
+    "correlation_id",
+    "task_id",
+    "claim_id",
+    "idempotency_key",
+    "causation_id",
+    "parent_run_id",
+    "agent_id",
+    "session_id",
+    "external_a2a_task_id",
+    "message_id",
+    "event_id",
+    "artifact_id",
+    "proposal_id",
+)
+
 
 def _json_dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, ensure_ascii=True)
@@ -963,6 +980,40 @@ def _merge_idempotency_metadata(
     merged = dict(existing.metadata)
     merged.update(metadata or {})
     return merged
+
+
+def _execution_identity_conflicts(
+    existing: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+) -> dict[str, dict[str, str]]:
+    if existing is None:
+        return {}
+    conflicts: dict[str, dict[str, str]] = {}
+    for field_name in _EXECUTION_IDENTITY_CONFLICT_FIELDS:
+        existing_value = str(getattr(existing, field_name, "") or "")
+        incoming_value = str(getattr(incoming, field_name, "") or "")
+        if existing_value and incoming_value and existing_value != incoming_value:
+            conflicts[field_name] = {
+                "existing": existing_value,
+                "incoming": incoming_value,
+            }
+    return conflicts
+
+
+def _raise_on_execution_identity_conflict(
+    existing: ExecutionIdentity | None,
+    incoming: ExecutionIdentity,
+) -> None:
+    conflicts = _execution_identity_conflicts(existing, incoming)
+    if not conflicts:
+        return
+    details = ", ".join(
+        f"{field} existing={values['existing']!r} incoming={values['incoming']!r}"
+        for field, values in sorted(conflicts.items())
+    )
+    raise ValueError(
+        f"execution identity conflict for run_id {incoming.run_id!r}: {details}"
+    )
 
 
 def _identity_from_metadata(metadata: dict[str, Any] | None) -> ExecutionIdentity | None:
@@ -2731,6 +2782,8 @@ class RuntimeStateStore:
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
         await self.init_db()
+        existing = await self.get_execution_identity(identity.run_id)
+        _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -2751,6 +2804,8 @@ class RuntimeStateStore:
     ) -> ExecutionIdentity:
         identity.require_for_dispatch()
         self.init_db_sync()
+        existing = self.get_execution_identity_sync(identity.run_id)
+        _raise_on_execution_identity_conflict(existing, identity)
         now = _utc_now()
         with sqlite3.connect(self.db_path) as db:
             _apply_connection_pragmas_sync(db)
