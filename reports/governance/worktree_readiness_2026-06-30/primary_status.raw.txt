@@ -1,0 +1,148 @@
+ M CLAUDE.md
+ M README.md
+ M api/main.py
+ M dharma_swarm/chetana/graph_unifier.py
+ M dharma_swarm/chetana/promote.py
+ M dharma_swarm/chetana/tests/test_graph_unifier.py
+ M dharma_swarm/context.py
+ M dharma_swarm/cron_runner.py
+ M dharma_swarm/dgc_cli.py
+ M dharma_swarm/fractal/__init__.py
+ M dharma_swarm/fractal/room_configs.py
+ M dharma_swarm/gaia_platform.py
+ M dharma_swarm/idea_spark/semantic_routing.py
+ M dharma_swarm/idea_spark/store.py
+ M dharma_swarm/memory_kernel/facade.py
+ M dharma_swarm/orchestrator.py
+ M dharma_swarm/providers.py
+ M dharma_swarm/runtime_provider.py
+ M dharma_swarm/telos_substrate.py
+ M dharma_swarm/terminal_bridge.py
+ M dharma_swarm/terminal_commands/infrastructure.py
+ M dharma_swarm/terminal_commands/memory.py
+ M dharma_swarm/tui/app.py
+ M dharma_swarm/tui/commands/system_commands.py
+ M dharma_swarm/vector_store.py
+ M docs/governance/ACTIVE_TRACK.yaml
+ M docs/governance/BUILD_SESSION_ENTRYPOINT.md
+ M docs/governance/SOVEREIGN_MANIFEST.md
+ M docs/missions/2026-06-20_jagat_kalyan_gaia_execution_spine.md
+ M docs/missions/2026-06-26_jagat_kalyan_gaia_mechanistic_execution_spine.md
+ M docs/ontology/semantic_aliases.yaml
+ M docs/ontology/semantic_objects.yaml
+ M docs/ontology/session_orientation.yaml
+ M pyproject.toml
+ M reports/governance/active_track_evidence.json
+ M reports/governance/active_track_evidence.md
+ M reports/governance/track_portfolio.json
+ M reports/sovereign_holons/l4_memory_write_receipts.jsonl
+ M scripts/governance/agent_onboard.py
+ M scripts/governance/check_a2a_readiness.py
+ M scripts/governance/orientation_graph.py
+ M scripts/runtime/codex_composer_wake_loop.py
+ M scripts/runtime/model_critic_runner.py
+ M tests/test_a2a_readiness_gate.py
+D  tests/test_apex_command_map.py
+ M tests/test_context.py
+ M tests/test_cron_runner.py
+ M tests/test_dgc_cli.py
+ M tests/test_gaia_platform.py
+ M tests/test_idea_spark_semantic_routing.py
+ M tests/test_memory_kernel_generic_adapters.py
+ M tests/test_memory_palace.py
+ M tests/test_model_critic_runner.py
+ M tests/test_model_key_routing_guard.py
+ M tests/test_orchestrator_spine_dispatch.py
+ M tests/test_orientation_graph.py
+ M tests/test_provider_smoke.py
+ M tests/test_room_configs.py
+ M tests/test_runtime_provider.py
+ M tests/test_terminal_bridge.py
+ M tests/test_vector_store.py
+?? api/routers/pool.py
+?? dashboard/src/app/dashboard/telos/
+?? dharma_swarm/idea_spark/cli.py
+?? dharma_swarm/langgraph_parity/
+?? dharma_swarm/memory_common.py
+?? dharma_swarm/memory_retrieval.py
+?? dharma_swarm/model_pool_registry.py
+?? dharma_swarm/venture_cell/
+?? dharma_swarm/welfare_tons.py
+?? dharma_swarm/wiki_vector_ingest.py
+?? docs/agents/livelihood_loom_ceo/
+?? docs/governance/hygiene/baselines/2026-06-29.txt
+?? docs/langgraph_parity/
+?? docs/ops/MEMORY_COMMON.md
+?? docs/ops/OPERATOR_IDEA_SPARK_LIVE_INGEST.md
+?? foundations/WHAT_THE_NEXT_TOKEN_WANTS.md
+?? langgraph_parity/
+?? reports/a2a/domain_reply_artifacts/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+?? reports/a2a/domain_reply_artifacts/20260627T163926Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/domain_reply_artifacts/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/domain_reply_receipts/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+?? reports/a2a/domain_reply_receipts/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/reply_receipts/20260627T163457Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+?? reports/a2a/reply_receipts/20260627T164248Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/semantic_inbox_drains/20260627T163430Z-codex_composer-semantic-responder-live-drill-20260627T163107Z.json
+?? reports/a2a/semantic_inbox_drains/20260627T163926Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/semantic_inbox_drains/20260627T164124Z-codex_composer-semantic-responder-launchd-drill-20260627T163809Z.json
+?? reports/a2a/semantic_inbox_drains/prompts/semantic-responder-launchd-drill-20260627T163809Z.md
+?? reports/a2a/semantic_inbox_drains/prompts/semantic-responder-live-drill-20260627T163107Z.md
+?? reports/agentops/semantic_receipts/20260627T163430Z-ollama-glm-5_cloud-f47ac10b-58cc-4372-a567-0e02b2c3d479.json
+?? reports/agentops/semantic_receipts/20260627T163926Z-ollama-glm-5_cloud-critic-receipt-20260627T163840Z.json
+?? reports/agentops/semantic_receipts/20260627T164124Z-ollama-glm-5_cloud-receipt-codex_composer-20260627T163835Z.json
+?? reports/governance/active_track_revalidation_2026-06-29.md
+?? reports/governance/active_track_revalidation_2026-06-30.md
+?? reports/governance/worktree_readiness_2026-06-30/
+?? reports/idea_spark/
+?? reports/langgraph_parity/
+?? reports/livelihood_loom/
+?? reports/loop_closure/RETROSPECTIVE.md
+?? reports/loop_closure/cybernetics_codex/
+?? reports/loop_closure/phase1/
+?? reports/sab_first_six_agent_flywheel/
+?? reports/telos_ai/
+?? reports/terminal/
+?? scripts/governance/register_livelihood_loom_ceo.py
+?? scripts/memory_retrieval_benchmark.py
+?? scripts/memory_retrieval_broad_sweep.py
+?? scripts/memory_retrieval_live_gate.py
+?? scripts/memory_retrieval_sync_index.py
+?? scripts/memory_retrieval_system_gate.py
+?? scripts/runtime/codex_composer_semantic_responder.py
+?? scripts/runtime/cross_model_verification.py
+?? scripts/runtime/prove_loop1_live_provider_dispatch.py
+?? scripts/terminal_guardian_preflight.sh
+?? scripts/vector_store_backfill_memory_sources.py
+?? scripts/vector_store_backfill_vec0.py
+?? scripts/vector_store_live_gate.py
+?? scripts/vector_store_reembed_vec0.py
+?? scripts/wiki_vector_live_gate.py
+?? terminal/scripts/
+?? terminal/tests/compactShell.test.tsx
+?? terminal/tests/golden/
+?? tests/test_codex_composer_semantic_responder.py
+?? tests/test_idea_spark_cli.py
+?? tests/test_langgraph_parity_isolation_benchmark.py
+?? tests/test_langgraph_parity_supervisor.py
+?? tests/test_langgraph_parity_swarm.py
+?? tests/test_memory_common.py
+?? tests/test_memory_retrieval.py
+?? tests/test_memory_retrieval_broad_sweep.py
+?? tests/test_memory_retrieval_sync_index.py
+?? tests/test_memory_retrieval_system_gate.py
+?? tests/test_model_pool_registry.py
+?? tests/test_pool_router.py
+?? tests/test_vector_store_backfill_memory_sources.py
+?? tests/test_vector_store_backfill_vec0.py
+?? tests/test_vector_store_live_gate.py
+?? tests/test_vector_store_reembed_vec0.py
+?? tests/test_venture_cell_domain_ceo.py
+?? tests/test_venture_cell_external_actions.py
+?? tests/test_venture_cell_livelihood_ceo_agent.py
+?? tests/test_venture_cell_livelihood_cli.py
+?? tests/test_venture_cell_livelihood_execution.py
+?? tests/test_venture_cell_livelihood_loom.py
+?? tests/test_venture_cell_livelihood_status.py
+?? tests/test_venture_cell_runtime.py
+?? tests/test_wiki_vector_live_gate.py

@@ -1,0 +1,99 @@
+worktree /Users/dhyana/dharma_swarm
+HEAD 260a11539b806c3db74f6220094e61eaad4fe85a
+branch refs/heads/agent/magpie-seed
+
+worktree /private/tmp/ds_loop
+HEAD ca2518b67f3b129e7fe7fb33d1d4ab15b070fb9d
+branch refs/heads/ratchet/loop-phases-1-3
+
+worktree /Users/dhyana/dharma-debug-corral
+HEAD 62cc51b85bf1717995bb0191365f9cffacb2c8e8
+branch refs/heads/claude/debug-corral
+
+worktree /Users/dhyana/dharma_helm_build
+HEAD 680b013c027194eb50416840d63055f025ca4bb7
+branch refs/heads/helm/worldclass-20260612
+
+worktree /Users/dhyana/dharma_swarm_cashclaw
+HEAD c487d2725663bc83d1846bf349763c25930ab2ec
+branch refs/heads/cashclaw/revenue-hydra-v1
+
+worktree /Users/dhyana/dharma_swarm_live
+HEAD e67b91829cb0b375069a19e4e60125b6d89ba374
+branch refs/heads/organ/03-seat
+
+worktree /Users/dhyana/dharma_swarm_main
+HEAD 6b9c5005a222507a20eb59f5dcf095819a3ffb70
+detached
+
+worktree /Users/dhyana/dharma_swarm_oz_integration
+HEAD 2cdef3d78b119010ca2714390952b9e7bec56e83
+branch refs/heads/oz/integration-2026-06-25
+
+worktree /Users/dhyana/dharma_swarm_slice_roast
+HEAD 5288c8ea54e8b771184d828e96389fc89e574806
+branch refs/heads/slice/roast-skill
+
+worktree /Users/dhyana/dharma_swarm_wt/render-on-demand
+HEAD 21ee18b365a7a0f4b22bb9b087a987973c6fdaa3
+branch refs/heads/chore/render-on-demand-stop-churn-20260625
+
+worktree /Users/dhyana/dharma_ws_idea_spark
+HEAD 2cb4669775321e2e5bdf6503a5e017f2179c1a85
+branch refs/heads/feat/operator-idea-spark-ingest
+
+worktree /Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618
+HEAD 86418541a99c265c09040b9bfc064625c6d59994
+branch refs/heads/runtime-truth/nats-rebuild-preflight-20260618
+
+worktree /Users/dhyana/ds_cleanup_convergence_20260625
+HEAD 791801e0fd9f9410df38166d53aa957a2f92e218
+branch refs/heads/codex/governance-fitness-ci-20260625-225920
+
+worktree /Users/dhyana/ds_forge_proving_ground_10_10_20260626
+HEAD 50c8e2b7556258d80839e9860065dad488d855cc
+branch refs/heads/codex/dharma-forge-proving-ground-10-10-20260626
+
+worktree /Users/dhyana/ds_forge_proving_ground_droid_10_10_20260626
+HEAD 50c8e2b7556258d80839e9860065dad488d855cc
+branch refs/heads/droid/dharma-forge-proving-ground-10-10-20260626
+
+worktree /Users/dhyana/ds_forge_v1_scoreboard
+HEAD d8bca7aab20af7871cff4ef46d08227cdb0923fa
+branch refs/heads/forge-v1/tokenbroker-scoreboard-20260620
+
+worktree /Users/dhyana/ds_mike_nonstop_20260626
+HEAD 3e46efe934fb02990cf84a904a7bc937d84c7038
+branch refs/heads/codex/mike-nonstop-dedupe-20260626
+
+worktree /Users/dhyana/ds_semantic_commons_100
+HEAD c53721d5f8aa713db88b5647b06682fa8ea50e98
+branch refs/heads/codex/semantic-commons-livingdock-composer-100
+
+worktree /Users/dhyana/ds_supplychain_slice
+HEAD 11de04fb743ff9b02a293b248d579bf02fe8fd38
+branch refs/heads/loop-closure/supplychain-bronze-20260620
+
+worktree /Users/dhyana/worktrees/ds_a2a_governance_readiness_20260626
+HEAD 98d374d3fec7c516c3a9959c7b6c8e45b49dea29
+branch refs/heads/codex/a2a-governance-readiness-20260626
+
+worktree /Users/dhyana/worktrees/ds_cockpit_grafana_static_20260626
+HEAD 69506fc803c2b56912a71e0c169a5b37b9ea345d
+branch refs/heads/scratch/cockpit-grafana-static-20260626
+
+worktree /Users/dhyana/worktrees/ds_mike_arbiter_20260626
+HEAD dc29826f903d60ea87cbe1da2cf469743cf48316
+branch refs/heads/governance/mike-trust-arbiter-2026-06
+
+worktree /Users/dhyana/worktrees/ds_pr674_rebase_20260624
+HEAD ebccfb1e2d242f035ac7d9c7a10c3a1ed7d05edc
+branch refs/heads/repair/pr674-track-closure-gate-20260624
+
+worktree /Users/dhyana/worktrees/ds_reconciliation_promotion_20260626
+HEAD fecff4b8565356301c7f9f617eacfb322fd6d11f
+branch refs/heads/codex/reconciliation-promotion-20260626
+
+worktree /Users/dhyana/worktrees/pr689_closure
+HEAD 91dfe4db255f0078670288017683a00f5c901fcc
+branch refs/heads/pr-689-closure
