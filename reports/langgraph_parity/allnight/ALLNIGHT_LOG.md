@@ -736,3 +736,64 @@
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
   - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T04:04:37Z - Phase 4 Legacy Proof Receipt Recovery Start
+
+- Target gate: reduce the remaining A2A unverified-closed blocker without weakening strict readiness by adapting only already-terminal rows that have an existing legacy proof artifact into embedded `dharma_a2a_task_receipt.v1` receipts.
+- Current branch state:
+  - Worktree was clean before this continuation; `make onboard` regenerated unrelated `reports/governance/*` portfolio evidence files, which are not part of this A2A slice.
+  - PR #732 is open as draft at head `78c69b21a`; most checks are green, with GitHub `pytest (3.11)` and `pytest (3.12)` still pending at round start.
+- Tests/checks run at round start:
+  - `make onboard` -> exit 0; reports generated governance dirt unrelated to this slice.
+  - `bash scripts/runtime/codex_toolbelt_status.sh` -> local toolbelt available; Sourcegraph/src optional path unavailable.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T0400Z.json` -> `blocker_count=18`; one `closed_missing_a2a_receipt_no_pointer` row remains.
+  - `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl` lines for `ts-converge-0611` show one original pending mandate row and one later completed closure row with proof pointer `/Users/dhyana/.dharma/a2a_bus/collab/convergence/SHARED_PICTURE.md`.
+- Planned files:
+  - `scripts/governance/a2a_recover_legacy_proof_receipts.py`
+  - `tests/test_a2a_legacy_proof_receipt_recovery.py`
+  - `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z*.json`
+  - `reports/langgraph_parity/allnight/ALLNIGHT_LOG.md`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - `reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md`
+- Current blockers:
+  - The duplicate original `ts-converge-0611` pending row remains open and must not be inferred closed from the completed closure row.
+  - Seventeen open/claimed rows still need task-specific execution or explicit blocked receipts.
+  - Strict A2A cannot be green until `open_tasks=0` and `unverified_closed_tasks=0`.
+
+## 2026-07-01T04:07:48Z - Phase 4 Legacy Proof Receipt Recovery Closeout
+
+- Target gate result: partial success. A2A strict remains red, but the remaining terminal no-pointer blocker is now recovered into a verified A2A receipt.
+- Code changes landed locally:
+  - Added `scripts/governance/a2a_recover_legacy_proof_receipts.py`.
+  - Added `tests/test_a2a_legacy_proof_receipt_recovery.py`.
+  - The adapter only targets already-terminal rows that are unverified by `task_lifecycle_state()`, have no embedded A2A receipt, carry a legacy proof pointer, and resolve to an existing proof artifact with closer identity and legacy closure context.
+  - It explicitly does not close duplicate open rows with the same task id.
+  - The live queue was backed up before apply at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-legacy-proof-recovery-20260701T040437Z.bak`.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.dry_run.json`
+  - `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.json`
+  - `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_post_apply_dry_run_20260701T040437Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T040437Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T0400Z.json`
+- A2A readiness result:
+  - Dry-run found 1 candidate and 0 skips: the completed `ts-converge-0611` closure row pointing at `/Users/dhyana/.dharma/a2a_bus/collab/convergence/SHARED_PICTURE.md`.
+  - Apply recovered 1/1 legacy proof row into an embedded A2A receipt.
+  - Post-apply dry-run found `candidate_count=0`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still exits 2, now with `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Fresh blocker audit now reports `blocker_count=17`: 11 stale claimed rows and 6 stale unclaimed rows.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_legacy_proof_receipt_recovery.py` -> `3 passed in 0.38s`.
+  - `.venv/bin/ruff check scripts/governance/a2a_recover_legacy_proof_receipts.py tests/test_a2a_legacy_proof_receipt_recovery.py` -> pass.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_recover_legacy_proof_receipts.py tests/test_a2a_legacy_proof_receipt_recovery.py` -> pass.
+  - `.venv/bin/python -m pytest -q tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `29 passed in 0.55s`.
+  - `jq -e . reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.dry_run.json reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.json reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_post_apply_dry_run_20260701T040437Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T040437Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T0400Z.json reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+  - `git diff --check` -> pass.
+  - `gh pr checks 732` on previous head `78c69b21a` -> all checks pass, including `pytest (3.11)` and `pytest (3.12)`.
+- Scoreboard: raised conservatively to `91/100`; still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

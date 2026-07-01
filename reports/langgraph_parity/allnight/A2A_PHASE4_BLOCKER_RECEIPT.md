@@ -159,6 +159,42 @@ Verification:
 - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`
 - `git diff --check` -> pass
 
+## 2026-07-01 Addendum: Legacy Proof Receipt Recovery
+
+The semantic adapter intentionally left the receipt-less completed `ts-converge-0611` row untouched. A follow-up narrow adapter now handles that separate legacy proof class:
+
+- Added `scripts/governance/a2a_recover_legacy_proof_receipts.py`
+- Added `tests/test_a2a_legacy_proof_receipt_recovery.py`
+- The adapter only targets already-terminal rows that are unverified by the A2A lifecycle classifier, have no embedded A2A receipt, include a legacy proof pointer, resolve to an existing proof artifact, and carry closer identity plus legacy closure context.
+- It does not close open rows or infer closure across duplicate task IDs. The original pending `ts-converge-0611` row remains open.
+
+Receipts:
+
+- `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.dry_run.json`
+- `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.json`
+- `reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_post_apply_dry_run_20260701T040437Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T040437Z.json`
+
+Live queue backup before adapter apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-legacy-proof-recovery-20260701T040437Z.bak`
+
+Result:
+
+- Dry-run found 1 candidate and 0 skips: the completed `ts-converge-0611` row pointing at `/Users/dhyana/.dharma/a2a_bus/collab/convergence/SHARED_PICTURE.md`.
+- Apply recovered 1/1 candidate into an embedded valid `dharma_a2a_task_receipt.v1` receipt.
+- Post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2, now with `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit now reports `blocker_count=17`: 11 stale claimed rows and 6 stale unclaimed rows.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_legacy_proof_receipt_recovery.py` -> `3 passed in 0.38s`
+- `.venv/bin/python -m pytest -q tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `29 passed in 0.55s`
+- `.venv/bin/ruff check scripts/governance/a2a_recover_legacy_proof_receipts.py tests/test_a2a_legacy_proof_receipt_recovery.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_recover_legacy_proof_receipts.py tests/test_a2a_legacy_proof_receipt_recovery.py` -> pass
+- `jq -e . reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.dry_run.json reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_20260701T040437Z.json reports/langgraph_parity/allnight/a2a_legacy_proof_receipt_recovery_post_apply_dry_run_20260701T040437Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T040437Z.json reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass
+
 Remaining Phase 4 blocker:
 
-The strict A2A gate is still not green. Remaining blockers are the 17 open or claimed rows and the completed no-pointer `ts-converge-0611` row. They require task-specific execution, operator-gated closure, or recovered evidence; the semantic adapter intentionally does not infer those outcomes.
+The strict A2A gate is still not green. Remaining blockers are the 17 open or claimed rows. They require task-specific execution, operator-gated closure, or explicit blocked receipts; the adapters intentionally do not infer those outcomes.
