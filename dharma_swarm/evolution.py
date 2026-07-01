@@ -21,7 +21,7 @@ import shlex
 import shutil
 from tempfile import TemporaryDirectory
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
@@ -198,7 +198,11 @@ def _paths_from_unified_diff(diff_text: str) -> list[str]:
     return paths
 
 
-def _promotion_verification_allows_live(packet: dict[str, Any] | None) -> bool:
+def _promotion_verification_allows_live(
+    packet: dict[str, Any] | None,
+    *,
+    trusted_judge_public_keys: Iterable[str | bytes] = (),
+) -> bool:
     """Return True only for a fail-closed Forge promotion verification packet."""
     if not isinstance(packet, dict):
         return False
@@ -224,11 +228,27 @@ def _promotion_verification_allows_live(packet: dict[str, Any] | None) -> bool:
     signed_receipts = dict(packet.get("signed_receipts") or {})
     if not signed_receipts or not all(value is True for value in signed_receipts.values()):
         return False
+    try:
+        from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
+            verify_promotion_verification_signature,
+        )
+
+        if not verify_promotion_verification_signature(
+            packet,
+            trusted_public_keys=trusted_judge_public_keys,
+        ):
+            return False
+    except Exception:
+        return False
     if packet.get("payload_sha256"):
         try:
             from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
 
-            body = {k: v for k, v in packet.items() if k != "payload_sha256"}
+            body = {
+                k: v
+                for k, v in packet.items()
+                if k not in {"payload_sha256", "verification_signature"}
+            }
             if canonical_sha256(body) != packet["payload_sha256"]:
                 return False
         except Exception:
@@ -2459,6 +2479,7 @@ class DarwinEngine:
         max_diff_lines: int = 50,
         halt_path: Path | None = None,
         promotion_verification: dict[str, Any] | None = None,
+        trusted_judge_public_keys: Iterable[str | bytes] = (),
     ) -> SealedPacketApplyResult:
         """Ingest a sealed Build Protocol packet through Darwin guards."""
         from dharma_swarm.sealed_packet_apply import apply_sealed_packet
@@ -2472,6 +2493,7 @@ class DarwinEngine:
             max_diff_lines=max_diff_lines,
             halt_path=halt_path,
             promotion_verification=promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys,
         )
 
     async def apply_in_sandbox(
@@ -3278,6 +3300,7 @@ class DarwinEngine:
         shadow: bool = True,
         parent_id: str | None = None,
         promotion_verification: dict[str, Any] | None = None,
+        trusted_judge_public_keys: Iterable[str | bytes] = (),
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> CycleResult:
         """Autonomous evolution: LLM proposes improvements, engine evaluates them.
@@ -3313,7 +3336,10 @@ class DarwinEngine:
             A CycleResult summarizing the autonomous evolution cycle.
         """
         _emit = on_progress or (lambda _e, _d: None)
-        if not shadow and not _promotion_verification_allows_live(promotion_verification):
+        if not shadow and not _promotion_verification_allows_live(
+            promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys,
+        ):
             reason = "live_apply_refused: forge_v2.verify_promotion packet required"
             logger.warning("Auto-evolve refused live mode: %s", reason)
             _emit("cycle_refused", {"reason": reason, "shadow": shadow})
@@ -3526,6 +3552,7 @@ class DarwinEngine:
         router: Any | None = None,
         shadow: bool = True,
         promotion_verification: dict[str, Any] | None = None,
+        trusted_judge_public_keys: Iterable[str | bytes] = (),
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Run autonomous evolution continuously.
@@ -3623,6 +3650,7 @@ class DarwinEngine:
                     router=router,
                     shadow=shadow,
                     promotion_verification=promotion_verification,
+                    trusted_judge_public_keys=trusted_judge_public_keys,
                     on_progress=on_progress,
                 )
 

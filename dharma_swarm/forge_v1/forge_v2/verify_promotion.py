@@ -49,6 +49,12 @@ def _canonical_receipt_payload(payload: Any) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
 
 
+def _normal_public_key_hex(public_key: str | bytes) -> str:
+    if isinstance(public_key, bytes):
+        return public_key.hex()
+    return str(public_key).strip().lower()
+
+
 def verify_signed_receipt(receipt: dict[str, Any]) -> bool:
     """Verify an ed25519-signed receipt payload.
 
@@ -68,6 +74,71 @@ def verify_signed_receipt(receipt: dict[str, Any]) -> bool:
         Ed25519PublicKey.from_public_bytes(public_key).verify(
             signature,
             _canonical_receipt_payload(payload),
+        )
+        return True
+    except Exception:
+        return False
+
+
+def _verification_signature_payload(packet: dict[str, Any]) -> dict[str, Any]:
+    body = dict(packet)
+    body.pop("verification_signature", None)
+    return body
+
+
+def sign_promotion_verification(
+    packet: dict[str, Any],
+    signing_key: Any,
+    *,
+    key_id: str = "",
+) -> dict[str, Any]:
+    """Attach a judge ed25519 signature to a promotion verification packet."""
+    from cryptography.hazmat.primitives import serialization
+
+    signed = _verification_signature_payload(packet)
+    body = {k: v for k, v in signed.items() if k != "payload_sha256"}
+    signed["payload_sha256"] = canonical_sha256(body)
+    signature = signing_key.sign(_canonical_receipt_payload(signed))
+    public_key = signing_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    signed["verification_signature"] = {
+        "scheme": "ed25519",
+        "key_id": key_id,
+        "public_key": public_key.hex(),
+        "signature": signature.hex(),
+    }
+    return signed
+
+
+def verify_promotion_verification_signature(
+    packet: dict[str, Any],
+    *,
+    trusted_public_keys: Iterable[str | bytes] = (),
+) -> bool:
+    """Verify that a promotion verdict was signed by a trusted judge key."""
+    try:
+        trusted = {_normal_public_key_hex(key) for key in trusted_public_keys}
+        if not trusted:
+            return False
+        sig = dict(packet.get("verification_signature", {}) or {})
+        if sig.get("scheme") != "ed25519":
+            return False
+        public_key_hex = _normal_public_key_hex(sig["public_key"])
+        if public_key_hex not in trusted:
+            return False
+        body = _verification_signature_payload(packet)
+        body_without_hash = {k: v for k, v in body.items() if k != "payload_sha256"}
+        if body.get("payload_sha256") != canonical_sha256(body_without_hash):
+            return False
+        public_key = binascii.unhexlify(public_key_hex)
+        signature = binascii.unhexlify(str(sig["signature"]))
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+        Ed25519PublicKey.from_public_bytes(public_key).verify(
+            signature,
+            _canonical_receipt_payload(body),
         )
         return True
     except Exception:
@@ -176,4 +247,10 @@ def verify_promotion(
     return verification.to_dict()
 
 
-__all__ = ["PromotionVerification", "verify_promotion", "verify_signed_receipt"]
+__all__ = [
+    "PromotionVerification",
+    "sign_promotion_verification",
+    "verify_promotion",
+    "verify_promotion_verification_signature",
+    "verify_signed_receipt",
+]

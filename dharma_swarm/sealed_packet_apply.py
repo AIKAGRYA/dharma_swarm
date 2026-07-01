@@ -7,6 +7,7 @@ out of ``evolution.py`` while preserving DarwinEngine as the public authority.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 import fnmatch
 import json
 from pathlib import Path
@@ -50,6 +51,7 @@ async def apply_sealed_packet(
     max_diff_lines: int = 50,
     halt_path: Path | None = None,
     promotion_verification: dict[str, Any] | None = None,
+    trusted_judge_public_keys: Iterable[str | bytes] = (),
 ) -> SealedPacketApplyResult:
     """Validate, gate, prove, and archive a sealed Build Protocol packet."""
     root = Path(dryrun_root).expanduser().resolve()
@@ -57,7 +59,10 @@ async def apply_sealed_packet(
     if not shadow:
         from dharma_swarm.evolution import _promotion_verification_allows_live
 
-        if not _promotion_verification_allows_live(promotion_verification):
+        if not _promotion_verification_allows_live(
+            promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys,
+        ):
             return await _refuse_sealed_packet(
                 engine,
                 result,
