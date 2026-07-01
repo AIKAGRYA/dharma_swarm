@@ -106,7 +106,7 @@ def cmd_evolve_rollback(entry_id: str, reason: str = "Manual rollback") -> None:
 def cmd_evolve_auto(
     files: list[str] | None, model: str, context: str,
     single_model: bool = False,
-    shadow: bool = False,
+    shadow: bool = True,
     token_budget: int = 0,
 ) -> None:
     """LLM-powered autonomous evolution cycle."""
@@ -184,7 +184,7 @@ def cmd_evolve_auto(
 def cmd_evolve_daemon(
     interval: float, threshold: float, model: str, cycles: int | None,
     single_model: bool = False,
-    shadow: bool = False,
+    shadow: bool = True,
     token_budget: int = 0,
 ) -> None:
     """Run continuous autonomous evolution daemon."""
@@ -226,6 +226,7 @@ def cmd_evolve_daemon(
                 fitness_threshold=threshold,
                 max_cycles=cycles,
                 router=swarm._router if use_router else None,
+                shadow=shadow,
             )
         except KeyboardInterrupt:
             pass

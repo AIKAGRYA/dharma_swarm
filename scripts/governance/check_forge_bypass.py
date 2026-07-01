@@ -16,7 +16,11 @@ SENSITIVE_DIRS = (
     ROOT / "dharma_swarm" / "forge_v1" / "forge_v2",
 )
 SENSITIVE_FILES = (
+    ROOT / "dharma_swarm" / "evolution.py",
     ROOT / "dharma_swarm" / "dgm_loop.py",
+    ROOT / "dharma_swarm" / "orchestrate_live.py",
+    ROOT / "dharma_swarm" / "sealed_packet_apply.py",
+    ROOT / "dharma_swarm" / "terminal_commands" / "evolution.py",
 )
 FALSE_KEYWORDS = {"shadow", "shadow_mode"}
 LIVE_APPLY_CALLS = {"auto_evolve", "apply_sealed_packet", "apply_diff_and_test", "DGMLoop"}
@@ -58,6 +62,24 @@ def check_file(path: Path) -> list[str]:
         findings.append(f"{rel}: syntax error while scanning: {exc}")
         return findings
     for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            arg_names = [arg.arg for arg in node.args.args]
+            defaults = list(node.args.defaults)
+            if defaults:
+                default_by_arg = dict(zip(arg_names[-len(defaults):], defaults))
+                for arg_name in FALSE_KEYWORDS:
+                    default = default_by_arg.get(arg_name)
+                    if default is not None and _is_false_constant(default):
+                        findings.append(
+                            f"{rel}:{node.lineno}: unsafe default {node.name}(..., {arg_name}=False)"
+                        )
+            kw_defaults = dict(zip((arg.arg for arg in node.args.kwonlyargs), node.args.kw_defaults))
+            for arg_name in FALSE_KEYWORDS:
+                default = kw_defaults.get(arg_name)
+                if default is not None and _is_false_constant(default):
+                    findings.append(
+                        f"{rel}:{node.lineno}: unsafe keyword default {node.name}(..., {arg_name}=False)"
+                    )
         if not isinstance(node, ast.Call):
             continue
         name = _call_name(node)

@@ -49,10 +49,21 @@ async def apply_sealed_packet(
     proof_timeout: float = 120.0,
     max_diff_lines: int = 50,
     halt_path: Path | None = None,
+    promotion_verification: dict[str, Any] | None = None,
 ) -> SealedPacketApplyResult:
     """Validate, gate, prove, and archive a sealed Build Protocol packet."""
     root = Path(dryrun_root).expanduser().resolve()
     result = SealedPacketApplyResult(packet_root=str(root), shadow=shadow)
+    if not shadow:
+        from dharma_swarm.evolution import _promotion_verification_allows_live
+
+        if not _promotion_verification_allows_live(promotion_verification):
+            return await _refuse_sealed_packet(
+                engine,
+                result,
+                "live apply requires forge_v2.verify_promotion packet",
+                "promotion_verification",
+            )
     stop_file = halt_path or (Path.home() / ".dharma" / "HALT_DARWIN_PROPOSALS")
     if Path(stop_file).exists():
         return await _refuse_sealed_packet(engine, result, "halt switch present", "kill_switch")

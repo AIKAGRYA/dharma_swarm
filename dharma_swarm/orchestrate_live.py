@@ -600,10 +600,9 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
             except Exception:
                 pass
 
-            # Auto-evolve: propose improvements via LLM every 3rd cycle
-            # (_evo_allowed computed by the EVAL VERDICT GATE above)
-            # Shadow mode controlled by env var (default: ON for safety)
-            # Set DHARMA_EVOLUTION_SHADOW=0 + DGC_AUTONOMY_LEVEL>=2 for real mutation
+            # Auto-evolve: propose improvements via LLM every 3rd cycle.
+            # Live mutation is disabled here; Forge verify_promotion is the
+            # sole live-apply door for RSI Lab work.
             if cycle_count % 3 == 0 and _evo_allowed:
                 try:
                     from dharma_swarm.providers import OpenRouterProvider
@@ -619,12 +618,7 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                         if targets:
                             selected = _evo_rng.sample(targets, min(2, len(targets)))
 
-                            # Determine shadow mode: real mutation requires explicit opt-in
-                            _shadow = _evo_os.environ.get("DHARMA_EVOLUTION_SHADOW", "1") != "0"
-                            _autonomy = int(_evo_os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-                            if not _shadow and _autonomy < 2:
-                                _shadow = True  # Autonomy too low for real mutation
-                                _log("evolution", "Shadow forced: DGC_AUTONOMY_LEVEL < 2")
+                            _shadow = True
 
                             # Eval verdict override: HOLD forces shadow mode
                             try:
@@ -1365,7 +1359,7 @@ async def run_free_evolution_grind(shutdown_event: asyncio.Event) -> None:
                             provider=_free_provider,
                             source_files=_llm_files,
                             model=_model,
-                            shadow=False,  # Real mode — apply diffs, run tests, roll back on failure
+                            shadow=True,
                             timeout=30.0,
                             context=f"Grind cycle {cycle_count}, hunger={hunger:.2f}",
                         )

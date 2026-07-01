@@ -500,10 +500,10 @@ async def run_loop_watcher(state_dir: Path) -> list[GuardianFinding]:
                     detail=(
                         f"Archive has {total} entries but 0 have status='applied'. "
                         f"Evolution is running in shadow mode or all diffs are being rejected. "
-                        f"Set DHARMA_EVOLUTION_SHADOW=0 and DGC_AUTONOMY_LEVEL=2 for real mutation."
+                        f"Live mutation now requires a Forge verify_promotion packet."
                     ),
                     file=str(archive_path),
-                    fix_hint="Set DHARMA_EVOLUTION_SHADOW=0 and DGC_AUTONOMY_LEVEL=2 in .env",
+                    fix_hint="Use forge_v2.verify_promotion with signed receipts and an operator lease.",
                 ))
         except Exception as exc:
             logger.debug("Evolution archive check failed: %s", exc)

@@ -198,6 +198,44 @@ def _paths_from_unified_diff(diff_text: str) -> list[str]:
     return paths
 
 
+def _promotion_verification_allows_live(packet: dict[str, Any] | None) -> bool:
+    """Return True only for a fail-closed Forge promotion verification packet."""
+    if not isinstance(packet, dict):
+        return False
+    if packet.get("schema") != "forge_v2.promotion_verification.v1":
+        return False
+    if packet.get("decision") != "allow":
+        return False
+    if packet.get("live_apply_allowed") is not True:
+        return False
+    if packet.get("operator_lease_present") is not True:
+        return False
+    if packet.get("blockers"):
+        return False
+    promotion_packet = dict(packet.get("promotion_packet") or {})
+    if promotion_packet.get("decision") != "promotable_candidate":
+        return False
+    admission = dict(packet.get("governed_admission") or {})
+    if admission.get("decision") != "allow":
+        return False
+    telos = dict(packet.get("telos") or {})
+    if telos.get("decision") != "allow":
+        return False
+    signed_receipts = dict(packet.get("signed_receipts") or {})
+    if not signed_receipts or not all(value is True for value in signed_receipts.values()):
+        return False
+    if packet.get("payload_sha256"):
+        try:
+            from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
+
+            body = {k: v for k, v in packet.items() if k != "payload_sha256"}
+            if canonical_sha256(body) != packet["payload_sha256"]:
+                return False
+        except Exception:
+            return False
+    return True
+
+
 class CycleResult(BaseModel):
     """Summary of a single evolution cycle run."""
 
@@ -2420,6 +2458,7 @@ class DarwinEngine:
         proof_timeout: float = 120.0,
         max_diff_lines: int = 50,
         halt_path: Path | None = None,
+        promotion_verification: dict[str, Any] | None = None,
     ) -> SealedPacketApplyResult:
         """Ingest a sealed Build Protocol packet through Darwin guards."""
         from dharma_swarm.sealed_packet_apply import apply_sealed_packet
@@ -2432,6 +2471,7 @@ class DarwinEngine:
             proof_timeout=proof_timeout,
             max_diff_lines=max_diff_lines,
             halt_path=halt_path,
+            promotion_verification=promotion_verification,
         )
 
     async def apply_in_sandbox(
@@ -3235,8 +3275,9 @@ class DarwinEngine:
         timeout: float = 60.0,
         context: str = "",
         router: Any | None = None,
-        shadow: bool = False,
+        shadow: bool = True,
         parent_id: str | None = None,
+        promotion_verification: dict[str, Any] | None = None,
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> CycleResult:
         """Autonomous evolution: LLM proposes improvements, engine evaluates them.
@@ -3262,6 +3303,8 @@ class DarwinEngine:
             context: Extra context to guide the LLM (focus areas, recent errors).
             router: Optional ModelRouter for multi-model roster selection.
             shadow: If True, do not apply diffs — evaluate proposals in dry-run mode.
+                False requires a Forge verify_promotion packet with
+                live_apply_allowed=True.
             parent_id: Optional archive entry id these proposals evolve from
                 (recorded on each proposal so lineage reaches the archive).
             on_progress: Optional callback ``(event_name, data)`` for real-time UX.
@@ -3270,6 +3313,11 @@ class DarwinEngine:
             A CycleResult summarizing the autonomous evolution cycle.
         """
         _emit = on_progress or (lambda _e, _d: None)
+        if not shadow and not _promotion_verification_allows_live(promotion_verification):
+            reason = "live_apply_refused: forge_v2.verify_promotion packet required"
+            logger.warning("Auto-evolve refused live mode: %s", reason)
+            _emit("cycle_refused", {"reason": reason, "shadow": shadow})
+            return CycleResult(reflection=reason)
 
         if not model:
             from dharma_swarm.model_hierarchy import default_model as _dm
@@ -3476,7 +3524,8 @@ class DarwinEngine:
         fitness_threshold: float = 0.6,
         max_cycles: int | None = None,
         router: Any | None = None,
-        shadow: bool = False,
+        shadow: bool = True,
+        promotion_verification: dict[str, Any] | None = None,
         on_progress: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         """Run autonomous evolution continuously.
@@ -3497,7 +3546,8 @@ class DarwinEngine:
             fitness_threshold: Minimum fitness to auto-commit.
             max_cycles: Stop after N cycles (None = run forever).
             router: Optional ModelRouter for multi-model roster selection.
-            shadow: If True, do not apply diffs or commit.
+            shadow: If True, do not apply diffs or commit. False requires a
+                Forge verify_promotion packet with live_apply_allowed=True.
             on_progress: Optional callback ``(event_name, data)`` for real-time UX.
         """
         if not model:
@@ -3572,6 +3622,7 @@ class DarwinEngine:
                     context=context,
                     router=router,
                     shadow=shadow,
+                    promotion_verification=promotion_verification,
                     on_progress=on_progress,
                 )
 

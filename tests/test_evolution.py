@@ -17,12 +17,37 @@ from dharma_swarm.evolution import (
     Proposal,
     _paths_from_unified_diff,
 )
+from dharma_swarm.forge_v1.forge_v2.signals import canonical_sha256
 from dharma_swarm.landscape import BasinType, LandscapeProbe
 from dharma_swarm.meta_evolution import MetaParameters
 from dharma_swarm.experiment_log import ExperimentRecord
 from dharma_swarm.models import GateDecision, LLMResponse, SandboxResult
 from dharma_swarm.router_retrospective import RouteOutcomeRecord
 from dharma_swarm.ucb_selector import UCBConfig
+
+
+class _ExplodingProvider:
+    async def complete(self, request):
+        del request
+        raise AssertionError("proposal generation should have been monkeypatched or refused")
+
+
+def _allow_live_packet() -> dict:
+    from dharma_swarm.forge_v1.forge_v2.promote import REQUIRED_RECEIPTS_V0_ABSENT
+
+    packet = {
+        "schema": "forge_v2.promotion_verification.v1",
+        "decision": "allow",
+        "live_apply_allowed": True,
+        "promotion_packet": {"decision": "promotable_candidate"},
+        "governed_admission": {"decision": "allow"},
+        "telos": {"decision": "allow"},
+        "signed_receipts": {name: True for name in REQUIRED_RECEIPTS_V0_ABSENT},
+        "operator_lease_present": True,
+        "blockers": [],
+    }
+    packet["payload_sha256"] = canonical_sha256(packet)
+    return packet
 
 
 # ---------------------------------------------------------------------------
@@ -1511,10 +1536,31 @@ async def test_auto_evolve_routes_through_sandbox_cycle(engine_paths, tmp_path, 
         [source_a, source_b],
         test_command="echo 'global passed'",
         timeout=9.0,
+        shadow=False,
+        promotion_verification=_allow_live_packet(),
     )
 
     assert result.proposals_submitted == 2
     assert result.proposals_archived == 2
+
+
+async def test_auto_evolve_live_mode_requires_verified_promotion_packet(engine, tmp_path, monkeypatch):
+    source = tmp_path / "target.py"
+    source.write_text("def f():\n    return 1\n", encoding="utf-8")
+
+    async def explode_generate(*_args, **_kwargs):
+        raise AssertionError("live refusal must happen before proposal generation")
+
+    monkeypatch.setattr(engine, "generate_proposal", explode_generate)
+
+    result = await engine.auto_evolve(
+        _ExplodingProvider(),
+        [source],
+        shadow=False,
+    )
+
+    assert result.proposals_submitted == 0
+    assert "verify_promotion packet required" in result.reflection
 
 
 async def test_run_cycle_circuit_breaker_after_repeated_failures(engine):
@@ -2056,6 +2102,7 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
         workspace=workspace,
         proof_timeout=5.0,
         halt_path=tmp_path / "missing-halt",
+        promotion_verification=_allow_live_packet(),
     )
 
     assert result.accepted is True
@@ -2063,6 +2110,35 @@ async def test_apply_sealed_packet_live_calls_apply_after_guards(
     assert result.archive_entry_id is not None
     assert len(calls) == 1
     assert calls[0][3] == workspace
+
+
+async def test_apply_sealed_packet_live_requires_verified_promotion_packet(
+    engine,
+    tmp_path,
+    monkeypatch,
+):
+    root = tmp_path / "dryrun"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _write_sealed_packet(root, diff_text=_safe_diff())
+
+    async def fake_apply(*_args, **_kwargs):
+        raise AssertionError("live sealed packet must refuse before apply")
+
+    monkeypatch.setattr(engine, "apply_diff_and_test", fake_apply)
+
+    result = await engine.apply_sealed_packet(
+        root,
+        shadow=False,
+        workspace=workspace,
+        proof_timeout=5.0,
+        halt_path=tmp_path / "missing-halt",
+    )
+
+    assert result.accepted is False
+    assert result.applied is False
+    assert result.refused_checks == ["promotion_verification"]
+    assert "verify_promotion" in result.reason
 
 
 async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
@@ -2091,6 +2167,7 @@ async def test_apply_sealed_packet_blocked_path_refuses_before_apply(
         shadow=False,
         proof_timeout=5.0,
         halt_path=tmp_path / "missing-halt",
+        promotion_verification=_allow_live_packet(),
     )
 
     assert result.accepted is False
