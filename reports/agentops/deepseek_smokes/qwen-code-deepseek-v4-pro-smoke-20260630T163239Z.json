@@ -1,0 +1,33 @@
+{
+  "agent_uid": "qwen_code",
+  "api_key_logged": false,
+  "auth_env_var": "DEEPSEEK_API_KEY",
+  "base_url": "https://api.deepseek.com",
+  "callsign": "qwen-code",
+  "command_no_secret": [
+    "qwen",
+    "--bare",
+    "--auth-type",
+    "openai",
+    "--model",
+    "deepseek-v4-pro",
+    "--output-format",
+    "text",
+    "--max-tool-calls",
+    "0",
+    "--max-wall-time",
+    "90",
+    "--prompt",
+    "<redacted prompt text; hash recorded>"
+  ],
+  "duration_s": 0.369,
+  "expected": "DS_ML_LEAD_VERIFIER_RANKER_SANITY_OK",
+  "model": "deepseek-v4-pro",
+  "prompt_sha256": "sha256:dd01112a5d7e562253a0a48863afd57147e18cb55f771cd51a1995e69e9df8d8",
+  "provider": "deepseek",
+  "qwen_version": "0.17.1",
+  "run_id": "qwen-code-deepseek-v4-pro-smoke-20260630T163239Z",
+  "schema_version": "dharma.qwen_code_deepseek_smoke.v1",
+  "started_at": "2026-06-30T16:32:40.127733+00:00",
+  "status": "blocked_missing_deepseek_api_key"
+}
