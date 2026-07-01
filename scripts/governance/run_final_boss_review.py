@@ -353,18 +353,7 @@ def build_review_packet(
         isinstance(row, dict) and row.get("passed") is True for row in verifier_results
     )
     profile = track_status._as_lower_token(dossier.get("graduation_profile"))
-    required_failure_modes = set(
-        (dossier.get("profile_requirements") or {}).get("required_failure_modes") or []
-    )
-    if profile != "runtime_transport":
-        failure_modes = sorted(track_status._as_str_set(failure_modes_tested))
-    elif failure_modes_tested:
-        failure_modes = sorted(track_status._as_str_set(failure_modes_tested))
-    else:
-        # The council has reviewed the profile-specific failure-mode list, but
-        # runtime_evidence remains explicit so fake/mock transport cannot pass
-        # just because a dossier listed the right words.
-        failure_modes = sorted(required_failure_modes)
+    failure_modes = sorted(track_status._as_str_set(failure_modes_tested))
 
     packet: dict[str, Any] = {
         "schema_version": REVIEW_SCHEMA,
@@ -474,11 +463,11 @@ def yaml_snippet(packet: dict[str, Any]) -> str:
             lines.extend(f"    - {json.dumps(path)}" for path in packet["runtime_evidence"])
         else:
             lines.append("  runtime_evidence: []")
-        lines.append("  failure_modes_tested:")
         if packet.get("failure_modes_tested"):
+            lines.append("  failure_modes_tested:")
             lines.extend(f"    - {json.dumps(mode)}" for mode in packet["failure_modes_tested"])
         else:
-            lines.append("    []")
+            lines.append("  failure_modes_tested: []")
         lines.append(f"  mock_only: {str(bool(packet.get('mock_only'))).lower()}")
     return "\n".join(lines) + "\n"
 
