@@ -758,6 +758,7 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
             promotion_summary = run_zeitgeist_promotion(promotion_state)
         except Exception as promo_exc:  # noqa: BLE001
             promotion_summary = {"error": str(promo_exc)[:200]}
+        promotion_error = str(promotion_summary.get("error", ""))
         output = (
             "world_scout: "
             f"raw={result.raw_observations} signals={result.emitted_signals} "
@@ -767,12 +768,20 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
             f"promotion_proposals={promotion_summary.get('proposal_count', 0)} "
             f"brief={result.brief_path} health={result.health_path}"
         )
+        # Surface a promotion-hook failure so it is not reported identically to a
+        # clean run with zero proposals (the follow-on is non-fatal to the scout,
+        # but a silent write/import failure must be visible to the operator).
+        if promotion_error:
+            output = f"{output} promotion_error={promotion_error}"
         if result.errors:
             output = f"{output} errors={list(result.errors)}"
+        combined_error = "; ".join(result.errors)[:500] if result.errors else ""
+        if promotion_error and not combined_error:
+            combined_error = f"promotion_hook: {promotion_error}"
         return CronJobExecutionResult(
             status=CronJobRunStatus.COMPLETED if result.ok else CronJobRunStatus.FAILED,
             output=output,
-            error="; ".join(result.errors)[:500] if result.errors else "",
+            error=combined_error,
             metadata={
                 "fetch_enabled": True,
                 "raw_observations": result.raw_observations,
@@ -781,6 +790,7 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 "incubations_written": result.incubations_written,
                 "canonical_zeitgeist_signals": len(canonical_signals),
                 "promotion_proposals": promotion_summary.get("proposal_count", 0),
+                "promotion_error": promotion_error,
                 "promotion_review_md": promotion_summary.get("review_md", ""),
                 "board_path": result.board_path,
                 "brief_path": result.brief_path,

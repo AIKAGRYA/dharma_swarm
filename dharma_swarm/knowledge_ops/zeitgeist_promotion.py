@@ -37,17 +37,29 @@ from dharma_swarm.knowledge_ops.memory_promotion_queue import (
     render_memory_promotion_queue_markdown,
 )
 
-# External zeitgeist signals are unverified and cross a trust boundary, so they
-# require the full external-content gate battery before any promotion.
+# External zeitgeist signals cross a trust boundary and are public web content,
+# so they require the FULL structural gate battery before any promotion —
+# including privacy_review (PII) and canon_policy_review, which the KnowledgeOps
+# battery (memory_conflict_review) mandates for promotable candidates. Since
+# build_memory_decision_ledger validates an ACCEPT only against
+# proposal.required_gates, omitting these would let an operator validly promote
+# external content without a privacy/canon check. We list the full set.
 _ZEITGEIST_REQUIRED_GATES: tuple[str, ...] = (
     MemoryPromotionGate.HUMAN_REVIEW.value,
     MemoryPromotionGate.PROVENANCE_REVIEW.value,
     MemoryPromotionGate.CONFLICT_REVIEW.value,
+    MemoryPromotionGate.PRIVACY_REVIEW.value,
+    MemoryPromotionGate.CANON_POLICY_REVIEW.value,
     MemoryPromotionGate.KNOWLEDGEOPS_LINKING.value,
 )
 
 _SURFACE_ID = "world_zeitgeist"
-_TRUTH_STATE = "unverified"
+# TruthState.OBSERVED: we observed the signal in the world feed but have not
+# verified/curated it. This is the honest state for an external observation AND
+# the state the promotion executor requires to be promotable
+# (_PROMOTABLE_TRUTH_STATES = {"observed", "curated"}); "unverified" is not a
+# valid TruthState and would make every proposal silently non-promotable.
+_TRUTH_STATE = "observed"
 _AUTHORITY_LEVEL = "external_signal"
 
 
@@ -226,7 +238,12 @@ def _proposal_from_signal(row: dict[str, Any]) -> MemoryPromotionProposal | None
 
 
 def _proposal_id(signal_id: str, content_ref: str, title: str) -> str:
+    # Use the shared "memory_promotion_proposal:" prefix (not a bespoke
+    # "zeitgeist_promotion_proposal:" one) so that, if a reviewed proposal is
+    # ever bridged, the MemoryKernel control-surface receipt check recognizes
+    # its source_proposal_id and links the canonical receipt. The "zg" segment
+    # keeps zeitgeist ids distinguishable within the shared namespace.
     digest = hashlib.sha256(
         "\n".join((signal_id, content_ref, title)).encode("utf-8")
     ).hexdigest()
-    return f"zeitgeist_promotion_proposal:{digest[:24]}"
+    return f"memory_promotion_proposal:zg-{digest[:24]}"

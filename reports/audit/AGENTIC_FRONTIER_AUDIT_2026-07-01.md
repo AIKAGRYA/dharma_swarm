@@ -51,10 +51,15 @@ Four findings survived adversarial review; all are resolved in-branch.
 
 **Governance floor verified:** exhaustive write-site audit confirms the bridge
 writes **only** under `meta/knowledge_ops/` — never MemoryKernel, canon, or any
-authority store. Every proposal carries HUMAN_REVIEW + PROVENANCE + CONFLICT +
-LINKING gates; nothing auto-accepts. The One-Wire invariant (internal/unverified
-artifacts never touch archive fitness) is respected: signals are `truth_state:
-unverified`, human-gated, with zero auto-advance path.
+authority store. Post-review (Codex App), the gate set was corrected to the FULL
+structural battery — HUMAN_REVIEW + PROVENANCE + CONFLICT + **PRIVACY** +
+**CANON_POLICY** + LINKING — so external public content cannot be promoted
+without a privacy/canon check; nothing auto-accepts. Proposals carry
+`truth_state: observed` (the honest state for an external observation, and the
+state the promotion executor requires — the earlier `unverified` was an invalid
+`TruthState` that silently made every proposal non-promotable). The One-Wire
+invariant (internal artifacts never touch archive fitness) holds: promotion is
+human-gated with zero auto-advance path.
 
 **Loop-closure honesty:** this wiring **extends Loop 5 (Zeitgeist Scanner)** but
 does **not** fully close it. Sense✓ Interpret✓ Constrain(propose)✓, but

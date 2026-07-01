@@ -55,14 +55,37 @@ def test_signal_becomes_ready_for_review_proposal() -> None:
     assert proposal.status is MemoryPromotionQueueStatus.READY_FOR_REVIEW
     assert proposal.atom_id == "world-1"
     assert proposal.surface_id == "world_zeitgeist"
-    assert proposal.truth_state == "unverified"
+    # OBSERVED is the honest state for an external observation AND is required
+    # for the proposal to be promotable at all (regression guard for the bug
+    # where "unverified" silently blocked every proposal).
+    assert proposal.truth_state == "observed"
 
 
-def test_every_proposal_requires_human_review() -> None:
+def test_every_proposal_requires_the_full_external_gate_battery() -> None:
     queue = build_zeitgeist_promotion_queue([_signal("world-1"), _signal("world-2")])
+    required = {
+        MemoryPromotionGate.HUMAN_REVIEW.value,
+        MemoryPromotionGate.PROVENANCE_REVIEW.value,
+        MemoryPromotionGate.CONFLICT_REVIEW.value,
+        MemoryPromotionGate.PRIVACY_REVIEW.value,
+        MemoryPromotionGate.CANON_POLICY_REVIEW.value,
+        MemoryPromotionGate.KNOWLEDGEOPS_LINKING.value,
+    }
     for proposal in queue.proposals:
-        assert MemoryPromotionGate.HUMAN_REVIEW.value in proposal.required_gates
-        assert MemoryPromotionGate.PROVENANCE_REVIEW.value in proposal.required_gates
+        # external public content must not be promotable without privacy + canon
+        assert required <= set(proposal.required_gates)
+
+
+def test_proposals_are_promotable_and_receipt_compatible() -> None:
+    # Guards the two Codex-review bugs: non-promotable truth_state, and a
+    # proposal-id prefix the MemoryKernel receipt check would not recognize.
+    from dharma_swarm.knowledge_ops.memory_promotion_executor import (
+        _PROMOTABLE_TRUTH_STATES,
+    )
+
+    proposal = build_zeitgeist_promotion_queue([_signal("world-1")]).proposals[0]
+    assert proposal.truth_state in _PROMOTABLE_TRUTH_STATES
+    assert proposal.proposal_id.startswith("memory_promotion_proposal:")
 
 
 def test_rows_without_id_are_blocked_not_promoted() -> None:
