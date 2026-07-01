@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.dgm_loop import DGMLoop, run_dgm_evolution_task
-from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, signals
+from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, promote, signals
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ArmSpec, grade_genome
 from dharma_swarm.forge_v1.forge_v2.verify_promotion import verify_promotion
 from scripts.governance.check_forge_bypass import check_file, check_paths
@@ -242,6 +242,77 @@ def test_promotion_accepts_sealed_clean_provenance_predicate_before_receipts() -
     assert predicate["contamination_sealed_provenance"] is True
     assert "promotion_packet:contamination_sealed_provenance" not in verdict["blockers"]
     assert verdict["decision"] == "refused"  # missing signed receipts still fail closed
+
+
+def _receipt_ready_signal() -> dict:
+    return {
+        "run_id": "receipt-ready",
+        "signal_key": "receipt:key",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "confirm_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "sealed_provenance": {"contamination_state": "fresh_heldout"},
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+    }
+
+
+def _fake_signed_receipts(public_key: str) -> list[dict]:
+    return [
+        {
+            "name": name,
+            "payload": {"receipt": name},
+            "signature": {
+                "scheme": "ed25519",
+                "public_key": public_key,
+                "signature": "02" * 64,
+            },
+        }
+        for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
+    ]
+
+
+def test_verify_promotion_rejects_self_signed_receipts_without_trusted_key(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "verify_signed_receipt", lambda _receipt: True)
+    public_key = "01" * 32
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=_fake_signed_receipts(public_key),
+        operator_lease={"lease_id": "op-1"},
+    )
+
+    assert verdict["decision"] == "refused"
+    assert "untrusted_signed_receipt:preregistration" in verdict["blockers"]
+    assert verdict["signed_receipts"]["preregistration"] is False
+
+
+def test_verify_promotion_trusts_receipts_only_from_configured_judge_key(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "verify_signed_receipt", lambda _receipt: True)
+    public_key = "01" * 32
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=_fake_signed_receipts(public_key),
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "op-1"},
+    )
+
+    assert verdict["decision"] == "refused"  # v0 promotion packet still marks receipt predicates absent
+    assert verdict["signed_receipts"]["preregistration"] is True
+    assert not any(b.startswith("untrusted_signed_receipt:") for b in verdict["blockers"])
+    assert not any(b.startswith("missing_or_invalid_signed_receipt:") for b in verdict["blockers"])
 
 
 def test_e2_green_pytest_red_holdout_is_refused() -> None:

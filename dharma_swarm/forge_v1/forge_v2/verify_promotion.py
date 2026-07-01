@@ -80,6 +80,30 @@ def verify_signed_receipt(receipt: dict[str, Any]) -> bool:
         return False
 
 
+def _receipt_public_key_hex(receipt: dict[str, Any]) -> str:
+    try:
+        sig = dict(receipt.get("signature", {}) or {})
+        return _normal_public_key_hex(sig["public_key"])
+    except Exception:
+        return ""
+
+
+def verify_trusted_signed_receipt(
+    receipt: dict[str, Any],
+    *,
+    trusted_public_keys: Iterable[str | bytes] = (),
+) -> bool:
+    """Verify receipt signature and signer authority.
+
+    A receipt signed by an arbitrary key is still worker-authorable.  It counts
+    only when the signature is valid and the signer public key is explicitly
+    trusted by the promotion verifier.
+    """
+    trusted = {_normal_public_key_hex(key) for key in trusted_public_keys}
+    public_key = _receipt_public_key_hex(receipt)
+    return bool(trusted and public_key in trusted and verify_signed_receipt(receipt))
+
+
 def _verification_signature_payload(packet: dict[str, Any]) -> dict[str, Any]:
     body = dict(packet)
     body.pop("verification_signature", None)
@@ -159,6 +183,7 @@ def verify_promotion(
     *,
     signed_receipts: Iterable[dict[str, Any]] = (),
     operator_lease: dict[str, Any] | None = None,
+    trusted_receipt_public_keys: Iterable[str | bytes] = (),
     agent_uid: str = "forge_dgm",
     mission_contract_present: bool = True,
     mutation_budget_remaining: int | None = 1,
@@ -169,7 +194,12 @@ def verify_promotion(
     packet = promote.evaluate_promotion(signal)
     receipt_by_name = _receipt_map(signed_receipts)
     signed_status = {
-        name: verify_signed_receipt(receipt_by_name[name]) if name in receipt_by_name else False
+        name: verify_trusted_signed_receipt(
+            receipt_by_name[name],
+            trusted_public_keys=trusted_receipt_public_keys,
+        )
+        if name in receipt_by_name
+        else False
         for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
     }
 
@@ -216,9 +246,19 @@ def verify_promotion(
 
     blockers = set(packet.get("blockers", []) or [])
     blockers.update(f"promotion_packet:{name}" for name in packet.get("failed_conjuncts", []) or [])
+    trusted_receipt_keys = {
+        _normal_public_key_hex(key) for key in trusted_receipt_public_keys
+    }
     for name, ok in signed_status.items():
         if not ok:
-            blockers.add(f"missing_or_invalid_signed_receipt:{name}")
+            if name in receipt_by_name and verify_signed_receipt(receipt_by_name[name]):
+                receipt_key = _receipt_public_key_hex(receipt_by_name[name])
+                if not trusted_receipt_keys or receipt_key not in trusted_receipt_keys:
+                    blockers.add(f"untrusted_signed_receipt:{name}")
+                else:
+                    blockers.add(f"missing_or_invalid_signed_receipt:{name}")
+            else:
+                blockers.add(f"missing_or_invalid_signed_receipt:{name}")
     if not operator_lease:
         blockers.add("operator_lease_missing")
     if admission_dict.get("decision") != "allow":
@@ -253,4 +293,5 @@ __all__ = [
     "verify_promotion",
     "verify_promotion_verification_signature",
     "verify_signed_receipt",
+    "verify_trusted_signed_receipt",
 ]
