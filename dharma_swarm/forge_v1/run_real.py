@@ -372,6 +372,27 @@ MODEL_CALL_TIMEOUT_S = 600
 # burning the sample, wait the hinted delay (capped) and retry a few times.
 _RATE_LIMIT_RETRIES = 3
 _RATE_LIMIT_MAX_WAIT_S = 65
+_NON_RETRYABLE_QUOTA_MARKERS = (
+    "insufficient balance",
+    "no resource package",
+    "please recharge",
+    "insufficient_quota",
+    "insufficient quota",
+    "exceeded your current quota",
+    "credit balance",
+    "billing hard limit",
+    "payment required",
+    "insufficient credits",
+    "quota_exhausted",
+    "billing_exhausted",
+    "error code: 402",
+    "http error 402",
+)
+
+
+def _is_non_retryable_quota_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _NON_RETRYABLE_QUOTA_MARKERS)
 
 
 def _rate_limit_wait_s(exc: Exception) -> float | None:
@@ -379,6 +400,8 @@ def _rate_limit_wait_s(exc: Exception) -> float | None:
     (seconds), parsed from the provider's hint; else None. Looks for 429 /
     RESOURCE_EXHAUSTED and a 'retry in Ns' or retryDelay '...s' figure."""
     msg = str(exc)
+    if _is_non_retryable_quota_error(exc):
+        return None
     is_429 = (
         "429" in msg
         or "RESOURCE_EXHAUSTED" in msg
