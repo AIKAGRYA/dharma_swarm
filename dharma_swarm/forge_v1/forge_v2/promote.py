@@ -33,6 +33,7 @@ _CLEAN_CONTAMINATION = ("fresh_heldout", "self_mod_clean", "clean")
 MIN_CONFIRM_N_FOR_PROMOTION = 500
 MIN_PROMOTION_EFFECT = 0.05
 DEFAULT_PREREGISTERED_MDE = 0.056
+PASSING_PACKET_GUARD_VERDICT = "pass_for_next_scale"
 
 
 def _float(value, default: float = 0.0) -> float:
@@ -82,6 +83,27 @@ def _sealed_contamination(signal: dict) -> str | None:
     return None
 
 
+def _packet_guard_review(signal: dict) -> dict:
+    """Extract the deterministic packet guard review from a signal.
+
+    Promotion treats the deterministic packet guard as part of the fail-closed
+    receipt battery.  The optional NVIDIA/NIM review is advisory; it is not used
+    as a promotion oracle.
+    """
+    candidate = (
+        signal.get("packet_guard_review")
+        or signal.get("nvidia_guard_review")
+        or signal.get("forge_packet_guard")
+        or {}
+    )
+    if not isinstance(candidate, dict):
+        return {}
+    deterministic = candidate.get("deterministic_review")
+    if isinstance(deterministic, dict):
+        return deterministic
+    return candidate
+
+
 def _evidence_predicate(signal: dict) -> dict:
     """The substantive checks computable from the signal itself."""
     overall = signal.get("overall_ci", {}) or {}
@@ -93,6 +115,7 @@ def _evidence_predicate(signal: dict) -> dict:
     explore_n = _int(explore.get("n"))
     overall_n = _int(overall.get("n"))
     preregistered_mde = _preregistered_mde(signal)
+    guard = _packet_guard_review(signal)
     return {
         "receipt_core_present": bool(overall) and bool(confirm),
         "stats_confirm_gate": positive_claim_gate(
@@ -111,6 +134,8 @@ def _evidence_predicate(signal: dict) -> dict:
         "class_null_valid": bool(signal.get("class_null")),
         "null_did_not_survive": not bool(signal.get("null_survived", False)),
         "evidence_strength_positive": float(signal.get("evidence_strength", 0.0)) > 0.0,
+        "packet_guard_review_present": bool(guard),
+        "packet_guard_passed": guard.get("verdict") == PASSING_PACKET_GUARD_VERDICT,
     }
 
 
@@ -128,6 +153,20 @@ def evaluate_promotion(signal: dict) -> dict:
         set(signal.get("promotion_blockers", []) or [])
         | {f"missing:{name}" for name in REQUIRED_RECEIPTS_V0_ABSENT}
     )
+    guard = _packet_guard_review(signal)
+    if not guard:
+        blockers.append("missing:packet_guard_review")
+    elif guard.get("verdict") != PASSING_PACKET_GUARD_VERDICT:
+        findings = guard.get("findings") or []
+        guard_codes = [
+            str(finding.get("code"))
+            for finding in findings
+            if isinstance(finding, dict) and finding.get("code")
+        ]
+        blockers.extend(f"packet_guard:{code}" for code in guard_codes)
+        if not guard_codes:
+            blockers.append(f"packet_guard:verdict_{guard.get('verdict', 'missing')}")
+    blockers = sorted(set(blockers))
 
     promotion_allowed = len(failed) == 0
     decision = "promotable_candidate" if promotion_allowed else "refused"

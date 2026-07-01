@@ -260,7 +260,27 @@ def _receipt_ready_signal() -> dict:
         "class_null": "self_moa",
         "null_survived": False,
         "evidence_strength": 0.9,
+        "packet_guard_review": _passing_packet_guard_review(),
         "promotion_blockers": [],
+    }
+
+
+def _passing_packet_guard_review() -> dict:
+    return {
+        "deterministic_review": {
+            "verdict": "pass_for_next_scale",
+            "findings": [],
+            "task_count": 500,
+            "taskbed_power": {
+                "split": "confirm",
+                "task_count": 500,
+                "full_confirm": True,
+                "no_split_confirm": True,
+                "clean_confirm": True,
+                "ci_half_width": 0.04,
+                "pre_registered_mde": 0.056,
+            },
+        }
     }
 
 
@@ -277,6 +297,56 @@ def _fake_signed_receipts(public_key: str) -> list[dict]:
         }
         for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
     ]
+
+
+def test_promotion_requires_packet_guard_review_before_receipts() -> None:
+    signal = _receipt_ready_signal()
+    signal.pop("packet_guard_review")
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["packet_guard_review_present"] is False
+    assert predicate["packet_guard_passed"] is False
+    assert "missing:packet_guard_review" in verdict["promotion_packet"]["blockers"]
+    assert "promotion_packet:packet_guard_review_present" in verdict["blockers"]
+    assert verdict["decision"] == "refused"
+
+
+def test_promotion_refuses_blocked_packet_guard_review_before_receipts() -> None:
+    signal = _receipt_ready_signal()
+    signal["packet_guard_review"] = {
+        "deterministic_review": {
+            "verdict": "blocked_with_evidence",
+            "findings": [
+                {
+                    "severity": "error",
+                    "code": "confirm_taskbed_underpowered",
+                    "message": "CONFIRM taskbed is below the full E4 floor.",
+                    "evidence": ["task_count=135"],
+                }
+            ],
+        }
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["packet_guard_review_present"] is True
+    assert predicate["packet_guard_passed"] is False
+    assert "packet_guard:confirm_taskbed_underpowered" in verdict["promotion_packet"]["blockers"]
+    assert "promotion_packet:packet_guard_passed" in verdict["blockers"]
+    assert verdict["decision"] == "refused"
+
+
+def test_promotion_accepts_passing_packet_guard_predicate_before_receipts() -> None:
+    verdict = verify_promotion(_receipt_ready_signal(), operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["packet_guard_review_present"] is True
+    assert predicate["packet_guard_passed"] is True
+    assert not any(b.startswith("packet_guard:") for b in verdict["promotion_packet"]["blockers"])
+    assert verdict["decision"] == "refused"  # signed receipt predicates still fail closed.
 
 
 def test_verify_promotion_rejects_self_signed_receipts_without_trusted_key(monkeypatch) -> None:
