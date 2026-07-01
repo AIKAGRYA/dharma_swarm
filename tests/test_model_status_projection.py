@@ -6,13 +6,22 @@ import json
 import time
 from pathlib import Path
 
+import pytest
+
 from dharma_swarm import key_oracle
 from dharma_swarm.model_status import (
+    LIVE_CALL_MATRIX_DIR_ENV,
+    LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV,
     LIVE_CALL_MATRIX_PATH_ENV,
     floor_model_status,
     save_profile,
     top_floor_models_for_dashboard,
 )
+
+
+@pytest.fixture(autouse=True)
+def _disable_auto_live_matrix(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(tmp_path / "no-auto-live-matrix"))
 
 
 def _row(glyph: str, *, status: str = "live", http: str = "200") -> dict[str, str]:
@@ -414,6 +423,155 @@ def test_live_probe_closeout_receipt_merges_referenced_artifacts(
     assert by_route["codex:gpt-5.5"].status == "live_routable"
     assert gpt.verification.status == "verified"
     assert gpt.verification.verified_at == "2026-07-01T02:53:01Z"
+
+
+def test_fresh_live_probe_closeout_is_discovered_without_operator_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(tmp_path, {"claude_code": _row("✓", status="oauth present")})
+    allnight = tmp_path / "reports" / "langgraph_parity" / "allnight"
+    allnight.mkdir(parents=True)
+    live_probe = allnight / "model_routing_live_probe_live.json"
+    closeout = allnight / "provider_live_matrix_20260701T010345Z.json"
+    live_probe.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "claude-opus-4.8",
+                        "route": "claude_code:claude-opus-4.8",
+                        "status": "failed",
+                        "failure_class": "timeout",
+                        "started_at": "2026-07-01T01:09:06Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    closeout.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.provider_live_matrix_closeout.v1",
+                "generated_at": "2026-07-01T02:58:57Z",
+                "artifacts": {"full_live_matrix": str(live_probe)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.delenv(LIVE_CALL_MATRIX_PATH_ENV, raising=False)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(allnight))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV, "100000")
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    opus = {model.id: model for model in projection.models}["claude-opus-4.8"]
+
+    assert opus.available is False
+    assert opus.status == "unavailable"
+    assert opus.unavailable_reason == "timeout"
+    assert opus.verification.status == "failed"
+
+
+def test_stale_auto_discovered_live_probe_closeout_expires(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(tmp_path, {"claude_code": _row("✓", status="oauth present")})
+    allnight = tmp_path / "reports" / "langgraph_parity" / "allnight"
+    allnight.mkdir(parents=True)
+    live_probe = allnight / "model_routing_live_probe_live.json"
+    closeout = allnight / "provider_live_matrix_20200101T000000Z.json"
+    live_probe.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "claude-opus-4.8",
+                        "route": "claude_code:claude-opus-4.8",
+                        "status": "failed",
+                        "failure_class": "timeout",
+                        "started_at": "2020-01-01T00:00:00Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    closeout.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.provider_live_matrix_closeout.v1",
+                "generated_at": "2020-01-01T00:00:00Z",
+                "artifacts": {"full_live_matrix": str(live_probe)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.delenv(LIVE_CALL_MATRIX_PATH_ENV, raising=False)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(allnight))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV, "1")
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    opus = {model.id: model for model in projection.models}["claude-opus-4.8"]
+
+    assert opus.available is True
+    assert opus.status == "live_routable"
+    assert opus.verification.status == "unverified"
+
+
+def test_fresh_live_probe_sets_model_status_when_key_oracle_unknown(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    allnight = tmp_path / "reports" / "langgraph_parity" / "allnight"
+    allnight.mkdir(parents=True)
+    live_probe = allnight / "model_routing_live_probe_live.json"
+    closeout = allnight / "provider_live_matrix_20260701T010345Z.json"
+    live_probe.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "kimi-k2.6",
+                        "route": "ollama:kimi-k2.6:cloud",
+                        "status": "ok",
+                        "response_preview": "PONG",
+                        "started_at": "2026-07-01T01:15:09Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    closeout.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.provider_live_matrix_closeout.v1",
+                "generated_at": "2026-07-01T02:58:57Z",
+                "artifacts": {"full_live_matrix": str(live_probe)},
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.delenv(LIVE_CALL_MATRIX_PATH_ENV, raising=False)
+    monkeypatch.setenv(LIVE_CALL_MATRIX_DIR_ENV, str(allnight))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_MAX_AGE_HOURS_ENV, "100000")
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    kimi = {model.id: model for model in projection.models}["kimi-k2.6"]
+
+    assert projection.oracle_state == "unknown"
+    assert kimi.available is True
+    assert kimi.status == "live_routable"
+    assert kimi.available_routes == ["ollama:kimi-k2.6:cloud"]
+    assert kimi.verification.status == "verified"
 
 
 def test_missing_key_status_is_unverified_not_advertised_callable(

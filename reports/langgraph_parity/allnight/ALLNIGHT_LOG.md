@@ -1071,3 +1071,25 @@
   - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> pass with `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
   - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T072000Z_after_forge_v01.json` -> `blocker_count=0`.
 - Scoreboard: raised conservatively to `97/100`; still explicitly not 100/100 because provider freshness/quarantine and aggregate closeout gitleaks governance remain unresolved.
+
+## 2026-07-01T07:12:48Z - Phase 6 Provider Auto Freshness And Quarantine Policy
+
+- Target gate result: success for the remaining provider-truth freshness gap. The model-status projection now discovers fresh provider live-matrix closeout receipts automatically when `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH` is unset.
+- What changed:
+  - `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH` still wins as an explicit operator override.
+  - Without that env var, `model_status.py` discovers fresh `provider_live_matrix_*.json` receipts from `reports/langgraph_parity/allnight`.
+  - Auto-discovered receipts expire by TTL through `DHARMA_MODEL_LIVE_CALL_MATRIX_MAX_AGE_HOURS`, defaulting to 24 hours.
+  - Tests prove stale auto-discovered receipts are ignored.
+  - Fresh live receipt evidence now sets model-level `live_routable` or `unavailable` status even when the key-oracle cache is stale/unknown.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/provider_auto_live_matrix_policy_20260701T071248Z.json`
+- Live projection smoke without explicit matrix env:
+  - `claude-opus-4.8` -> `unavailable`, no available routes, reason `timeout`, verification `failed` at `2026-07-01T01:10:36Z`.
+  - `kimi-k2.6` -> `live_routable`, available route `ollama:kimi-k2.6:cloud`, verification `verified` at `2026-07-01T01:15:09Z`.
+  - `gpt-5.5` -> `live_routable`, available route `codex:gpt-5.5`, verification `verified` at `2026-07-01T02:53:17Z`.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_model_status_projection.py` -> `12 passed in 20.20s`.
+  - `.venv/bin/ruff check dharma_swarm/model_status.py tests/test_model_status_projection.py` -> pass.
+  - `.venv/bin/python -m compileall -q dharma_swarm/model_status.py tests/test_model_status_projection.py` -> pass.
+  - `env -u DHARMA_MODEL_LIVE_CALL_MATRIX_PATH .venv/bin/python -c 'from dharma_swarm.model_status import floor_model_status; ...'` -> live projection smoke above.
+- Scoreboard: raised conservatively to `98/100`; still explicitly not 100/100 because aggregate closeout gitleaks governance and final full acceptance closeout remain unresolved.

@@ -304,6 +304,12 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/a2a_block_stale_forge_v01.py --apply --timestamp 2026-07-01T07:20:00Z --output reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_20260701T072000Z.json` -> blocked `forge-v0.1-001` as `blocked_verified`; backup written at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak`.
 - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` after Forge v0.1 supervisor block -> pass; `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
 - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T072000Z_after_forge_v01.json` -> pass; `blocker_count=0`.
+- Phase 6 provider auto freshness/quarantine policy: `model_status.py` now auto-discovers fresh `provider_live_matrix_*.json` closeout receipts when `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH` is unset, expires stale auto-discovered receipts, and lets fresh live receipt evidence set model-level `live_routable` or `unavailable` status even when key-oracle cache is stale.
+- `.venv/bin/python -m pytest -q tests/test_model_status_projection.py` -> `12 passed in 20.20s`.
+- `.venv/bin/ruff check dharma_swarm/model_status.py tests/test_model_status_projection.py` -> pass.
+- `.venv/bin/python -m compileall -q dharma_swarm/model_status.py tests/test_model_status_projection.py` -> pass.
+- `env -u DHARMA_MODEL_LIVE_CALL_MATRIX_PATH .venv/bin/python -c 'from dharma_swarm.model_status import floor_model_status; ...'` -> without explicit matrix env, `claude-opus-4.8` is `unavailable` due `timeout`, `kimi-k2.6` is `live_routable` via `ollama:kimi-k2.6:cloud`, and `gpt-5.5` is `live_routable` via `codex:gpt-5.5`.
+- Provider policy receipt: `reports/langgraph_parity/allnight/provider_auto_live_matrix_policy_20260701T071248Z.json`.
 
 ## Failing Gates
 
@@ -312,15 +318,14 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A blocker audit classification after semantic, legacy-proof, operator-gated, verified-duplicate, SAB-Qwen runtime-blocker, TAM Darshan completion, stale Hermes claim supervisor-block, Holon stale-review target blocks, and Forge v0.1 supervisor block work: zero remaining blockers. The Forge row is blocked, not completed, because the required source spec/handoff are absent and the target worker identity is stale/manual-gated.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
-- Provider truth: partial after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix proves several routes work. The model-status overlay now prevents failed probed routes from remaining advertised as live when an operator supplies the closeout receipt. The full gate is still not green because the overlay is not yet an automatic production freshness/quarantine policy and Claude Code needs retest/quarantine.
+- Provider truth: passed for the current executable gate. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback; model-status now automatically consumes fresh live-probe closeout receipts, expires stale auto-discovered receipts, and quarantines failed probed routes without an operator-selected matrix env var. Claude Code timeout routes are quarantined by the fresh receipt rather than advertised live.
 - Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, and fresh-process resume persistence are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers.
 
 ## Next Patch Sequence
 
-1. Promote provider-truth overlay from operator-selected receipt input to a safe production policy with freshness/expiry semantics, then retest or quarantine Claude Code timeouts.
-2. Address aggregate closeout governance without exposing or committing secret material: run the repo-approved gitleaks remediation path or document exact historical findings through the existing redacted governance receipt.
-3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
-4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
+1. Address aggregate closeout governance without exposing or committing secret material: run the repo-approved gitleaks remediation path or document exact historical findings through the existing redacted governance receipt.
+2. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
+3. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
 
 ## Residual Risk
 

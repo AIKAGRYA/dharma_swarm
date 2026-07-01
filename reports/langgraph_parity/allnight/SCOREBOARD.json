@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T07:20:00Z",
+  "updated_at": "2026-07-01T07:12:48Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 97,
+    "current": 98,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A reconciliation through strict green, Phase 5 MemoryKernel live retrieval improvements, Phase 6 provider-truth spine receipt/live-probe overlay work, and Phase 7 RuntimeStateStore-backed platform/cockpit surfaces. A2A strict readiness is now green with ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0 after the Forge v0.1 stale-row supervisor block. This is still not 100/100 because automatic production provider quarantine/freshness policy and aggregate closeout gitleaks governance remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A reconciliation through strict green, Phase 5 MemoryKernel live retrieval improvements, Phase 6 provider-truth spine receipt/live-probe evidence with automatic fresh receipt discovery and stale receipt expiry, and Phase 7 RuntimeStateStore-backed platform/cockpit surfaces. A2A strict readiness is green with ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0. Provider status now automatically quarantines failed fresh probed routes without DHARMA_MODEL_LIVE_CALL_MATRIX_PATH. This is still not 100/100 because aggregate closeout gitleaks governance remains failing and final full acceptance still needs a clean closeout bundle."
   },
   "rounds": [
     {
@@ -1006,6 +1006,30 @@
         "The Forge v0.1 row was blocked, not completed: the supervisor did not build Forge, did not select a parallel Forge lane, and did not claim merge/promote/external authority.",
         "Full 100/100 remains blocked by automatic provider freshness/quarantine policy and aggregate closeout gitleaks governance."
       ]
+    },
+    {
+      "id": "phase-6-provider-auto-live-matrix-policy",
+      "timestamp": "2026-07-01T07:12:48Z",
+      "status": "completed",
+      "target_gate": "Make provider live-probe quarantine automatic with freshness expiry",
+      "files_touched": [
+        "dharma_swarm/model_status.py",
+        "tests/test_model_status_projection.py",
+        "reports/langgraph_parity/allnight/provider_auto_live_matrix_policy_20260701T071248Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        ".venv/bin/python -m pytest -q tests/test_model_status_projection.py",
+        ".venv/bin/ruff check dharma_swarm/model_status.py tests/test_model_status_projection.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/model_status.py tests/test_model_status_projection.py",
+        "env -u DHARMA_MODEL_LIVE_CALL_MATRIX_PATH .venv/bin/python -c 'from dharma_swarm.model_status import floor_model_status; ...'"
+      ],
+      "blockers": [
+        "This slice uses fresh local provider live-probe receipts; it does not run new live provider calls.",
+        "Full 100/100 remains blocked by aggregate closeout gitleaks governance and final full acceptance closeout."
+      ]
     }
   ],
   "gates": {
@@ -1020,7 +1044,7 @@
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_supervisor_final_output_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "passed_ready_true_open_0_unknown_0_unverified_0_after_forge_v01_supervisor_block",
     "phase_5_memory_live_retrieval": "passed_current_executable_lane_text_query_topology_agent_isolation_stale_rejection_retrieval_telemetry_curated_source_coverage_tool_exposure_metadata_isolation",
-    "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_and_live_probe_receipt_overlay_removes_failed_routes_when_operator_supplies_receipt",
+    "phase_6_provider_truth": "passed_spine_receipts_actual_provider_model_plus_auto_fresh_live_matrix_discovery_stale_expiry_and_failed_route_quarantine",
     "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_and_fresh_process_resume_api_cockpit_partial"
   },
   "latest_verification": {
@@ -1066,7 +1090,8 @@
       "agent_build_preflight": "passed three times; latest run compileall clean, F821 clean, 12349 tests collected, onboard OK, hygiene integrity OK",
       "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits",
       "a2a_tam_darshan_publication_completion": "Created reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md from 8 existing Darshan wiki/source atoms; wrote validated receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json; backed up live queue to /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-tam-darshan-complete-20260701T061529Z.bak; claimed and completed tam-wp-wp_dfa4e1134277 as codex_composer; check_a2a_readiness.py --strict still fails with open_tasks=8, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit reports 5 stale claimed and 3 stale unclaimed rows.",
-      "a2a_stale_forge_v01_blocker": "Dry-run found exactly 1 stale Forge v0.1 row and 0 skips; apply supervisor-blocked forge-v0.1-001 as blocked_verified with embedded dharma_a2a_task_receipt.v1 receipt, backup at /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak; focused test 5 passed in 0.40s; ruff and compileall passed; strict A2A readiness passed with ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit count=0."
+      "a2a_stale_forge_v01_blocker": "Dry-run found exactly 1 stale Forge v0.1 row and 0 skips; apply supervisor-blocked forge-v0.1-001 as blocked_verified with embedded dharma_a2a_task_receipt.v1 receipt, backup at /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak; focused test 5 passed in 0.40s; ruff and compileall passed; strict A2A readiness passed with ready=true, open_tasks=0, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit count=0.",
+      "provider_auto_live_matrix_policy": "model_status auto-discovers fresh provider_live_matrix_*.json closeout receipts from reports/langgraph_parity/allnight when DHARMA_MODEL_LIVE_CALL_MATRIX_PATH is unset, expires stale auto-discovered receipts, and lets fresh live receipt evidence set model-level live_routable/unavailable even when key_oracle is stale. Focused tests 12 passed in 20.20s; ruff and compileall passed; live projection smoke without explicit matrix env marks claude-opus-4.8 unavailable due timeout, kimi-k2.6 live_routable through ollama, and gpt-5.5 live_routable through codex."
     }
   }
 }
