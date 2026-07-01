@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T00:34:44Z",
+  "updated_at": "2026-07-01T02:58:57Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 84,
+    "current": 86,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, exhaustive live-provider served-model proof, and closeout gitleaks governance remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice plus a direct live provider matrix falsification receipt, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, full live-provider served-model proof, and closeout gitleaks governance remain failing or unproven."
   },
   "rounds": [
     {
@@ -635,6 +635,40 @@
       "blockers": [
         "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
         "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
+    },
+    {
+      "id": "phase-6-live-provider-matrix-proof",
+      "timestamp": "2026-07-01T01:03:45Z",
+      "status": "completed_partial",
+      "target_gate": "Run exhaustive live provider/model routing probe over the canonical floor_model_status projection and record served provider/model truth",
+      "files_touched": [
+        "reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json",
+        "reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json",
+        "reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "make onboard",
+        "gh pr checks 732",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "dkeys test",
+        "floor_model_status() projection probe",
+        ".venv/bin/python scripts/verify/model_routing_live_probe.py --dry-run --no-refresh --profile standard --output reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json",
+        "DHARMA_LIVE_MODEL_E2E=1 .venv/bin/python scripts/verify/model_routing_live_probe.py --live --profile standard --timeout 90 --output reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json",
+        "DHARMA_LIVE_MODEL_E2E=1 .venv/bin/python scripts/verify/model_routing_live_probe.py --live --no-refresh --profile standard --model gpt-5.5 --timeout 120 --output reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json",
+        "jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json",
+        ".venv/bin/python -m pytest -q tests/test_model_routing_live_probe.py tests/test_model_status_projection.py tests/test_model_pool_e2e_live_gate.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py",
+        ".venv/bin/ruff check dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py",
+        "git diff --check"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Provider truth remains red after direct live evidence: full matrix attempted 24 live calls with 16 ok and 8 failed; Codex retest outside the sandbox passed 2/2 but Claude Code timed out and NVIDIA NIM moonshotai/kimi-k2.6 failed both schema-bound probes.",
         "Closeout governance remains blocked by aggregate full-history gitleaks findings."
       ]
     }

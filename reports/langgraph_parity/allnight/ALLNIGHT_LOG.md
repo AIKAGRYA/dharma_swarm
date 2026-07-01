@@ -596,3 +596,50 @@
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Provider truth still lacks exhaustive live-provider served-model matrix proof.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T01:03:45Z - Phase 6 Live Provider Matrix Proof Start
+
+- Target gate: extend provider truth from routed receipt stamping to an exhaustive live-provider matrix over the canonical `floor_model_status()` projection.
+- Current branch state:
+  - Worktree at `codex/langgraph-orchestration-parity-20260701`.
+  - PR #732 head `86f49a470` is mergeable and all GitHub checks pass, including `pytest (3.11)` and `pytest (3.12)`.
+  - `make onboard` passes; it regenerated governance active-track projection files, currently left unstaged because they are not part of this provider-proof surface.
+- Planned files:
+  - `reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/ALLNIGHT_LOG.md`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - `reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md`
+- Tests/checks run at round start:
+  - `make onboard` -> pass.
+  - `gh pr checks 732` -> all checks passing on `86f49a470`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `dkeys test` -> 10 live provider/key rows, 2 valid-but-no-funds, 2 auth-fail, 0 no-key-yet.
+  - `floor_model_status()` after dkeys refresh -> `oracle_state=fresh`, 12 live provider routes planned across 9 live model IDs.
+  - `.venv/bin/python scripts/verify/model_routing_live_probe.py --dry-run --no-refresh --profile standard --output reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json` -> planned=12, skipped=3, attempted=0.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth has a fresh dry-run plan but still needs live call evidence.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T02:58:57Z - Phase 6 Live Provider Matrix Proof Closeout
+
+- Target gate result: failed, with direct falsification evidence recorded.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json`
+  - `reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json`
+- Live matrix result:
+  - Dry run planned 12 live routes, skipped 3 unavailable models, and made 0 calls.
+  - Full live matrix attempted 24 calls over 12 routes with 16 ok and 8 failed.
+  - Passing full-matrix routes: Ollama Kimi K2.6, Ollama Kimi K2.7 Code, Ollama DeepSeek V4 Pro, NVIDIA NIM DeepSeek V4 Pro, Ollama GLM 5.1, Ollama Minimax M3, NVIDIA NIM Minimax M3, and Ollama Qwen3 Coder 480B Cloud.
+  - Codex `gpt-5.5` failed in the full matrix with sandbox `Operation not permitted`, then passed a scoped outside-sandbox retest with 2/2 probes ok.
+  - Remaining failed routes: Claude Code Opus 4.8 timed out twice, Claude Code Sonnet 4.6 timed out twice, and NVIDIA NIM `moonshotai/kimi-k2.6` returned non-contract text for both probes.
+  - A scoped outside-sandbox Claude retest was interrupted before a receipt was produced, so the Claude timeout blocker remains open.
+- Scoreboard: raised conservatively to `86/100`; still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth remains red until every live-routable route either passes the bounded probe contract or is downgraded/quarantined by explicit routing policy.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

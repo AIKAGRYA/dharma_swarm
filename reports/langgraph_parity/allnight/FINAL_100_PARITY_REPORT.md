@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **84/100**.
+Current score: **86/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime multi-process resume proof on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof plus Phase 6 live-provider matrix closeout artifacts on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -31,6 +31,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Runtime approve/reject/resume actions are now exposed through `POST /api/runtime/interrupts/approve`, `/reject`, and `/resume`. They write canonical `OperatorAction` audit rows, emit `operator_control` `SessionEventRecord` rows, return refreshed interrupt snapshots, and best-effort write checkpoint interrupt responses when an `interrupt_id` is supplied.
 - Runtime resume now has fresh-process proof: a child Python process calls the configured `runtime_interrupt_resume` API route against `DHARMA_RUNTIME_DB`, then the parent process reopens the same `RuntimeStateStore` and verifies the `runtime_resume_requested` event, `runtime_control.resume` action row, resume token, and checkpoint detail.
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
+- Provider truth now has direct live-matrix falsification evidence: the dry-run planned 12 live routes and skipped 3 unavailable models; the full live matrix attempted 24 calls with 16 ok and 8 failed; a scoped Codex outside-sandbox retest passed 2/2 and supersedes the sandbox-only Codex failure in the full matrix. The gate still fails because Claude Code timed out in the full matrix and NVIDIA NIM `moonshotai/kimi-k2.6` failed both schema-bound probes.
 
 ## Verification
 
@@ -187,6 +188,16 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`, no touched file added new violations.
 - `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
 - `git diff --check` -> pass.
+- Phase 6 live-provider matrix closeout: `dkeys test` -> 10 live provider/key rows, 2 valid-but-no-funds, 2 auth-fail, 0 no-key-yet.
+- `.venv/bin/python scripts/verify/model_routing_live_probe.py --dry-run --no-refresh --profile standard --output reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json` -> planned 12 routes, skipped 3 unavailable models, attempted 0 live calls.
+- `DHARMA_LIVE_MODEL_E2E=1 .venv/bin/python scripts/verify/model_routing_live_probe.py --live --profile standard --timeout 90 --output reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json` -> failed as expected for a red gate; 24 live calls attempted, 16 ok, 8 failed.
+- `DHARMA_LIVE_MODEL_E2E=1 .venv/bin/python scripts/verify/model_routing_live_probe.py --live --no-refresh --profile standard --model gpt-5.5 --timeout 120 --output reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json` outside the managed sandbox -> passed; 2 live calls attempted, 2 ok.
+- Provider matrix receipt: `reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json`.
+- `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json` -> pass.
+- `.venv/bin/python -m pytest -q tests/test_model_routing_live_probe.py tests/test_model_status_projection.py tests/test_model_pool_e2e_live_gate.py` -> `29 passed in 21.24s`.
+- `.venv/bin/python -m compileall -q dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py` -> pass.
+- `.venv/bin/ruff check dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py` -> pass.
+- `git diff --check` -> pass.
 
 ## Failing Gates
 
@@ -195,13 +206,13 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A blocker audit classification: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, 18 valid SAB semantic receipts that are still non-A2A evidence, and 1 completed `ts-converge-0611` row with no receipt pointer.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
-- Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
+- Provider truth: failed after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix now proves several routes work. The full gate is still red: Claude Code timed out in the full matrix, NVIDIA NIM `moonshotai/kimi-k2.6` failed both schema-bound probes, and unavailable models remain skipped as provider-dead.
 - Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, and fresh-process resume persistence are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers.
 
 ## Next Patch Sequence
 
 1. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
-2. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
+2. Close the provider-truth red routes: retest or quarantine Claude Code timeouts, downgrade or route around NVIDIA NIM `moonshotai/kimi-k2.6`, and require every `live_routable` route to pass bounded probe contracts before it counts as live.
 3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
 4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
 

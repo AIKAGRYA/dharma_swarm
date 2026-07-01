@@ -1,0 +1,182 @@
+{
+  "schema_version": "dharma.provider_live_matrix_closeout.v1",
+  "generated_at": "2026-07-01T02:58:57Z",
+  "status": "failed",
+  "claim": "Direct live provider routing evidence exists, but the provider-truth gate remains failing. The full live matrix produced 16/24 passing probes; a scoped Codex retest outside the sandbox passed 2/2 and supersedes the sandbox-only Codex failure in the full matrix.",
+  "artifacts": {
+    "dry_run": "reports/langgraph_parity/allnight/model_routing_live_probe_dry_run_20260701T010345Z.json",
+    "full_live_matrix": "reports/langgraph_parity/allnight/model_routing_live_probe_live_20260701T010345Z.json",
+    "codex_outside_sandbox_retest": "reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json"
+  },
+  "dry_run": {
+    "status": "planned",
+    "planned_routes": 12,
+    "skipped_models": 3,
+    "probe_cases_per_route": 2,
+    "live_calls_attempted": 0
+  },
+  "full_live_matrix": {
+    "status": "failed",
+    "planned_routes": 12,
+    "skipped_models": 3,
+    "probe_cases_per_route": 2,
+    "live_calls_attempted": 24,
+    "ok": 16,
+    "failed": 8
+  },
+  "codex_outside_sandbox_retest": {
+    "status": "passed",
+    "planned_routes": 1,
+    "probe_cases_per_route": 2,
+    "live_calls_attempted": 2,
+    "ok": 2,
+    "failed": 0
+  },
+  "passing_full_matrix_routes": [
+    {
+      "logical_model_id": "kimi-k2.6",
+      "route": "ollama:kimi-k2.6:cloud",
+      "provider": "ollama",
+      "served_model": "kimi-k2.6",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "kimi-k2.7-code",
+      "route": "ollama:kimi-k2.7-code:cloud",
+      "provider": "ollama",
+      "served_model": "kimi-k2.7-code",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "deepseek-v4-pro",
+      "route": "ollama:deepseek-v4-pro:cloud",
+      "provider": "ollama",
+      "served_model": "deepseek-v4-pro",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "deepseek-v4-pro",
+      "route": "nvidia_nim:deepseek-ai/deepseek-v4-pro",
+      "provider": "nvidia_nim",
+      "served_model": "deepseek-ai/deepseek-v4-pro",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "glm-5.1",
+      "route": "ollama:glm-5.1:cloud",
+      "provider": "ollama",
+      "served_model": "glm-5.1",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "minimax-m3",
+      "route": "ollama:minimax-m3:cloud",
+      "provider": "ollama",
+      "served_model": "minimax-m3",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "minimax-m3",
+      "route": "nvidia_nim:minimaxai/minimax-m3",
+      "provider": "nvidia_nim",
+      "served_model": "minimaxai/minimax-m3",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    },
+    {
+      "logical_model_id": "qwen3-coder:480b-cloud",
+      "route": "ollama:qwen3-coder:480b-cloud",
+      "provider": "ollama",
+      "served_model": "qwen3-coder:480b-cloud",
+      "passing_probes": [
+        "pong_exact",
+        "json_schema"
+      ]
+    }
+  ],
+  "superseded_full_matrix_failures": [
+    {
+      "logical_model_id": "gpt-5.5",
+      "route": "codex:gpt-5.5",
+      "full_matrix_failure_class": "routing_bug",
+      "superseding_receipt": "reports/langgraph_parity/allnight/model_routing_live_probe_codex_retest_20260701T010345Z.json",
+      "superseding_status": "passed",
+      "notes": "The full matrix ran inside the managed sandbox and Codex failed with Operation not permitted while initializing the in-process app-server client. The outside-sandbox retest passed both probes."
+    }
+  ],
+  "remaining_failed_routes": [
+    {
+      "logical_model_id": "claude-opus-4.8",
+      "route": "claude_code:claude-opus-4.8",
+      "provider": "claude_code",
+      "failed_probes": [
+        "pong_exact",
+        "json_schema"
+      ],
+      "failure_class": "timeout",
+      "notes": "The full live matrix timed out for both probes. A scoped outside-sandbox Claude retest was interrupted before a receipt was produced."
+    },
+    {
+      "logical_model_id": "claude-sonnet-4.6",
+      "route": "claude_code:claude-sonnet-4.6",
+      "provider": "claude_code",
+      "failed_probes": [
+        "pong_exact",
+        "json_schema"
+      ],
+      "failure_class": "timeout",
+      "notes": "The full live matrix timed out for both probes. A scoped outside-sandbox Claude retest was interrupted before a receipt was produced."
+    },
+    {
+      "logical_model_id": "kimi-k2.6",
+      "route": "nvidia_nim:moonshotai/kimi-k2.6",
+      "provider": "nvidia_nim",
+      "failed_probes": [
+        "pong_exact",
+        "json_schema"
+      ],
+      "failure_class": "schema_failure",
+      "notes": "The route was live but returned non-contract text for both bounded probe prompts."
+    }
+  ],
+  "skipped_unavailable_models": [
+    {
+      "logical_model_id": "gpt-5-codex",
+      "failure_class": "provider_dead"
+    },
+    {
+      "logical_model_id": "qwen3-235b-a22b",
+      "failure_class": "provider_dead"
+    },
+    {
+      "logical_model_id": "gemini-3-pro",
+      "failure_class": "provider_dead"
+    }
+  ],
+  "gate_blockers": [
+    "Provider truth remains red until every live_routable route either passes the bounded contract or is downgraded/quarantined with explicit policy.",
+    "Claude Code routes timed out in the full matrix and did not produce a completed outside-sandbox retest receipt.",
+    "NVIDIA NIM moonshotai/kimi-k2.6 is marked live_routable but failed both schema-bound probes.",
+    "A2A strict readiness remains red independently of provider truth: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19."
+  ]
+}
