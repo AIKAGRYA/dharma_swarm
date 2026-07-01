@@ -2,7 +2,7 @@
 
 **Status:** SEEDED (inaugural, 2026-07-01)
 **Slot:** MEGAFILE Slot 4 (Limbs Atlas) substrate reference — the "which limb
-implements which canonical agentic pattern" lens. Linked from
+implements which named agentic pattern" lens. Linked from
 [`LIMBS_ATLAS.md`](LIMBS_ATLAS.md).
 **Source frame:** Antonio Gulli, *Agentic Design Patterns: A Hands-On Guide to
 Building Intelligent Systems* (21 chapters + 7 appendices). This atlas maps the
@@ -12,7 +12,7 @@ Companion to the DRAFT track
 [`proposed_tracks/agentic-design-patterns-cognition-2026-07.yaml`](../governance/proposed_tracks/agentic-design-patterns-cognition-2026-07.yaml).
 
 > **Doc decays — check before citing (Axiom A6).** Verdicts below were current at
-> the audit date. Before treating any row as ground truth, confirm the cited
+> the audit date. Before treating any row as settled fact, confirm the cited
 > path against the code (`make xray`, GitNexus, or a direct read). A verdict is a
 > pointer, not a guarantee.
 
@@ -20,9 +20,9 @@ Companion to the DRAFT track
 
 ## Why this atlas exists
 
-The book is a canonical catalogue of the patterns that make an "AI system" an
+The book is a comprehensive catalogue of the patterns that make an "AI system" an
 *agent*. Mapping it against the repo answers one question precisely: **for each
-canonical pattern, does the substrate already implement it, and how well?** The
+named pattern, does the substrate already implement it, and how well?** The
 answer sharpens where new work has leverage and — just as important — where it
 would be redundant.
 

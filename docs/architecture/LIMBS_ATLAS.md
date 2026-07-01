@@ -4,10 +4,10 @@
 reserved in [`docs/MEGAFILE_INDEX.md`](../MEGAFILE_INDEX.md)).
 **Audience:** Engineer, Agent.
 **Read for:** the module map, the dependency graph, "what calls what," and —
-via the lenses below — which limb implements which canonical capability.
+via the lenses below — which limb implements which named capability.
 
 This file is a thin **index** for Slot 4, not a re-authored map. The substrate it
-points to remains the source of truth; this file exists so the pieces are
+points to remains the primary reference; this file exists so the pieces are
 discoverable from one place (MEGAFILE_INDEX recursion rule 2).
 
 ## Substrate (the real maps)
@@ -24,7 +24,7 @@ discoverable from one place (MEGAFILE_INDEX recursion rule 2).
 
 ## Lenses (capability views over the limbs)
 
-- [`AGENTIC_PATTERNS_ATLAS.md`](AGENTIC_PATTERNS_ATLAS.md) — the 21 canonical
+- [`AGENTIC_PATTERNS_ATLAS.md`](AGENTIC_PATTERNS_ATLAS.md) — the 21 named
   agentic design patterns (Gulli) mapped to the modules that implement them, with
   STRONG / PARTIAL / OUT-OF-SCOPE verdicts. Answers "does the substrate already do
   pattern X, and how well?"

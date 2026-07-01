@@ -753,7 +753,7 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
             promotion_state = (
                 Path(str(state_dir)).expanduser()
                 if state_dir
-                else Path.home() / ".dharma"
+                else dharma_state_dir()
             )
             promotion_summary = run_zeitgeist_promotion(promotion_state)
         except Exception as promo_exc:  # noqa: BLE001
