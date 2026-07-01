@@ -198,3 +198,58 @@ Verification:
 Remaining Phase 4 blocker:
 
 The strict A2A gate is still not green. Remaining blockers are the 17 open or claimed rows. They require task-specific execution, operator-gated closure, or explicit blocked receipts; the adapters intentionally do not infer those outcomes.
+
+## 2026-07-01 Addendum: Operator-Gated Stale Row Blocker
+
+After semantic and legacy-proof recovery, the remaining blocker class was open/claimed work. A third narrow tool now handles only the subset whose task body explicitly requires operator action:
+
+- Added `scripts/governance/a2a_block_operator_gated_tasks.py`
+- Added `tests/test_a2a_operator_gated_blocker.py`
+- The tool only targets non-terminal stale rows that contain explicit operator-gate phrases such as `operator-gated`, `operator approval required`, or `operator sign-off`.
+- It does not block ordinary stale work, recent work, terminal rows, generic `without approval` wording, or rows without explicit operator-gate phrases.
+
+Receipts:
+
+- `reports/langgraph_parity/allnight/a2a_operator_gated_block_dry_run_20260701T043613Z.json`
+- `reports/langgraph_parity/allnight/a2a_operator_gated_block_20260701T043613Z.json`
+- `reports/langgraph_parity/allnight/a2a_operator_gated_block_post_apply_dry_run_20260701T043613Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T043613Z.json`
+
+Live queue backup before apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-operator-gated-block-20260701T043613Z.bak`
+
+Result:
+
+- Dry-run found 6 candidates and 0 skips.
+- Apply blocked 6/6 explicit operator-gated stale rows as valid `blocked_verified` A2A lifecycle rows.
+- Post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2, now with `ready=false`, `open_tasks=11`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit now reports `blocker_count=11`: 5 stale claimed rows and 6 stale unclaimed rows.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_operator_gated_blocker.py` -> `3 passed in 0.64s`
+- `.venv/bin/python -m pytest -q tests/test_a2a_operator_gated_blocker.py tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `32 passed in 0.82s`
+- `.venv/bin/ruff check scripts/governance/a2a_block_operator_gated_tasks.py tests/test_a2a_operator_gated_blocker.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_block_operator_gated_tasks.py tests/test_a2a_operator_gated_blocker.py` -> pass
+- `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/a2a_operator_gated_block_dry_run_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_operator_gated_block_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_operator_gated_block_post_apply_dry_run_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_closeout.json` -> pass
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`
+- `git diff --check` -> pass
+
+Remaining Phase 4 blocker:
+
+The strict A2A gate is still not green. Remaining blockers are 11 open or claimed rows:
+
+- `forge-v0.1-001`
+- `holon-plan-review-cursor-20260612`
+- `holon-plan-review-opus-20260612`
+- `l1-fx-001`
+- `reconcile-564-565-20260611`
+- `sab-flywheel-d01-qwen-code-first-spark`
+- `tam-wp-wp_dfa4e1134277`
+- `ts-converge-0611`
+- `ts-hb0631-credit`
+- `ts-pr-babysit-div-20260610`
+- `yatagarasu-10cceaa8`

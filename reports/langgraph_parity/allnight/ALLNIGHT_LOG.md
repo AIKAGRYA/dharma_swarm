@@ -797,3 +797,59 @@
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
   - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T04:31:00Z - Phase 4 Remaining Open A2A Blocker Triage Start
+
+- Target gate: continue reducing the A2A strict readiness blocker after terminal receipt recovery, focusing only on the 17 rows that are still open or claimed.
+- Current branch state:
+  - Worktree was clean at resume before this round's checks.
+  - `make onboard` completed; it regenerated unrelated `reports/governance/*` projection files, which were restored because they are not part of this A2A slice.
+  - PR #732 remains open as draft on `codex/langgraph-orchestration-parity-20260701`.
+- Tests/checks run at round start:
+  - `make onboard` -> exit 0.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --artifact-root /Users/dhyana/.dharma/a2a_bus/collab/convergence --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_closeout.json` -> `blocker_count=17`; 11 `claimed_open`, 6 `open_unclaimed`.
+- Planned files:
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_closeout.json`
+  - `reports/langgraph_parity/allnight/ALLNIGHT_LOG.md`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - Additional code/tests only if a conservative, evidence-backed closure workflow is justified by queue-row inspection.
+- Current blockers:
+  - 17 open/claimed rows remain: `forge-v0.1-001`, `holon-plan-review-cursor-20260612`, `holon-plan-review-opus-20260612`, `l1-fx-001`, `reconcile-564-565-20260611`, `sab-flywheel-d01-qwen-code-first-spark`, `tam-wp-wp_dfa4e1134277`, `ts-converge-0611`, `ts-evo-0611-1`, `ts-evo-0611-2`, `ts-evo-0611-3`, `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, `yatagarasu-10cceaa8`, `yatagarasu-20260619-credit-monitor`, `yatagarasu-20260619-gap-scan-fix`, `yatagarasu-20260619-staging-decay`.
+  - Strict A2A cannot be green until every row is closed with a valid terminal `dharma_a2a_task_receipt.v1` or the row is otherwise removed by an explicit, evidence-backed lifecycle transition.
+
+## 2026-07-01T04:36:13Z - Phase 4 Operator-Gated A2A Block Closeout
+
+- Target gate result: partial success. A2A strict remains red, but six explicitly operator-gated stale claimed rows are now closed as `blocked_verified` with supervisor receipts.
+- Code changes landed locally:
+  - Added `scripts/governance/a2a_block_operator_gated_tasks.py`.
+  - Added `tests/test_a2a_operator_gated_blocker.py`.
+  - The tool is dry-run-first and only targets stale non-terminal rows whose body contains an explicit operator gate phrase such as `operator-gated`, `operator approval required`, or `operator sign-off`.
+  - It intentionally skips ordinary stale work and generic forbidden-action phrasing such as `without approval`.
+  - The live queue was backed up before apply at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-operator-gated-block-20260701T043613Z.bak`.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/a2a_operator_gated_block_dry_run_20260701T043613Z.json`
+  - `reports/langgraph_parity/allnight/a2a_operator_gated_block_20260701T043613Z.json`
+  - `reports/langgraph_parity/allnight/a2a_operator_gated_block_post_apply_dry_run_20260701T043613Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T043613Z.json`
+- A2A readiness result:
+  - Dry-run found 6 candidates and 0 skips: `ts-evo-0611-1`, `ts-evo-0611-2`, `ts-evo-0611-3`, `yatagarasu-20260619-gap-scan-fix`, `yatagarasu-20260619-credit-monitor`, and `yatagarasu-20260619-staging-decay`.
+  - Apply blocked 6/6 candidates with valid embedded `dharma_a2a_task_receipt.v1` receipts.
+  - Post-apply dry-run found `candidate_count=0`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still exits 2, now with `ready=false`, `open_tasks=11`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Fresh blocker audit now reports `blocker_count=11`: 5 stale claimed rows and 6 stale unclaimed rows.
+- Verification so far:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_operator_gated_blocker.py` -> `3 passed in 0.64s`.
+  - `.venv/bin/python -m pytest -q tests/test_a2a_operator_gated_blocker.py tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `32 passed in 0.82s`.
+  - `.venv/bin/ruff check scripts/governance/a2a_block_operator_gated_tasks.py tests/test_a2a_operator_gated_blocker.py` -> pass.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_block_operator_gated_tasks.py tests/test_a2a_operator_gated_blocker.py` -> pass.
+  - `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/a2a_operator_gated_block_dry_run_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_operator_gated_block_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_operator_gated_block_post_apply_dry_run_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T043613Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_closeout.json` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `92/100`; still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=11`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Remaining A2A blockers: `forge-v0.1-001`, `holon-plan-review-cursor-20260612`, `holon-plan-review-opus-20260612`, `l1-fx-001`, `reconcile-564-565-20260611`, `sab-flywheel-d01-qwen-code-first-spark`, `tam-wp-wp_dfa4e1134277`, `ts-converge-0611`, `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, and `yatagarasu-10cceaa8`.
+  - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
