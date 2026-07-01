@@ -135,7 +135,7 @@ test:
 	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x --timeout=60 -m "not slow and not docker"
 
 test-fast:
-	$(VENV_PYTHON) -m pytest tests/ -q --tb=line --timeout=10 --timeout-method=signal -m "not slow and not docker"
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line --timeout=10 -m "not slow and not docker"
 
 lint:
 	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
