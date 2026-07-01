@@ -1,0 +1,250 @@
+{
+  "$id": "https://dharma.local/schemas/dharma_semantic_receipt_graph_v0.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "provider_attempt"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "provider",
+              "model",
+              "success",
+              "outcome",
+              "duration_ms"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "routing_decision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "decision_id",
+              "route_path",
+              "selected_provider",
+              "confidence"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "verifier_outcome"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "verdict",
+              "score",
+              "gate_failures",
+              "missing_evidence"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "record_type": {
+            "const": "human_or_council_label"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "label_fields": {
+            "required": [
+              "gold_labels",
+              "label_source",
+              "adjudication_state"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "content_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "created_at": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "label_fields": {
+      "additionalProperties": true,
+      "properties": {
+        "adjudication_state": {
+          "enum": [
+            "unlabeled",
+            "single_label",
+            "needs_adjudication",
+            "adjudicated"
+          ]
+        },
+        "gold_labels": {
+          "items": {
+            "enum": [
+              "valid_receipt",
+              "unsupported_claim",
+              "weak_completion",
+              "bad_route",
+              "privacy_violation",
+              "good_next_action",
+              "needs_external_verification",
+              "real_completion"
+            ]
+          },
+          "type": "array"
+        },
+        "label_source": {
+          "type": "string"
+        },
+        "labeler_id_hash": {
+          "type": "string"
+        },
+        "weak_labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "observed_at": {
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "privacy_tags": {
+      "items": {
+        "enum": [
+          "public",
+          "internal_redacted",
+          "internal_hash_only",
+          "private_metadata",
+          "quarantine_sensitive",
+          "excluded_raw_secret",
+          "excluded_raw_message",
+          "excluded_provider_payload"
+        ]
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "provenance": {
+      "additionalProperties": true,
+      "properties": {
+        "collector": {
+          "type": "string"
+        },
+        "collector_version": {
+          "type": "string"
+        },
+        "extraction_mode": {
+          "enum": [
+            "metadata_only",
+            "redacted_content",
+            "hash_only"
+          ]
+        },
+        "upstream_record_id": {
+          "type": "string"
+        },
+        "upstream_schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "collector",
+        "collector_version",
+        "extraction_mode"
+      ],
+      "type": "object"
+    },
+    "record_id": {
+      "minLength": 12,
+      "type": "string"
+    },
+    "record_type": {
+      "enum": [
+        "agent_event",
+        "provider_attempt",
+        "routing_decision",
+        "semantic_receipt",
+        "verifier_outcome",
+        "artifact_ref",
+        "claim_evidence",
+        "a2a_delivery",
+        "eval_result",
+        "human_or_council_label"
+      ]
+    },
+    "schema_version": {
+      "const": "dharma.semantic_receipt_graph.v0"
+    },
+    "source_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_ref": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "record_type",
+    "record_id",
+    "source_ref",
+    "source_hash",
+    "content_hash",
+    "created_at",
+    "provenance",
+    "privacy_tags",
+    "evidence_refs",
+    "label_fields",
+    "payload"
+  ],
+  "title": "Dharma Semantic Receipt Graph v0",
+  "type": "object"
+}

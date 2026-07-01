@@ -1,0 +1,65 @@
+{
+  "artifacts": {
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/BASELINE_AND_EVAL_PLAN_20260701.md": {
+      "bytes": 3718,
+      "sha256": "sha256:b8972e8b651f561afe29239b6e02bdc9a663d3dc94ebd1e3596949dc6702e1f4"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DATA_INVENTORY_20260701.md": {
+      "bytes": 6630,
+      "sha256": "sha256:066ba4f198cb6ed0ad4afe208164bcb84a1f5d87985ccfbed60edc7874bbb1e0"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DATA_INVENTORY_RECEIPT_20260701.json": {
+      "bytes": 15003,
+      "sha256": "sha256:6832ba9555a37de0c0a5324b624fa5fe3b7659793d02258ad25e674b1f96520a"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DHARMA_SEMANTIC_RECEIPT_GRAPH_V0.schema.json": {
+      "bytes": 5274,
+      "sha256": "sha256:b4299f8feaf3aa6477b7f5e665abe330023c4ec1a1b1bb603bcd84d2c1eaa377"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/DHARMA_VERIFIER_RANKER_OUTPUT_V0.schema.json": {
+      "bytes": 1686,
+      "sha256": "sha256:2993590bd8f323641b3850f0c81356d48c9b8661d04885aae150d41a7bb42fbc"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/LABEL_TAXONOMY_AND_GOLD_PLAN_20260701.md": {
+      "bytes": 3603,
+      "sha256": "sha256:6ea6d920528223f5e3efe87ca10a48bd9aca76a577ad191a1d808575cce89637"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/MODEL_ARCHITECTURE_AND_TRAINING_READINESS_20260701.md": {
+      "bytes": 4833,
+      "sha256": "sha256:f9d47260c791c54605c16b77e2d243d9d5d4a74fab4a7af3e8014758bf24a837"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/MODEL_CARD_AND_PROMOTION_DECISION_20260701.md": {
+      "bytes": 1790,
+      "sha256": "sha256:43a2bbda677a7a930d048fc115ca6ad301b8226e3c240a204677b914b6569697"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/MODEL_CARD_TEMPLATE_20260701.md": {
+      "bytes": 1755,
+      "sha256": "sha256:cac9f22d481df0e269b4233ebe203d2752e5848e71854bc9fe9503157d86fd76"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/PROMOTION_AND_KILL_GATES_20260701.md": {
+      "bytes": 2624,
+      "sha256": "sha256:33a453aa6d9a445489090659092f6cf625b335bd8d2169cec375a5a75fe4d476"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/README.md": {
+      "bytes": 3224,
+      "sha256": "sha256:acf056acaa3944c810454622dea246c27b7486e493e72dcd6638e5d6207f44b2"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/REDACTION_AND_PRIVACY_RULES_20260701.md": {
+      "bytes": 3809,
+      "sha256": "sha256:2e1194af9d34f88ef42caa4f3002894b847b0a1f5ee298a6d2b3ec5d18788723"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/TOOL_RESOURCE_RESEARCH_20260701.md": {
+      "bytes": 3209,
+      "sha256": "sha256:31f2f9e533e11f4771c151f328f3f0abe3cba6284b788aea1ee2f4b13a81cffc"
+    },
+    "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0/TRAINING_COMMAND_PLAN_20260701.md": {
+      "bytes": 3787,
+      "sha256": "sha256:2d59eeee11c639e5d4e6c8853107fa66106580a6db95823112ffaf29fc81a006"
+    }
+  },
+  "missing": [],
+  "package_dir": "/Users/dhyana/dharma_swarm/reports/agentops/verifier_ranker_v0",
+  "schema_errors": [],
+  "schema_version": "dharma.verifier_ranker_v0.package_manifest.v1",
+  "status": "pass"
+}
