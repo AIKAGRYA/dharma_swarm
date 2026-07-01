@@ -1,0 +1,41 @@
+# Tab Closeout Receipt
+
+- UTC: 2026-07-01T03:03:23Z
+- terminal_status: BLOCKED_WITH_PATCH
+- repo_root: /Users/dhyana/dharma_swarm
+- worktree_path: /Users/dhyana/dharma_swarm
+- branch: agent/magpie-seed
+- upstream: origin/agent/magpie-seed
+- head_sha: b6e6ae8ca7de9df01f0fa1d1248a24a4de9ad6b2
+- base_sha_or_origin_main: dd02c1e03abb9348d442156c727f036b4bd65343
+- dirty_after_closeout: yes
+- pushed: no
+- remote_branch: origin/agent/magpie-seed
+- pr_url: none
+- patch_bundle: /Users/dhyana/tab_closeout_control/patches/dharma_swarm__agent_magpie-seed__20260701T025940Z
+- verification_commands:
+  - pwd
+  - git -C /Users/dhyana/dharma_swarm rev-parse --show-toplevel
+  - git -C /Users/dhyana/dharma_swarm branch --show-current
+  - git -C /Users/dhyana/dharma_swarm rev-parse --abbrev-ref --symbolic-full-name @{u}
+  - git -C /Users/dhyana/dharma_swarm status --short
+  - git -C /Users/dhyana/dharma_swarm log --oneline -5
+  - git -C /Users/dhyana/dharma_swarm diff --stat
+  - git -C /Users/dhyana/dharma_swarm diff --cached --stat
+  - gh pr view agent/magpie-seed --repo AmitabhainArunachala/dharma_swarm --json number,url,title,state,headRefName,isDraft,mergeStateStatus,mergeable
+  - gh pr list --repo AmitabhainArunachala/dharma_swarm --state open --json number,title,headRefName,url,isDraft,mergeStateStatus,mergeable
+  - test -s /Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/INDEX.md
+  - test -s /Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/post_716_cleanup.md
+  - test -s /Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/worktree_production_readiness_plan.md
+  - test -s /Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/MANIFEST.json
+  - test -s /Users/dhyana/tab_closeout_control/patches/dharma_swarm__agent_magpie-seed__20260701T025940Z/worktree_readiness_2026-06-30/INDEX.md
+  - test -s /Users/dhyana/tab_closeout_control/patches/dharma_swarm__agent_magpie-seed__20260701T025940Z/status_short.txt
+- verification_result: Context captured. No PR exists for branch agent/magpie-seed. Report files and preservation manifest are non-empty. Patch bundle was created and includes git diff, empty staged diff, status, untracked file list, open PR inventory, branch/upstream/head/base SHAs, and a copied worktree_readiness_2026-06-30 report directory. No code test suite was run during closeout because this closeout did not make code changes and the repo has broad pre-existing dirty state that is not safe to normalize here.
+- files_changed:
+  - /Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/ (untracked governance closeout and worktree preservation reports from this tab)
+  - /Users/dhyana/tab_closeout_control/patches/dharma_swarm__agent_magpie-seed__20260701T025940Z/ (patch bundle created for monitor agent)
+  - /Users/dhyana/tab_closeout_control/receipts/dharma_swarm__agent_magpie-seed__20260701T025940Z.md (this receipt)
+- commits_created: none during closeout
+- operator_decision_needed: yes
+- risks_or_blockers: The current worktree is heavily dirty. Committing from agent/magpie-seed would mix unrelated work with this tab's governance receipts. The branch has no open PR. During closeout capture the branch head advanced from f1f3e140e3ddac4e5d246daaabb1d1d588bd04e2 to b6e6ae8ca7de9df01f0fa1d1248a24a4de9ad6b2, and origin/agent/magpie-seed now matches b6e6ae8ca7de9df01f0fa1d1248a24a4de9ad6b2; this closeout did not run git commit or git push. Current open PR inventory was captured in open_prs_current.json; as of closeout #704 is conflicting, #718 and #719 are mergeable and non-draft, #723/#732/#736/#737 are clean draft PRs, and #734 is draft and unstable. Earlier this tab closed stale PRs #708, #710, #714, #715, #717, #720, and #722, preserved dirty worktrees, and recorded the post-716 production-readiness plan in the report directory.
+- next_recommended_action: Monitor agent should treat the patch bundle as the durable handoff. If the governance reports should live in git, copy only reports/governance/worktree_readiness_2026-06-30 from the patch bundle into a clean branch and open a focused docs/governance PR. Then use worktree_production_readiness_plan.md to assign production-readiness runs for remaining PR/worktree lanes, with operator decision on merge order for #718/#719 and conflict resolution strategy for #704.

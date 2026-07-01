@@ -1,0 +1,444 @@
+{
+  "generated_at": "2026-06-30T16:43:37.406405+00:00",
+  "packet_count": 28,
+  "packets": [
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:27.292573+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_helm_build",
+      "path": "/Users/dhyana/dharma_helm_build",
+      "status": "preserved",
+      "untracked_file_count": 2,
+      "untracked_tar_candidate_bytes": 10131
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:27.970482+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm",
+      "path": "/Users/dhyana/dharma_swarm",
+      "status": "preserved",
+      "untracked_file_count": 409,
+      "untracked_tar_candidate_bytes": 20128868
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:29.363014+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_cashclaw",
+      "path": "/Users/dhyana/dharma_swarm_cashclaw",
+      "status": "preserved",
+      "untracked_file_count": 714,
+      "untracked_tar_candidate_bytes": 3213867
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_live/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_live/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_live/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_live/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:30.284029+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_live",
+      "path": "/Users/dhyana/dharma_swarm_live",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_main/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_main/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_main/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_main/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:30.894063+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_main",
+      "path": "/Users/dhyana/dharma_swarm_main",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_wt_render-on-demand/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_wt_render-on-demand/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_wt_render-on-demand/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_wt_render-on-demand/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:31.543047+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_swarm_wt_render-on-demand",
+      "path": "/Users/dhyana/dharma_swarm_wt/render-on-demand",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:32.205864+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_dharma_ws_idea_spark",
+      "path": "/Users/dhyana/dharma_ws_idea_spark",
+      "status": "preserved",
+      "untracked_file_count": 2,
+      "untracked_tar_candidate_bytes": 18815
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:32.928251+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_a2a_nats_rebuild_preflight_20260618",
+      "path": "/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618",
+      "status": "preserved",
+      "untracked_file_count": 316,
+      "untracked_tar_candidate_bytes": 4032941
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-30T16:10:34.453945+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_active_track_graduation_20260630",
+      "path": "/Users/dhyana/ds_active_track_graduation_20260630",
+      "status": "preserved",
+      "untracked_file_count": 14,
+      "untracked_tar_candidate_bytes": 124372
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_cleanup_convergence_20260625/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_cleanup_convergence_20260625/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_cleanup_convergence_20260625/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_cleanup_convergence_20260625/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:33.837385+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_cleanup_convergence_20260625",
+      "path": "/Users/dhyana/ds_cleanup_convergence_20260625",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "observed_at": "2026-06-30T16:43:34.419072+00:00",
+      "path": "/Users/dhyana/ds_forge_nvidia_foundry_mvp_20260701",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701",
+      "status": "preserved",
+      "errors": [],
+      "untracked_file_count": 2,
+      "untracked_tar_candidate_bytes": 34632,
+      "artifacts": {
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701/meta.json",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701/HEAD.bundle",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701/tracked.diff",
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701/cached.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_nvidia_foundry_mvp_20260701/untracked_files.tar.gz"
+      }
+    },
+    {
+      "observed_at": "2026-06-30T16:43:36.742888+00:00",
+      "path": "/Users/dhyana/ds_forge_prod_contracts_20260701",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701",
+      "status": "preserved",
+      "errors": [],
+      "untracked_file_count": 6,
+      "untracked_tar_candidate_bytes": 29994,
+      "artifacts": {
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701/meta.json",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701/HEAD.bundle",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701/tracked.diff",
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701/cached.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_prod_contracts_20260701/untracked_files.tar.gz"
+      }
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:34.547443+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_10_10_20260626",
+      "path": "/Users/dhyana/ds_forge_proving_ground_10_10_20260626",
+      "status": "preserved",
+      "untracked_file_count": 25,
+      "untracked_tar_candidate_bytes": 134586
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:35.258163+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_proving_ground_droid_10_10_20260626",
+      "path": "/Users/dhyana/ds_forge_proving_ground_droid_10_10_20260626",
+      "status": "preserved",
+      "untracked_file_count": 2,
+      "untracked_tar_candidate_bytes": 35418
+    },
+    {
+      "observed_at": "2026-06-30T16:43:35.307996+00:00",
+      "path": "/Users/dhyana/ds_forge_spine_v0",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0",
+      "status": "preserved",
+      "errors": [],
+      "untracked_file_count": 40,
+      "untracked_tar_candidate_bytes": 301736,
+      "artifacts": {
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/meta.json",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/HEAD.bundle",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/tracked.diff",
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/cached.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_spine_v0/untracked_files.tar.gz"
+      }
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:35.970113+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_forge_v1_scoreboard",
+      "path": "/Users/dhyana/ds_forge_v1_scoreboard",
+      "status": "preserved",
+      "untracked_file_count": 12,
+      "untracked_tar_candidate_bytes": 102127
+    },
+    {
+      "observed_at": "2026-06-30T16:43:36.028312+00:00",
+      "path": "/Users/dhyana/ds_langgraph_parity_20260701",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701",
+      "status": "preserved",
+      "errors": [],
+      "untracked_file_count": 1,
+      "untracked_tar_candidate_bytes": 13340,
+      "artifacts": {
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701/meta.json",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701/HEAD.bundle",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701/tracked.diff",
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701/cached.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_langgraph_parity_20260701/untracked_files.tar.gz"
+      }
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:40.905451+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_pudgala_autopoiesis_20260626",
+      "path": "/Users/dhyana/ds_pudgala_autopoiesis_20260626",
+      "status": "preserved",
+      "untracked_file_count": 1,
+      "untracked_tar_candidate_bytes": 23870
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_routing_canon_20260630/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_routing_canon_20260630/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_routing_canon_20260630/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_routing_canon_20260630/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:36.693881+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_routing_canon_20260630",
+      "path": "/Users/dhyana/ds_routing_canon_20260630",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:37.444230+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_semantic_commons_100",
+      "path": "/Users/dhyana/ds_semantic_commons_100",
+      "status": "preserved",
+      "untracked_file_count": 30,
+      "untracked_tar_candidate_bytes": 319129
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:38.150777+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_ds_supplychain_slice",
+      "path": "/Users/dhyana/ds_supplychain_slice",
+      "status": "preserved",
+      "untracked_file_count": 5,
+      "untracked_tar_candidate_bytes": 54063
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:41.618176+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_migration_delta_dharma_swarm_old",
+      "path": "/Users/dhyana/migration_delta/dharma_swarm_old",
+      "status": "preserved",
+      "untracked_file_count": 40,
+      "untracked_tar_candidate_bytes": 180774
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626/tracked.diff",
+        "untracked_tar": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626/untracked_files.tar.gz"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:38.840997+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_cockpit_grafana_static_20260626",
+      "path": "/Users/dhyana/worktrees/ds_cockpit_grafana_static_20260626",
+      "status": "preserved",
+      "untracked_file_count": 1,
+      "untracked_tar_candidate_bytes": 1455753
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_pr674_rebase_20260624/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_pr674_rebase_20260624/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_pr674_rebase_20260624/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_pr674_rebase_20260624/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:39.496767+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_ds_pr674_rebase_20260624",
+      "path": "/Users/dhyana/worktrees/ds_pr674_rebase_20260624",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_pr689_closure/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_pr689_closure/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_pr689_closure/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_pr689_closure/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-29T16:34:40.174512+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/Users_dhyana_worktrees_pr689_closure",
+      "path": "/Users/dhyana/worktrees/pr689_closure",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_dharma-lgp-pr/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_dharma-lgp-pr/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_dharma-lgp-pr/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_dharma-lgp-pr/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-30T16:10:31.999459+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_dharma-lgp-pr",
+      "path": "/private/tmp/dharma-lgp-pr",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_loop/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_loop/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_loop/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_loop/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-30T16:10:32.866636+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_loop",
+      "path": "/private/tmp/ds_loop",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    },
+    {
+      "artifacts": {
+        "cached_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_pr727_merged_verify_20260630/cached.diff",
+        "head_bundle": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_pr727_merged_verify_20260630/HEAD.bundle",
+        "meta": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_pr727_merged_verify_20260630/meta.json",
+        "tracked_diff": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_pr727_merged_verify_20260630/tracked.diff"
+      },
+      "errors": [],
+      "observed_at": "2026-06-30T16:10:33.665485+00:00",
+      "packet_dir": "/Users/dhyana/dharma_swarm/reports/governance/worktree_readiness_2026-06-30/preservation_packets/private_tmp_ds_pr727_merged_verify_20260630",
+      "path": "/private/tmp/ds_pr727_merged_verify_20260630",
+      "status": "preserved",
+      "untracked_file_count": 0,
+      "untracked_tar_candidate_bytes": 0
+    }
+  ]
+}

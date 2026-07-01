@@ -1,0 +1,809 @@
+{
+  "generated_at": "2026-06-30T16:43:46.651476+00:00",
+  "worktree_count": 40,
+  "open_pr_count": 5,
+  "preservation_packet_count": 28,
+  "unpacketized_dirty": [],
+  "rows": [
+    {
+      "path": "/Users/dhyana/dharma_swarm",
+      "branch": "agent/magpie-seed",
+      "head": "f1f3e140e",
+      "dirty": true,
+      "status_counts": {
+        "M": 86,
+        "A": 0,
+        "D": 1,
+        "U": 267,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 307,
+        "ahead": 27
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/private/tmp/dharma-lgp-pr",
+      "branch": "main",
+      "head": "3c2e4a684",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 8,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/private/tmp/ds_loop",
+      "branch": "ratchet/loop-phases-1-3",
+      "head": "2f9d6eb09",
+      "dirty": true,
+      "status_counts": {
+        "M": 27,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 20
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/private/tmp/ds_pr727_merged_verify_20260630",
+      "branch": "(detached)",
+      "head": "17a55d346",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 6,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/private/tmp/ds_pr729_a2a_nats_review_20260630",
+      "branch": "claude/a2a-nats-review-test-ncol7c",
+      "head": "e0b8d6ab6",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 7,
+        "ahead": 7
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/private/tmp/ds_pr731_telos_formal_repair_20260630",
+      "branch": "devin/1782798202-formal-telos-gates",
+      "head": "9701419f3",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 1,
+        "ahead": 0
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/dharma-debug-corral",
+      "branch": "claude/debug-corral",
+      "head": "62cc51b85",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 1
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/dharma_helm_build",
+      "branch": "helm/worldclass-20260612",
+      "head": "680b013c0",
+      "dirty": true,
+      "status_counts": {
+        "M": 7,
+        "A": 0,
+        "D": 0,
+        "U": 2,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 364,
+        "ahead": 90
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_cashclaw",
+      "branch": "cashclaw/revenue-hydra-v1",
+      "head": "c487d2725",
+      "dirty": true,
+      "status_counts": {
+        "M": 1,
+        "A": 0,
+        "D": 0,
+        "U": 17,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 386,
+        "ahead": 10
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_live",
+      "branch": "organ/03-seat",
+      "head": "e67b91829",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 1,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 381,
+        "ahead": 10
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_main",
+      "branch": "(detached)",
+      "head": "6b9c5005a",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 224,
+        "ahead": 1
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_oz_integration",
+      "branch": "oz/integration-2026-06-25",
+      "head": "2cdef3d78",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 3
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_slice_roast",
+      "branch": "slice/roast-skill",
+      "head": "5288c8ea5",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 2
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/dharma_swarm_wt/render-on-demand",
+      "branch": "chore/render-on-demand-stop-churn-20260625",
+      "head": "21ee18b36",
+      "dirty": true,
+      "status_counts": {
+        "M": 8,
+        "A": 0,
+        "D": 4,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 49,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/dharma_ws_idea_spark",
+      "branch": "feat/operator-idea-spark-ingest",
+      "head": "2cb466977",
+      "dirty": true,
+      "status_counts": {
+        "M": 1,
+        "A": 0,
+        "D": 0,
+        "U": 2,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 307,
+        "ahead": 26
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_a2a_nats_rebuild_preflight_20260618",
+      "branch": "runtime-truth/nats-rebuild-preflight-20260618",
+      "head": "86418541a",
+      "dirty": true,
+      "status_counts": {
+        "M": 28,
+        "A": 0,
+        "D": 0,
+        "U": 54,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 224,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_active_track_graduation_20260630",
+      "branch": "codex/active-track-graduation-20260630",
+      "head": "f84f40344",
+      "dirty": true,
+      "status_counts": {
+        "M": 9,
+        "A": 0,
+        "D": 0,
+        "U": 1,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_cleanup_convergence_20260625",
+      "branch": "codex/governance-fitness-ci-20260625-225920",
+      "head": "791801e0f",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 2
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_nvidia_foundry_mvp_20260701",
+      "branch": "forge/nvidia-foundry-mvp-20260701",
+      "head": "f1f3e140e",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 2,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 307,
+        "ahead": 27
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_prod_contracts_20260701",
+      "branch": "codex/forge-prod-contracts-20260701",
+      "head": "f84f40344",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 2,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_proving_ground_10_10_20260626",
+      "branch": "codex/dharma-forge-proving-ground-10-10-20260626",
+      "head": "50c8e2b75",
+      "dirty": true,
+      "status_counts": {
+        "M": 4,
+        "A": 0,
+        "D": 0,
+        "U": 21,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_proving_ground_droid_10_10_20260626",
+      "branch": "droid/dharma-forge-proving-ground-10-10-20260626",
+      "head": "50c8e2b75",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 17,
+        "D": 0,
+        "U": 2,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_spine_v0",
+      "branch": "feat/forge-spine-v0",
+      "head": "f84f40344",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 6,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_forge_v1_scoreboard",
+      "branch": "forge-v1/tokenbroker-scoreboard-20260620",
+      "head": "d8bca7aab",
+      "dirty": true,
+      "status_counts": {
+        "M": 21,
+        "A": 0,
+        "D": 0,
+        "U": 8,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 224,
+        "ahead": 9
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_langgraph_parity_20260701",
+      "branch": "codex/langgraph-orchestration-parity-20260701",
+      "head": "a9f94781c",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 1,
+        "other": 0
+      },
+      "packet": true,
+      "pr": 732,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 3
+      },
+      "disposition": "blocked: PR #732 has failing CI; exact failing gates recorded in receipts"
+    },
+    {
+      "path": "/Users/dhyana/ds_mike_nonstop_20260626",
+      "branch": "codex/mike-nonstop-dedupe-20260626",
+      "head": "3e46efe93",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 4
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/ds_pr704_pudgala_autopoiesis",
+      "branch": "codex/pudgala-autopoiesis-protostar-20260626",
+      "head": "ffe3ad358",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": 704,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 2
+      },
+      "disposition": "green draft awaiting operator"
+    },
+    {
+      "path": "/Users/dhyana/ds_pr713_quality_ratchet",
+      "branch": "claude/anti-slop-enforcement-2026-06",
+      "head": "1ada96634",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 10,
+        "ahead": 1
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/ds_pr716_sleep_cycle_fix",
+      "branch": "fix/pr716-sleep-cycle-graceful",
+      "head": "9c12761ac",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 11,
+        "ahead": 1
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/ds_pr718_vnh_sis_seed",
+      "branch": "claude/monetization-strategy-team-rgn7g6",
+      "head": "f59972b6c",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": 718,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 16
+      },
+      "disposition": "green/operator-gated"
+    },
+    {
+      "path": "/Users/dhyana/ds_pr719_sis_seed1_carbon",
+      "branch": "claude/sis-seed1-carbon-attribution",
+      "head": "c7863e51e",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": 719,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 2
+      },
+      "disposition": "green/operator-gated"
+    },
+    {
+      "path": "/Users/dhyana/ds_routing_canon_20260630",
+      "branch": "codex/routing-canon-20260630",
+      "head": "29bd36aa6",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": 723,
+      "ahead_behind_origin_main": {
+        "behind": 0,
+        "ahead": 8
+      },
+      "disposition": "green draft awaiting operator"
+    },
+    {
+      "path": "/Users/dhyana/ds_semantic_commons_100",
+      "branch": "codex/semantic-commons-livingdock-composer-100",
+      "head": "c53721d5f",
+      "dirty": true,
+      "status_counts": {
+        "M": 9,
+        "A": 0,
+        "D": 0,
+        "U": 29,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/ds_supplychain_slice",
+      "branch": "loop-closure/supplychain-bronze-20260620",
+      "head": "11de04fb7",
+      "dirty": true,
+      "status_counts": {
+        "M": 9,
+        "A": 0,
+        "D": 0,
+        "U": 5,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 205,
+        "ahead": 1
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/ds_a2a_governance_readiness_20260626",
+      "branch": "codex/a2a-governance-readiness-20260626",
+      "head": "98d374d3f",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 4
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/ds_cockpit_grafana_static_20260626",
+      "branch": "scratch/cockpit-grafana-static-20260626",
+      "head": "69506fc80",
+      "dirty": true,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 1,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 307,
+        "ahead": 10
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/ds_mike_arbiter_20260626",
+      "branch": "governance/mike-trust-arbiter-2026-06",
+      "head": "dc29826f9",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 3
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/ds_pr674_rebase_20260624",
+      "branch": "repair/pr674-track-closure-gate-20260624",
+      "head": "ebccfb1e2",
+      "dirty": true,
+      "status_counts": {
+        "M": 4,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 64,
+        "ahead": 0
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/ds_reconciliation_promotion_20260626",
+      "branch": "codex/reconciliation-promotion-20260626",
+      "head": "fecff4b85",
+      "dirty": false,
+      "status_counts": {
+        "M": 0,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": false,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 35,
+        "ahead": 2
+      },
+      "disposition": "archive-plan-only unless operator promotes unique diff"
+    },
+    {
+      "path": "/Users/dhyana/worktrees/pr689_closure",
+      "branch": "pr-689-closure",
+      "head": "91dfe4db2",
+      "dirty": true,
+      "status_counts": {
+        "M": 3,
+        "A": 0,
+        "D": 0,
+        "U": 0,
+        "other": 0
+      },
+      "packet": true,
+      "pr": null,
+      "ahead_behind_origin_main": {
+        "behind": 22,
+        "ahead": 3
+      },
+      "disposition": "blocked: dirty WIP preserved; split source/generated artifacts before promotion"
+    }
+  ]
+}
