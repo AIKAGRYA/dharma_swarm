@@ -46,9 +46,9 @@ It does not prove:
 
 Fresh local-live evidence was generated from this branch:
 
-- `reports/governance/nats_live_production_matrix/nats-live-20260701T145851Z-44b1cf6d/evidence.json`
+- `reports/governance/nats_live_production_matrix/nats-live-20260701T152205Z-a82fdddb/evidence.json`
 - `reports/governance/nats_live_production_matrix/latest.json`
-- `reports/a2a/nats_live_production_matrix/nats-live-20260701T145851Z-44b1cf6d/receipts/nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30.semantic_receipt.json`
+- `reports/a2a/nats_live_production_matrix/nats-live-20260701T152205Z-a82fdddb/receipts/nats_live_20260701T152205Z_a82fdddb_happy_path_fa4f36bd.semantic_receipt.json`
 
 Provider note: the first live matrix attempt failed because `ollama:glm-5.2:cloud` returned a weekly usage-limit error. The passing evidence uses `--provider deterministic --model local-deterministic`; NATS broker delivery remains live against `nats://127.0.0.1:4222`.
 
@@ -69,4 +69,3 @@ Commands run successfully:
 4. Initialize `NodeGateway` in the API lifespan and enforce Agent Card signatures or an equivalent trust gate.
 5. Add the speaking adapter: speech-to-text -> OperatorIntent -> A2A task -> reply/artifact -> text-to-speech.
 6. Integrate LangGraph only as a durable long-workflow layer after A2A task truth is stable.
-

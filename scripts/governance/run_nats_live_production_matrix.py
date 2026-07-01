@@ -53,6 +53,7 @@ CONSUMER_CLASS = "dharma_swarm.a2a.a2a_server.A2AServer"
 
 SOURCE_FRESHNESS_PATHS = [
     "dharma_swarm/a2a/nats_transport.py",
+    "dharma_swarm/a2a/nats_transport_support.py",
     "dharma_swarm/a2a/a2a_server.py",
     "dharma_swarm/a2a/a2a_bridge.py",
     "dharma_swarm/runtime_state.py",

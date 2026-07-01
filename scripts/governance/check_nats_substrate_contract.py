@@ -36,6 +36,7 @@ def _repo_paths(repo_root: Path) -> dict[str, Path]:
         "a2a_reply_capture": repo_root / "scripts" / "runtime" / "a2a_reply_capture.py",
         "nats_status": repo_root / "dharma_swarm" / "operator_core" / "nats_substrate_status.py",
         "nats_transport": repo_root / "dharma_swarm" / "a2a" / "nats_transport.py",
+        "nats_transport_support": repo_root / "dharma_swarm" / "a2a" / "nats_transport_support.py",
         "a2a_cloud_contact": repo_root / "dharma_swarm" / "a2a" / "a2a_cloud_contact.py",
         "nats_live_matrix": repo_root / "scripts" / "governance" / "run_nats_live_production_matrix.py",
         "nats_live_evidence": repo_root / "scripts" / "governance" / "check_nats_live_production_evidence.py",
@@ -64,6 +65,7 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
     a2a_reply_capture = _read(paths["a2a_reply_capture"])
     nats_status = _read(paths["nats_status"])
     nats_transport = _read(paths["nats_transport"])
+    nats_transport_contract = nats_transport + "\n" + _read(paths["nats_transport_support"])
     a2a_cloud_contact = _read(paths["a2a_cloud_contact"])
     nats_live_matrix = _read(paths["nats_live_matrix"])
     nats_live_evidence = _read(paths["nats_live_evidence"])
@@ -165,7 +167,11 @@ def check_contract(repo_root: Path | str = REPO_ROOT) -> list[str]:
         "requires A2AServer(require_execution_identity=True)",
     ]
     for marker in required_transport_markers:
-        _require(marker in nats_transport, f"nats_transport missing contract marker: {marker}", failures)
+        _require(
+            marker in nats_transport_contract,
+            f"nats_transport missing contract marker: {marker}",
+            failures,
+        )
 
     required_cloud_contact_markers = [
         "A2ANatsTransport",

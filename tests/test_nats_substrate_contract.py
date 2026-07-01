@@ -98,6 +98,7 @@ def _write_contract_repo(root: Path) -> dict[str, Path]:
         "a2a_reply_capture": root / "scripts" / "runtime" / "a2a_reply_capture.py",
         "nats_status": root / "dharma_swarm" / "operator_core" / "nats_substrate_status.py",
         "nats_transport": root / "dharma_swarm" / "a2a" / "nats_transport.py",
+        "nats_transport_support": root / "dharma_swarm" / "a2a" / "nats_transport_support.py",
         "a2a_cloud_contact": root / "dharma_swarm" / "a2a" / "a2a_cloud_contact.py",
         "nats_live_matrix": root / "scripts" / "governance" / "run_nats_live_production_matrix.py",
         "nats_live_evidence": root / "scripts" / "governance" / "check_nats_live_production_evidence.py",
@@ -190,6 +191,7 @@ NATS_MAX_DELIVER_EXHAUSTED
 requires A2AServer(require_execution_identity=True)
 ''',
     )
+    _write(paths["nats_transport_support"], "wire helpers\n")
     _write(paths["a2a_cloud_contact"], "A2ANatsTransport publish_task JETSTREAM_PUBLISH_CONTRACT operator_transport_required\n")
     _write(
         paths["nats_live_matrix"],
