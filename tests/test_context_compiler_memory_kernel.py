@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -118,6 +119,12 @@ class _AdmissionMemoryKernel:
         return preview_memory_pack(filtered_atoms, budget=budget)
 
 
+class _BudgetOnlyAdmissionMemoryKernel(_AdmissionMemoryKernel):
+    def preview_memory_pack(self, **kwargs: object):
+        self.kwargs = kwargs
+        return preview_memory_pack(self.atoms, budget=kwargs["budget"])
+
+
 def _memory_surface() -> MemorySurface:
     return MemorySurface(
         surface_id="agent.memory",
@@ -143,8 +150,11 @@ def _memory_atom(
     agent_id: str | None = None,
     freshness: str = "current_or_live_snapshot",
     valid_until: str | None = None,
+    metadata: dict[str, object] | None = None,
 ) -> MemoryAtom:
-    metadata = {"agent_id": agent_id} if agent_id else {}
+    atom_metadata: dict[str, object] = dict(metadata or {})
+    if agent_id:
+        atom_metadata["agent_id"] = agent_id
     return MemoryAtom.build(
         surface=_memory_surface(),
         atom_type=MemoryAtomType.WITNESS_EVENT,
@@ -154,7 +164,7 @@ def _memory_atom(
         source_path="/tmp/agent-memory.jsonl",
         adapter_name="test",
         read_mode=ReadMode.READ_ONLY,
-        metadata=metadata,
+        metadata=atom_metadata,
         source_row_key=f"row:{content}",
         memory_lane=MemoryLane.PROVENANCE,
         scope=scope,
@@ -356,6 +366,73 @@ async def test_context_compiler_rejects_stale_memory_with_retrieval_telemetry() 
     assert metadata["retrieval_telemetry"]["admitted_surface_ids"] == ["agent.memory"]
     budget = kernel.kwargs["budget"]
     assert getattr(budget, "reject_stale") is True
+
+
+@pytest.mark.asyncio
+async def test_context_compiler_enforces_curated_source_and_tool_exposure_isolation() -> None:
+    current_atom = _memory_atom(
+        "alpha curated source memory for live graph context",
+        scope=MemoryScope.PROJECT,
+    )
+    missing_digest_atom = replace(
+        _memory_atom(
+            "alpha missing digest memory must not enter context",
+            scope=MemoryScope.PROJECT,
+        ),
+        source_digest=None,
+    )
+    missing_row_key_atom = replace(
+        _memory_atom(
+            "alpha missing row key memory must not enter context",
+            scope=MemoryScope.PROJECT,
+        ),
+        source_row_key=None,
+    )
+    tool_exposure_atom = _memory_atom(
+        "alpha tool exposure memory must not enter context",
+        scope=MemoryScope.PROJECT,
+        metadata={
+            "visible_tools": ["apply_patch", "write_file"],
+            "tool_calls": [{"name": "apply_patch", "arguments": {}}],
+        },
+    )
+    kernel = _BudgetOnlyAdmissionMemoryKernel(
+        (current_atom, missing_digest_atom, missing_row_key_atom, tool_exposure_atom)
+    )
+    compiler = _compiler(kernel)
+
+    bundle = await compiler.compile_bundle(
+        session_id="sess_memory_kernel_curated_tool_isolation",
+        task_id="task_memory_kernel_curated_tool_isolation",
+        task_description="Use governed memory.",
+        query="alpha",
+        token_budget=4000,
+        metadata={"topology": "swarm", "agent_id": "agent-alpha"},
+    )
+
+    assert "alpha curated source memory for live graph context" in bundle.rendered_text
+    assert "alpha missing digest memory must not enter context" not in bundle.rendered_text
+    assert "alpha missing row key memory must not enter context" not in bundle.rendered_text
+    assert "alpha tool exposure memory must not enter context" not in bundle.rendered_text
+    assert "source_digest_required" in bundle.rendered_text
+    assert "source_row_key_required" in bundle.rendered_text
+    assert "tool_exposure_blocked" in bundle.rendered_text
+
+    metadata = bundle.metadata["memory_kernel_default"]
+    assert metadata["admitted_count"] == 1
+    assert metadata["omitted_count"] == 3
+    assert metadata["retrieval_telemetry"]["omission_reason_counts"] == {
+        "source_digest_required": 1,
+        "source_row_key_required": 1,
+        "tool_exposure_blocked": 1,
+    }
+    query = kernel.kwargs["query"]
+    assert getattr(query, "require_source_digest") is True
+    assert getattr(query, "require_source_row_key") is True
+    budget = kernel.kwargs["budget"]
+    assert getattr(budget, "require_source_digest") is True
+    assert getattr(budget, "require_source_row_key") is True
+    assert getattr(budget, "block_tool_exposure") is True
 
 
 @pytest.mark.asyncio

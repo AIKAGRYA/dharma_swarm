@@ -498,3 +498,52 @@
   - Provider truth still lacks exhaustive live-provider served-model matrix proof.
   - Full live multi-process resume semantics remain unproven.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T00:03:32Z - Phase 5 Curated Source and Tool Isolation Start
+
+- Target gate: close the remaining Phase 5 MemoryKernel live-context blockers for curated-source coverage and full tool-exposure isolation.
+- Current branch state:
+  - Worktree clean at `codex/langgraph-orchestration-parity-20260701`.
+  - PR #732 head `d3182e98d` is mergeable and all GitHub checks pass, including `pytest (3.11)` and `pytest (3.12)`.
+- Planned files:
+  - `dharma_swarm/memory_kernel/atoms.py`
+  - `dharma_swarm/memory_kernel/context_admission.py`
+  - `dharma_swarm/memory_kernel/default_context.py`
+  - `tests/test_context_compiler_memory_kernel.py`
+  - `tests/test_memory_kernel_readiness.py`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - `reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md`
+- Tests run at round start:
+  - `git status --short --branch` -> clean and aligned with origin.
+  - `gh pr checks 732` -> all checks passing on `d3182e98d`.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Memory curated-source coverage and full tool-exposure isolation remain incomplete or unproven.
+  - Provider truth still lacks exhaustive live-provider served-model matrix proof.
+  - Full live multi-process resume semantics remain unproven.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T00:08:16Z - Phase 5 Curated Source and Tool Isolation Closeout
+
+- Target gate: prove curated-source coverage and full tool-exposure isolation in live MemoryKernel context packs.
+- Code changes landed locally:
+  - Added `MemoryContextBudget.require_source_digest`, `require_source_row_key`, and `block_tool_exposure`.
+  - Enabled those policy fields in the default live `ContextCompiler` Memory Kernel section, in addition to the existing `MemoryQuery` source requirements.
+  - Added omission reasons `source_digest_required`, `source_row_key_required`, and `tool_exposure_blocked`.
+  - Added structured metadata detection for tool exposure fields such as `visible_tools`, `requested_tools`, `tool_calls`, `tool_results`, `tool_plan`, `tool_request`, `tool_registry`, and tool schemas.
+  - Added an acceptance test proving a live bundle admits the curated-source atom, excludes missing-provenance atoms, blocks tool-exposure metadata, renders omission reasons, and exposes omission reason telemetry.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/memory_curated_source_tool_isolation_20260701T000816Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_enforces_curated_source_and_tool_exposure_isolation --tb=short` -> `1 passed in 0.22s`.
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `31 passed in 0.60s`.
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `55 passed in 0.65s`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+  - `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `80/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth still lacks exhaustive live-provider served-model matrix proof.
+  - Full live multi-process resume semantics remain unproven.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
