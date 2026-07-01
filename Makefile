@@ -246,7 +246,7 @@ nats-substrate-contract:
 		--tb=line
 
 uplift-guards:
-	python3 scripts/uplift_guards/run_pre_commit.py
+	$(REPO_PYTHON) scripts/uplift_guards/run_pre_commit.py
 
 module-budget:
 	$(PYTHON) scripts/governance/check_module_budget.py \

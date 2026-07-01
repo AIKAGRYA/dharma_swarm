@@ -33,7 +33,7 @@ repos:
         stages: [pre-commit]
       - id: dharma-uplift-guards
         name: dharma uplift guards
-        entry: bash -c '"${DHARMA_PYTHON:-python3}" scripts/uplift_guards/run_pre_commit.py'
+        entry: bash -c 'PY="${DHARMA_PYTHON:-.venv/bin/python}"; if [ ! -x "$PY" ]; then PY=python3; fi; PYTHONPATH=. "$PY" scripts/uplift_guards/run_pre_commit.py'
         language: system
         pass_filenames: false
         always_run: true

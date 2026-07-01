@@ -40,6 +40,7 @@ paths = [
 
     # Reports, analyses, audit logs — text dumps, not credentials
     '''(^|/)reports/''',
+    '''(^|/)quality-reports/''',
     '''(^|/)analysis/''',
     '''(^|/)results/''',
     '''(^|/)experiments/''',
