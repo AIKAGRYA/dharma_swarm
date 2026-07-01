@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,12 @@ import pytest
 from dharma_swarm.dgm_loop import DGMLoop, run_dgm_evolution_task
 from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, promote, signals
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ArmSpec, grade_genome
-from dharma_swarm.forge_v1.forge_v2.verify_promotion import verify_promotion
+from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
+    sign_receipt,
+    verify_promotion,
+    verify_signed_receipt,
+    verify_trusted_signed_receipt,
+)
 from scripts.governance.check_forge_bypass import check_file, check_paths
 
 
@@ -318,6 +324,77 @@ def _fake_signed_receipts(public_key: str) -> list[dict]:
     ]
 
 
+class _FakeEd25519Key:
+    public_hex = "ab" * 32
+
+    def public_key_hex(self) -> str:
+        return self.public_hex
+
+    def sign(self, message: bytes) -> bytes:
+        return hashlib.sha512(bytes.fromhex(self.public_hex) + message).digest()[:64]
+
+
+def _fake_verify_ed25519_signature(public_key: bytes, signature: bytes, message: bytes) -> None:
+    expected = hashlib.sha512(public_key + message).digest()[:64]
+    if signature != expected:
+        raise ValueError("bad signature")
+
+
+def _backend_signed_receipts(signing_key, *, epoch_ruler_sha256: str = "ruler-epoch-sha") -> list[dict]:
+    return [
+        sign_receipt(
+            name=name,
+            payload={"receipt": name, "status": "pass", "epoch_ruler_sha256": epoch_ruler_sha256},
+            signing_key=signing_key,
+            epoch_ruler_sha256=epoch_ruler_sha256,
+            key_id="test-judge",
+        )
+        for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
+    ]
+
+
+def test_signed_receipt_binds_name_payload_and_ruler_epoch(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "_verify_ed25519_signature", _fake_verify_ed25519_signature)
+    signing_key = _FakeEd25519Key()
+    public_key = signing_key.public_key_hex()
+    receipt = sign_receipt(
+        name="preregistration",
+        payload={"status": "pass", "epoch_ruler_sha256": "epoch-a"},
+        signing_key=signing_key,
+        epoch_ruler_sha256="epoch-a",
+        key_id="test-judge",
+    )
+
+    assert verify_signed_receipt(receipt) is True
+    assert verify_trusted_signed_receipt(receipt, trusted_public_keys=[public_key]) is True
+
+    renamed = dict(receipt)
+    renamed["name"] = "independent_judge"
+    assert verify_signed_receipt(renamed) is False
+
+    wrong_epoch = dict(receipt)
+    wrong_epoch["epoch_ruler_sha256"] = "epoch-b"
+    assert verify_signed_receipt(wrong_epoch) is False
+
+
+def test_signed_receipt_requires_epoch_ruler_binding(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "_verify_ed25519_signature", _fake_verify_ed25519_signature)
+    signing_key = _FakeEd25519Key()
+    receipt = sign_receipt(
+        name="preregistration",
+        payload={"status": "pass"},
+        signing_key=signing_key,
+        epoch_ruler_sha256="epoch-a",
+    )
+    receipt.pop("epoch_ruler_sha256")
+
+    assert verify_signed_receipt(receipt) is False
+
+
 def test_promotion_requires_packet_guard_review_before_receipts() -> None:
     signal = _receipt_ready_signal()
     signal.pop("packet_guard_review")
@@ -461,6 +538,27 @@ def test_verify_promotion_missing_one_trusted_receipt_fails_closed(monkeypatch) 
     assert verdict["signed_receipts"][missing] is False
     assert f"promotion_packet:receipt_{missing}_present" in verdict["blockers"]
     assert f"missing_or_invalid_signed_receipt:{missing}" in verdict["blockers"]
+
+
+def test_verify_promotion_allows_backend_verified_trusted_receipt_bundle(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "_verify_ed25519_signature", _fake_verify_ed25519_signature)
+    signing_key = _FakeEd25519Key()
+    public_key = signing_key.public_key_hex()
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=_backend_signed_receipts(signing_key),
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "op-1"},
+    )
+
+    assert verdict["decision"] == "allow"
+    assert verdict["live_apply_allowed"] is True
+    assert verdict["promotion_packet"]["decision"] == "promotable_candidate"
+    assert verdict["promotion_packet"]["failed_conjuncts"] == []
+    assert not verdict["blockers"]
 
 
 def test_e2_green_pytest_red_holdout_is_refused() -> None:

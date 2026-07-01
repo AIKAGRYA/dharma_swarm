@@ -55,26 +55,46 @@ def _normal_public_key_hex(public_key: str | bytes) -> str:
     return str(public_key).strip().lower()
 
 
+def _verify_ed25519_signature(public_key: bytes, signature: bytes, message: bytes) -> None:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    Ed25519PublicKey.from_public_bytes(public_key).verify(signature, message)
+
+
+def _signing_key_public_key_hex(signing_key: Any) -> str:
+    if hasattr(signing_key, "public_key_hex"):
+        return str(signing_key.public_key_hex()).strip().lower()
+    if hasattr(signing_key, "public_key_bytes"):
+        return bytes(signing_key.public_key_bytes()).hex()
+    from cryptography.hazmat.primitives import serialization
+
+    return signing_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    ).hex()
+
+
 def verify_signed_receipt(receipt: dict[str, Any]) -> bool:
     """Verify an ed25519-signed receipt payload.
 
     Expected shape:
     ``{"name": "...", "payload": {...}, "signature": {"scheme": "ed25519",
     "public_key": "<hex>", "signature": "<hex>"}}``.
+
+    The signature is bound to the receipt name, payload, and
+    ``epoch_ruler_sha256`` so a trusted receipt for one predicate cannot be
+    renamed and replayed as another predicate.
     """
     try:
         sig = dict(receipt.get("signature", {}) or {})
         if sig.get("scheme") != "ed25519":
             return False
-        payload = receipt["payload"]
         public_key = binascii.unhexlify(str(sig["public_key"]))
         signature = binascii.unhexlify(str(sig["signature"]))
-        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-        Ed25519PublicKey.from_public_bytes(public_key).verify(
-            signature,
-            _canonical_receipt_payload(payload),
-        )
+        body = _receipt_signature_body(receipt)
+        if receipt.get("signed_payload_sha256") and receipt.get("signed_payload_sha256") != canonical_sha256(body):
+            return False
+        _verify_ed25519_signature(public_key, signature, _canonical_receipt_payload(body))
         return True
     except Exception:
         return False
@@ -102,6 +122,61 @@ def verify_trusted_signed_receipt(
     trusted = {_normal_public_key_hex(key) for key in trusted_public_keys}
     public_key = _receipt_public_key_hex(receipt)
     return bool(trusted and public_key in trusted and verify_signed_receipt(receipt))
+
+
+def _receipt_name(receipt: dict[str, Any]) -> str:
+    return str(receipt.get("name") or receipt.get("receipt_type") or "").strip()
+
+
+def _receipt_epoch_ruler_sha256(receipt: dict[str, Any]) -> str:
+    payload = receipt.get("payload") if isinstance(receipt.get("payload"), dict) else {}
+    return str(
+        receipt.get("epoch_ruler_sha256")
+        or payload.get("epoch_ruler_sha256")
+        or ""
+    ).strip()
+
+
+def _receipt_signature_body(receipt: dict[str, Any]) -> dict[str, Any]:
+    name = _receipt_name(receipt)
+    epoch_ruler_sha256 = _receipt_epoch_ruler_sha256(receipt)
+    if not name:
+        raise ValueError("signed receipt requires name or receipt_type")
+    if not epoch_ruler_sha256:
+        raise ValueError("signed receipt requires epoch_ruler_sha256")
+    if "payload" not in receipt:
+        raise ValueError("signed receipt requires payload")
+    return {
+        "name": name,
+        "payload": receipt["payload"],
+        "epoch_ruler_sha256": epoch_ruler_sha256,
+    }
+
+
+def sign_receipt(
+    *,
+    name: str,
+    payload: dict[str, Any],
+    signing_key: Any,
+    epoch_ruler_sha256: str,
+    key_id: str = "",
+) -> dict[str, Any]:
+    """Create an ed25519 signed Forge receipt bound to the ruler epoch."""
+    receipt = {
+        "name": name,
+        "payload": dict(payload),
+        "epoch_ruler_sha256": str(epoch_ruler_sha256),
+    }
+    body = _receipt_signature_body(receipt)
+    receipt["signed_payload_sha256"] = canonical_sha256(body)
+    signature = signing_key.sign(_canonical_receipt_payload(body))
+    receipt["signature"] = {
+        "scheme": "ed25519",
+        "key_id": key_id,
+        "public_key": _signing_key_public_key_hex(signing_key),
+        "signature": signature.hex(),
+    }
+    return receipt
 
 
 def _verification_signature_payload(packet: dict[str, Any]) -> dict[str, Any]:
@@ -307,6 +382,7 @@ def verify_promotion(
 
 __all__ = [
     "PromotionVerification",
+    "sign_receipt",
     "sign_promotion_verification",
     "verify_promotion",
     "verify_promotion_verification_signature",
