@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from dharma_swarm.forge_v1.forge_v2 import packet_guard, scheduler
+from dharma_swarm.forge_v1.forge_v2 import packet_guard, scheduler, taskbed_ledger
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -177,6 +177,118 @@ def test_scheduler_canonical_packet_has_no_missing_guard_files(tmp_path: Path, m
     assert [name for name, meta in collected["files"].items() if not meta["exists"]] == []
     assert deterministic["verdict"] == "revise_protocol"
     assert "minimum_packet_incomplete" not in {finding["code"] for finding in deterministic["findings"]}
+
+
+def test_scheduler_full_confirm_packet_can_pass_guard_with_runner_final_use(tmp_path: Path, monkeypatch) -> None:
+    run_root = tmp_path / "runs"
+    db = tmp_path / "taskbed.db"
+    monkeypatch.setattr(scheduler, "RUN_ROOT", run_root)
+    taskbed_ledger.register_tasks(
+        [
+            {
+                "task_id": f"fresh-{idx:03d}",
+                "created_at": "2026-07-01T00:00:00Z",
+                "contamination_state": "fresh_heldout",
+                "provenance": {"contamination_state": "fresh_heldout", "source": "post_cutoff_pr_suite"},
+            }
+            for idx in range(packet_guard.MIN_CONFIRM_N)
+        ],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+        taskbed="fresh_pr_suite",
+    )
+    arms = list(packet_guard.CANONICAL_CONTROL_ARM_ALIASES)
+
+    def fake_runner(instances, *_args, **kwargs):
+        arm = kwargs["arm"]
+        attempts = [
+            {
+                "task_id": task_id,
+                "split": "confirm",
+                "arm": arm,
+                "replicate": 0,
+                "resolved": arm == "full_a2a_swarm",
+                "budget": {"total_cost_usd": 0.001, "spent_tokens": 1000, "cap_tokens": 1000},
+                "invalid": False,
+            }
+            for task_id in instances
+        ]
+        return {
+            "arm": arm,
+            "class_null": "same_budget_self_moa",
+            "closeout": "positive_lift_candidate",
+            "n_pairs": len(instances),
+            "contrast_vs_class_null": {
+                "n": len(instances),
+                "mean": 0.06,
+                "lower": 0.01,
+                "upper": 0.11,
+                "p_le_0": 0.01,
+            },
+            "split_contrasts": {
+                "confirm": {
+                    "n": len(instances),
+                    "mean": 0.06,
+                    "lower": 0.01,
+                    "upper": 0.11,
+                    "p_le_0": 0.01,
+                }
+            },
+            "critic_verdict": {"ran": False},
+            "contamination_state": {"state": "fresh_heldout"},
+            "budget_matched_proof": {"any_invalid": False},
+            "attempts": attempts,
+            "coordination_edges": [
+                {"edge_kind": "swarm_only_win", "from": "planner", "to": "builder", "final_use_proof": True},
+                {"edge_kind": "swarm_only_win", "from": "verifier", "to": "builder", "final_use_proof": True},
+                {"edge_kind": "swarm_only_win", "from": "critic", "to": "builder", "final_use_proof": False},
+            ],
+            "next_experiment": "synthetic native packet pass regression",
+        }
+
+    scheduler.run_scheduler(
+        instances=["legacy"],
+        n_explore=0,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=arms,
+        mix_models=[],
+        label="native_guard_pass",
+        max_campaigns=len(arms),
+        duration_hours=None,
+        total_budget_usd=10.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        epoch_id="epoch-guard-pass",
+        taskbed_db=db,
+        taskbed_split="confirm",
+        taskbed_count=packet_guard.MIN_CONFIRM_N,
+        taskbed_allocation_id="confirm-native-guard-pass",
+        runner=fake_runner,
+    )
+    packet = next(run_root.iterdir())
+
+    review = packet_guard.run_guard(packet_dir=packet)
+    deterministic = review["deterministic_review"]
+
+    assert deterministic["verdict"] == "pass_for_next_scale"
+    assert deterministic["task_count"] == packet_guard.MIN_CONFIRM_N
+    assert deterministic["taskbed_power"]["full_confirm"] is True
+    assert deterministic["taskbed_power"]["clean_confirm"] is True
+    assert all(deterministic["canonical_arm_coverage"].values())
+    assert deterministic["budget_parity"]["status"] == "pass"
+    assert deterministic["invalid_run_rate"] == 0.0
+    assert deterministic["final_use_ratio"] >= 0.30
+    assert not deterministic["findings"]
 
 
 def test_live_nim_failure_is_recorded_without_crashing(monkeypatch, tmp_path: Path) -> None:

@@ -85,6 +85,10 @@ def cost_from_attempts(receipt: dict[str, Any]) -> float:
 
 
 def receipt_summary(receipt: dict[str, Any]) -> dict[str, Any]:
+    coordination_edges = receipt.get("coordination_edges") or receipt.get("final_use_edges") or []
+    if isinstance(coordination_edges, dict):
+        coordination_edges = [coordination_edges]
+    coordination_edges = [dict(edge) for edge in coordination_edges if isinstance(edge, dict)]
     return {
         "arm": receipt.get("arm"),
         "class_null": receipt.get("class_null"),
@@ -98,6 +102,7 @@ def receipt_summary(receipt: dict[str, Any]) -> dict[str, Any]:
         "cost_usd": cost_from_attempts(receipt),
         "attempt_count": len(receipt.get("attempts", []) or []),
         "artifact_dir": receipt.get("artifact_dir", ""),
+        "coordination_edges": coordination_edges,
         "next_experiment": receipt.get("next_experiment", ""),
     }
 
@@ -341,6 +346,29 @@ def _canonical_budget_rows(state: dict[str, Any], history_attempts: list[dict[st
     return rows
 
 
+def _canonical_coordination_rows(state: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        edges = campaign.get("coordination_edges") or []
+        if isinstance(edges, dict):
+            edges = [edges]
+        if not isinstance(edges, list):
+            continue
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            row = dict(edge)
+            row.setdefault("schema", "forge_v2.coordination_edge_row.v1")
+            row.setdefault("edge_kind", "coordination")
+            row.setdefault("campaign_index", campaign.get("campaign_index"))
+            row.setdefault("campaign_label", campaign.get("campaign_label"))
+            row.setdefault("edge_index", len(rows) + 1)
+            rows.append(row)
+    return rows
+
+
 def _canonical_model_roster(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> dict[str, Any]:
     config = dict(state.get("config", {}) or {})
     arms = {str(arm) for arm in config.get("arms", []) or [] if arm}
@@ -447,6 +475,7 @@ def emit_canonical_packet(
     task_rows = _campaign_task_rows(state, history_attempts)
     result_rows = _canonical_result_rows(state, history_attempts)
     budget_rows = _canonical_budget_rows(state, history_attempts)
+    coordination_rows = _canonical_coordination_rows(state)
     run_manifest = {
         "schema_version": "forge_v2.scheduler_canonical_packet.v1",
         "scheduler_schema": state.get("schema"),
@@ -478,7 +507,7 @@ def emit_canonical_packet(
     write_jsonl(run_dir / "task_manifest.jsonl", task_rows)
     write_json(run_dir / "model_roster.json", _canonical_model_roster(state, history_attempts))
     write_jsonl(run_dir / "budget_ledger.jsonl", budget_rows)
-    write_jsonl(run_dir / "coordination_edges.jsonl", [])
+    write_jsonl(run_dir / "coordination_edges.jsonl", coordination_rows)
     write_jsonl(run_dir / "results.jsonl", result_rows)
     (run_dir / "control_comparison.md").write_text(_control_comparison_markdown(state))
     (run_dir / "failure_taxonomy.md").write_text(_failure_taxonomy_markdown(state, result_rows))
@@ -490,6 +519,7 @@ def emit_canonical_packet(
         "task_rows": len(task_rows),
         "result_rows": len(result_rows),
         "budget_rows": len(budget_rows),
+        "coordination_rows": len(coordination_rows),
     }
 
 
