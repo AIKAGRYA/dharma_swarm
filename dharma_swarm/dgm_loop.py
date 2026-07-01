@@ -59,15 +59,97 @@ Reference: Sakana AI Darwin Gödel Machine (ICLR 2026)
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 import random
+import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from dharma_swarm.daemon_config import dharma_state_dir
 from typing import Any
 
 logger = logging.getLogger(__name__)
+DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S = 1800.0
+
+
+def _jsonable_forge_genome(genome: dict[str, Any] | Any) -> dict[str, Any]:
+    if isinstance(genome, dict):
+        return dict(genome)
+    if is_dataclass(genome):
+        return asdict(genome)
+    to_dict = getattr(genome, "to_dict", None)
+    if callable(to_dict):
+        data = to_dict()
+        if isinstance(data, dict):
+            return data
+    raise TypeError("Forge genome subprocess grading requires a dict-like or dataclass genome")
+
+
+def _forge_grade_subprocess_timeout() -> float:
+    raw = os.environ.get("DGM_FORGE_GRADE_SUBPROCESS_TIMEOUT_S")
+    if not raw:
+        return DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return DEFAULT_FORGE_GRADE_SUBPROCESS_TIMEOUT_S
+
+
+def _parse_forge_grade_subprocess_stdout(stdout: bytes) -> dict[str, Any]:
+    from dharma_swarm.forge_v1.forge_v2.forge_fitness import SUBPROCESS_RESULT_PREFIX
+
+    text = stdout.decode("utf-8", errors="replace")
+    for line in reversed(text.splitlines()):
+        if line.startswith(SUBPROCESS_RESULT_PREFIX):
+            return json.loads(line[len(SUBPROCESS_RESULT_PREFIX):])
+    raise RuntimeError("Forge grade subprocess did not emit a structured fitness result")
+
+
+async def _grade_forge_genome_in_subprocess(
+    genome: dict[str, Any] | Any,
+    instance_ids: list[str],
+    *,
+    split: str,
+    timeout_s: float | None = None,
+) -> dict[str, Any]:
+    """Run the sync Forge grade path in an isolated Python process.
+
+    The Forge runner and provider clients use sync wrappers that create their own
+    event loops.  Running that stack inside the DGM async process, or a worker
+    thread spawned by it, has provider-specific failure modes.  A subprocess
+    gives each grade a fresh interpreter, fresh event loop, and crash boundary.
+    """
+    payload = {
+        "genome": _jsonable_forge_genome(genome),
+        "instance_ids": list(instance_ids),
+        "split": split,
+    }
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "dharma_swarm.forge_v1.forge_v2.forge_fitness",
+        "--json-stdin",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")),
+            timeout=timeout_s or _forge_grade_subprocess_timeout(),
+        )
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.wait()
+        raise TimeoutError("Forge grade subprocess timed out") from exc
+    if proc.returncode != 0:
+        err = stderr.decode("utf-8", errors="replace").strip()
+        out = stdout.decode("utf-8", errors="replace").strip()
+        detail = err or out or f"exit={proc.returncode}"
+        raise RuntimeError(f"Forge grade subprocess failed: {detail[:2000]}")
+    return _parse_forge_grade_subprocess_stdout(stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -325,19 +407,23 @@ class DGMLoop:
         start = time.monotonic()
         result = DGMResult(shadow_mode=True, source_file="forge_scaffold")
         try:
-            from dharma_swarm.forge_v1.forge_v2.forge_fitness import grade_genome
-
-            grader = grade_fn or grade_genome
             arm = getattr(genome, "arm", None)
             if arm is None and isinstance(genome, dict):
                 arm = genome.get("arm", "verify_chain")
             result.source_file = f"forge_scaffold::{arm or 'verify_chain'}"
-            fitness = grader(
-                genome,
-                list(instance_ids),
-                split=split,
-            )
-            fitness_dict = fitness.to_dict() if hasattr(fitness, "to_dict") else dict(fitness)
+            if grade_fn is not None:
+                fitness = grade_fn(
+                    genome,
+                    list(instance_ids),
+                    split=split,
+                )
+                fitness_dict = fitness.to_dict() if hasattr(fitness, "to_dict") else dict(fitness)
+            else:
+                fitness_dict = await _grade_forge_genome_in_subprocess(
+                    genome,
+                    list(instance_ids),
+                    split=split,
+                )
             result.forge_grade = fitness_dict
             result.fitness_after = float(fitness_dict.get("fitness", 0.0) or 0.0)
             result.fitness_delta = result.fitness_after - result.fitness_before

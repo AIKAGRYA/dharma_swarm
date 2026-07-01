@@ -6,6 +6,9 @@ an arm/scaffold spec, not a Python source diff.
 """
 from __future__ import annotations
 
+import argparse
+import json
+import sys
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Literal
 
@@ -16,6 +19,7 @@ from . import runner
 from .promote import DEFAULT_PREREGISTERED_MDE, MIN_CONFIRM_N_FOR_PROMOTION, MIN_PROMOTION_EFFECT
 
 SplitName = Literal["explore", "confirm"]
+SUBPROCESS_RESULT_PREFIX = "FORGE_GENOME_FITNESS_JSON "
 
 
 def _default_generator() -> str:
@@ -184,4 +188,51 @@ def grade_genome(
     )
 
 
-__all__ = ["ArmSpec", "ForgeGenomeFitness", "grade_genome"]
+def grade_genome_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Grade a JSON payload in a fresh process for async DGM callers."""
+    kwargs: dict[str, Any] = {}
+    for key in (
+        "budget_cap",
+        "budget_usd",
+        "per_call_tokens",
+        "k_self_moa",
+        "grade_timeout",
+        "timeout_s",
+        "strategy",
+        "roster_n",
+        "replicates",
+    ):
+        if key in payload:
+            kwargs[key] = payload[key]
+    fitness = grade_genome(
+        payload["genome"],
+        list(payload["instance_ids"]),
+        split=payload["split"],
+        **kwargs,
+    )
+    return fitness.to_dict()
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Forge genome fitness subprocess worker")
+    parser.add_argument("--json-stdin", action="store_true", help="Read grading payload JSON from stdin")
+    args = parser.parse_args(argv)
+    if not args.json_stdin:
+        parser.error("--json-stdin is required")
+    payload = json.loads(sys.stdin.read())
+    result = grade_genome_from_payload(payload)
+    print(SUBPROCESS_RESULT_PREFIX + json.dumps(result, sort_keys=True, default=str), flush=True)
+    return 0
+
+
+__all__ = [
+    "ArmSpec",
+    "ForgeGenomeFitness",
+    "SUBPROCESS_RESULT_PREFIX",
+    "grade_genome",
+    "grade_genome_from_payload",
+]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

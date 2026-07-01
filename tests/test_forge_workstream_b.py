@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.dgm_loop import DGMLoop, run_dgm_evolution_task
-from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, promote, signals
+from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, forge_fitness, promote, signals
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ArmSpec, grade_genome
 from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
     sign_receipt,
@@ -123,6 +123,39 @@ def test_grade_genome_explore_can_learn_but_not_promote() -> None:
     assert fitness.fitness == pytest.approx(0.08)
     assert fitness.promote_eligible is False
     assert "promotion_requires_confirm_split" in fitness.blockers
+
+
+def test_grade_genome_payload_worker_is_jsonable(monkeypatch) -> None:
+    def fake_grade(genome, instance_ids, *, split, **kwargs):
+        assert genome == {"arm": "verify_chain"}
+        assert instance_ids == ["task-a"]
+        assert split == "confirm"
+        assert kwargs["budget_usd"] == 0.1
+        return forge_fitness.ForgeGenomeFitness(
+            genome={"arm": "verify_chain"},
+            split="confirm",
+            fitness=0.06,
+            ci={"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1},
+            closeout="positive_lift_candidate",
+            real_grade=True,
+            promote_eligible=False,
+            runner_receipt={"source": "payload-worker"},
+            blockers=["missing_signed_receipts"],
+        )
+
+    monkeypatch.setattr(forge_fitness, "grade_genome", fake_grade)
+
+    result = forge_fitness.grade_genome_from_payload(
+        {
+            "genome": {"arm": "verify_chain"},
+            "instance_ids": ["task-a"],
+            "split": "confirm",
+            "budget_usd": 0.1,
+        }
+    )
+
+    assert result["fitness"] == pytest.approx(0.06)
+    assert result["runner_receipt"]["source"] == "payload-worker"
 
 
 def test_e4_underpowered_positive_lift_is_refused_before_receipts() -> None:

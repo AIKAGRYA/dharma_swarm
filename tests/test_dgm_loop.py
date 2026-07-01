@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import dharma_swarm.dgm_loop as dgm_loop_mod
 from dharma_swarm.dgm_loop import (
     DGM_PROTECTED_FILES,
     DGM_TARGET_FILES,
@@ -93,5 +94,50 @@ async def test_dgm_forge_genome_generation_uses_forge_grade_not_auto_evolve() ->
     assert result.forge_grade["real_grade"] is True
     assert result.promote_eligible is False
     assert result.promotion_blockers == ["missing_signed_receipts"]
+    assert result.applied is False
+    assert result.shadow_mode is True
+
+
+@pytest.mark.asyncio
+async def test_dgm_forge_genome_generation_defaults_to_subprocess_bridge(monkeypatch) -> None:
+    class ExplodingEngine:
+        async def auto_evolve(self, **_kwargs):
+            raise AssertionError("Forge genome DGM path must not use local Darwin auto_evolve")
+
+    captured = {}
+
+    async def fake_subprocess_grade(genome, instance_ids, *, split):
+        captured["genome"] = genome
+        captured["instance_ids"] = instance_ids
+        captured["split"] = split
+        return {
+            "genome": {"arm": "verify_chain"},
+            "split": "confirm",
+            "fitness": 0.07,
+            "ci": {"n": 500, "mean": 0.07, "lower": 0.02, "upper": 0.12},
+            "closeout": "positive_lift_candidate",
+            "real_grade": True,
+            "promote_eligible": False,
+            "runner_receipt": {"source": "subprocess_forge_runner"},
+            "blockers": ["missing_signed_receipts"],
+        }
+
+    monkeypatch.setattr(dgm_loop_mod, "_grade_forge_genome_in_subprocess", fake_subprocess_grade)
+    loop = DGMLoop(engine=ExplodingEngine(), shadow_mode=True)
+
+    result = await loop.run_forge_genome_generation(
+        {"arm": "verify_chain"},
+        ["fresh-task-1"],
+        split="confirm",
+    )
+
+    assert captured == {
+        "genome": {"arm": "verify_chain"},
+        "instance_ids": ["fresh-task-1"],
+        "split": "confirm",
+    }
+    assert result.error is None
+    assert result.fitness_after == pytest.approx(0.07)
+    assert result.forge_grade["runner_receipt"]["source"] == "subprocess_forge_runner"
     assert result.applied is False
     assert result.shadow_mode is True
