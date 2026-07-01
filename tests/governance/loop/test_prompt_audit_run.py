@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+VENV_PYTHON = sys.executable
 AUDIT_RUN_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "prompt_audit_run.py"
 VALIDATE_AUDIT_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "validate_audit.py"
 RUNS_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "runs.py"

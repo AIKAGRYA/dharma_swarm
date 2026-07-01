@@ -34,7 +34,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+DEFAULT_PYTHON = os.environ.get("LOOP_PYTHON", sys.executable)
 DEFAULT_GATE_TIMEOUT = 300
 
 
@@ -97,9 +97,9 @@ class Oracle(ABC):
 class CIOracle(Oracle):
     """Default oracle: runs real pytest/governance commands and captures exit codes.
 
-    Uses the mission venv python (``DEFAULT_PYTHON``) for pytest/governance
-    script invocations. Sets ``PYTHONPATH`` to the repo root so first-party
-    imports resolve.
+    Uses the active interpreter, or ``LOOP_PYTHON`` when set, for
+    pytest/governance script invocations. Sets ``PYTHONPATH`` to the repo root
+    so first-party imports resolve.
     """
 
     def __init__(

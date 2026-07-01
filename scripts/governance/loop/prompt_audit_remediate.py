@@ -61,7 +61,7 @@ from scripts.governance.loop.oracle import CIOracle
 from scripts.governance.loop.runs import Run, RunManager
 from scripts.governance.loop.warrant import Warrant, WarrantError
 
-DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+DEFAULT_PYTHON = os.environ.get("LOOP_PYTHON", sys.executable)
 DEFAULT_WORKTREE_ROOT = "/tmp"
 
 CHECKLIST_ITEMS = (

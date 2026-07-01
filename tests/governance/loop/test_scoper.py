@@ -20,7 +20,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+VENV_PYTHON = sys.executable
 SCOPER_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "scoper.py"
 
 SENTINELS = ["TV-01", "TV-08", "APS-01", "APS-02", "RDR-10", "GEF-02"]

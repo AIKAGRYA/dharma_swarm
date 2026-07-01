@@ -22,7 +22,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+VENV_PYTHON = sys.executable
 WARRANT_CLI = REPO_ROOT / "scripts" / "governance" / "loop" / "warrant.py"
 
 REQUIRED_FIELDS = [

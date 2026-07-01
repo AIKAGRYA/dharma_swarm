@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+VENV_PYTHON = sys.executable
 ORACLE_MODULE = REPO_ROOT / "scripts" / "governance" / "loop" / "oracle.py"
 
 # Make scripts.governance.loop.oracle importable as a full dotted path (avoids

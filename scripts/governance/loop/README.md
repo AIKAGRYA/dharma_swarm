@@ -48,7 +48,7 @@ is ever recorded as truth. Every verdict is backed by a deterministic receipt
 ```bash
 # From the repo root, always use the venv python with PYTHONPATH=.
 export PYTHONPATH=.
-PYTHON=/Users/dhyana/dharma_swarm/.venv/bin/python
+PYTHON=${LOOP_PYTHON:-$(command -v python3)}
 ```
 
 ## Run

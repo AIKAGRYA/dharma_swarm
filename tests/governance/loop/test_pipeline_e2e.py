@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -31,7 +32,7 @@ import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-VENV_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+VENV_PYTHON = sys.executable
 
 LOOP_DIR = REPO_ROOT / "scripts" / "governance" / "loop"
 RUNS_CLI = LOOP_DIR / "runs.py"

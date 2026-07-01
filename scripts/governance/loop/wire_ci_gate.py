@@ -73,7 +73,21 @@ def _base_workflow() -> dict:
                         "uses": "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
                         "with": {"python-version": "3.11"},
                     },
+                    {
+                        "name": "Set up Go",
+                        "uses": "actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff",
+                        "with": {"go-version": "1.26"},
+                    },
                     {"name": "Install dev package", "run": 'python -m pip install -e ".[dev]"'},
+                    {
+                        "name": "Install gitleaks CLI",
+                        "run": (
+                            'mkdir -p "$HOME/.local/bin"\n'
+                            'GOBIN="$HOME/.local/bin" go install '
+                            "github.com/zricethezav/gitleaks/v8@v8.30.1\n"
+                            'echo "$HOME/.local/bin" >> "$GITHUB_PATH"\n'
+                        ),
+                    },
                     {
                         "name": "Select comparison refs",
                         "id": "refs",

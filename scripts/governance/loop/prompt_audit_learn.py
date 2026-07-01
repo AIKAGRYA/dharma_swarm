@@ -35,6 +35,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import subprocess
 import sys
@@ -46,7 +47,7 @@ from scripts.governance.loop.oracle import CIOracle, GateResult
 from scripts.governance.loop.runs import Run, RunManager
 from scripts.governance.loop.warrant import Warrant, WarrantError
 
-DEFAULT_PYTHON = "/Users/dhyana/dharma_swarm/.venv/bin/python"
+DEFAULT_PYTHON = os.environ.get("LOOP_PYTHON", sys.executable)
 RATCHET_SCRIPT = "scripts/governance/hygiene/ratchet.py"
 PROMOTE_SCRIPT = "scripts/governance/hygiene/promote.py"
 DEFAULT_CI_WORKFLOW = ".github/workflows/loop-ratchet-gates.yml"
