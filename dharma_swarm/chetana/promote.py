@@ -30,6 +30,7 @@ from .provenance import (
     ReviewStatus,
     parse_frontmatter,
 )
+from .quality_gate import quality_check_atom, review_queue_root
 from .staging import quarantine_atom, write_trusted
 from .stigmergy_emit import emit_mark
 from .wiki_log import append_wiki_log
@@ -45,6 +46,8 @@ class PromoteResult:
     review_status: ReviewStatus | None
     rationale: str | None = None
     notes: list[str] = field(default_factory=list)
+    quality_grade: str | None = None
+    quality_reason: str | None = None
 
 
 def promote(
@@ -54,6 +57,7 @@ def promote(
     reviewer: str | None = None,
     auto_promote: bool = False,
     confidence_override: float | None = None,
+    enforce_quality: bool = False,
 ) -> PromoteResult:
     """Promote a staged atom to the trusted wiki layer.
 
@@ -102,6 +106,39 @@ def promote(
             notes=notes,
         )
 
+    # ADDITIVE quality/admission layer — runs AFTER the telos safety gate,
+    # BEFORE write_trusted. Telos asks "is it safe?"; this asks "is it slop?".
+    # Off by default (additive, for operator review); enabled per-call.
+    quality = None
+    target_root = None
+    if enforce_quality:
+        quality = quality_check_atom(
+            title=schema.title,
+            body=body,
+            trusted_root=staging_mod.TRUSTED_DEFAULT,
+        )
+        if quality.grade == "REJECT":
+            rejected_path = quarantine_atom(staged_path)
+            notes.append(
+                f"QUALITY REJECT ({quality.reason}); staged atom moved to {rejected_path}"
+            )
+            return PromoteResult(
+                staged_path=staged_path,
+                trusted_path=None,
+                decision=gov.result,
+                review_status="rejected",
+                rationale=gov.record.rationale,
+                notes=notes,
+                quality_grade=quality.grade,
+                quality_reason=quality.reason,
+            )
+        if quality.grade == "WARN":
+            # Route to a review queue dir instead of concepts/.
+            target_root = review_queue_root()
+            notes.append(
+                f"QUALITY WARN ({quality.reason}); routed to review queue {target_root}"
+            )
+
     review_status: ReviewStatus
     if gov.result == "WARN":
         review_status = "staged"
@@ -120,8 +157,32 @@ def promote(
         }
     )
 
-    trusted_path = write_trusted(promoted_schema, body)
+    trusted_path = write_trusted(promoted_schema, body, root=target_root)
     notes.append(f"promoted ({gov.result}, review={review_status}) → {trusted_path}")
+    if target_root is not None:
+        # WARN-routed atoms wait in the review queue; do not index them into the
+        # main wiki graph until an operator grades them up into concepts/.
+        result = PromoteResult(
+            staged_path=staged_path,
+            trusted_path=trusted_path,
+            decision=gov.result,
+            review_status=review_status,
+            rationale=gov.record.rationale,
+            notes=notes,
+            quality_grade=quality.grade if quality else None,
+            quality_reason=quality.reason if quality else None,
+        )
+        emit_mark(
+            action="chetana.promote",
+            content=f"{schema.title} | {gov.result} | quality_warn",
+            connections=["chetana", "promote", schema.type, "review_queue"],
+            salience=schema.confidence,
+        )
+        try:
+            staged_path.unlink()
+        except OSError as e:
+            logger.warning("failed to unlink staged atom %s: %s", staged_path, e)
+        return result
     try:
         log_path = append_wiki_log(
             operation="promote",
@@ -150,6 +211,8 @@ def promote(
         review_status=review_status,
         rationale=gov.record.rationale,
         notes=notes,
+        quality_grade=quality.grade if quality else None,
+        quality_reason=quality.reason if quality else None,
     )
 
     # Best-effort stigmergy emit — never blocks promotion on failure.
