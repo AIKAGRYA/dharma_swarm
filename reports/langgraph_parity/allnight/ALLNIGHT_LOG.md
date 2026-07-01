@@ -584,10 +584,11 @@
 - Generated artifact:
   - `reports/langgraph_parity/allnight/runtime_multiprocess_resume_20260701T003444Z.json`
 - Verification:
-  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short` -> `1 passed in 0.61s`.
-  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py` -> `24 passed in 3.84s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short` -> `1 passed in 0.68s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py` -> `24 passed in 3.60s`.
   - `.venv/bin/python -m compileall -q tests/test_runtime_graph_api.py` -> pass.
   - `.venv/bin/ruff check tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`, no touched file added new violations.
   - `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
   - `git diff --check` -> pass.
 - Scoreboard: raised conservatively to `84/100`, still explicitly not 100/100.

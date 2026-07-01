@@ -25,11 +25,11 @@
   "verification": [
     {
       "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short",
-      "result": "1 passed in 0.61s"
+      "result": "1 passed in 0.68s"
     },
     {
       "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py",
-      "result": "24 passed in 3.84s"
+      "result": "24 passed in 3.60s"
     },
     {
       "command": ".venv/bin/python -m compileall -q tests/test_runtime_graph_api.py",
@@ -38,6 +38,10 @@
     {
       "command": ".venv/bin/ruff check tests/test_runtime_graph_api.py",
       "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD",
+      "result": "pass; REGRESSIONS (0), no touched file added new violations"
     },
     {
       "command": "jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
-import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -436,13 +436,17 @@ async def main() -> None:
 
 asyncio.run(main())
 """
-    completed = subprocess.run(
-        [sys.executable, "-c", child_code, str(db_path)],
-        check=True,
-        capture_output=True,
-        text=True,
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-c",
+        child_code,
+        str(db_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
     )
-    child_payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    stdout, stderr = await process.communicate()
+    assert process.returncode == 0, stderr.decode()
+    child_payload = json.loads(stdout.decode().strip().splitlines()[-1])
 
     assert child_payload["api_status"] == "ok"
     assert child_payload["runtime_db"] == str(db_path)
