@@ -20,7 +20,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import pickle
 import sqlite3
 import struct
@@ -30,6 +29,8 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
+
+from dharma_swarm.vector_fallback_guard import fallback_vector_scan_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -328,9 +329,6 @@ class VectorStore:
     """
 
     _SCHEMA_VERSION = 1
-    _DEFAULT_FALLBACK_MAX_DB_BYTES = 256 * 1024 * 1024
-    _DEFAULT_FALLBACK_MAX_ROWS = 50_000
-
     def __init__(
         self,
         state_dir: Path,
@@ -454,48 +452,6 @@ class VectorStore:
             return True
         except Exception:
             return False
-
-    @staticmethod
-    def _env_int(name: str, default: int) -> int:
-        try:
-            return int(str(os.environ.get(name, default)).strip())
-        except (TypeError, ValueError):
-            return default
-
-    def _fallback_vector_scan_allowed(self, conn: sqlite3.Connection) -> bool:
-        """Return whether Python-side vector fallback may scan all embeddings.
-
-        Without sqlite-vec, fallback similarity is O(n): it loads every fallback
-        embedding row and computes cosine similarity in Python. That is fine for
-        small local fixtures, but unsafe for live stores; large stores should
-        degrade to text search instead of blocking daemon dispatch.
-        """
-        max_bytes = self._env_int(
-            "DHARMA_VECTOR_FALLBACK_MAX_DB_BYTES",
-            self._DEFAULT_FALLBACK_MAX_DB_BYTES,
-        )
-        if max_bytes > 0:
-            try:
-                if self._db_path.exists() and self._db_path.stat().st_size > max_bytes:
-                    return False
-            except OSError:
-                return False
-
-        max_rows = self._env_int(
-            "DHARMA_VECTOR_FALLBACK_MAX_ROWS",
-            self._DEFAULT_FALLBACK_MAX_ROWS,
-        )
-        if max_rows > 0:
-            try:
-                row = conn.execute(
-                    "SELECT seq FROM sqlite_sequence WHERE name = 'vec_documents'"
-                ).fetchone()
-                if row is not None and int(row[0] or 0) > max_rows:
-                    return False
-            except Exception:
-                return False
-
-        return True
 
     # ------------------------------------------------------------------
     # Public write API
@@ -734,11 +690,11 @@ class VectorStore:
                         results.append(self._row_to_dict(row, distance=row["distance"]))
                 except Exception as vec_exc:
                     logger.debug("vec0 search failed, falling back: %s", vec_exc)
-                    if not self._fallback_vector_scan_allowed(conn):
+                    if not fallback_vector_scan_allowed(self._db_path, conn):
                         return []
                     results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
             else:
-                if not self._fallback_vector_scan_allowed(conn):
+                if not fallback_vector_scan_allowed(self._db_path, conn):
                     return []
                 results = self._fallback_vector_search(conn, query_vec, top_k, include_invalid)
 
