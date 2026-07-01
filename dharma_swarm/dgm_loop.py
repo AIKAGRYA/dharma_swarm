@@ -616,11 +616,14 @@ async def run_dgm_evolution_task(
     n_generations: int = 1,
     shadow: bool | None = None,
     state_dir: Path | None = None,
+    allow_legacy_local_fitness: bool = False,
 ) -> dict[str, Any]:
-    """Entry point for autonomous agents calling the DGM loop as a tool.
+    """Legacy source-file DGM task.
 
-    Agents call this when they want to trigger a real evolution cycle.
-    This is the bridge between the task system and the DarwinEngine.
+    RSI Lab DGM fitness must come from Forge held-out grading.  The default
+    agent-callable path therefore refuses this local-Darwin source-file loop and
+    points callers to ``run_dgm_forge_genome_task``.  The legacy shadow path is
+    kept only for explicit non-promotion experimentation.
 
     Args:
         source_file: Which file to evolve (agent_runner.py, etc.). None = auto-select.
@@ -630,6 +633,8 @@ async def run_dgm_evolution_task(
         shadow: True=dry-run. False is refused; live mutation must go through
             forge_v2.verify_promotion.
         state_dir: DHARMA state directory.
+        allow_legacy_local_fitness: Explicit opt-in for the old local Darwin
+            shadow loop.  Never promotion-eligible.
 
     Returns:
         Dict with results, summary, and lineage information.
@@ -643,6 +648,18 @@ async def run_dgm_evolution_task(
                 "as the sole promotion/live-apply door."
             ),
             "shadow_mode": True,
+        }
+
+    if not allow_legacy_local_fitness:
+        return {
+            "success": False,
+            "error": (
+                "Legacy source-file DGM uses local Darwin fitness and is disabled "
+                "for RSI Lab. Use run_dgm_forge_genome_task so fitness comes from "
+                "forge_v2.forge_fitness.grade_genome."
+            ),
+            "shadow_mode": True,
+            "forge_required": True,
         }
 
     # Load the DarwinEngine from the running swarm

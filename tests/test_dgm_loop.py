@@ -9,6 +9,7 @@ from dharma_swarm.dgm_loop import (
     DGM_TARGET_FILES,
     DGMLoop,
     _is_protected_dgm_target,
+    run_dgm_evolution_task,
 )
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ForgeGenomeFitness
 
@@ -32,6 +33,20 @@ async def test_dgm_rejects_explicit_protected_source_file_before_evolution() -> 
     assert result.error is not None
     assert "Protected DGM target rejected" in result.error
     assert result.source_file == ""
+
+
+@pytest.mark.asyncio
+async def test_agent_callable_dgm_task_refuses_legacy_local_fitness_by_default(tmp_path) -> None:
+    result = await run_dgm_evolution_task(
+        source_file="agent_runner.py",
+        state_dir=tmp_path,
+    )
+
+    assert result["success"] is False
+    assert result["shadow_mode"] is True
+    assert result["forge_required"] is True
+    assert "run_dgm_forge_genome_task" in result["error"]
+    assert "grade_genome" in result["error"]
 
 
 @pytest.mark.asyncio
