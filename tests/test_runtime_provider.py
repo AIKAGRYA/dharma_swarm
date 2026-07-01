@@ -8,10 +8,12 @@ from dharma_swarm.runtime_provider import (
     DEFAULT_GROQ_MODEL,
     DEFAULT_SILICONFLOW_MODEL,
     DEFAULT_FIREWORKS_MODEL,
+    DEFAULT_KIMI_CODE_MODEL,
     DEFAULT_OPENROUTER_MODEL,
     DEFAULT_TOGETHER_MODEL,
     FIREWORKS_BASE_URL,
     GROQ_BASE_URL,
+    KIMI_BASE_URL,
     NVIDIA_NIM_BASE_URL,
     OPENROUTER_BASE_URL,
     SILICONFLOW_BASE_URL,
@@ -19,6 +21,7 @@ from dharma_swarm.runtime_provider import (
     RuntimeProviderConfig,
     complete_via_preferred_runtime_providers,
     create_default_provider_map,
+    create_runtime_provider,
     preferred_runtime_provider_configs,
     resolve_runtime_provider_config,
 )
@@ -70,6 +73,49 @@ def test_resolve_runtime_provider_config_normalizes_alias_env() -> None:
 
     assert cfg.api_key == "gemini-key"
     assert cfg.available is True
+
+
+def test_resolve_runtime_provider_config_for_kimi_code_uses_default_model() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={"KIMI_API_KEY": "kimi-key"},
+    )
+
+    assert cfg.api_key == "kimi-key"
+    assert cfg.base_url == KIMI_BASE_URL
+    assert cfg.default_model == DEFAULT_KIMI_CODE_MODEL
+    assert cfg.default_model == "kimi-for-coding"
+    assert cfg.available is True
+
+
+def test_resolve_runtime_provider_config_for_kimi_code_uses_env_base_and_alias() -> None:
+    cfg = resolve_runtime_provider_config(
+        ProviderType.KIMI_CODE,
+        env={
+            "MOONSHOT_KIMI_API_KEY": "kimi-key",
+            "KIMI_BASE_URL": "https://kimi.internal/coding/v1",
+        },
+    )
+
+    assert cfg.api_key == "kimi-key"
+    assert cfg.base_url == "https://kimi.internal/coding/v1"
+    assert cfg.default_model == "kimi-for-coding"
+    assert cfg.available is True
+
+
+def test_create_runtime_provider_threads_timeout_to_kimi_code() -> None:
+    kimi = create_runtime_provider(
+        RuntimeProviderConfig(
+            provider=ProviderType.KIMI_CODE,
+            api_key="kimi-key",
+            base_url=KIMI_BASE_URL,
+            default_model=DEFAULT_KIMI_CODE_MODEL,
+            timeout_seconds=17,
+            available=True,
+        )
+    )
+
+    assert kimi._timeout == 17
 
 
 def test_anthropic_routes_to_claude_code_by_default(monkeypatch) -> None:
@@ -241,6 +287,7 @@ def test_create_default_provider_map_includes_expected_runtime_providers() -> No
     assert ProviderType.NVIDIA_NIM in provider_map
     assert ProviderType.OPENROUTER_FREE in provider_map
     assert ProviderType.OLLAMA in provider_map
+    assert ProviderType.KIMI_CODE in provider_map
 
 
 def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openrouter(
@@ -253,6 +300,7 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
     monkeypatch.setenv("SILICONFLOW_API_KEY", "sf-key")
     monkeypatch.setenv("TOGETHER_API_KEY", "together-key")
     monkeypatch.setenv("FIREWORKS_API_KEY", "fireworks-key")
+    monkeypatch.setenv("KIMI_API_KEY", "kimi-key")
 
     configs = preferred_runtime_provider_configs(model="test-model")
 
@@ -261,6 +309,7 @@ def test_preferred_runtime_provider_configs_prioritizes_ollama_nim_before_openro
     assert providers.index(ProviderType.SILICONFLOW) < providers.index(ProviderType.OPENROUTER)
     assert providers.index(ProviderType.TOGETHER) < providers.index(ProviderType.OPENROUTER)
     assert providers.index(ProviderType.FIREWORKS) < providers.index(ProviderType.OPENROUTER)
+    assert providers.index(ProviderType.KIMI_CODE) < providers.index(ProviderType.OPENROUTER)
     assert ProviderType.OPENROUTER_FREE in providers
     assert ProviderType.NVIDIA_NIM in providers
     assert ProviderType.OLLAMA in providers

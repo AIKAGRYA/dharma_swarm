@@ -65,6 +65,7 @@ _PROVIDER_TO_ROW: dict[str, str] = {
     "mistral": "mistral",
     "deepseek": "deepseek",
     "kimi": "kimi",
+    "kimi_code": "kimi",
     "minimax": "minimax",
     "qwen": "qwen",
     "xai": "xai",

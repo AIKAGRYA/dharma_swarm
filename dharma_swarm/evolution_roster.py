@@ -376,6 +376,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         256_000,
         "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
     ),
+    ModelSlot(
+        ProviderType.KIMI_CODE,
+        "kimi-for-coding",
+        "Kimi Code (stable latest)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor — direct Kimi Code membership API; stable id maps to latest K2.x Code",
+    ),
     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
     # The K2.6 floor the roster must SERVE. Live providers first: each rides
     # the Ollama-Cloud keyless route ahead of any paid aggregator.

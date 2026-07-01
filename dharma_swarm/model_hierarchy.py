@@ -93,6 +93,7 @@ TIER_FREE: tuple[ProviderType, ...] = (
 
 TIER_CHEAP: tuple[ProviderType, ...] = (
     ProviderType.ZHIPU,          # glm-5.2 direct (z.ai/Zhipu first-party lane)
+    ProviderType.KIMI_CODE,      # Kimi Code membership API (stable kimi-for-coding)
     ProviderType.GOOGLE_AI,      # gemini-2.5-pro (free tier, 1M ctx)
     ProviderType.CHUTES,         # DeepSeek-R1 (community)
     ProviderType.MISTRAL,        # mistral-large (1B tok/mo free tier)
@@ -147,6 +148,7 @@ PRIMARY_DRIVER_LANES: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,      # Kimi Code direct API
     ProviderType.OPENROUTER,     # Kimi / GLM / Qwen router
     ProviderType.OLLAMA,         # GLM-5 / Kimi cloud
     ProviderType.NVIDIA_NIM,     # MiniMax / Nemotron frontier support
@@ -157,12 +159,14 @@ DELEGATED_RESEARCH_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.GROQ,
     ProviderType.CEREBRAS,
     ProviderType.GOOGLE_AI,
+    ProviderType.ZHIPU,
     ProviderType.MISTRAL,
     ProviderType.CHUTES,
     ProviderType.SAMBANOVA,
 )
 
 CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,
     ProviderType.NVIDIA_NIM,
     ProviderType.OPENROUTER,
     ProviderType.OLLAMA,
@@ -171,6 +175,7 @@ CHALLENGER_PRIORITY: tuple[ProviderType, ...] = (
 )
 
 DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
+    ProviderType.KIMI_CODE,
     ProviderType.OPENROUTER,
     ProviderType.OPENROUTER_FREE,
     ProviderType.OLLAMA,
@@ -179,6 +184,7 @@ DELEGATED_BUILDER_PRIORITY: tuple[ProviderType, ...] = (
     ProviderType.FIREWORKS,
     ProviderType.GROQ,
     ProviderType.GOOGLE_AI,
+    ProviderType.ZHIPU,
     ProviderType.MISTRAL,
     ProviderType.CHUTES,
     ProviderType.CEREBRAS,
@@ -243,6 +249,7 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
     ProviderType.CLAUDE_CODE: LaneRole.PRIMARY_DRIVER,
     ProviderType.ANTHROPIC: LaneRole.PRIMARY_DRIVER,
     ProviderType.OPENROUTER: LaneRole.RESEARCH_DELEGATE,
+    ProviderType.KIMI_CODE: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OLLAMA: LaneRole.RESEARCH_DELEGATE,
     ProviderType.OPENROUTER_FREE: LaneRole.RESEARCH_DELEGATE,
     ProviderType.NVIDIA_NIM: LaneRole.CHALLENGER,
@@ -252,6 +259,7 @@ _LANE_ROLES: dict[ProviderType, LaneRole] = {
     ProviderType.GROQ: LaneRole.VALIDATOR,
     ProviderType.CEREBRAS: LaneRole.BULK_BUILDER,
     ProviderType.GOOGLE_AI: LaneRole.GENERAL_SUPPORT,
+    ProviderType.ZHIPU: LaneRole.RESEARCH_DELEGATE,
     ProviderType.MISTRAL: LaneRole.GENERAL_SUPPORT,
     ProviderType.CHUTES: LaneRole.GENERAL_SUPPORT,
     ProviderType.SAMBANOVA: LaneRole.GENERAL_SUPPORT,
@@ -316,6 +324,7 @@ MODEL_INTELLIGENCE: dict[ProviderType, int] = {
     ProviderType.CODEX: 70,            # GPT-5-class via subscription
     # Free / cheap frontier
     ProviderType.OLLAMA: 68,           # GLM-5 744B (cloud)
+    ProviderType.KIMI_CODE: 68,        # Kimi Code stable lane (K2.x Code)
     ProviderType.ZHIPU: 67,            # glm-5.2 direct (z.ai/Zhipu)
     ProviderType.GOOGLE_AI: 65,        # Gemini 2.5 Pro
     ProviderType.GROQ: 64,             # Kimi K2 1T MoE

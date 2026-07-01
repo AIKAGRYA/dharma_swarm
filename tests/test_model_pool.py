@@ -60,7 +60,7 @@ def test_pool_routes_are_exactly_the_roster_literals():
 
 
 def test_pool_collapses_roster_slots_to_logical_entries():
-    """The roster has 44 slots that collapse to 30 logical pool entries.
+    """The roster has 45 slots that collapse to 31 logical pool entries.
     Guards against silent regroup drift.
 
     The floor-demarcation work (2026-06-17) added 13 slots for the K2.6-floor
@@ -72,9 +72,11 @@ def test_pool_collapses_roster_slots_to_logical_entries():
     logical entries. That is 13 new slots (31 -> 44) and 7 new logical entries
     (23 -> 30): claude-opus-4.8,
     claude-sonnet-4.6, gpt-5.5, kimi-k2.7-code, deepseek-v4-pro, glm-5.1,
-    minimax-m3. No sub-floor model was removed — they are marked, not deleted."""
-    assert len(EVOLUTION_ROSTER) == 44
-    assert len(MODEL_POOL) == 30
+    minimax-m3. The Kimi Code direct route adds one more floor slot/logical
+    entry with the stable documented model id ``kimi-for-coding``. No sub-floor
+    model was removed — they are marked, not deleted."""
+    assert len(EVOLUTION_ROSTER) == 45
+    assert len(MODEL_POOL) == 31
 
 
 # --------------------------------------------------------------------------
@@ -242,7 +244,7 @@ def test_floor_and_grunt_partition_the_pool():
     assert len(floor) + len(grunt) == len(MODEL_POOL)
     assert all(not e.below_floor for e in floor)
     assert all(e.below_floor for e in grunt)
-    assert len(floor) == 12
+    assert len(floor) == 13
     assert len(grunt) == 18
 
 

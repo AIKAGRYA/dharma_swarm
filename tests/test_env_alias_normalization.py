@@ -19,6 +19,7 @@ import pytest
 from dharma_swarm.api_keys import (
     ENV_ALIASES,
     GOOGLE_AI_API_KEY_ENV,
+    KIMI_API_KEY_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     PPLX_API_KEY_ENV,
     apply_env_assignment,
@@ -40,6 +41,9 @@ class TestEnvAliasTable:
 
     def test_perplexity_maps_to_pplx(self) -> None:
         assert ENV_ALIASES["PERPLEXITY_API_KEY"] == PPLX_API_KEY_ENV
+
+    def test_kimi_code_alias_maps_to_kimi(self) -> None:
+        assert ENV_ALIASES["MOONSHOT_KIMI_API_KEY"] == KIMI_API_KEY_ENV
 
     def test_self_mapping_is_noop(self) -> None:
         for alias, canonical in ENV_ALIASES.items():
@@ -72,6 +76,12 @@ class TestNormalizeEnvAliases:
         env: dict[str, str] = {"PERPLEXITY_API_KEY": "pplx-test"}
         applied = normalize_env_aliases(env)
         assert env["PPLX_API_KEY"] == "pplx-test"
+
+    def test_copies_moonshot_kimi_to_kimi(self) -> None:
+        env: dict[str, str] = {"MOONSHOT_KIMI_API_KEY": "kimi-test"}
+        applied = normalize_env_aliases(env)
+        assert env["KIMI_API_KEY"] == "kimi-test"
+        assert ("MOONSHOT_KIMI_API_KEY", "KIMI_API_KEY") in applied
 
     def test_does_not_overwrite_existing_canonical(self) -> None:
         env: dict[str, str] = {

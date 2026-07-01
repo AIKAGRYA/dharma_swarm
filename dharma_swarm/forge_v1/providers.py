@@ -62,7 +62,7 @@ def _provider_for_model(model_id: str):
     elif mid in {"kimi-for-coding", "kimi-code"} or mid.startswith("kimi_code/") or mid.startswith("kimi-code/"):
         provider_type = ProviderType.KIMI_CODE
     elif mid.startswith("glm-5.2") or mid.startswith("zai/") or mid.startswith("z-ai/"):
-        provider_type = ProviderType.ZAI
+        provider_type = ProviderType.ZHIPU
     elif mid.endswith(":cloud") or mid.startswith("glm") or mid.startswith("kimi"):
         provider_type = ProviderType.OLLAMA  # Ollama Cloud frontier chain
     elif mid.startswith("meta/") or mid.startswith("nvidia/") or "llama" in mid:

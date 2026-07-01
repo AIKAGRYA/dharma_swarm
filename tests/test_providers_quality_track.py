@@ -15,6 +15,7 @@ from dharma_swarm.providers import (
     CerebrasProvider,
     ClaudeCodeProvider,
     CodexProvider,
+    KimiCodeProvider,
     ModelRouter,
     NVIDIANIMProvider,
     OllamaProvider,
@@ -55,6 +56,7 @@ def _mk_resp(
     content: str | None = "ok",
     *,
     reasoning: str | None = None,
+    reasoning_content: str | None = None,
     reasoning_details: list[object] | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
@@ -64,6 +66,7 @@ def _mk_resp(
             message=SimpleNamespace(
                 content=content,
                 reasoning=reasoning,
+                reasoning_content=reasoning_content,
                 reasoning_details=reasoning_details,
                 tool_calls=None,
             ),
@@ -373,6 +376,25 @@ async def test_cerebras_provider_uses_reasoning_when_content_empty(monkeypatch):
     assert out.content == "OK"
 
 
+@pytest.mark.asyncio
+async def test_kimi_code_provider_uses_reasoning_content_when_content_empty(monkeypatch):
+    p = KimiCodeProvider(api_key="k")
+    req = LLMRequest(model="kimi-for-coding", messages=[{"role": "user", "content": "hi"}])
+
+    client = AsyncMock()
+    client.chat.completions.create = AsyncMock(
+        return_value=_mk_resp(content=None, reasoning_content="OK")
+    )
+    monkeypatch.setattr(p, "_client_or_raise", lambda: client)
+
+    out = await p.complete(req)
+
+    kwargs = client.chat.completions.create.await_args.kwargs
+    assert kwargs["model"] == "kimi-for-coding"
+    assert kwargs["temperature"] == 1
+    assert out.content == "OK"
+
+
 def test_openai_build_messages_without_system_does_not_prepend():
     msgs = [{"role": "user", "content": "x"}]
     out = OpenAIProvider._build_messages(msgs, "")
@@ -410,6 +432,7 @@ def test_create_default_router_contains_expected_provider_types():
         ProviderType.NVIDIA_NIM,
         ProviderType.OLLAMA,
         ProviderType.ZHIPU,
+        ProviderType.KIMI_CODE,
     }
     assert set(router._providers.keys()) == expected
 
@@ -857,6 +880,7 @@ from dharma_swarm.providers import (  # noqa: E402
     ChutesProvider,
     FireworksProvider,
     GoogleAIProvider,
+    KimiCodeProvider,
     MistralProvider,
     SambaNovaProvider,
     SiliconFlowProvider,
@@ -869,6 +893,7 @@ _SIBLING_PROVIDERS = [
     TogetherProvider,
     FireworksProvider,
     GoogleAIProvider,
+    KimiCodeProvider,
     SambaNovaProvider,
     MistralProvider,
     ChutesProvider,
@@ -927,6 +952,9 @@ def test_extractor_handles_plain_dict_message() -> None:
     assert _extract_openai_compatible_message_text(
         {"content": None, "reasoning": "dict reasoning"}
     ) == "dict reasoning"
+    assert _extract_openai_compatible_message_text(
+        {"content": None, "reasoning_content": "dict reasoning content"}
+    ) == "dict reasoning content"
     assert _extract_openai_compatible_message_text(
         {"content": [{"type": "text", "text": "dict list"}]}
     ) == "dict list"

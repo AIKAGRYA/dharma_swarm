@@ -14,6 +14,7 @@ from dharma_swarm.api_keys import (
     FINNHUB_API_KEY_ENV,
     FRED_API_KEY_ENV,
     GINKO_API_KEY_ENV_VARS,
+    KIMI_API_KEY_ENV,
     OPENROUTER_API_KEY_ENV,
     RUNTIME_PROVIDER_API_KEY_ENV_KEYS,
     env_has_value,
@@ -48,6 +49,7 @@ def test_provider_registry_covers_runtime_providers() -> None:
     assert provider_api_key_env(ProviderType.OPENROUTER_FREE) == OPENROUTER_API_KEY_ENV
     assert provider_api_key_env(ProviderType.OLLAMA) == "OLLAMA_API_KEY"
     assert provider_api_key_env(ProviderType.CHUTES) == "CHUTES_API_KEY"
+    assert provider_api_key_env(ProviderType.KIMI_CODE) == KIMI_API_KEY_ENV
 
 
 def test_runtime_provider_registry_is_unique() -> None:
@@ -77,6 +79,7 @@ def test_all_api_key_registry_contains_system_services() -> None:
 def test_chat_provider_registry_matches_dashboard_surface() -> None:
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.OPENROUTER.value] == OPENROUTER_API_KEY_ENV
     assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.NVIDIA_NIM.value] == "NVIDIA_NIM_API_KEY"
+    assert CHAT_PROVIDER_API_KEY_ENV_KEYS[ProviderType.KIMI_CODE.value] == KIMI_API_KEY_ENV
 
 
 def test_env_value_empty_mapping_does_not_read_real_shell(monkeypatch) -> None:

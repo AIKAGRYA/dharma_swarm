@@ -136,6 +136,7 @@ _PROVIDER_RANK: dict[ProviderType, int] = {
     ProviderType.CLAUDE_CODE: 0,
     ProviderType.OPENAI: 1,
     ProviderType.CODEX: 1,
+    ProviderType.KIMI_CODE: 2,
     ProviderType.OLLAMA: 2,
     ProviderType.NVIDIA_NIM: 3,
     ProviderType.GROQ: 4,

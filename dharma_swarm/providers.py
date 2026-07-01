@@ -31,6 +31,7 @@ from dharma_swarm.api_keys import (
     FIREWORKS_API_KEY_ENV,
     GOOGLE_AI_API_KEY_ENV,
     GROQ_API_KEY_ENV,
+    KIMI_API_KEY_ENV,
     MISTRAL_API_KEY_ENV,
     NVIDIA_NIM_API_KEY_ENV,
     OLLAMA_API_KEY_ENV,
@@ -166,6 +167,11 @@ def _extract_openai_compatible_message_text(message: Any) -> str:
     reasoning = _coerce_openrouter_text(_get_openai_compatible_field(message, "reasoning"))
     if reasoning:
         return reasoning
+    reasoning_content = _coerce_openrouter_text(
+        _get_openai_compatible_field(message, "reasoning_content")
+    )
+    if reasoning_content:
+        return reasoning_content
     return _coerce_openrouter_text(
         _get_openai_compatible_field(message, "reasoning_details")
     )
@@ -1681,6 +1687,109 @@ class GoogleAIProvider(LLMProvider):
             model=request.model, stream=True,
             messages=self._build_messages(request.messages, request.system),
             max_tokens=request.max_tokens, temperature=request.temperature,
+        )
+        async for chunk in resp:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
+
+class KimiCodeProvider(LLMProvider):
+    """Kimi Code membership API, using its OpenAI-compatible chat endpoint."""
+
+    capabilities = ProviderCapabilities(
+        supports_streaming=True,
+        supports_tools=True,
+        supports_thinking=True,
+        supports_system_prompt=True,
+        max_context_tokens=256_000,
+        provider_family="kimi_code",
+    )
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        default_model: str | None = None,
+        timeout: float = 300.0,
+    ) -> None:
+        self._api_key = api_key or os.environ.get(KIMI_API_KEY_ENV)
+        self._base_url = (
+            base_url
+            or os.environ.get("KIMI_BASE_URL")
+            or "https://api.kimi.com/coding/v1"
+        ).rstrip("/")
+        self._default_model = default_model or canonical_default_model(ProviderType.KIMI_CODE)
+        self._timeout = float(timeout)
+        self._client: Any = None
+
+    def _client_or_raise(self) -> Any:
+        if self._client is not None:
+            return self._client
+        if not self._api_key:
+            raise RuntimeError(f"{KIMI_API_KEY_ENV} not set")
+        try:
+            from openai import AsyncOpenAI
+        except ImportError as exc:
+            raise ImportError("pip install openai") from exc
+        self._client = AsyncOpenAI(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            timeout=self._timeout,
+        )
+        return self._client
+
+    @staticmethod
+    def _build_messages(msgs: list[dict[str, str]], system: str) -> list[dict[str, str]]:
+        out: list[dict[str, str]] = []
+        if system:
+            out.append({"role": "system", "content": system})
+        out.extend(msgs)
+        return out
+
+    @jikoku_traced_provider
+    async def complete(self, request: LLMRequest) -> LLMResponse:
+        client = self._client_or_raise()
+        kwargs: dict[str, Any] = dict(
+            model=request.model or self._default_model,
+            messages=self._build_messages(request.messages, request.system),
+            max_tokens=request.max_tokens,
+            # Kimi Code rejects other temperature values on the coding model.
+            temperature=1,
+        )
+        if request.tools:
+            kwargs["tools"] = request.tools
+        resp = await client.chat.completions.create(**kwargs)
+        choice = resp.choices[0]
+        msg = choice.message
+        tool_calls: list[dict[str, Any]] = [
+            {
+                "id": tc.id,
+                "name": tc.function.name,
+                "arguments": tc.function.arguments,
+            }
+            for tc in (msg.tool_calls or [])
+        ]
+        return LLMResponse(
+            content=_extract_openai_compatible_message_text(msg),
+            model=resp.model,
+            usage={
+                "prompt_tokens": resp.usage.prompt_tokens,
+                "completion_tokens": resp.usage.completion_tokens,
+                "total_tokens": resp.usage.total_tokens,
+            } if resp.usage else {},
+            tool_calls=tool_calls,
+            stop_reason=choice.finish_reason,
+        )
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        client = self._client_or_raise()
+        resp = await client.chat.completions.create(
+            model=request.model or self._default_model,
+            stream=True,
+            messages=self._build_messages(request.messages, request.system),
+            max_tokens=request.max_tokens,
+            temperature=1,
         )
         async for chunk in resp:
             delta = chunk.choices[0].delta if chunk.choices else None
