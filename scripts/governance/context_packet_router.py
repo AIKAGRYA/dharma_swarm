@@ -18,6 +18,13 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INDEX_PATH = REPO_ROOT / "docs/context_engineering/CONTEXT_PACKET_INDEX.json"
+INDEX_SCHEMA_VERSION = "context-packet-index-v1.1"
+ANCHOR_FIELDS = (
+    "vision_anchors",
+    "current_reality_anchors",
+    "dense_docs",
+    "future_agent_review_hooks",
+)
 
 
 @dataclass(frozen=True)
@@ -27,21 +34,56 @@ class PacketMatch:
     score: int
     reasons: tuple[str, ...]
 
-    def to_json(self) -> dict[str, Any]:
-        return {
+    def to_json(self, *, hydrate: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "packet_id": self.packet_id,
             "file": self.file,
             "score": self.score,
             "reasons": list(self.reasons),
         }
+        if hydrate:
+            packet = packet_by_id(self.packet_id)
+            if packet is not None:
+                for field in ANCHOR_FIELDS:
+                    payload[field] = packet.get(field, [])
+        return payload
 
 
 def _tokens(text: str) -> set[str]:
     return {token.lower() for token in re.findall(r"[A-Za-z0-9_./-]+", text)}
 
 
+def _validate_anchor_items(packet_id: str, field: str, value: Any) -> None:
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{packet_id} missing non-empty {field}")
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"{packet_id}.{field}[{index}] must be an object")
+        if field == "future_agent_review_hooks":
+            for key in ("when", "ask", "expect"):
+                if not item.get(key):
+                    raise ValueError(f"{packet_id}.{field}[{index}] missing {key}")
+        else:
+            for key in ("type", "ref", "why"):
+                if not item.get(key):
+                    raise ValueError(f"{packet_id}.{field}[{index}] missing {key}")
+
+
+def _validate_index(data: dict[str, Any]) -> None:
+    if data.get("schema_version") != INDEX_SCHEMA_VERSION:
+        raise ValueError(f"schema_version must be {INDEX_SCHEMA_VERSION}")
+    for packet in data.get("packets", []):
+        packet_id = str(packet.get("id", "<unknown>"))
+        for field in ANCHOR_FIELDS:
+            if field not in packet:
+                raise ValueError(f"{packet_id} missing {field}")
+            _validate_anchor_items(packet_id, field, packet[field])
+
+
 def load_index(path: Path = INDEX_PATH) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    _validate_index(data)
+    return data
 
 
 def _path_matches(pattern: str, path: str) -> bool:
@@ -123,6 +165,31 @@ def _render_text(matches: list[PacketMatch]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _label(field: str) -> str:
+    labels = {
+        "vision_anchors": "Vision anchors",
+        "current_reality_anchors": "Current reality anchors",
+        "dense_docs": "Dense docs",
+        "future_agent_review_hooks": "Future-agent review hooks",
+    }
+    return labels[field]
+
+
+def _render_anchors(packet: dict[str, Any]) -> str:
+    lines = [f"{packet['id']} anchors:"]
+    for field in ANCHOR_FIELDS:
+        lines.append(f"{_label(field)}:")
+        for item in packet.get(field, []):
+            if field == "future_agent_review_hooks":
+                lines.append(
+                    f"- {item['when']}: {item['ask']} "
+                    f"(expect: {item['expect']})"
+                )
+            else:
+                lines.append(f"- {item['ref']} [{item['type']}]: {item['why']}")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("query", nargs="*", help="Task/topic text to route")
@@ -130,7 +197,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--top", type=int, default=3, help="Number of packets to return")
     parser.add_argument("--id", help="Return an exact packet id")
     parser.add_argument("--print-packet", action="store_true", help="Print packet markdown for --id or top match")
+    parser.add_argument("--show-anchors", action="store_true", help="Print compact packet anchors")
     parser.add_argument("--json", action="store_true", help="Emit JSON")
+    parser.add_argument("--hydrate", action="store_true", help="Include anchor metadata in route JSON")
     args = parser.parse_args(argv)
 
     if args.id:
@@ -143,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
             print(packet_path.read_text(encoding="utf-8"))
         elif args.json:
             print(json.dumps(packet, indent=2))
+        elif args.show_anchors:
+            print(_render_anchors(packet), end="")
         else:
             print(f"{packet['id']} -> docs/context_engineering/{packet['file']}")
         return 0
@@ -157,7 +228,14 @@ def main(argv: list[str] | None = None) -> int:
         packet_path = REPO_ROOT / "docs/context_engineering" / str(packet["file"])
         print(packet_path.read_text(encoding="utf-8"))
     elif args.json:
-        print(json.dumps([match.to_json() for match in matches], indent=2))
+        print(json.dumps([match.to_json(hydrate=args.hydrate) for match in matches], indent=2))
+    elif args.show_anchors and matches:
+        print(_render_text(matches), end="\n")
+        packet = packet_by_id(matches[0].packet_id)
+        if packet is None:
+            print(f"Packet disappeared from index: {matches[0].packet_id}", file=sys.stderr)
+            return 2
+        print(_render_anchors(packet), end="")
     else:
         print(_render_text(matches), end="")
     return 0

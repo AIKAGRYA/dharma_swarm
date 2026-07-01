@@ -27,6 +27,56 @@ Keep the repo navigable and honest without adding doc maze. Governance work
 should reduce ambiguity, protect agents from stale claims, and make generated
 or canonical ownership explicit.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: DocOps as organism memory hygiene.
+- `docs/vision_maps/NORTH_STAR.md`: repo hygiene must serve the north star.
+- `docs/governance/CANONICAL_DOC_STACK.md`: canonical documentation stack.
+- `docs/governance/ANTI_SLOP_RULES.md`: anti-slop doctrine.
+- `docs/governance/VIBE_CODE_HYGIENE.md`: hygiene catalogue and risk map.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current governance and stale-doc status.
+- `docs/docops/assertions.yaml`: DocOps assertions.
+- `docs/docops/AUTO_INVENTORY.md`: generated doc inventory.
+- `reports/docops/corpus_inventory.md`: corpus inventory snapshot.
+- `reports/governance/anti_ai_slop_control_backlog_2026-06-08.md`: control
+  backlog.
+
+## Dense Docs
+
+- `docs/governance/PR_QUALITY_GATES.md`: PR quality gates.
+- `reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md`: deep
+  anti-slop research and control frame.
+- `docs/governance/hygiene/**`: hygiene patterns and baselines.
+- `scripts/governance/**`: governance and DocOps enforcement scripts.
+
+## Work-Lane Anchors
+
+- DocOps integrity and hygiene checks define current governance readiness.
+- Generated inventories must be refreshed by their owners, not hand-edited.
+- PR hygiene requires narrow verification and honest residual-risk reporting.
+
+## Evidence Boundary
+
+- Canonical owner: canonical stack, assertions, hygiene docs, governance
+  scripts, CI/pre-commit output.
+- Projection: inventories, corpus scans, stale-doc renderers, and advisory
+  hygiene reports.
+- Transient recall: prior doc status only motivates a fresh owner/check lookup.
+- Forbidden-to-cite: generated files as policy owners, stale docs as current
+  truth, consensus prose without checks, or hidden pre-existing failures.
+
+## Future-Agent Review Hooks
+
+- Before acting, classify the target as canonical, generated, stale, or
+  advisory.
+- Before claiming complete, cite the exact hygiene/docops checks and name
+  pre-existing failures separately.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -156,6 +206,11 @@ pre-existing unrelated failures.
   "related_failures": [],
   "unrelated_preexisting_failures": [],
   "staged_files": [],
-  "next_docops_action": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_docops_action": "",
+  "next_step": ""
 }
 ```

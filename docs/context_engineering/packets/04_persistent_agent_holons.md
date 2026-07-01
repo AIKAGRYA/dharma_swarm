@@ -26,6 +26,61 @@ Keep persistent agents alive, inspectable, and accountable without confusing
 terminal liveness with useful work. Agents need an identity, a task lease or
 mission, a wake mechanism, a health signal, and receipts outside the pane.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: holons as living organs of the organism.
+- `docs/vision_maps/NORTH_STAR.md`: why persistent agents must serve coherent
+  action.
+- `docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md`: maturity target for the
+  agent hierarchy.
+- `docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md`: long-running composer
+  wake-loop vision.
+- `reports/swarm_genome/2026-06-11/SYNTHESIS.md`: holon organ in the organism
+  synthesis.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current holon and active-track state.
+- `docs/governance/ACTIVE_TRACK.yaml`: composer holon and admission lanes.
+- `reports/agentops/PERSISTENT_AGENT_HIERARCHY_20260630.md`: current hierarchy.
+- `reports/agentops/PERSISTENT_AGENT_CENSUS_20260630.md`: current census.
+- `tmux ls`: inspectable terminal substrate liveness only.
+
+## Dense Docs
+
+- `docs/ops/TMUX_AGENT_SUBSTRATE.md`: tmux substrate contract and limits.
+- `reports/a2a/codex_holon_always_live_upgrade.md`: always-live holon upgrade
+  context.
+- `reports/agentops/**`: agent receipts, census, hierarchy, and review evidence.
+- `docs/agents/**/CONTEXT_ENGINEERING.md`: named seat context when the task is
+  seat-specific.
+
+## Work-Lane Anchors
+
+- `composer-holon-spine-longrun-2026-06`: composer wake loop and receipts.
+- `agent-admission-semantic-commons-2026-06`: identity, naming, and admission.
+- Persistent-agent promotion requires receipts outside the pane, not a running
+  process alone.
+
+## Evidence Boundary
+
+- Canonical owner: identity files, agent registry, health rows, holon code, and
+  receipts.
+- Projection: tmux status, process lists, dashboards, and agentops summaries.
+- Transient recall: prior claims of "always live" only justify checking current
+  identity and health.
+- Forbidden-to-cite: pane text as completion proof, process existence as useful
+  work, stale identity material, or secrets from agent homes.
+
+## Future-Agent Review Hooks
+
+- Before acting, state whether you are proving identity, liveness, health,
+  output, or semantic completion.
+- Before claiming complete, cite the receipt outside the pane that proves useful
+  work.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -156,6 +211,11 @@ liveness, tmux liveness, and sovereign holon service health.
   "receipts": [],
   "commands_run": [],
   "safe_to_keep_running": true,
-  "next_action": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_action": "",
+  "next_step": ""
 }
 ```

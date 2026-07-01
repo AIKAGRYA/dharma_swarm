@@ -26,6 +26,59 @@ acts, and adapts on real data with receipts to its declared owner.
 Convert cybernetic-loop ambition into executable closure. The system should not
 mistake a dossier, demo, or internal artifact for adaptive loop closure.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: cybernetics as organism self-regulation.
+- `docs/vision_maps/NORTH_STAR.md`: loop closure must serve coherent action.
+- `CYBERNETIC_LOOP_MAP.md`: 13-loop vision and map.
+- `docs/ops/CYBERNETICS_CODEX.md`: cybernetics steward frame.
+- `architecture/CYBERNETIC_TRANSCENDENCE_PROTOCOL.md`: high-level cybernetic
+  protocol.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current loop-closure and cybernetics-codex track state.
+- `docs/governance/ACTIVE_TRACK.yaml`: loop active lanes and blockers.
+- `reports/loop_closure/RETROSPECTIVE.md`: loop closure retrospective.
+- `reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md`: Loop 1 closure
+  receipt.
+- `reports/loop_closure/phase1/CURRENT_BLOCKER_RECEIPT_2026-06-30.md`: current
+  blocker receipt.
+
+## Dense Docs
+
+- `docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md`: Cybernetics Codex
+  seat context.
+- `docs/missions/CYBERNETIC_DIRECTIVE.md`: cybernetic directive.
+- `reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md`: loop research dossier.
+- `reports/agentops/verifier_ranker_v0/**`: verifier-ranker receipts and
+  models.
+
+## Work-Lane Anchors
+
+- `loop-closure-2026-06`: executable closure and receipt proof.
+- `cybernetics-codex-stewardship-2026-06`: stewardship and context desk.
+- Loop 1 provider trunk and One Wire quorum claims require current receipts.
+
+## Evidence Boundary
+
+- Canonical owner: loop map, Cybernetics Codex, loop supervisor, active tracks,
+  and closure receipts.
+- Projection: retrospectives, dossiers, verifier summaries, and council notes.
+- Transient recall: prior closure stories only justify checking current receipt
+  state.
+- Forbidden-to-cite: demos, aspiration docs, stale one-off receipts, or internal
+  artifacts as adaptive closure on real data.
+
+## Future-Agent Review Hooks
+
+- Before acting, name the loop and phase: sense, interpret, constrain, act, or
+  adapt.
+- Before claiming closure, cite real-data receipts for every phase and list
+  unclosed claims.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -149,6 +202,11 @@ One Wire invariant and verify with the narrowest loop-specific gate.
   "receipts": [],
   "tests": [],
   "status": "closed|partial|blocked|not_started",
-  "next_blocker": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_blocker": "",
+  "next_step": ""
 }
 ```

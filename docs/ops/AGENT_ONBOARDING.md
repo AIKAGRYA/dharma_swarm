@@ -23,13 +23,15 @@ the actual implementation work:
 ```bash
 make agent-build-preflight
 # make the smallest scoped change and run the task-specific test
+make offboard
 make agent-build-closeout
 ```
 
 `make agent-build-preflight` runs onboarding plus hygiene integrity. `make
-agent-build-closeout` writes a no-worktree hygiene receipt to `/tmp` and runs
-the full governance bundle. `make onboard` alone is orientation, not proof that
-the build is clean.
+offboard` writes a local handoff receipt for the next agent or auditor.
+`make agent-build-closeout` writes a no-worktree hygiene receipt to `/tmp` and
+runs the full governance bundle. `make onboard` alone is orientation, and
+`make offboard` alone is handoff evidence, not proof that the build is clean.
 
 GitHub-only agents cannot see local credentials, `dkeys`, or live process environment. Do not conclude "no LLM provider is configured" from repository contents alone; that claim requires a current local `make onboard`, `dkeys list`, `python -m dharma_swarm.api_key_audit --no-agentic`, or `/api/chat/status` check from the operator machine.
 
@@ -99,8 +101,10 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 5. Before modifying a shared symbol, check impact/blast radius.
 6. Make the smallest scoped change.
 7. Run the relevant test or read-only status script.
-8. Run `make agent-build-closeout` before PR handoff.
-9. Update the owning doc only if the change alters durable truth.
+8. Run `make offboard` with task, verification, artifacts, claims not made,
+   risks, and next step.
+9. Run `make agent-build-closeout` before PR handoff.
+10. Update the owning doc only if the change alters durable truth.
 
 ## Handoff Prompt
 
@@ -119,4 +123,6 @@ Read `docs/ops/AGENT_ONBOARDING.md`, then follow the task route that matches the
 Use GitNexus + Context+ + rg as the default large-codebase context stack. Treat Sourcegraph, GDrive, and Postgres MCPs as optional and removed unless their gates in `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` are green.
 
 Never print secrets. Do not revert user or other-agent changes. Do not add new substrates before checking `docs/governance/BUILD_SESSION_ENTRYPOINT.md` and `reports/audit/end_to_end/000_MASTER_COHERENCE_SYNTHESIS.md`.
+
+When finished, run `make offboard ARGS='--task "..." --verification "..." --next-step "..."'` and include the receipt path in your final handoff. Run `make agent-build-closeout` before PR/merge handoff.
 ```

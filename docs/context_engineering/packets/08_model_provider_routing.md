@@ -27,6 +27,60 @@ Prevent dead-provider spirals, secret leakage, and hardcoded model drift. The
 model layer should choose the strongest live available route, fail over
 honestly, and never bypass the resolver or key rules.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: models serve organism action; they are not
+  authority.
+- `docs/vision_maps/NORTH_STAR.md`: provider routing must serve the north star.
+- `docs/ops/MODEL_KEY_ROUTING.md`: one key home and one resolver door.
+- `docs/architecture/MODEL_ROUTING_CANON.md`: canonical routing architecture.
+- `docs/architecture/PROVIDER_MATRIX_HARNESS.md`: provider matrix and
+  evaluation harness.
+
+## Current Reality Anchors
+
+- Run `make onboard` for fresh provider/model route telemetry.
+- Run `dkeys test` without printing secrets.
+- `reports/agentops/QWEN_CODE_DEEPSEEK_V4_PRO_WIRING_20260701.md`: latest
+  Qwen/DeepSeek wiring report.
+- `reports/agentops/deepseek_smokes/**`: provider smoke evidence.
+- `reports/agentops/open_model_council/**`: open-model council evidence.
+
+## Dense Docs
+
+- `MODEL_ROUTING_MAP.md`: top-level model routing map.
+- `docs/_archive/2026-04/MODEL_ROUTING_MAP.md`: archived routing map for drift
+  comparison.
+- `reports/agentops/deepseek_ml_lead_council/**`: DeepSeek ML lead council
+  evidence.
+- `tests/test_*provider*.py`: provider and routing guard tests.
+
+## Work-Lane Anchors
+
+- Provider/model rollup in `make onboard` is the current served-evidence view.
+- `docs/ops/MODEL_KEY_ROUTING.md` owns the deprecated route list and key rules.
+- Cross-model verification must go through existing model council or provider
+  harness scripts, not hardcoded provider calls.
+
+## Evidence Boundary
+
+- Canonical owner: `api_keys.py`, runtime provider resolver, model hierarchy,
+  provider adapters, key-routing doc, and provider telemetry.
+- Projection: onboard provider rollup, smoke reports, and model council
+  summaries.
+- Transient recall: remembered model availability only justifies a live probe.
+- Forbidden-to-cite: raw keys, environment dumps, hardcoded model strings,
+  provider marketing, or stale smoke output as current availability.
+
+## Future-Agent Review Hooks
+
+- Before acting, state whether you are touching keys, provider adapters, model
+  hierarchy, or telemetry routing.
+- Before claiming complete, cite resolver tests, provider attempts, and a secret
+  scan or redaction guarantee.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -145,6 +199,11 @@ provider smoke, model key guard, or model pool tests.
   "tests": [],
   "live_status": "",
   "secrets_exposed": false,
-  "fallback_behavior": ""
+  "fallback_behavior": "",
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_step": ""
 }
 ```

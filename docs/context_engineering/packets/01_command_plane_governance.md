@@ -28,6 +28,66 @@ must answer, quickly and honestly: where am I, what is live, what is shippable,
 what is broken, what surfaces are owned, what should not be touched, and which
 packet should be loaded next.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: whole-system identity and why the command
+  plane exists.
+- `docs/vision_maps/NORTH_STAR.md`: highest priority frame for governance
+  choices.
+- `docs/plans/OPERATOR_COMMAND_VISION.md`: target state for operator command.
+- `reports/swarm_genome/2026-06-11/SYNTHESIS.md`: whole-organism synthesis and
+  organ map.
+- `docs/governance/SOVEREIGN_MANIFEST.md`: doctrine for authority and
+  sovereignty.
+
+## Current Reality Anchors
+
+- Run `make onboard` before claims or edits.
+- `docs/governance/ACTIVE_TRACK.yaml`: current intent, tracks, owners, and
+  gates.
+- `reports/governance/active_track_evidence.md`: rendered evidence for the
+  active portfolio.
+- `ACTIVE_SURFACE_MANIFEST.yaml`: surface ownership and boundaries.
+- `git status --short --branch`: dirty state and branch truth.
+
+## Dense Docs
+
+- `docs/governance/CANONICAL_DOC_STACK.md`: ownership of canonical docs.
+- `docs/ops/AGENT_OFFBOARDING.md`: end-of-session handoff receipt contract.
+- `docs/governance/ANTI_SLOP_RULES.md`: hygiene rules for agent claims.
+- `docs/ontology/session_orientation.yaml`: session and semantic route data.
+- `reports/swarm_genome/2026-06-11/agent_4_governance_operating_canon.md`:
+  dense governance operating canon.
+
+## Work-Lane Anchors
+
+- Orientation graph and onboarding are shippable command-plane lanes.
+- New work must enter `docs/governance/ACTIVE_TRACK.yaml` before it is treated
+  as committed scope.
+- PR handoff work must follow `make agent-build-closeout` unless explicitly
+  blocked and receipted.
+- Finished substantial work should run `make offboard` with task, packet id,
+  verification, artifacts, claims not made, risks, and next step.
+
+## Evidence Boundary
+
+- Canonical owner: `ACTIVE_TRACK.yaml`, `ACTIVE_SURFACE_MANIFEST.yaml`, git, and
+  governance scripts.
+- Projection: onboarding output, orientation graphs, generated evidence reports.
+- Transient recall: prior chat or model memory can only suggest a source to
+  inspect.
+- Forbidden-to-cite: stale packet prose that conflicts with owners, secrets, or
+  unprobed live-state claims.
+
+## Future-Agent Review Hooks
+
+- Before acting, state which vision anchor and current-reality anchor you
+  loaded.
+- Before claiming complete, separate owner-file claims, probe observations,
+  receipts, and inference.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -106,6 +166,7 @@ Use retrieval only after L0-L2 route selection.
 5. Act only within owned surfaces or explicitly explain overlap.
 6. Verify with the narrowest meaningful governance/test command.
 7. Leave changed files, verification, residual risk, and packet id used.
+8. Run `make offboard` for a handoff receipt before leaving the thread.
 
 ## Guardrails
 
@@ -159,8 +220,10 @@ owned surfaces, verify narrowly, and leave a receipt-style handoff.
   "owned_surfaces_touched": [],
   "commands_run": [],
   "verification": [],
+  "claims_with_citations": [],
   "claims_not_made": [],
   "next_packet": "",
-  "residual_risk": ""
+  "residual_risk": "",
+  "next_step": ""
 }
 ```

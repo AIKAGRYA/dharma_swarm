@@ -29,6 +29,63 @@ owner files, when to retrieve from wiki/vector space, when to ask graph-shaped
 questions, and when to reject retrieved material as stale, unauthoritative, or
 secret-bearing.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: memory as organism continuity, not freeform
+  recall.
+- `docs/vision_maps/NORTH_STAR.md`: why retrieval must improve coherent action.
+- `docs/ontology/SEMANTIC_COMMONS.md`: target state for shared semantic
+  objects.
+- `docs/architecture/memory_kernel_current_intent.md`: current intent of the
+  memory kernel.
+- `reports/swarm_genome/2026-06-11/SYNTHESIS.md`: memory organ inside the
+  organism map.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current semantic-commons track status.
+- `docs/governance/ACTIVE_TRACK.yaml`: agent-admission and semantic-commons
+  ownership.
+- `reports/governance/semantic_commons_projection_manifest.json`: current
+  projection manifest.
+- `reports/memory_kernel/**`: retrieval gates, benchmarks, and backfill receipts.
+- Run `python3 scripts/memory_retrieval_system_gate.py` before retrieval quality
+  claims.
+
+## Dense Docs
+
+- `docs/ontology/retrieval_scope.yaml`: retrieval scope contract.
+- `docs/ontology/semantic_objects.yaml`: semantic object registry.
+- `docs/ontology/semantic_aliases.yaml`: alias map for admission and retrieval.
+- `docs/architecture/MEMORY_KERNEL_PROD_BAR.md`: production bar.
+- `docs/ops/MEMORY_COMMON.md`: shared memory operations guide.
+
+## Work-Lane Anchors
+
+- `agent-admission-semantic-commons-2026-06`: admission, naming, and retrieval
+  scope.
+- Memory retrieval gate and vector/wiki live gates own current quality claims.
+- Backfill and re-embed reports are evidence, not owners of truth.
+
+## Evidence Boundary
+
+- Canonical owner: ontology files, retrieval-scope contract, memory code, and
+  gate outputs.
+- Projection: wiki, vector DBs, memory reports, semantic indexes, and graph
+  traversal.
+- Transient recall: model memory can suggest query terms only.
+- Forbidden-to-cite: retrieved text without provenance, stale cached summaries,
+  private material, or anything rejected by retrieval scope.
+
+## Future-Agent Review Hooks
+
+- Before retrieval, classify the task as owner lookup, recall, relation
+  traversal, or evidence search.
+- Before claiming complete, list accepted context, rejected context, unresolved
+  conflicts, and why each source family was authoritative or not.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -162,8 +219,14 @@ context in the handoff.
   "retrieval_queries": [],
   "accepted_context": [],
   "rejected_context": [],
+  "unresolved_conflicts": [],
   "diagnostics": [],
   "commands_run": [],
-  "next_index_or_ingest_action": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_index_or_ingest_action": "",
+  "next_step": ""
 }
 ```

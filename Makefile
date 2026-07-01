@@ -1,7 +1,7 @@
 # DHARMA SWARM — Makefile
 # Run `make help` to see all targets.
 
-.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
+.PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene test-contracts nats-substrate-contract nats-live-production-matrix uplift-guards module-budget hygiene-audit hygiene-check bug-corral-scan name-drift-preflight semantic-commons-check semantic-commons-project agent-admit onboard-agent codex-composer-bootstrap codex-composer-once codex-composer-status codex-composer-start codex-composer-stop docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke runtime-truth-ci runtime-truth-closeout runtime-truth-burn-in runtime-truth-burn-in-smoke runtime-truth-100-audit runtime-task-firebreak ds-goal-longrun-preflight-check governance-all agent-build-preflight agent-build-closeout cybernetics-codex-audit spine-check onboard offboard orient status go-fmt-check go-test go-vet go-ci xray compile test-smoke test-all dashboard-lint dashboard-build
 
 # Prefer the repo venv when present so onboarding sections that need repo
 # dependencies (pydantic, yaml) render instead of degrading silently.
@@ -95,6 +95,7 @@ help:
 	@echo "  make ds-goal-longrun-preflight-check Block unpinned repo-owned ds-goal longrun workflow commands"
 	@echo "  make cybernetics-codex-audit Render read-only cybernetic loop closure ledger"
 	@echo "  make onboard      Render current operating reality (active track, live ops, broken register, axioms)"
+	@echo "  make offboard     Render end-of-session handoff receipt for the next agent/auditor"
 	@echo "  make orient       Render the whole organism at once (identity, organs, tracks, custody, liveness)"
 	@echo "  make agent-build-preflight Run onboarding + hygiene integrity before agent work"
 	@echo "  make agent-build-closeout Run hygiene scan + full governance bundle after agent work"
@@ -458,7 +459,7 @@ ds-goal-longrun-preflight-check:
 governance-all: semgrep gitleaks test-hygiene test-contracts nats-substrate-contract uplift-guards module-budget ds-goal-longrun-preflight-check docops-integrity
 
 agent-build-preflight: verifier-selfcheck onboard hygiene-check
-	@printf "\nAgent build preflight complete. Use the task route from make onboard; close out with: make agent-build-closeout\n"
+	@printf "\nAgent build preflight complete. Use the task route from make onboard; leave a handoff with make offboard, and run make agent-build-closeout before PR/merge handoff.\n"
 
 agent-build-closeout:
 	$(PYTHON) scripts/governance/hygiene/scan.py --output /tmp/dharma-hygiene-audit.txt
@@ -477,6 +478,12 @@ spine-check:
 # session — humans and agents both.
 onboard:
 	$(PYTHON) scripts/governance/agent_onboard.py
+
+# Single-door offboarding: writes a receipt for the next agent/auditor after a
+# scoped work session. By default this writes under ~/.dharma/ops; pass
+# ARGS='--repo-receipt ...' only when a durable repo handoff is intended.
+offboard:
+	$(PYTHON) scripts/governance/agent_offboard.py $(ARGS)
 
 # Whole-system orientation: identity, organs, tracks, canon custody, liveness,
 # broken register — one read-only view projected from the owners. Always exits 0.

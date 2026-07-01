@@ -26,6 +26,61 @@ Make the operator see what is real, quickly, without hiding stale state or
 mixing authority layers. UI work should be dense, inspectable, and operational,
 not decorative.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: operator surfaces as the organism's inspectable
+  nervous system.
+- `docs/vision_maps/NORTH_STAR.md`: UI must serve coherent action, not display
+  theater.
+- `docs/plans/OPERATOR_COMMAND_VISION.md`: operator command-plane target.
+- `docs/ops/LIVE_OPS_COCKPIT.md`: live ops cockpit design.
+- `docs/architecture/CONTROL_SURFACE.md`: control surface architecture.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current terminal/dashboard active track state.
+- `ACTIVE_SURFACE_MANIFEST.yaml`: current UI/API surface ownership.
+- `reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md`: terminal live tmux
+  receipt.
+- `reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md`: terminal closeout state.
+- `reports/dashboard/DASHBOARD_WIRING_AUDIT_2026-03-19.md`: dashboard wiring
+  audit.
+
+## Dense Docs
+
+- `docs/design/COCKPIT_V2_DESKTOP_SOURCE_MANIFEST.md`: cockpit v2 source
+  manifest.
+- `docs/design/COCKPIT_V2_GRAFANA_LONG_RUNNING_GOAL.md`: long-running cockpit
+  design goal.
+- `api/**`: FastAPI surface.
+- `dashboard/src/**`: dashboard frontend surface.
+- `terminal/**`: terminal UI surface.
+
+## Work-Lane Anchors
+
+- `helm-worldclass-terminal-2026-06`: terminal harness, golden captures, and
+  live receipt.
+- Dashboard and API work must follow `ACTIVE_SURFACE_MANIFEST.yaml`.
+- Visible UI changes require tests plus browser/screenshot verification when a
+  human would inspect the result.
+
+## Evidence Boundary
+
+- Canonical owner: surface manifest, API/dashboard/terminal code, runtime
+  sources, and test output.
+- Projection: screenshots, dashboard snapshots, live ops census, and audits.
+- Transient recall: operator anecdotes only justify probing the current surface.
+- Forbidden-to-cite: screenshots as backend truth, stale dashboard data as live
+  state, or UI mocks as implemented capability.
+
+## Future-Agent Review Hooks
+
+- Before acting, name the user-visible surface and owner manifest entry.
+- Before claiming complete, cite tests, screenshots, probes, or receipts that
+  prove the visible behavior.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -155,6 +210,11 @@ relevant tests and inspect visual changes before handoff.
   "tests_run": [],
   "visual_verification": "",
   "state_owner": "",
-  "remaining_ui_risk": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "remaining_ui_risk": "",
+  "next_step": ""
 }
 ```

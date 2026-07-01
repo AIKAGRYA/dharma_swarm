@@ -28,6 +28,64 @@ Move Dharma Swarm from internal coherence to real-world usefulness while
 preserving consent, privacy, and honest status. The packet prevents agents from
 turning designs, drafts, or imagined outreach into claims of traction.
 
+## Vision Anchors
+
+- `foundations/THE_ORGANISM.md`: external value as organism action in the world.
+- `docs/vision_maps/NORTH_STAR.md`: world-service north star for external work.
+- `foundations/ECONOMIC_VISION.md`: economic and abundance vision.
+- `docs/architecture/VENTURE_CELL_LIFECYCLE.md`: venture-cell lifecycle target.
+- `docs/governance/VENTURE_CELL_REVENUE_WEDGE.md`: revenue wedge and external
+  value frame.
+
+## Current Reality Anchors
+
+- Run `make onboard` for current revenue and external-human track status.
+- `docs/governance/ACTIVE_TRACK.yaml`: external-value active lanes.
+- `docs/governance/VENTURE_CELL_PORTFOLIO.yaml`: current venture-cell
+  portfolio.
+- `reports/telos_ai/EXTERNAL_ACTION_OPERATOR_PACKET_2026-06-30.md`: TELOS
+  external action packet.
+- `reports/livelihood_loom/promotion/human_review_packet.md`: Livelihood Loom
+  human review packet.
+
+## Dense Docs
+
+- `docs/agents/livelihood_loom_ceo/CONTEXT_ENGINEERING.md`: Livelihood Loom
+  seat context.
+- `docs/agents/codex_telos/CONTEXT_ENGINEERING.md`: TELOS seat context.
+- `reports/telos_ai/EXTERNAL_ACTED_RECEIPT_SCHEMA.md`: external acted receipt
+  schema.
+- `reports/revenue_wedge/first_cash_receipt_status.md`: first-cash receipt
+  status.
+- `reports/livelihood_loom/**`: demand, promotion, and enablement artifacts.
+
+## Work-Lane Anchors
+
+- `telos-ai-morning-refinery-2026-06`: external acted receipt remains the
+  important proof gate.
+- Livelihood Loom promotion and sponsor packets are reviewable drafts until
+  external action is approved and receipted.
+- Venture-cell portfolio defines current cells; internal designs do not count
+  as traction.
+
+## Evidence Boundary
+
+- Canonical owner: venture portfolio, venture-cell code, consented artifacts,
+  external acted receipts, and active tracks.
+- Projection: market research, idea-spark output, sponsor drafts, and sanitized
+  review packets.
+- Transient recall: claimed customer interest only motivates checking receipts.
+- Forbidden-to-cite: private raw material, unconsented outreach, internal drafts
+  as external traction, or revenue claims without external proof.
+
+## Future-Agent Review Hooks
+
+- Before external action, state the consent, privacy, and human-review gate.
+- Before claiming traction, cite the external acted receipt or explicitly list
+  the claim not made.
+- If evolving this packet, request a five-lane multi-agent/model review when
+  practical; otherwise record the skip or failure reason in a handoff receipt.
+
 ## First Reads
 
 L0 Safety:
@@ -155,6 +213,11 @@ real outside human acted and redacted durable evidence exists.
   "commands_run": [],
   "tests": [],
   "status_change": "none",
-  "next_operator_decision": ""
+  "claims_with_citations": [],
+  "claims_not_made": [],
+  "next_packet": "",
+  "residual_risk": "",
+  "next_operator_decision": "",
+  "next_step": ""
 }
 ```

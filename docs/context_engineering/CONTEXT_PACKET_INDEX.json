@@ -1,9 +1,9 @@
 {
-  "schema_version": "context-packet-index-v1",
-  "generated_at": "2026-06-30T00:00:00Z",
+  "schema_version": "context-packet-index-v1.1",
+  "generated_at": "2026-07-01T15:10:06Z",
   "research_cutoff": "late June 2026",
   "repo_root": "/Users/dhyana/dharma_swarm",
-  "repo_head_observed": "f1f3e140e3",
+  "repo_head_observed": "0a02a6fe4",
   "packet_directory": "docs/context_engineering/packets",
   "packets": [
     {
@@ -11,8 +11,34 @@
       "file": "packets/01_command_plane_governance.md",
       "aliases": ["onboard", "orientation", "active track", "governance", "first token"],
       "primary_surfaces": ["CLAUDE.md", "AGENTS.md", "scripts/governance/agent_onboard.py", "scripts/governance/orientation_graph.py", "docs/governance/ACTIVE_TRACK.yaml"],
-      "commands": ["make onboard", "make orient", "python3 scripts/governance/check_track_status.py"],
-      "authority": "read-only projection over owners"
+      "commands": ["make onboard", "make offboard", "make orient", "python3 scripts/governance/check_track_status.py"],
+      "authority": "read-only projection over owners",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Whole-system organism identity and telos boundary"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Highest priority frame for governance choices"},
+        {"type": "file", "ref": "docs/plans/OPERATOR_COMMAND_VISION.md", "why": "Command-plane target state"},
+        {"type": "file", "ref": "reports/swarm_genome/2026-06-11/SYNTHESIS.md", "why": "Whole-organism synthesis and organ map"},
+        {"type": "file", "ref": "docs/governance/SOVEREIGN_MANIFEST.md", "why": "Governance doctrine and first-principles authority"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh command-plane and active portfolio state"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "Current intent, ownership, and acceptance criteria"},
+        {"type": "file", "ref": "reports/governance/active_track_evidence.md", "why": "Rendered evidence for active tracks"},
+        {"type": "file", "ref": "ACTIVE_SURFACE_MANIFEST.yaml", "why": "Owned surfaces and declared boundaries"},
+        {"type": "command", "ref": "git status --short --branch", "why": "Dirty worktree and branch reality before edits"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/governance/CANONICAL_DOC_STACK.md", "why": "Doc ownership map and canonical-stack discipline"},
+        {"type": "file", "ref": "docs/ops/AGENT_OFFBOARDING.md", "why": "End-of-session handoff receipt contract"},
+        {"type": "file", "ref": "docs/governance/ANTI_SLOP_RULES.md", "why": "Agent hygiene rules for governance claims"},
+        {"type": "file", "ref": "docs/ontology/session_orientation.yaml", "why": "Session route and semantic orientation data"},
+        {"type": "file", "ref": "reports/swarm_genome/2026-06-11/agent_4_governance_operating_canon.md", "why": "Dense governance operating canon"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Which vision and current-reality anchors did you load, and which owner files outrank packet prose?", "expect": "owners_consulted plus accepted_context and rejected_context"},
+        {"when": "before claiming complete", "ask": "Which claims are backed by owner, probe, or receipt evidence, and which claims are intentionally not made?", "expect": "claims_with_citations, claims_not_made, and residual_risk"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.runtime-spine-a2a-nats",
@@ -20,7 +46,32 @@
       "aliases": ["spine", "A2A", "NATS", "dispatch", "runtime truth", "receipts"],
       "primary_surfaces": ["dharma_swarm/spine/**", "dharma_swarm/a2a/**", "dharma_swarm/operator_core/**", "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
       "commands": ["make onboard", "python3 scripts/governance/spine_bypass_report.py", "pytest tests/test_spine_persistence_invariant.py"],
-      "authority": "receipts and transport contracts"
+      "authority": "receipts and transport contracts",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Whole-system organism identity behind the runtime spine"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Why transport exists: coherent action, not message theater"},
+        {"type": "file", "ref": "docs/architecture/SPINE_ADOPTION_NARRATIVE.md", "why": "Runtime-spine adoption target state"},
+        {"type": "file", "ref": "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md", "why": "NATS substrate vision and contract"},
+        {"type": "file", "ref": "reports/swarm_genome/2026-06-11/SYNTHESIS.md", "why": "Runtime spine inside the organism map"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh runtime-truth track status and provider/route rollup"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "Runtime-truth, NATS, spine, and A2A active lanes"},
+        {"type": "file", "ref": "reports/governance/active_track_evidence.md", "why": "Current gate results for runtime lanes"},
+        {"type": "file", "ref": "reports/governance/runtime_truth_nats_council_evidence_2026-07-01.md", "why": "Most recent NATS review/council evidence"},
+        {"type": "glob", "ref": "reports/a2a/**", "why": "A2A receipts and domain reply artifacts"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "reports/a2a/A2A_MASTER_SPEC_WORKING_STATE_20260617.md", "why": "A2A working-state master spec"},
+        {"type": "file", "ref": "docs/architecture/A2A_CLOUD_BRIDGE.md", "why": "Cloud-agent bridge design"},
+        {"type": "file", "ref": "reports/governance/runtime_truth_nats_closeout_packet_2026-07-01.md", "why": "Dense closeout packet for the latest NATS truth slice"},
+        {"type": "glob", "ref": "reports/agentops/decorrelated_review_council/**", "why": "Independent runtime-truth review evidence"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Which closure layer are you touching: transport, dispatch, persistence, semantic reply, or completion?", "expect": "closure_layer and owner_files"},
+        {"when": "before claiming complete", "ask": "Which fresh probe or receipt proves each runtime claim?", "expect": "fresh_live_evidence plus unproven_claims"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.memory-semantic-commons",
@@ -28,7 +79,33 @@
       "aliases": ["memory", "wiki", "vector", "semantic commons", "retrieval", "context"],
       "primary_surfaces": ["dharma_swarm/memory_retrieval.py", "dharma_swarm/wiki_vector_ingest.py", "docs/ontology/**", "reports/memory_kernel/**"],
       "commands": ["make onboard", "python3 scripts/memory_retrieval_system_gate.py", "python3 scripts/wiki_vector_live_gate.py"],
-      "authority": "governed retrieval projection plus ontology owners"
+      "authority": "governed retrieval projection plus ontology owners",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Whole-system identity the memory layer serves"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Why retrieval must improve coherent action"},
+        {"type": "file", "ref": "docs/ontology/SEMANTIC_COMMONS.md", "why": "Semantic commons target state"},
+        {"type": "file", "ref": "docs/architecture/memory_kernel_current_intent.md", "why": "Current memory-kernel intent"},
+        {"type": "file", "ref": "reports/swarm_genome/2026-06-11/SYNTHESIS.md", "why": "Memory organ inside the organism map"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh semantic-commons active track state"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "Agent admission and semantic-commons ownership"},
+        {"type": "file", "ref": "reports/governance/semantic_commons_projection_manifest.json", "why": "Current semantic commons projection manifest"},
+        {"type": "glob", "ref": "reports/memory_kernel/**", "why": "Latest memory retrieval gate and benchmark receipts"},
+        {"type": "command", "ref": "python3 scripts/memory_retrieval_system_gate.py", "why": "Live retrieval gate before quality claims"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/ontology/retrieval_scope.yaml", "why": "Retrieval scope contract"},
+        {"type": "file", "ref": "docs/ontology/semantic_objects.yaml", "why": "Semantic object registry"},
+        {"type": "file", "ref": "docs/ontology/semantic_aliases.yaml", "why": "Alias map for retrieval and admission"},
+        {"type": "file", "ref": "docs/architecture/MEMORY_KERNEL_PROD_BAR.md", "why": "Production bar for the memory kernel"},
+        {"type": "file", "ref": "docs/ops/MEMORY_COMMON.md", "why": "Shared memory operations guide"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before retrieval", "ask": "Is this owner lookup, recall, relation traversal, or evidence search?", "expect": "task_type and retrieval plan"},
+        {"when": "before claiming complete", "ask": "Which retrieved context was accepted, rejected, or unresolved, and why?", "expect": "accepted_context, rejected_context, unresolved_conflicts"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.persistent-agent-holons",
@@ -36,7 +113,32 @@
       "aliases": ["holon", "persistent agent", "codex composer", "tmux", "wake loop", "agent hierarchy"],
       "primary_surfaces": ["docs/ops/TMUX_AGENT_SUBSTRATE.md", "dharma_swarm/holon_*", "scripts/runtime/codex_composer_wake_loop.py", "reports/agentops/**"],
       "commands": ["make onboard", "make tmux-status", "dgc agent list"],
-      "authority": "agent registry, health rows, receipts, and tmux as inspectable substrate only"
+      "authority": "agent registry, health rows, receipts, and tmux as inspectable substrate only",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Holons as living organs of the organism"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Why persistent agents must serve coherent action"},
+        {"type": "file", "ref": "docs/architecture/AGENT_HIERARCHY_MATURITY_MAP.md", "why": "Agent hierarchy maturity target"},
+        {"type": "file", "ref": "docs/sovereign_holons/CODEX_COMPOSER_WAKE_LOOP.md", "why": "Long-running composer wake-loop vision"},
+        {"type": "file", "ref": "reports/swarm_genome/2026-06-11/SYNTHESIS.md", "why": "Holon organ inside the organism map"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh holon and active-track state"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "Composer holon and agent-admission active lanes"},
+        {"type": "file", "ref": "reports/agentops/PERSISTENT_AGENT_HIERARCHY_20260630.md", "why": "Current persistent-agent hierarchy"},
+        {"type": "file", "ref": "reports/agentops/PERSISTENT_AGENT_CENSUS_20260630.md", "why": "Current persistent-agent census"},
+        {"type": "command", "ref": "tmux ls", "why": "Inspectable terminal substrate liveness only"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/ops/TMUX_AGENT_SUBSTRATE.md", "why": "Tmux substrate contract and limitations"},
+        {"type": "file", "ref": "reports/a2a/codex_holon_always_live_upgrade.md", "why": "Always-live holon upgrade context"},
+        {"type": "glob", "ref": "reports/agentops/**", "why": "Agent receipts, hierarchy, census, and review evidence"},
+        {"type": "glob", "ref": "docs/agents/**/CONTEXT_ENGINEERING.md", "why": "Named seat context only when seat-specific"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Are you proving identity, liveness, health, work output, or semantic completion?", "expect": "evidence_class and proof_owner"},
+        {"when": "before claiming complete", "ask": "Which receipt outside the pane proves useful work?", "expect": "receipts plus claims_not_made"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.sab-flywheel",
@@ -44,7 +146,32 @@
       "aliases": ["SAB", "Dharmic Agora", "flywheel", "First Spark", "agent community"],
       "primary_surfaces": ["reports/sab_first_six_agent_flywheel/**", "docs/missions/SAB_DHARMIC_AGORA_*"],
       "commands": ["python3 reports/sab_first_six_agent_flywheel/tools/flywheel_status.py", "python3 reports/sab_first_six_agent_flywheel/tools/sab_flywheel_tick.py --insecure-tls"],
-      "authority": "SAB mission contract, witness chain, tick receipts"
+      "authority": "SAB mission contract, witness chain, tick receipts",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "SAB as outward community action of the organism"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Why public agent community work must serve the north star"},
+        {"type": "file", "ref": "docs/missions/SAB_DHARMIC_AGORA_1000X_BUILD_PLAN_2026-03-13.md", "why": "SAB 1000x vision and build direction"},
+        {"type": "file", "ref": "docs/missions/SAB_DHARMIC_AGORA_POWER_BUILD_PROMPT_2026-03-13.md", "why": "Dense SAB mission prompt"},
+        {"type": "file", "ref": "reports/sab_first_six_agent_flywheel/MISSION_CONTRACT.md", "why": "Current SAB flywheel mission contract"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "python3 reports/sab_first_six_agent_flywheel/tools/flywheel_status.py --insecure-tls", "why": "Fresh SAB status dashboard"},
+        {"type": "file", "ref": "reports/sab_first_six_agent_flywheel/FLYWHEEL_STATUS_DASHBOARD_20260630T1549Z.md", "why": "Latest observed SAB status dashboard in repo"},
+        {"type": "file", "ref": "reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_TICK_STATE.json", "why": "Tick state and throttle reality"},
+        {"type": "glob", "ref": "reports/sab_first_six_agent_flywheel/receipts/**", "why": "Witnessed SAB receipts"},
+        {"type": "glob", "ref": "reports/a2a/domain_reply_receipts/**", "why": "Semantic reply receipts"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "reports/sab_first_six_agent_flywheel/SAB_FLYWHEEL_AUTONOMY_RUNBOOK.md", "why": "Bounded flywheel autonomy rules"},
+        {"type": "file", "ref": "docs/missions/SAB_DHARMIC_AGORA_PINNED_TODO.md", "why": "Pinned SAB work-lane TODOs"},
+        {"type": "file", "ref": "reports/sab_first_six_agent_flywheel/RESEARCH_SPARK_REVIEW_ENDPOINTS_20260627T1930Z.md", "why": "Research Spark review endpoints"},
+        {"type": "glob", "ref": "reports/sab_first_six_agent_flywheel/tools/**", "why": "Operational flywheel tools"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before live action", "ask": "Is this dry run, queued action, live submission, or admin approval?", "expect": "dry_run, live_submit, throttle, and approval state"},
+        {"when": "before claiming complete", "ask": "Which witness, dashboard, or semantic receipt proves the SAB claim?", "expect": "receipts plus latest_witness_hash_seen"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.venture-external-value",
@@ -52,7 +179,33 @@
       "aliases": ["venture cell", "Darshan", "Livelihood Loom", "Telos", "revenue", "external humans"],
       "primary_surfaces": ["docs/governance/VENTURE_CELL_PORTFOLIO.yaml", "dharma_swarm/venture_cell/**", "reports/livelihood_loom/**", "reports/telos_ai/**"],
       "commands": ["make onboard", "python3 -m dharma_swarm.idea_spark.cli health --json"],
-      "authority": "external acted receipts and venture-cell portfolio"
+      "authority": "external acted receipts and venture-cell portfolio",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "External value as organism action in the world"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "World-service north star for external work"},
+        {"type": "file", "ref": "foundations/ECONOMIC_VISION.md", "why": "Economic and abundance vision"},
+        {"type": "file", "ref": "docs/architecture/VENTURE_CELL_LIFECYCLE.md", "why": "Venture-cell lifecycle target"},
+        {"type": "file", "ref": "docs/governance/VENTURE_CELL_REVENUE_WEDGE.md", "why": "Revenue wedge and external value frame"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh revenue/external-human track status"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "External-value active lanes"},
+        {"type": "file", "ref": "docs/governance/VENTURE_CELL_PORTFOLIO.yaml", "why": "Current venture-cell portfolio"},
+        {"type": "file", "ref": "reports/telos_ai/EXTERNAL_ACTION_OPERATOR_PACKET_2026-06-30.md", "why": "TELOS external action operator packet"},
+        {"type": "file", "ref": "reports/livelihood_loom/promotion/human_review_packet.md", "why": "Livelihood Loom human review packet"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/agents/livelihood_loom_ceo/CONTEXT_ENGINEERING.md", "why": "Livelihood Loom seat context"},
+        {"type": "file", "ref": "docs/agents/codex_telos/CONTEXT_ENGINEERING.md", "why": "TELOS seat context"},
+        {"type": "file", "ref": "reports/telos_ai/EXTERNAL_ACTED_RECEIPT_SCHEMA.md", "why": "External acted receipt schema"},
+        {"type": "file", "ref": "reports/revenue_wedge/first_cash_receipt_status.md", "why": "First-cash receipt status"},
+        {"type": "glob", "ref": "reports/livelihood_loom/**", "why": "Livelihood Loom demand, promotion, and enablement artifacts"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before external action", "ask": "What consent, privacy, and human-review gate applies?", "expect": "approval_state and sanitized_artifacts"},
+        {"when": "before claiming traction", "ask": "Which external acted receipt proves a real outside human acted?", "expect": "external_acted_receipt or claims_not_made"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.operator-cockpit-terminal-dashboard",
@@ -60,7 +213,33 @@
       "aliases": ["dashboard", "terminal", "cockpit", "control plane", "API"],
       "primary_surfaces": ["api/**", "dashboard/**", "terminal/**", "ACTIVE_SURFACE_MANIFEST.yaml", "docs/ops/LIVE_OPS_COCKPIT.md"],
       "commands": ["make onboard", "npm --prefix dashboard run test", "npm --prefix terminal test"],
-      "authority": "surface manifest plus runtime/API evidence"
+      "authority": "surface manifest plus runtime/API evidence",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Operator surfaces as the organism's inspectable nervous system"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Operator UI must serve coherent action"},
+        {"type": "file", "ref": "docs/plans/OPERATOR_COMMAND_VISION.md", "why": "Operator command-plane target"},
+        {"type": "file", "ref": "docs/ops/LIVE_OPS_COCKPIT.md", "why": "Live ops cockpit design"},
+        {"type": "file", "ref": "docs/architecture/CONTROL_SURFACE.md", "why": "Control surface architecture"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh terminal/dashboard active track state"},
+        {"type": "file", "ref": "ACTIVE_SURFACE_MANIFEST.yaml", "why": "Current UI/API surface ownership"},
+        {"type": "file", "ref": "reports/terminal/HELM_WORLDCLASS_LIVE_TMUX_RECEIPT.md", "why": "Terminal live tmux receipt"},
+        {"type": "file", "ref": "reports/terminal/HELM_WORLDCLASS_CLOSEOUT.md", "why": "Terminal closeout state"},
+        {"type": "file", "ref": "reports/dashboard/DASHBOARD_WIRING_AUDIT_2026-03-19.md", "why": "Dashboard wiring audit"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/design/COCKPIT_V2_DESKTOP_SOURCE_MANIFEST.md", "why": "Cockpit v2 source manifest"},
+        {"type": "file", "ref": "docs/design/COCKPIT_V2_GRAFANA_LONG_RUNNING_GOAL.md", "why": "Long-running cockpit design goal"},
+        {"type": "glob", "ref": "api/**", "why": "FastAPI surface"},
+        {"type": "glob", "ref": "dashboard/src/**", "why": "Dashboard frontend surface"},
+        {"type": "glob", "ref": "terminal/**", "why": "Terminal UI surface"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Which user-visible surface and owner manifest entry are in scope?", "expect": "surface_manifest_entry and scoped_files"},
+        {"when": "before claiming complete", "ask": "Which tests, screenshots, or probes prove the visible state?", "expect": "verification plus visual_or_runtime_evidence"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.model-provider-routing",
@@ -68,7 +247,32 @@
       "aliases": ["model", "provider", "keys", "dkeys", "Qwen", "OpenAI", "DeepSeek", "routing"],
       "primary_surfaces": ["docs/ops/MODEL_KEY_ROUTING.md", "dharma_swarm/runtime_provider.py", "dharma_swarm/providers.py", "dharma_swarm/model_pool_registry.py"],
       "commands": ["make onboard", "dkeys test", "pytest tests/test_runtime_provider.py tests/test_model_key_routing_guard.py"],
-      "authority": "runtime provider resolver and provider telemetry"
+      "authority": "runtime provider resolver and provider telemetry",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Models as service to organism action, not authority"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Provider routing must serve the north star"},
+        {"type": "file", "ref": "docs/ops/MODEL_KEY_ROUTING.md", "why": "One key home and one resolver door"},
+        {"type": "file", "ref": "docs/architecture/MODEL_ROUTING_CANON.md", "why": "Routing canon"},
+        {"type": "file", "ref": "docs/architecture/PROVIDER_MATRIX_HARNESS.md", "why": "Provider matrix and evaluation harness"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh provider/model route telemetry"},
+        {"type": "command", "ref": "dkeys test", "why": "Key availability without printing secrets"},
+        {"type": "file", "ref": "reports/agentops/QWEN_CODE_DEEPSEEK_V4_PRO_WIRING_20260701.md", "why": "Most recent Qwen/DeepSeek wiring report"},
+        {"type": "glob", "ref": "reports/agentops/deepseek_smokes/**", "why": "Provider smoke evidence"},
+        {"type": "glob", "ref": "reports/agentops/open_model_council/**", "why": "Open-model council evidence"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "MODEL_ROUTING_MAP.md", "why": "Top-level model routing map"},
+        {"type": "file", "ref": "docs/_archive/2026-04/MODEL_ROUTING_MAP.md", "why": "Archived routing map for drift comparison"},
+        {"type": "glob", "ref": "reports/agentops/deepseek_ml_lead_council/**", "why": "DeepSeek ML lead council evidence"},
+        {"type": "glob", "ref": "tests/test_*provider*.py", "why": "Provider and routing guard tests"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Are you touching keys, provider adapters, model hierarchy, or telemetry routing?", "expect": "surface_class and owner_files"},
+        {"when": "before claiming complete", "ask": "Which resolver/test/live attempt proves the route, and were secrets kept out of output?", "expect": "tests, provider_attempts, and secret_scan"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.cybernetics-loop-closure",
@@ -76,7 +280,32 @@
       "aliases": ["cybernetics", "loop closure", "13 loops", "One Wire", "verification"],
       "primary_surfaces": ["CYBERNETIC_LOOP_MAP.md", "docs/ops/CYBERNETICS_CODEX.md", "reports/loop_closure/**", "dharma_swarm/loop_supervisor.py"],
       "commands": ["make onboard", "python3 scripts/agentops/verifier_ranker_v0_verify_package.py", "pytest tests/test_telos_morning_refinery.py"],
-      "authority": "loop receipts and closure checks"
+      "authority": "loop receipts and closure checks",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "Cybernetics as organism self-regulation"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Loop closure must serve coherent action"},
+        {"type": "file", "ref": "CYBERNETIC_LOOP_MAP.md", "why": "13-loop vision and map"},
+        {"type": "file", "ref": "docs/ops/CYBERNETICS_CODEX.md", "why": "Cybernetics codex steward frame"},
+        {"type": "file", "ref": "architecture/CYBERNETIC_TRANSCENDENCE_PROTOCOL.md", "why": "High-level cybernetic protocol"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh loop-closure and cybernetics-codex track state"},
+        {"type": "file", "ref": "docs/governance/ACTIVE_TRACK.yaml", "why": "Loop active lanes and blockers"},
+        {"type": "file", "ref": "reports/loop_closure/RETROSPECTIVE.md", "why": "Loop closure retrospective"},
+        {"type": "file", "ref": "reports/loop_closure/phase1/LOOP1_CLOSURE_RECEIPT.md", "why": "Loop 1 closure receipt"},
+        {"type": "file", "ref": "reports/loop_closure/phase1/CURRENT_BLOCKER_RECEIPT_2026-06-30.md", "why": "Current blocker receipt"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/agents/cybernetics_codex/CONTEXT_ENGINEERING.md", "why": "Cybernetics codex seat context"},
+        {"type": "file", "ref": "docs/missions/CYBERNETIC_DIRECTIVE.md", "why": "Cybernetic directive"},
+        {"type": "file", "ref": "reports/loop_closure/2026-06-11/RESEARCH_DOSSIER.md", "why": "Loop research dossier"},
+        {"type": "glob", "ref": "reports/agentops/verifier_ranker_v0/**", "why": "Verifier-ranker receipts and models"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Which loop and which phase: sense, interpret, constrain, act, or adapt?", "expect": "loop_id and phase"},
+        {"when": "before claiming closure", "ask": "Which real-data receipt proves every phase and which claims remain unclosed?", "expect": "closure_receipts plus claims_not_made"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     },
     {
       "id": "ctx.docops-hygiene-repo-governance",
@@ -84,7 +313,32 @@
       "aliases": ["docops", "hygiene", "anti-slop", "precommit", "PR", "repo governance"],
       "primary_surfaces": ["docs/governance/**", "docs/docops/**", "scripts/governance/**", ".pre-commit-config.yaml"],
       "commands": ["make onboard", "make hygiene-check", "make docops-integrity", "git diff --check"],
-      "authority": "governance docs, hygiene baselines, CI gates"
+      "authority": "governance docs, hygiene baselines, CI gates",
+      "vision_anchors": [
+        {"type": "file", "ref": "foundations/THE_ORGANISM.md", "why": "DocOps as organism memory hygiene"},
+        {"type": "file", "ref": "docs/vision_maps/NORTH_STAR.md", "why": "Repo hygiene must serve the north star"},
+        {"type": "file", "ref": "docs/governance/CANONICAL_DOC_STACK.md", "why": "Canonical documentation stack target"},
+        {"type": "file", "ref": "docs/governance/ANTI_SLOP_RULES.md", "why": "Anti-slop doctrine"},
+        {"type": "file", "ref": "docs/governance/VIBE_CODE_HYGIENE.md", "why": "Hygiene catalogue and risk map"}
+      ],
+      "current_reality_anchors": [
+        {"type": "command", "ref": "make onboard", "why": "Fresh governance and stale-doc status"},
+        {"type": "file", "ref": "docs/docops/assertions.yaml", "why": "DocOps assertions"},
+        {"type": "file", "ref": "docs/docops/AUTO_INVENTORY.md", "why": "Generated doc inventory"},
+        {"type": "file", "ref": "reports/docops/corpus_inventory.md", "why": "Corpus inventory snapshot"},
+        {"type": "file", "ref": "reports/governance/anti_ai_slop_control_backlog_2026-06-08.md", "why": "Anti-slop control backlog"}
+      ],
+      "dense_docs": [
+        {"type": "file", "ref": "docs/governance/PR_QUALITY_GATES.md", "why": "PR quality gates"},
+        {"type": "file", "ref": "reports/governance/anti_ai_slop_futureproof_deep_dive_2026-06-07.md", "why": "Deep anti-slop research and control frame"},
+        {"type": "glob", "ref": "docs/governance/hygiene/**", "why": "Hygiene patterns and baselines"},
+        {"type": "glob", "ref": "scripts/governance/**", "why": "Governance and DocOps enforcement scripts"}
+      ],
+      "future_agent_review_hooks": [
+        {"when": "before acting", "ask": "Is the target doc canonical, generated, stale, or advisory?", "expect": "doc_classification and owner"},
+        {"when": "before claiming complete", "ask": "Which hygiene/docops checks ran, and what pre-existing failures remain?", "expect": "verification plus residual_risk"},
+        {"when": "when evolving this packet", "ask": "Was a five-lane multi-agent/model council requested, and if not where is the skip or failure receipt?", "expect": "council_receipt or failure_or_skip_receipt"}
+      ]
     }
   ]
 }
