@@ -254,13 +254,27 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
 - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
 - `git diff --check` -> pass.
+- Phase 4 verified duplicate open-row blocker: added `scripts/governance/a2a_block_verified_duplicate_open_rows.py` and `tests/test_a2a_verified_duplicate_open_rows.py`.
+- `.venv/bin/python scripts/governance/a2a_block_verified_duplicate_open_rows.py --timestamp 2026-07-01T05:02:48Z --output reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_dry_run_20260701T050248Z.json` -> dry-run found 1 candidate and 0 skips.
+- `.venv/bin/python scripts/governance/a2a_block_verified_duplicate_open_rows.py --apply --timestamp 2026-07-01T05:02:48Z --output reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_20260701T050248Z.json` -> blocked 1/1 verified duplicate open row; backup written at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-verified-duplicate-block-20260701T050248Z.bak`.
+- `.venv/bin/python scripts/governance/a2a_block_verified_duplicate_open_rows.py --timestamp 2026-07-01T05:02:48Z --output reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_post_apply_dry_run_20260701T050248Z.json` -> post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` after verified duplicate block -> fail exit 2; `ready=false`, `open_tasks=10`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --artifact-root /Users/dhyana/.dharma/a2a_bus/collab/convergence --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T050248Z.json` -> pass; `blocker_count=10`.
+- `.venv/bin/python -m pytest -q tests/test_a2a_verified_duplicate_open_rows.py` -> `4 passed in 0.35s`.
+- `.venv/bin/ruff check scripts/governance/a2a_block_verified_duplicate_open_rows.py tests/test_a2a_verified_duplicate_open_rows.py` -> pass.
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_block_verified_duplicate_open_rows.py tests/test_a2a_verified_duplicate_open_rows.py` -> pass.
+- `.venv/bin/python -m pytest -q tests/test_a2a_verified_duplicate_open_rows.py tests/test_a2a_operator_gated_blocker.py tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `36 passed in 0.64s`.
+- `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_dry_run_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_post_apply_dry_run_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_operator_gated.json` -> pass.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+- `git diff --check` -> pass.
 
 ## Failing Gates
 
-- A2A strict readiness: `ready=false`, `open_tasks=11`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
+- A2A strict readiness: `ready=false`, `open_tasks=10`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
 - A2A remaining blocker receipt: `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`; replayable JSON audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`.
-- A2A fresh blocker audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T043613Z.json`.
-- A2A blocker audit classification after semantic, legacy-proof, and operator-gated adaptation: 5 stale claimed rows without terminal receipts and 6 stale unclaimed rows. The 18 valid SAB semantic receipt rows, the completed `ts-converge-0611` proof-pointer row, and six explicit operator-gated stale rows are now embedded A2A-verified.
+- A2A fresh blocker audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T050248Z.json`.
+- A2A blocker audit classification after semantic, legacy-proof, operator-gated, and verified-duplicate adaptation: 5 stale claimed rows without terminal receipts and 5 stale unclaimed rows. The 18 valid SAB semantic receipt rows, the completed `ts-converge-0611` proof-pointer row, six explicit operator-gated stale rows, and one same-id verified duplicate open row are now embedded A2A-verified.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
 - Provider truth: partial after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix proves several routes work. The model-status overlay now prevents failed probed routes from remaining advertised as live when an operator supplies the closeout receipt. The full gate is still not green because the overlay is not yet an automatic production freshness/quarantine policy, Claude Code needs retest/quarantine, and A2A strict readiness remains red.
@@ -268,7 +282,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 
 ## Next Patch Sequence
 
-1. Continue the safe A2A blocker closure workflow for the remaining 11 blockers: verify/close the 5 stale claimed rows and 6 stale unclaimed rows with task-specific receipts, duplicate/supersession evidence, semantic refusal receipts, or explicit blocked receipts; rerun `check_a2a_readiness.py --strict`.
+1. Continue the safe A2A blocker closure workflow for the remaining 10 blockers: verify/close the 5 stale claimed rows and 5 stale unclaimed rows with task-specific receipts, duplicate/supersession evidence, semantic refusal receipts, or explicit blocked receipts; rerun `check_a2a_readiness.py --strict`.
 2. Promote provider-truth overlay from operator-selected receipt input to a safe production policy with freshness/expiry semantics, then retest or quarantine Claude Code timeouts.
 3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
 4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.

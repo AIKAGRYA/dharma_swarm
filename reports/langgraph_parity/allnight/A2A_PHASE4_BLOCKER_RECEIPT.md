@@ -253,3 +253,59 @@ The strict A2A gate is still not green. Remaining blockers are 11 open or claime
 - `ts-hb0631-credit`
 - `ts-pr-babysit-div-20260610`
 - `yatagarasu-10cceaa8`
+
+## 2026-07-01 Addendum: Verified Duplicate Open Row Blocker
+
+After the operator-gated adapter, one remaining open row was a same-id duplicate of a terminal verified row. A fourth narrow tool now handles only that row class:
+
+- Added `scripts/governance/a2a_block_verified_duplicate_open_rows.py`
+- Added `tests/test_a2a_verified_duplicate_open_rows.py`
+- The tool only targets open, unclaimed rows whose exact task id appears in another terminal queue row with a valid embedded `dharma_a2a_task_receipt.v1` receipt and substantive artifact/evidence.
+- It mutates by queue row index because duplicate task ids make id-only lifecycle mutation ambiguous.
+- It does not touch claimed work, ordinary stale rows, all-open duplicate groups, or terminal duplicates whose receipt lacks substantive artifact/evidence.
+
+Receipts:
+
+- `reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_dry_run_20260701T050248Z.json`
+- `reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_20260701T050248Z.json`
+- `reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_post_apply_dry_run_20260701T050248Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T050248Z.json`
+
+Live queue backup before apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-verified-duplicate-block-20260701T050248Z.bak`
+
+Result:
+
+- Dry-run found 1 candidate and 0 skips: the pending `ts-converge-0611` duplicate row.
+- Apply blocked 1/1 candidate as a valid `blocked_verified` A2A lifecycle row with authority `verified_duplicate_terminal_row_supervisor_block`.
+- The terminal duplicate row remains `completed_verified` with receipt `a2a-task-receipt:ts-converge-0611:28da1fdabddc`.
+- Post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2, now with `ready=false`, `open_tasks=10`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit now reports `blocker_count=10`: 5 stale claimed rows and 5 stale unclaimed rows.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_verified_duplicate_open_rows.py` -> `4 passed in 0.35s`
+- `.venv/bin/ruff check scripts/governance/a2a_block_verified_duplicate_open_rows.py tests/test_a2a_verified_duplicate_open_rows.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_block_verified_duplicate_open_rows.py tests/test_a2a_verified_duplicate_open_rows.py` -> pass
+- `.venv/bin/python -m pytest -q tests/test_a2a_verified_duplicate_open_rows.py tests/test_a2a_operator_gated_blocker.py tests/test_a2a_legacy_proof_receipt_recovery.py tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `36 passed in 0.64s`
+- `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_dry_run_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_verified_duplicate_open_row_block_post_apply_dry_run_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T050248Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_resume_20260701T_after_operator_gated.json` -> pass
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`
+- `git diff --check` -> pass
+
+Remaining Phase 4 blocker:
+
+The strict A2A gate is still not green. Remaining blockers are 10 open or claimed rows:
+
+- `forge-v0.1-001`
+- `holon-plan-review-cursor-20260612`
+- `holon-plan-review-opus-20260612`
+- `l1-fx-001`
+- `reconcile-564-565-20260611`
+- `sab-flywheel-d01-qwen-code-first-spark`
+- `tam-wp-wp_dfa4e1134277`
+- `ts-hb0631-credit`
+- `ts-pr-babysit-div-20260610`
+- `yatagarasu-10cceaa8`
