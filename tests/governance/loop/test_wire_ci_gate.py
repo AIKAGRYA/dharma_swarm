@@ -370,3 +370,86 @@ def test_prompt_audit_learn_wire_ci_flag_updates_workflow(tmp_path):
     doc = _load_yaml(workflow)
     assert any(step.get("id") == "ratchet_f_wire_ci" for step in _workflow_steps(doc))
     assert list(run.receipts_dir.glob("ci_wire_receipt_F-WIRE-CI.json"))
+
+
+def test_f2_property_collection_gate_fails_closed_on_reintroduced_slop(tmp_path):
+    """VAL-CI-003 (F2): the F2 property-collection gate exits non-zero when
+    property tests exist but collect zero items (the "green from uncollected
+    illusion" slop class). A clean/empty properties dir passes (exit 0).
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+    script = REPO_ROOT / "scripts" / "governance" / "check_property_collection.py"
+
+    # --- green: empty properties dir (nothing to protect) ---
+    empty_props = tmp_path / "empty_props"
+    empty_props.mkdir()
+    proc_clean = subprocess.run(
+        [VENV_PYTHON, str(script), "--properties-dir", str(empty_props),
+         "--repo-root", str(REPO_ROOT)],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_clean.returncode == 0, (
+        f"empty properties dir should pass (exit 0), got {proc_clean.returncode}\n"
+        f"stdout: {proc_clean.stdout}\nstderr: {proc_clean.stderr}"
+    )
+
+    # --- red: non-empty properties dir with a file that collects 0 items ---
+    slop_props = tmp_path / "slop_props"
+    slop_props.mkdir()
+    (slop_props / "test_slop.py").write_text(
+        "# no test functions here — just a bare import\n"
+        "import os\n"
+    )
+    proc_slop = subprocess.run(
+        [VENV_PYTHON, str(script), "--properties-dir", str(slop_props),
+         "--repo-root", str(REPO_ROOT)],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_slop.returncode != 0, (
+        f"slop properties dir (0 items collected) should fail (non-zero), got 0\n"
+        f"stdout: {proc_slop.stdout}\nstderr: {proc_slop.stderr}"
+    )
+
+
+def test_f3_importorskip_allowlist_gate_fails_closed_on_unlisted_guard(tmp_path):
+    """VAL-CI-003 (F3): the F3 importorskip-allowlist gate exits non-zero when
+    a first-party ``importorskip("dharma_swarm...")`` call site is not on the
+    allowlist. A repo with no first-party importorskip guards passes (exit 0).
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT)
+    script = REPO_ROOT / "scripts" / "governance" / "check_importorskip_allowlist.py"
+
+    # --- green: repo with no first-party importorskip guards ---
+    clean_repo = tmp_path / "clean_repo"
+    clean_repo.mkdir()
+    (clean_repo / "test_clean.py").write_text(
+        "def test_ok():\n    assert True\n"
+    )
+    proc_clean = subprocess.run(
+        [VENV_PYTHON, str(script), "--repo-root", str(clean_repo)],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_clean.returncode == 0, (
+        f"repo with no first-party importorskip should pass (exit 0), "
+        f"got {proc_clean.returncode}\n"
+        f"stdout: {proc_clean.stdout}\nstderr: {proc_clean.stderr}"
+    )
+
+    # --- red: repo with an unlisted first-party importorskip guard ---
+    slop_repo = tmp_path / "slop_repo"
+    slop_repo.mkdir()
+    (slop_repo / "test_slop.py").write_text(
+        "import pytest\n"
+        "pytest.importorskip('dharma_swarm.fake_module_that_does_not_exist')\n"
+        "def test_slop():\n    assert True\n"
+    )
+    proc_slop = subprocess.run(
+        [VENV_PYTHON, str(script), "--repo-root", str(slop_repo)],
+        capture_output=True, text=True, env=env,
+    )
+    assert proc_slop.returncode != 0, (
+        f"repo with unlisted first-party importorskip should fail (non-zero), got 0\n"
+        f"stdout: {proc_slop.stdout}\nstderr: {proc_slop.stderr}"
+    )

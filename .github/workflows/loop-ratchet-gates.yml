@@ -76,8 +76,8 @@ jobs:
 
       - name: Phase-0 F2 property collection ratchet
         id: phase0_f2_property_collection
-        run: PYTHONPATH=. python scripts/governance/hygiene/ratchet.py --json
+        run: PYTHONPATH=. python scripts/governance/check_property_collection.py
 
       - name: Phase-0 F3 importorskip allowlist ratchet
         id: phase0_f3_importorskip_allowlist
-        run: PYTHONPATH=. python scripts/governance/check_test_hygiene.py
+        run: PYTHONPATH=. python scripts/governance/check_importorskip_allowlist.py
