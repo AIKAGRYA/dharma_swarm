@@ -69,31 +69,6 @@ def _isolate_stigmergy(tmp_path, monkeypatch):
     monkeypatch.setattr("dharma_swarm.stigmergy._default_store", None)
 
 
-@pytest.fixture(autouse=True)
-def _cleanup_lancedb_threads():
-    """Cancel pending tasks on the LanceDB background event loop after each test.
-
-    LanceDB starts a daemon-thread event loop that persists across tests.
-    Pending futures accumulate and eventually cause later tests to hang.
-    This fixture schedules task cancellation on the loop's own thread (thread-safe).
-    """
-    yield
-    try:
-        from lancedb.background_loop import LOOP
-        if LOOP and LOOP.loop.is_running():
-            LOOP.loop.call_soon_threadsafe(_cancel_lancedb_tasks, LOOP.loop)
-    except Exception:
-        pass
-
-
-def _cancel_lancedb_tasks(loop):
-    """Cancel all pending tasks on the given asyncio loop (must run on loop's thread)."""
-    import asyncio
-    for task in asyncio.all_tasks(loop):
-        if not task.done():
-            task.cancel()
-
-
 @pytest.fixture
 def fast_gate():
     """Mock telos gate to return ALLOW instantly.
