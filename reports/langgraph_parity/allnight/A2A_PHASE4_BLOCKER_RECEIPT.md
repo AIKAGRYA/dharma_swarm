@@ -348,6 +348,78 @@ Remaining Phase 4 blockers:
 - `forge-v0.1-001`
 - `holon-plan-review-cursor-20260612`
 - `holon-plan-review-opus-20260612`
+
+## 2026-07-01 Addendum: Holon Review Targets And Forge v0.1 Closure
+
+Two stale Holon review target rows and the final Forge v0.1 row were closed after the stale Hermes claim block.
+
+Holon review target blocker:
+
+- Added `scripts/governance/a2a_block_stale_holon_review_targets.py`
+- Added `tests/test_a2a_stale_holon_review_target_blocker.py`
+- The tool only targets `holon-plan-review-opus-20260612` and `holon-plan-review-cursor-20260612`.
+- It requires the assigned review seat to be stale, the referenced plan path to be missing, and the expected seat-specific review deliverable to be absent.
+- It records `blocked`, not `completed`, and the receipt evidence says `block_only_no_review_completion_or_target_impersonation`.
+
+Holon receipts:
+
+- `reports/langgraph_parity/allnight/a2a_stale_holon_review_block_dry_run_20260701T070500Z.json`
+- `reports/langgraph_parity/allnight/a2a_stale_holon_review_block_20260701T070500Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T070500Z_after_holon_reviews.json`
+
+Holon live queue backup before apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-holon-review-block-20260701T070500Z.bak`
+
+Holon result:
+
+- Dry-run found 2 candidates and 0 skips: `holon-plan-review-opus-20260612` and `holon-plan-review-cursor-20260612`.
+- Apply blocked 2/2 candidates as valid `blocked_verified` A2A lifecycle rows with authority `stale_holon_review_target_supervisor_block`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still failed exit 2 after this step with `ready=false`, `open_tasks=1`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit reported `blocker_count=1`: `forge-v0.1-001`.
+
+Forge v0.1 blocker:
+
+- Added `scripts/governance/a2a_block_stale_forge_v01.py`
+- Added `tests/test_a2a_stale_forge_v01_blocker.py`
+- The tool only targets `forge-v0.1-001` for mission `20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649`.
+- It requires the exact target `codex_forgewright`, stale open row state, body references to `docs/specs/forge_packets/v0.1.1-transfer-gate.md` and `20260601T172816Z_forge_v0_1_handoff.json`, missing spec/handoff files, and stale/manual target policy.
+- It records `blocked`, not `completed`, and the receipt evidence says `block_only_no_forge_build_or_lane_selection_claimed`.
+
+Forge receipts:
+
+- `reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_dry_run_20260701T072000Z.json`
+- `reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_20260701T072000Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T072000Z_after_forge_v01.json`
+
+Forge live queue backup before apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak`
+
+Forge result:
+
+- Dry-run found 1 candidate and 0 skips: `forge-v0.1-001`.
+- Apply blocked 1/1 candidate as a valid `blocked_verified` A2A lifecycle row with authority `stale_forge_v01_supervisor_block`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` passed after this step with `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit reported `blocker_count=0`.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_stale_holon_review_target_blocker.py` -> `4 passed in 0.29s`
+- `.venv/bin/ruff check scripts/governance/a2a_block_stale_holon_review_targets.py tests/test_a2a_stale_holon_review_target_blocker.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_block_stale_holon_review_targets.py tests/test_a2a_stale_holon_review_target_blocker.py` -> pass
+- `.venv/bin/python -m pytest -q tests/test_a2a_stale_forge_v01_blocker.py` -> `5 passed in 0.40s`
+- `.venv/bin/ruff check scripts/governance/a2a_block_stale_forge_v01.py tests/test_a2a_stale_forge_v01_blocker.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_block_stale_forge_v01.py tests/test_a2a_stale_forge_v01_blocker.py` -> pass
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> pass
+
+Current Phase 4 result:
+
+- `ready=true`
+- `open_tasks=0`
+- `unknown_status_tasks=0`
+- `unverified_closed_tasks=0`
+- `blocker_count=0`
 - `l1-fx-001`
 - `reconcile-564-565-20260611`
 - `ts-hb0631-credit`

@@ -1040,3 +1040,34 @@
   - `.venv/bin/python scripts/governance/a2a_block_stale_hermes_claims.py --apply --timestamp 2026-07-01T06:40:00Z --output reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_20260701T064000Z.json` -> `candidate_count=5`, `applied_count=5`.
   - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T064000Z_after_stale_hermes.json` -> `blocker_count=3`.
 - Scoreboard: raised conservatively to `96/100`; still explicitly not 100/100.
+
+## 2026-07-01T07:20:00Z - Phase 4 Forge v0.1 Supervisor Block And A2A Strict Green
+
+- Target gate result: success for Phase 4. A2A strict readiness is now green: `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Why this was blocked instead of completed:
+  - The remaining row was the stale open/unclaimed `forge-v0.1-001` build row.
+  - The row referenced `docs/specs/forge_packets/v0.1.1-transfer-gate.md`, but that file is absent in this worktree and `/Users/dhyana/dharma_swarm`.
+  - The row referenced inbox handoff `20260601T172816Z_forge_v0_1_handoff.json`, but it is absent from the target inbox/archive and mission paths checked by the blocker report.
+  - The target identity `codex_forgewright` is stale/manual-gated: last seen `2026-05-31T17:04:12.385566+00:00`, `heartbeat_status=RED`, `requires_approval=true`, `repo_writes_allowed=false`, `can_write_source=false`.
+  - The supervisor receipt explicitly states `block_only_no_forge_build_or_lane_selection_claimed`.
+- Code changes:
+  - Added `scripts/governance/a2a_block_stale_forge_v01.py`.
+  - Added `tests/test_a2a_stale_forge_v01_blocker.py`.
+  - The tool only targets `forge-v0.1-001` for mission `20260531T172816Z-dharma-reward-forge-v0-1-x-chain-forge-council-v-97f649`; it requires the exact target agent, stale open row, body references to the spec and handoff, missing spec/handoff, and stale/manual target policy.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_dry_run_20260701T072000Z.json`
+  - `reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_20260701T072000Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T072000Z_after_forge_v01.json`
+- Live queue handling:
+  - Dry-run found exactly 1 candidate and 0 skips: `forge-v0.1-001`.
+  - The live queue was backed up before apply at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-forge-v01-block-20260701T072000Z.bak`.
+  - Apply blocked 1/1 candidate as `blocked_verified`.
+- Verification so far:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_stale_forge_v01_blocker.py` -> `5 passed in 0.40s`.
+  - `.venv/bin/ruff check scripts/governance/a2a_block_stale_forge_v01.py tests/test_a2a_stale_forge_v01_blocker.py` -> pass.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_block_stale_forge_v01.py tests/test_a2a_stale_forge_v01_blocker.py` -> pass.
+  - `.venv/bin/python scripts/governance/a2a_block_stale_forge_v01.py --timestamp 2026-07-01T07:20:00Z --output reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_dry_run_20260701T072000Z.json` -> `candidate_count=1`, `applied_count=0`.
+  - `.venv/bin/python scripts/governance/a2a_block_stale_forge_v01.py --apply --timestamp 2026-07-01T07:20:00Z --output reports/langgraph_parity/allnight/a2a_stale_forge_v01_block_20260701T072000Z.json` -> `candidate_count=1`, `applied_count=1`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> pass with `ready=true`, `open_tasks=0`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T072000Z_after_forge_v01.json` -> `blocker_count=0`.
+- Scoreboard: raised conservatively to `97/100`; still explicitly not 100/100 because provider freshness/quarantine and aggregate closeout gitleaks governance remain unresolved.
