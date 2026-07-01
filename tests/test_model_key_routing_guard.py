@@ -23,6 +23,7 @@ MODEL_REGISTRY_FILES = {
     "dharma_swarm/evolution_roster.py",
     "dharma_swarm/free_fleet.py",
     "dharma_swarm/model_catalog.py",
+    "dharma_swarm/model_defaults.py",
     "dharma_swarm/model_hierarchy.py",
     "dharma_swarm/model_manager.py",
     "dharma_swarm/model_registry.py",

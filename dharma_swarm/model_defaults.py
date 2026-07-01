@@ -71,6 +71,11 @@ _PROVIDER_DEFAULTS: dict[ProviderType, str] = {
     ProviderType.CODEX: "gpt-5.4",
 }
 
+# Cybernetic Ratchet Loop Droid backend defaults. These are kept here rather
+# than in the loop feature code so model ids stay in the canonical registry.
+DROID_LOOP_PRIMARY_MODEL = _PROVIDER_DEFAULTS[ProviderType.ZHIPU]
+DROID_LOOP_VERIFIER_MODEL = "gpt-5.2"
+
 
 def default_for_provider(provider: ProviderType) -> str:
     """Return the pool's default provider-specific model id for ``provider``.
@@ -84,5 +89,7 @@ def default_for_provider(provider: ProviderType) -> str:
 __all__ = [
     "K2_FLOOR_ID",
     "MODEL_POWER_FLOOR",
+    "DROID_LOOP_PRIMARY_MODEL",
+    "DROID_LOOP_VERIFIER_MODEL",
     "default_for_provider",
 ]

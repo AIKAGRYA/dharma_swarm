@@ -34,10 +34,12 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
+from dharma_swarm.model_defaults import DROID_LOOP_PRIMARY_MODEL, DROID_LOOP_VERIFIER_MODEL
+
 
 DEFAULT_DROID_PATH = "/Users/dhyana/.local/bin/droid"
-DEFAULT_DROID_PRIMARY_MODEL = "glm-5.2"
-DEFAULT_DROID_VERIFIER_MODEL = "gpt-5.2"
+DEFAULT_DROID_PRIMARY_MODEL = DROID_LOOP_PRIMARY_MODEL
+DEFAULT_DROID_VERIFIER_MODEL = DROID_LOOP_VERIFIER_MODEL
 
 API_KEY_NAMES = (
     "OPENAI_API_KEY",
