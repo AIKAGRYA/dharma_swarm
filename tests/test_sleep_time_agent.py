@@ -56,7 +56,7 @@ class MockOrganism:
         from dharma_swarm.memory_palace import MemoryPalace
 
         self.memory = OrganismMemory(state_dir=tmp_path)
-        self.palace = MemoryPalace(state_dir=tmp_path / "palace")
+        self.palace = MemoryPalace()
         self._pulses: list[MockPulse] = []
 
     def add_pulses(self, pulses: list[MockPulse]):
@@ -395,6 +395,7 @@ class TestNeverFatal:
 # Memory Palace Phase 6 integration
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 class TestMemoryPalacePhase6:
     """Tests for Phase 6 upgrades to MemoryPalace."""
 
