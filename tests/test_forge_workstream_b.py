@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from dharma_swarm.dgm_loop import DGMLoop, run_dgm_evolution_task
-from dharma_swarm.forge_v1.forge_v2 import darwin_bridge, forge_fitness, promote, signals
+from dharma_swarm.forge_v1.forge_v2 import anchors, darwin_bridge, forge_fitness, promote, sequential, signals
 from dharma_swarm.forge_v1.forge_v2.forge_fitness import ArmSpec, grade_genome
 from dharma_swarm.forge_v1.forge_v2.verify_promotion import (
     sign_receipt,
@@ -384,6 +384,130 @@ def _backend_signed_receipts(signing_key, *, epoch_ruler_sha256: str = "ruler-ep
         )
         for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
     ]
+
+
+def test_preregistration_anchor_requires_full_confirm_plan() -> None:
+    receipt = anchors.evaluate_preregistration_anchor(
+        {
+            "run_id": "run-anchor",
+            "candidate_id": "candidate",
+            "epoch_id": "epoch-a",
+            "taskbed": "fresh-confirm",
+            "planned_split": "explore",
+            "planned_task_count": 499,
+            "primary_metric": "swarm_lift",
+            "class_null": "same_budget_self_moa",
+            "controls": ["same_budget_self_moa"],
+            "frozen_at": "2026-07-01T00:00:00Z",
+        }
+    )
+
+    assert receipt["name"] == "preregistration"
+    assert receipt["decision"] == "refused"
+    assert "planned_split_not_confirm" in receipt["blockers"]
+    assert "planned_task_count<500" in receipt["blockers"]
+    assert "missing_control:frontier_single_full_budget" in receipt["blockers"]
+
+
+def test_scaffold_parity_anchor_refuses_hash_mismatch() -> None:
+    receipt = anchors.evaluate_scaffold_parity(
+        {
+            "full_a2a_swarm": ["shared rubric", "shared verifier"],
+            "same_budget_self_moa": ["different rubric", "shared verifier"],
+        },
+        required_arms=("full_a2a_swarm", "same_budget_self_moa"),
+    )
+
+    assert receipt["name"] == "scaffold_parity_proof"
+    assert receipt["decision"] == "refused"
+    assert "scaffold_hash_mismatch" in receipt["blockers"]
+
+
+def test_sequential_alpha_spending_refuses_over_budget_and_confirm_peeking() -> None:
+    receipt = sequential.evaluate_alpha_spending(
+        [
+            {"look_index": 1, "look_id": "explore", "split": "explore", "alpha_spent": 0.03},
+            {"look_index": 2, "look_id": "confirm", "split": "confirm", "alpha_spent": 0.03},
+        ]
+    )
+
+    assert receipt["name"] == "sequential_alpha_spending"
+    assert receipt["decision"] == "refused"
+    assert "alpha_budget_exceeded" in receipt["blockers"]
+    assert "confirm_non_final_peek:confirm" in receipt["blockers"]
+
+
+def test_anchor_and_sequential_receipts_are_signable_for_promotion(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "_verify_ed25519_signature", _fake_verify_ed25519_signature)
+    signing_key = _FakeEd25519Key()
+    public_key = signing_key.public_key_hex()
+    epoch_ruler_sha256 = "ruler-epoch-sha"
+
+    prereg = anchors.evaluate_preregistration_anchor(
+        {
+            "run_id": "receipt-ready",
+            "candidate_id": "verify_chain",
+            "epoch_id": "epoch-a",
+            "taskbed": "fresh_taskbed",
+            "planned_split": "confirm",
+            "planned_task_count": 500,
+            "primary_metric": "swarm_lift",
+            "class_null": "self_moa",
+            "pre_registered_mde": 0.056,
+            "controls": anchors.CANONICAL_CONTROL_ARMS,
+            "frozen_at": "2026-07-01T00:00:00Z",
+        }
+    )
+    parity = anchors.evaluate_scaffold_parity(
+        {arm: ["shared prompt", "shared rubric"] for arm in anchors.CANONICAL_CONTROL_ARMS}
+    )
+    alpha = sequential.evaluate_alpha_spending(
+        [
+            {
+                "look_index": 1,
+                "look_id": "confirm-final",
+                "split": "confirm",
+                "alpha_spent": 0.05,
+                "p_value": 0.01,
+                "decision": "stop_for_success",
+                "final": True,
+            }
+        ]
+    )
+    assert prereg["decision"] == parity["decision"] == alpha["decision"] == "pass"
+
+    payload_by_name = {
+        prereg["name"]: prereg["payload"],
+        parity["name"]: parity["payload"],
+        alpha["name"]: alpha["payload"],
+        "independent_judge": {"status": "pass"},
+        "run_level_critic_refutation": {"status": "pass"},
+        "mutation_sandbox_proof": {"status": "pass"},
+        "budget_matched_proof": {"status": "pass"},
+    }
+    signed_receipts = [
+        sign_receipt(
+            name=name,
+            payload=payload,
+            signing_key=signing_key,
+            epoch_ruler_sha256=epoch_ruler_sha256,
+            key_id="test-judge",
+        )
+        for name, payload in payload_by_name.items()
+    ]
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=signed_receipts,
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "op-1"},
+    )
+
+    assert verdict["decision"] == "allow"
+    assert verdict["live_apply_allowed"] is True
+    assert not verdict["blockers"]
 
 
 def test_signed_receipt_binds_name_payload_and_ruler_epoch(monkeypatch) -> None:
