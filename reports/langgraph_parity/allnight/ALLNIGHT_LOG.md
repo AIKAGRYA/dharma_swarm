@@ -550,3 +550,48 @@
   - Provider truth still lacks exhaustive live-provider served-model matrix proof.
   - Full live multi-process resume semantics remain unproven.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T00:30:44Z - Phase 7 Runtime Multi-Process Resume Proof Start
+
+- Target gate: prove runtime approve/reject/resume control semantics survive a fresh process boundary using only canonical `RuntimeStateStore` state.
+- Current branch state:
+  - Worktree clean at `codex/langgraph-orchestration-parity-20260701`.
+  - PR #732 head `40baf350b` is mergeable and all GitHub checks pass, including `pytest (3.11)` and `pytest (3.12)`.
+- Planned files:
+  - `dharma_swarm/runtime_control_actions.py`
+  - `dharma_swarm/runtime_platform_views.py`
+  - `dharma_swarm/operator_views.py`
+  - `api/routers/runtime.py`
+  - `tests/test_runtime_graph_api.py`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - `reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md`
+- Tests run at round start:
+  - `git status --short --branch` -> clean and aligned with origin.
+  - `gh pr checks 732` -> all checks passing on `40baf350b`.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth still lacks exhaustive live-provider served-model matrix proof.
+  - Full live multi-process resume semantics remain unproven.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T00:34:44Z - Phase 7 Runtime Multi-Process Resume Proof Closeout
+
+- Target gate: prove runtime resume control semantics survive a fresh process boundary using only canonical `RuntimeStateStore` state.
+- Code changes landed locally:
+  - Added an acceptance test that seeds a runtime SQLite DB in the parent process, calls the configured `runtime_interrupt_resume` API route from a fresh Python subprocess with `DHARMA_RUNTIME_DB`, and reopens the same DB in the parent process.
+  - Verified the subprocess-created `runtime_resume_requested` control event, `runtime_control.resume` `OperatorAction`, resume token, and persisted topology checkpoint detail through canonical `RuntimeStateStore`/`OperatorViews` readback.
+  - No runtime implementation change was needed; the existing control/action/store path already preserved the required state across process boundaries.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_multiprocess_resume_20260701T003444Z.json`
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short` -> `1 passed in 0.61s`.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py` -> `24 passed in 3.84s`.
+  - `.venv/bin/python -m compileall -q tests/test_runtime_graph_api.py` -> pass.
+  - `.venv/bin/ruff check tests/test_runtime_graph_api.py` -> pass.
+  - `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `84/100`, still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth still lacks exhaustive live-provider served-model matrix proof.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

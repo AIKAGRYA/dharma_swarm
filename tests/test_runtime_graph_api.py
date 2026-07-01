@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 import json
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -391,6 +393,80 @@ async def test_operator_views_runtime_control_actions_record_canonical_state(
     assert interrupts["summary"]["control_event_count"] == 3
     assert interrupts["summary"]["approved_count"] == 2
     assert interrupts["control_events"][0]["event_name"] == "human_approval_approved"
+
+
+@pytest.mark.asyncio
+async def test_runtime_resume_action_survives_fresh_python_process(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path, include_memory_plane=False)
+    await _seed_runtime_graph(store)
+
+    child_code = """
+import asyncio
+import json
+import os
+import sys
+
+from api.routers.runtime import RuntimeControlActionRequest, runtime_interrupt_resume
+
+
+async def main() -> None:
+    os.environ["DHARMA_RUNTIME_DB"] = sys.argv[1]
+    response = await runtime_interrupt_resume(
+        RuntimeControlActionRequest(
+            session_id="sess-graph",
+            run_id="run-parent",
+            resume_token="resume-run-parent",
+            actor="operator",
+            reason="resume from child process",
+            payload={"multiprocess_probe": True},
+        )
+    )
+    result = response.data
+    print(json.dumps({
+        "api_status": response.status,
+        "runtime_db": result["runtime_db"],
+        "status": result["status"],
+        "target_found": result["target_found"],
+        "target_event_id": result["target_control_event"]["event_id"],
+        "event_name": result["event"]["event_name"],
+        "runtime_action_id": result["event"]["payload"]["runtime_action_id"],
+    }, sort_keys=True))
+
+
+asyncio.run(main())
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", child_code, str(db_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    child_payload = json.loads(completed.stdout.strip().splitlines()[-1])
+
+    assert child_payload["api_status"] == "ok"
+    assert child_payload["runtime_db"] == str(db_path)
+    assert child_payload["status"] == "resumed"
+    assert child_payload["target_found"] is True
+    assert child_payload["target_event_id"] == "event-interrupt-requested"
+    assert child_payload["event_name"] == "runtime_resume_requested"
+
+    reopened_store = RuntimeStateStore(db_path, include_memory_plane=False)
+    reopened_views = OperatorViews(reopened_store)
+    interrupts = await reopened_views.runtime_interrupts(session_id="sess-graph", limit=10)
+    detail = await reopened_views.runtime_run_detail("run-parent")
+    actions = await reopened_store.list_operator_actions(session_id="sess-graph", limit=10)
+
+    assert interrupts["summary"]["control_event_count"] == 3
+    assert interrupts["summary"]["resumed_count"] == 1
+    assert interrupts["control_events"][0]["event_name"] == "runtime_resume_requested"
+    assert interrupts["control_events"][0]["resume_token"] == "resume-run-parent"
+    assert detail["detail"]["topology_state"]["checkpoint_id"] == (
+        "task-graph:supervisor:checkpoint-1"
+    )
+    assert actions[0].action_id == child_payload["runtime_action_id"]
+    assert actions[0].action_name == "runtime_control.resume"
+    assert actions[0].payload["multiprocess_probe"] is True
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T00:08:16Z",
+  "updated_at": "2026-07-01T00:34:44Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 80,
+    "current": 84,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, and auditable approve/reject/resume runtime control actions are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, exhaustive live-provider served-model proof, and full live multi-process resume semantics remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, exhaustive live-provider served-model proof, and closeout gitleaks governance remain failing or unproven."
   },
   "rounds": [
     {
@@ -609,6 +609,34 @@
         "Full live multi-process resume semantics remain unproven.",
         "Closeout governance remains blocked by aggregate full-history gitleaks findings."
       ]
+    },
+    {
+      "id": "phase-7-runtime-multiprocess-resume-proof",
+      "timestamp": "2026-07-01T00:30:44Z",
+      "status": "completed_partial",
+      "target_gate": "Prove runtime resume control semantics survive a fresh process boundary using canonical RuntimeStateStore state",
+      "files_touched": [
+        "tests/test_runtime_graph_api.py",
+        "reports/langgraph_parity/allnight/runtime_multiprocess_resume_20260701T003444Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "git status --short --branch",
+        "gh pr checks 732",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short",
+        ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py",
+        ".venv/bin/python -m compileall -q tests/test_runtime_graph_api.py",
+        ".venv/bin/ruff check tests/test_runtime_graph_api.py",
+        "jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "git diff --check"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Provider truth still lacks exhaustive live-provider served-model matrix proof.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -624,7 +652,7 @@
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "passed_current_executable_lane_text_query_topology_agent_isolation_stale_rejection_retrieval_telemetry_curated_source_coverage_tool_exposure_metadata_isolation",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
-    "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_and_control_action_endpoints_api_cockpit_partial_live_resume"
+    "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_and_fresh_process_resume_api_cockpit_partial"
   },
   "latest_verification": {
     "benchmark_summary": {
@@ -652,7 +680,8 @@
       "supervisor_restart_final_output": "SUPERVISOR topology persists delegated_agent_ids, supervisor_final_output_only=true, and user_visible_output=supervisor_final in topology_states.state; topology_state receipts include persisted state; fresh RuntimeStateStore readback, describe_run(), and receipt assertions pass; focused topology acceptance 4 passed in 2.30s; compileall pass; adjacent runtime/orchestrator/topology subset 51 passed in 46.26s; focused ruff and orchestrator F821 pass; module budget, hygiene ratchet, diff-check, onboard, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_interrupts_streaming_state": "RuntimePlatformViews projects interrupt/resume/human-approval state from session_events; GET /api/runtime/events/stream streams persisted runtime events as SSE; GET /api/runtime/interrupts exposes control-event snapshots; /dashboard/runtime fetches and renders interrupt/control summary plus recent control events and stream path; focused runtime API/operator/bootstrap tests 7 passed in 1.66s; broader parity/runtime/orchestrator/API subset 98 passed in 34.54s; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, onboard, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_agent_server_background_surfaces": "RuntimeAgentServerViews projects Agent Server-style assistant/configuration snapshots from RuntimeStateStore sessions/delegation runs and background/cron snapshots from existing cron scheduler storage plus runtime background events/runs; GET /api/runtime/assistants and /api/runtime/background-jobs are registered and honor DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders assistants/configurations, cron jobs, and background runs; focused runtime API tests 6 passed in 1.78s; broader runtime/API/topology subset 59 passed in 197.43s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
-      "runtime_control_action_endpoints": "RuntimeControlActions records runtime_control approve/reject/resume OperatorAction rows, emits operator_control session_events, returns refreshed interrupt snapshots, and best-effort writes checkpoint interrupt responses; POST /api/runtime/interrupts/approve, /reject, and /resume are registered and honor DHARMA_RUNTIME_DB; dashboard has typed request/result helpers; focused runtime API tests 7 passed in 1.23s; broader runtime/API/topology subset 60 passed in 29.29s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19; full live multi-process resume remains unproven",
+      "runtime_control_action_endpoints": "RuntimeControlActions records runtime_control approve/reject/resume OperatorAction rows, emits operator_control session_events, returns refreshed interrupt snapshots, and best-effort writes checkpoint interrupt responses; POST /api/runtime/interrupts/approve, /reject, and /resume are registered and honor DHARMA_RUNTIME_DB; dashboard has typed request/result helpers; focused runtime API tests 7 passed in 1.23s; broader runtime/API/topology subset 60 passed in 29.29s; dashboard control-plane test 11 passed with Node type-stripping warnings only; dashboard lint --quiet and npm build pass; module budget, hygiene ratchet, agent-build-preflight, diff-check, focused ruff, compileall, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
+      "runtime_multiprocess_resume": "Fresh Python subprocess calls the configured runtime_interrupt_resume API route against DHARMA_RUNTIME_DB; parent process reopens the same RuntimeStateStore and verifies runtime_resume_requested control event, runtime_control.resume OperatorAction row, resume token, and persisted topology checkpoint detail; focused acceptance 1 passed in 0.61s; broader runtime/API/state subset 24 passed in 3.84s; focused ruff, compileall, jq, and diff-check pass",
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",

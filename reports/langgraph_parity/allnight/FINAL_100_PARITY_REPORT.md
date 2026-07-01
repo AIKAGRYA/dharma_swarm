@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **80/100**.
+Current score: **84/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime control action endpoint proof on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -29,6 +29,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Persisted runtime events now have an SSE transport at `GET /api/runtime/events/stream`, and interrupt/resume/human-approval state is projected from `session_events` through `GET /api/runtime/interrupts`, `OperatorViews.runtime_interrupts()`, and `/dashboard/runtime` control-event summaries. This is state/transport proof, not approval action execution.
 - Runtime Agent Server-style assistants/configurations and background/cron jobs are now inspectable through `RuntimeAgentServerViews`, `OperatorViews`, `GET /api/runtime/assistants`, `GET /api/runtime/background-jobs`, and `/dashboard/runtime`, deriving state from `RuntimeStateStore` plus existing cron scheduler storage rather than adding a parallel dashboard store.
 - Runtime approve/reject/resume actions are now exposed through `POST /api/runtime/interrupts/approve`, `/reject`, and `/resume`. They write canonical `OperatorAction` audit rows, emit `operator_control` `SessionEventRecord` rows, return refreshed interrupt snapshots, and best-effort write checkpoint interrupt responses when an `interrupt_id` is supplied.
+- Runtime resume now has fresh-process proof: a child Python process calls the configured `runtime_interrupt_resume` API route against `DHARMA_RUNTIME_DB`, then the parent process reopens the same `RuntimeStateStore` and verifies the `runtime_resume_requested` event, `runtime_control.resume` action row, resume token, and checkpoint detail.
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
 
 ## Verification
@@ -178,6 +179,13 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict` -> pass; `orchestrator_mode: spine_default_on`.
 - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
 - `make onboard` -> pass; known governance projection churn restored.
+- Runtime multi-process resume receipt: `reports/langgraph_parity/allnight/runtime_multiprocess_resume_20260701T003444Z.json`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py::test_runtime_resume_action_survives_fresh_python_process --tb=short` -> `1 passed in 0.61s`.
+- `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py` -> `24 passed in 3.84s`.
+- `.venv/bin/python -m compileall -q tests/test_runtime_graph_api.py` -> pass.
+- `.venv/bin/ruff check tests/test_runtime_graph_api.py` -> pass.
+- `jq -e . reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
+- `git diff --check` -> pass.
 
 ## Failing Gates
 
@@ -187,14 +195,14 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
 - Provider truth: partial. Orchestrator spine receipts now capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback. This is not yet an exhaustive live-provider matrix proof.
-- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, and approve/reject/resume action endpoints are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers. Full live multi-process resume semantics remain unproven.
+- Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, and fresh-process resume persistence are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers.
 
 ## Next Patch Sequence
 
-1. Prove live multi-process resume semantics for the runtime control endpoints and add dashboard action UI only once the backend contract is accepted.
-2. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
-3. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
-4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources; do not add parallel dashboard-only control state.
+1. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
+2. Extend provider-truth proof to an exhaustive live-provider matrix and make every live provider completion receipt assert route plan, fallback behavior, and actual served model.
+3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
+4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
 
 ## Residual Risk
 
