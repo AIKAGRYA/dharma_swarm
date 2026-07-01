@@ -809,9 +809,10 @@ class TestUserWorkingTreeUntouched:
             ["git", "-C", str(REPO_ROOT), "branch", "--show-current"],
             capture_output=True, text=True,
         )
-        assert proc.stdout.strip() == MISSION_BRANCH, (
-            f"expected {MISSION_BRANCH}, got {proc.stdout.strip()}"
-        )
+        branch = proc.stdout.strip()
+        if not branch and os.environ.get("GITHUB_ACTIONS"):
+            branch = os.environ.get("GITHUB_HEAD_REF", "")
+        assert branch == MISSION_BRANCH, f"expected {MISSION_BRANCH}, got {branch}"
 
 
 # ---------------------------------------------------------------------------

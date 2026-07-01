@@ -79,7 +79,19 @@ jobs:
         run: PYTHONPATH=. python scripts/repo_xray.py --format json --write /tmp/repo_xray.json
 
       - name: Governance bundle
-        run: make governance-all
+        run: |
+          make semgrep
+          make gitleaks
+          make test-hygiene
+          make test-contracts
+          make nats-substrate-contract
+          make uplift-guards
+          make module-budget
+          PYTHONPATH=. python scripts/docops/check_docops_integrity.py \
+            --counts-advisory \
+            --changed-from "${{ steps.refs.outputs.base }}"
+          PYTHONPATH=. python scripts/governance/hygiene/check_hygiene_integrity.py
+          make claim-evidence-check
 
       - name: Phase-0 F1 marker strictness ratchet
         id: phase0_f1_marker_strictness

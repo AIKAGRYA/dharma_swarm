@@ -21,6 +21,20 @@ import yaml
 
 DEFAULT_WORKFLOW = Path(".github/workflows/loop-ratchet-gates.yml")
 JOB_ID = "loop-ratchet-gates"
+GOVERNANCE_BUNDLE_COMMAND = (
+    "make semgrep\n"
+    "make gitleaks\n"
+    "make test-hygiene\n"
+    "make test-contracts\n"
+    "make nats-substrate-contract\n"
+    "make uplift-guards\n"
+    "make module-budget\n"
+    "PYTHONPATH=. python scripts/docops/check_docops_integrity.py \\\n"
+    "  --counts-advisory \\\n"
+    '  --changed-from "${{ steps.refs.outputs.base }}"\n'
+    "PYTHONPATH=. python scripts/governance/hygiene/check_hygiene_integrity.py\n"
+    "make claim-evidence-check\n"
+)
 
 
 class WorkflowError(RuntimeError):
@@ -129,7 +143,7 @@ def _base_workflow() -> dict:
                         "name": "Repo xray",
                         "run": "PYTHONPATH=. python scripts/repo_xray.py --format json --write /tmp/repo_xray.json",
                     },
-                    {"name": "Governance bundle", "run": "make governance-all"},
+                    {"name": "Governance bundle", "run": GOVERNANCE_BUNDLE_COMMAND},
                     {
                         "name": "Phase-0 F1 marker strictness ratchet",
                         "id": "phase0_f1_marker_strictness",
