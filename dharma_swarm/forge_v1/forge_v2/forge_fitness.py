@@ -13,6 +13,7 @@ from dharma_swarm.model_hierarchy import default_model
 from dharma_swarm.models import ProviderType
 
 from . import runner
+from .promote import DEFAULT_PREREGISTERED_MDE, MIN_CONFIRM_N_FOR_PROMOTION, MIN_PROMOTION_EFFECT
 
 SplitName = Literal["explore", "confirm"]
 
@@ -86,6 +87,17 @@ def _fitness_from_receipt(receipt: dict[str, Any], split: SplitName) -> tuple[fl
     return float(ci.get("mean", 0.0)), ci
 
 
+def _ci_half_width(ci: dict[str, Any]) -> float:
+    return max(0.0, (float(ci.get("upper", 0.0)) - float(ci.get("lower", 0.0))) / 2.0)
+
+
+def _contamination_state(receipt: dict[str, Any]) -> str:
+    value = receipt.get("contamination_state")
+    if isinstance(value, dict):
+        return str(value.get("state", "unknown"))
+    return str(value or "unknown")
+
+
 def grade_genome(
     genome: ArmSpec | dict[str, Any],
     instance_ids: list[str],
@@ -134,6 +146,11 @@ def grade_genome(
     closeout = str(receipt.get("closeout", ""))
     any_invalid = bool((receipt.get("budget_matched_proof", {}) or {}).get("any_invalid", False))
     ci_lower = float(ci.get("lower", 0.0))
+    confirm_ci = dict((receipt.get("split_contrasts", {}) or {}).get("confirm", {}) or {})
+    explore_ci = dict((receipt.get("split_contrasts", {}) or {}).get("explore", {}) or {})
+    contamination_state = _contamination_state(receipt)
+    confirm_n = int(confirm_ci.get("n", 0) or 0)
+    explore_n = int(explore_ci.get("n", 0) or 0)
     blockers: list[str] = []
     if split != "confirm":
         blockers.append("promotion_requires_confirm_split")
@@ -141,6 +158,16 @@ def grade_genome(
         blockers.append(f"closeout_{closeout or 'missing'}")
     if ci_lower <= 0.0:
         blockers.append("confirm_ci_lower<=0")
+    if split == "confirm" and confirm_n < MIN_CONFIRM_N_FOR_PROMOTION:
+        blockers.append("confirm_n<500")
+    if split == "confirm" and explore_n:
+        blockers.append("split_confirm_not_allowed_for_promotion")
+    if split == "confirm" and fitness < MIN_PROMOTION_EFFECT:
+        blockers.append("confirm_mean<0.05")
+    if split == "confirm" and _ci_half_width(confirm_ci or ci) > DEFAULT_PREREGISTERED_MDE:
+        blockers.append("confirm_power_insufficient")
+    if split == "confirm" and contamination_state not in {"fresh_heldout", "self_mod_clean", "clean"}:
+        blockers.append(f"contamination_{contamination_state}")
     if any_invalid:
         blockers.append("invalid_budget")
 

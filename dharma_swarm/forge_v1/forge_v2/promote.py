@@ -30,6 +30,39 @@ REQUIRED_RECEIPTS_V0_ABSENT = (
 )
 
 _CLEAN_CONTAMINATION = ("fresh_heldout", "self_mod_clean", "clean")
+MIN_CONFIRM_N_FOR_PROMOTION = 500
+MIN_PROMOTION_EFFECT = 0.05
+DEFAULT_PREREGISTERED_MDE = 0.056
+
+
+def _float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _ci_half_width(ci: dict) -> float:
+    return max(0.0, (_float(ci.get("upper")) - _float(ci.get("lower"))) / 2.0)
+
+
+def _preregistered_mde(signal: dict) -> float:
+    power = dict(signal.get("power") or signal.get("power_receipt") or {})
+    return _float(
+        signal.get("pre_registered_mde")
+        or signal.get("preregistered_mde")
+        or power.get("pre_registered_mde")
+        or power.get("mde")
+        or DEFAULT_PREREGISTERED_MDE,
+        DEFAULT_PREREGISTERED_MDE,
+    )
 
 
 def _evidence_predicate(signal: dict) -> dict:
@@ -38,11 +71,19 @@ def _evidence_predicate(signal: dict) -> dict:
     explore = signal.get("explore_ci", {}) or {}
     confirm = signal.get("confirm_ci", {}) or {}
     contamination = str(signal.get("contamination_state", "unknown"))
+    confirm_n = _int(confirm.get("n"))
+    explore_n = _int(explore.get("n"))
+    overall_n = _int(overall.get("n"))
+    preregistered_mde = _preregistered_mde(signal)
     return {
         "receipt_core_present": bool(overall) and bool(confirm),
         "stats_confirm_gate": positive_claim_gate(
             overall, {"explore": explore, "confirm": confirm}
         ),
+        "e4_confirm_full_500": confirm_n >= MIN_CONFIRM_N_FOR_PROMOTION,
+        "e4_no_split_confirm": explore_n == 0 and overall_n == confirm_n and confirm_n > 0,
+        "e4_target_effect_ge_5pp": _float(confirm.get("mean")) >= MIN_PROMOTION_EFFECT,
+        "e4_confirm_power_sufficient": _ci_half_width(confirm) <= preregistered_mde,
         "fdr_significant": bool(signal.get("fdr_positive_significant", False)),
         "contamination_self_mod_clean": contamination in _CLEAN_CONTAMINATION,
         "class_null_valid": bool(signal.get("class_null")),

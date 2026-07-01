@@ -16,9 +16,10 @@ def _positive_receipt() -> dict:
         "closeout": "positive_lift_candidate",
         "split_contrasts": {
             "confirm": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
-            "explore": {"n": 50, "mean": 0.08, "lower": 0.0, "upper": 0.15, "p_le_0": 0.05},
+            "explore": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
         },
         "contrast_vs_class_null": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "contamination_state": {"state": "fresh_heldout"},
         "budget_matched_proof": {"any_invalid": False},
     }
 
@@ -47,17 +48,148 @@ def test_grade_genome_routes_scaffold_to_forge_runner_confirm() -> None:
     assert fitness.promote_eligible is True
 
 
+def test_grade_genome_blocks_underpowered_confirm() -> None:
+    def underpowered_runner(*_args, **_kwargs):
+        receipt = _positive_receipt()
+        receipt["split_contrasts"]["confirm"] = {
+            "n": 135,
+            "mean": 0.08,
+            "lower": 0.02,
+            "upper": 0.14,
+            "p_le_0": 0.01,
+        }
+        receipt["contrast_vs_class_null"] = receipt["split_contrasts"]["confirm"]
+        return receipt
+
+    fitness = grade_genome(
+        ArmSpec(arm="verify_chain", label="unit"),
+        ["task-a"],
+        split="confirm",
+        runner_fn=underpowered_runner,
+    )
+
+    assert fitness.promote_eligible is False
+    assert "confirm_n<500" in fitness.blockers
+
+
+def test_grade_genome_blocks_split_confirm_for_promotion() -> None:
+    def split_runner(*_args, **_kwargs):
+        receipt = _positive_receipt()
+        receipt["split_contrasts"]["explore"] = {
+            "n": 50,
+            "mean": 0.08,
+            "lower": 0.0,
+            "upper": 0.15,
+            "p_le_0": 0.05,
+        }
+        return receipt
+
+    fitness = grade_genome(
+        ArmSpec(arm="verify_chain", label="unit"),
+        ["task-a"],
+        split="confirm",
+        runner_fn=split_runner,
+    )
+
+    assert fitness.promote_eligible is False
+    assert "split_confirm_not_allowed_for_promotion" in fitness.blockers
+
+
 def test_grade_genome_explore_can_learn_but_not_promote() -> None:
+    def explore_runner(*_args, **_kwargs):
+        receipt = _positive_receipt()
+        receipt["split_contrasts"]["explore"] = {
+            "n": 50,
+            "mean": 0.08,
+            "lower": 0.0,
+            "upper": 0.15,
+            "p_le_0": 0.05,
+        }
+        return receipt
+
     fitness = grade_genome(
         {"arm": "mixed_moa", "mix_models": ["glm-5.2", "moonshotai/kimi-k2.6"]},
         ["task-a"],
         split="explore",
-        runner_fn=lambda *_args, **_kwargs: _positive_receipt(),
+        runner_fn=explore_runner,
     )
 
     assert fitness.fitness == pytest.approx(0.08)
     assert fitness.promote_eligible is False
     assert "promotion_requires_confirm_split" in fitness.blockers
+
+
+def test_e4_underpowered_positive_lift_is_refused_before_receipts() -> None:
+    signal = {
+        "run_id": "e4-underpowered",
+        "signal_key": "e4:key",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 135, "mean": 0.08, "lower": 0.02, "upper": 0.14, "p_le_0": 0.01},
+        "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "confirm_ci": {"n": 135, "mean": 0.08, "lower": 0.02, "upper": 0.14, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    assert verdict["decision"] == "refused"
+    assert "promotion_packet:e4_confirm_full_500" in verdict["blockers"]
+
+
+def test_e4_split_confirm_is_refused_even_when_confirm_is_positive() -> None:
+    signal = {
+        "run_id": "e4-split",
+        "signal_key": "e4:split",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 550, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "explore_ci": {"n": 50, "mean": 0.08, "lower": 0.0, "upper": 0.15, "p_le_0": 0.05},
+        "confirm_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    assert verdict["decision"] == "refused"
+    assert "promotion_packet:e4_no_split_confirm" in verdict["blockers"]
+
+
+def test_e4_wide_confirm_ci_is_refused_as_underpowered() -> None:
+    signal = {
+        "run_id": "e4-wide-ci",
+        "signal_key": "e4:wide",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 500, "mean": 0.08, "lower": 0.01, "upper": 0.2, "p_le_0": 0.01},
+        "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "confirm_ci": {"n": 500, "mean": 0.08, "lower": 0.01, "upper": 0.2, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+        "pre_registered_mde": 0.056,
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    assert verdict["decision"] == "refused"
+    assert "promotion_packet:e4_confirm_power_sufficient" in verdict["blockers"]
 
 
 def test_e2_green_pytest_red_holdout_is_refused() -> None:
