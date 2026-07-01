@@ -78,16 +78,12 @@ def _cleanup_lancedb_threads():
     This fixture cancels all pending tasks after each test to prevent accumulation.
     """
     yield
-    import gc
-    gc.collect()
     try:
-        from lancedb.background_loop import BackgroundEventLoop
+        from lancedb.background_loop import LOOP
         import asyncio
-        for obj in gc.get_objects():
-            if isinstance(obj, BackgroundEventLoop) and obj.loop.is_running():
-                for task in asyncio.all_tasks(obj.loop):
-                    task.cancel()
-                break
+        if LOOP and LOOP.loop.is_running():
+            for task in asyncio.all_tasks(LOOP.loop):
+                task.cancel()
     except Exception:
         pass
 
