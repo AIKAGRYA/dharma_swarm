@@ -50,6 +50,7 @@
   "files_touched": [
     "dharma_swarm/memory_kernel/context_admission.py",
     "dharma_swarm/memory_kernel/default_context.py",
+    "dharma_swarm/memory_kernel/tool_exposure.py",
     "tests/test_context_compiler_memory_kernel.py",
     "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
     "reports/langgraph_parity/allnight/SCOREBOARD.json",
@@ -70,11 +71,15 @@
       "result": "55 passed in 0.65s"
     },
     {
-      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py",
       "result": "passed"
     },
     {
-      "command": ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py",
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "passed; modules_over_500_lines 207 -> 207 after splitting tool exposure helper"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py",
       "result": "passed"
     },
     {

@@ -22,6 +22,7 @@ from dharma_swarm.memory_kernel.atoms import (
     SurfaceCategory,
     TruthState,
 )
+from dharma_swarm.memory_kernel.tool_exposure import has_tool_exposure
 
 
 _HIGH_RISKS = {RiskLevel.HIGH, RiskLevel.CRITICAL}
@@ -47,29 +48,6 @@ _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.CANONICAL,
 )
 _STALE_FRESHNESS_VALUES = {"snapshot", "dormant", "missing", "unknown"}
-_TOOL_EXPOSURE_KEYS = {
-    "available_tools",
-    "denial_reasons",
-    "late_bound_tools",
-    "requested_tools",
-    "tool_call",
-    "tool_calls",
-    "tool_plan",
-    "tool_registry",
-    "tool_request",
-    "tool_result",
-    "tool_results",
-    "tool_schema",
-    "tool_schemas",
-    "tools",
-    "visible_tools",
-}
-_TOOL_EXPOSURE_FLAGS = {
-    "contains_tool_exposure",
-    "contains_tool_plan",
-    "exposes_tools",
-    "tool_exposure",
-}
 
 
 @dataclass(frozen=True)
@@ -363,7 +341,7 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append("source_digest_required")
     if budget.require_source_row_key and not atom.source_row_key:
         reasons.append("source_row_key_required")
-    if budget.block_tool_exposure and _has_tool_exposure(atom):
+    if budget.block_tool_exposure and has_tool_exposure(atom):
         reasons.append("tool_exposure_blocked")
     if (
         not budget.allow_projections
@@ -459,31 +437,6 @@ def _is_expired(value: str | None) -> bool:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed <= datetime.now(timezone.utc)
-
-
-def _has_tool_exposure(atom: MemoryAtom) -> bool:
-    return _metadata_has_tool_exposure(atom.metadata)
-
-
-def _metadata_has_tool_exposure(value: object) -> bool:
-    if isinstance(value, dict):
-        for raw_key, raw_value in value.items():
-            key = str(raw_key).strip().lower()
-            if key in _TOOL_EXPOSURE_KEYS:
-                return True
-            if key in _TOOL_EXPOSURE_FLAGS and _truthy_metadata_value(raw_value):
-                return True
-            if _metadata_has_tool_exposure(raw_value):
-                return True
-    elif isinstance(value, (list, tuple, set)):
-        return any(_metadata_has_tool_exposure(item) for item in value)
-    return False
-
-
-def _truthy_metadata_value(value: object) -> bool:
-    if isinstance(value, str):
-        return value.strip().lower() not in {"", "0", "false", "no", "none", "off"}
-    return bool(value)
 
 
 def _stable_pack_id(atom_ids: Iterable[str]) -> str:

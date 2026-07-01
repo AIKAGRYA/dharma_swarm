@@ -86,8 +86,11 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_enforces_curated_source_and_tool_exposure_isolation --tb=short` -> `1 passed in 0.22s`.
 - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `31 passed in 0.60s`.
 - `.venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `55 passed in 0.65s`.
-- `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
-- `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- CI line-budget repair: split structured tool exposure detection to `dharma_swarm/memory_kernel/tool_exposure.py`; `context_admission.py` is now 472 lines.
+- `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `86 passed in 0.94s`.
+- `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `modules_over_500_lines` stayed `207 -> 207`.
+- `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py` -> pass.
+- `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py` -> pass.
 - `git diff --check` -> pass.
 - Phase 5 curated-source/tool-exposure isolation receipt: `reports/langgraph_parity/allnight/memory_curated_source_tool_isolation_20260701T000816Z.json`.
 - Phase 6 provider-truth spine receipt slice: added `AgentRunner` last-dispatch route/response telemetry, `dharma_swarm/provider_truth.py`, and updated orchestrator spine receipts to bind requested, planned, actual, and served provider/model truth.

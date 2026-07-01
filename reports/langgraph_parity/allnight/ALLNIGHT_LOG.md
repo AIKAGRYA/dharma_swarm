@@ -531,6 +531,7 @@
   - Enabled those policy fields in the default live `ContextCompiler` Memory Kernel section, in addition to the existing `MemoryQuery` source requirements.
   - Added omission reasons `source_digest_required`, `source_row_key_required`, and `tool_exposure_blocked`.
   - Added structured metadata detection for tool exposure fields such as `visible_tools`, `requested_tools`, `tool_calls`, `tool_results`, `tool_plan`, `tool_request`, `tool_registry`, and tool schemas.
+  - Split structured tool exposure detection into `dharma_swarm/memory_kernel/tool_exposure.py` after CI showed `context_admission.py` crossed the 500-line ratchet.
   - Added an acceptance test proving a live bundle admits the curated-source atom, excludes missing-provenance atoms, blocks tool-exposure metadata, renders omission reasons, and exposes omission reason telemetry.
 - Generated artifact:
   - `reports/langgraph_parity/allnight/memory_curated_source_tool_isolation_20260701T000816Z.json`
@@ -538,8 +539,10 @@
   - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py::test_context_compiler_enforces_curated_source_and_tool_exposure_isolation --tb=short` -> `1 passed in 0.22s`.
   - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py` -> `31 passed in 0.60s`.
   - `.venv/bin/python -m pytest -q tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `55 passed in 0.65s`.
-  - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
-  - `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py tests/test_context_compiler_memory_kernel.py` -> pass.
+  - `.venv/bin/python -m pytest -q tests/test_context_compiler_memory_kernel.py tests/test_memory_kernel_readiness.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py tests/test_context_compiler_vnext.py tests/test_context_compiler_cache.py` -> `86 passed in 0.94s`.
+  - `.venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45` -> pass; `modules_over_500_lines` stayed `207 -> 207`.
+  - `.venv/bin/python -m compileall -q dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py` -> pass.
+  - `.venv/bin/ruff check dharma_swarm/memory_kernel/context_admission.py dharma_swarm/memory_kernel/default_context.py dharma_swarm/memory_kernel/tool_exposure.py tests/test_context_compiler_memory_kernel.py` -> pass.
   - `git diff --check` -> pass.
 - Scoreboard: raised conservatively to `80/100`, still explicitly not 100/100.
 - Current blockers:
