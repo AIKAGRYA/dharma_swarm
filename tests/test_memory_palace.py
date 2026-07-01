@@ -56,6 +56,7 @@ def _run(coro):
 # ===========================================================================
 
 
+@pytest.mark.slow
 class TestLanceDBAdapter:
     """Direct tests for the _LanceDBAdapter wrapper."""
 
@@ -168,6 +169,7 @@ class TestLanceDBAdapter:
 
 
 @_requires_lancedb
+@pytest.mark.slow
 class TestMemoryPalaceLanceDB:
     """Tests for MemoryPalace with LanceDB integration (Phase 4)."""
 
