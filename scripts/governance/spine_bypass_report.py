@@ -55,6 +55,13 @@ _SPINE_ADOPTED: set[tuple[str, int]] = {
 # governance act, never a runtime escape hatch.
 _INTENTIONAL_BYPASS: dict[tuple[str, int], str] = {}
 
+# Stable snippet-keyed fallback for intentional sites whose line numbers
+# drift during transport hardening. Keys are (relative_path, exact code
+# line). Kept EMPTY for the same doctrine reason as _INTENTIONAL_BYPASS:
+# every previously allowlisted dispatch path has been drained through
+# submit_task_via_spine(). Adding an entry is a reviewed governance act.
+_INTENTIONAL_BYPASS_SNIPPETS: dict[tuple[str, str], str] = {}
+
 # Known non-production lines (docstring examples, etc.)
 _NON_PRODUCTION: set[tuple[str, int]] = {
     ("dharma_swarm/a2a/a2a_server.py", 259),  # docstring example
@@ -117,6 +124,13 @@ def _scan_production_submits() -> list[BypassEntry]:
                         file=rel, line=i,
                         classification="intentional",
                         reason=_INTENTIONAL_BYPASS[key],
+                        code=code,
+                    ))
+                elif (rel, code) in _INTENTIONAL_BYPASS_SNIPPETS:
+                    entries.append(BypassEntry(
+                        file=rel, line=i,
+                        classification="intentional",
+                        reason=_INTENTIONAL_BYPASS_SNIPPETS[(rel, code)],
                         code=code,
                     ))
                 else:
