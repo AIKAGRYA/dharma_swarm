@@ -5,11 +5,21 @@ import type {
   HealthOut,
   RuntimeAssistantsSnapshot,
   RuntimeBackgroundJobsSnapshot,
+  RuntimeControlActionRequest,
+  RuntimeControlActionResult,
   RuntimeGraphSnapshot,
+  RuntimeInterruptControlEvent,
   RuntimeInterruptsSnapshot,
 } from "./types";
 
 export type RuntimeControlPlaneStatusKind = "ok" | "warn" | "error" | "muted";
+export type RuntimeControlActionKind = RuntimeControlActionResult["action"];
+
+export interface RuntimeControlActionOption {
+  action: RuntimeControlActionKind;
+  label: string;
+  title: string;
+}
 
 export interface RuntimeControlPlaneData {
   chatStatus: ChatStatusOut | null;
@@ -85,6 +95,71 @@ function firstNonEmpty(values: Array<string | null | undefined>): string | null 
     .filter((value): value is string => Boolean(value));
   if (normalized.length === 0) return null;
   return normalized.join(" | ");
+}
+
+function nonEmpty(value: string | null | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function isPendingControlEvent(event: RuntimeInterruptControlEvent): boolean {
+  const status = event.status.trim().toLowerCase();
+  return status === "pending" || status === "requested" || status === "requires_human";
+}
+
+export function runtimeControlActionOptions(
+  event: RuntimeInterruptControlEvent,
+): RuntimeControlActionOption[] {
+  if (!isPendingControlEvent(event)) {
+    return [];
+  }
+
+  const options: RuntimeControlActionOption[] = [];
+  if (nonEmpty(event.approval_id) || event.requires_human) {
+    options.push(
+      {
+        action: "approve",
+        label: "Approve",
+        title: "Approve this runtime interrupt",
+      },
+      {
+        action: "reject",
+        label: "Reject",
+        title: "Reject this runtime interrupt",
+      },
+    );
+  }
+  if (nonEmpty(event.resume_token)) {
+    options.push({
+      action: "resume",
+      label: "Resume",
+      title: "Resume this runtime run",
+    });
+  }
+  return options;
+}
+
+export function buildRuntimeControlActionRequest(
+  event: RuntimeInterruptControlEvent,
+  action: RuntimeControlActionKind,
+  actor = "runtime-dashboard",
+): RuntimeControlActionRequest {
+  return {
+    session_id: nonEmpty(event.session_id),
+    task_id: nonEmpty(event.task_id),
+    run_id: nonEmpty(event.run_id),
+    approval_id: nonEmpty(event.approval_id),
+    interrupt_id: nonEmpty(event.interrupt_id),
+    resume_token: nonEmpty(event.resume_token),
+    actor,
+    reason: `Runtime cockpit ${action} for ${event.event_id}`,
+    payload: {
+      source: "dashboard.runtime",
+      control_event_id: event.event_id,
+      checkpoint_id: event.checkpoint_id,
+      control_type: event.control_type,
+    },
+  };
 }
 
 function resolveDefaultProfile(chatStatus: ChatStatusOut | null): ChatProfileOut | null {

@@ -8,11 +8,14 @@ import type {
   RuntimeAssistantsSnapshot,
   RuntimeBackgroundJobsSnapshot,
   RuntimeGraphSnapshot,
+  RuntimeInterruptControlEvent,
   RuntimeInterruptsSnapshot,
 } from "./types.ts";
 import {
+  buildRuntimeControlActionRequest,
   buildRuntimeControlPlaneSnapshot,
   normalizeRuntimeControlPlaneResponses,
+  runtimeControlActionOptions,
 } from "./runtimeControlPlane.ts";
 
 function chatOk(data: ChatStatusOut): ApiResponse<ChatStatusOut> {
@@ -72,6 +75,45 @@ function runtimeBackgroundJobsOk(
     data,
     error: "",
     timestamp: "2026-03-20T00:00:00.000Z",
+  };
+}
+
+function pendingControlEvent(
+  overrides: Partial<RuntimeInterruptControlEvent> = {},
+): RuntimeInterruptControlEvent {
+  return {
+    event_id: "event-interrupt-requested",
+    session_id: "sess-graph",
+    task_id: "task-graph",
+    run_id: "run-parent",
+    agent_id: "supervisor",
+    event_name: "interrupt_requested",
+    control_type: "interrupt",
+    status: "pending",
+    requires_human: true,
+    interrupt_id: "interrupt-1",
+    approval_id: "approval-1",
+    resume_token: "resume-run-parent",
+    checkpoint_id: "task-graph:supervisor:checkpoint-1",
+    summary: "Supervisor paused for human approval",
+    created_at: "2026-03-20T00:00:01.000Z",
+    event: {
+      event_id: "event-interrupt-requested",
+      session_id: "sess-graph",
+      ledger_kind: "runtime",
+      event_name: "interrupt_requested",
+      task_id: "task-graph",
+      run_id: "run-parent",
+      agent_id: "supervisor",
+      summary: "Supervisor paused for human approval",
+      event_text: "Supervisor requested human approval before resuming.",
+      payload: {
+        approval_id: "approval-1",
+        resume_token: "resume-run-parent",
+      },
+      created_at: "2026-03-20T00:00:01.000Z",
+    },
+    ...overrides,
   };
 }
 
@@ -379,16 +421,66 @@ test("buildRuntimeControlPlaneSnapshot exposes runtime graph counts", () => {
   assert.match(snapshot.runtimeBackgroundDetail, /1 cron jobs/);
 });
 
+test("runtimeControlActionOptions exposes cockpit actions for pending human interrupts", () => {
+  const options = runtimeControlActionOptions(pendingControlEvent());
+
+  assert.deepEqual(
+    options.map((option) => option.action),
+    ["approve", "reject", "resume"],
+  );
+  assert.equal(options[0].label, "Approve");
+  assert.match(options[2].title, /Resume/);
+});
+
+test("runtimeControlActionOptions hides controls for resolved events", () => {
+  const options = runtimeControlActionOptions(
+    pendingControlEvent({
+      event_id: "event-approval-approved",
+      event_name: "human_approval_approved",
+      status: "approved",
+    }),
+  );
+
+  assert.deepEqual(options, []);
+});
+
+test("buildRuntimeControlActionRequest targets canonical runtime control identifiers", () => {
+  const body = buildRuntimeControlActionRequest(
+    pendingControlEvent(),
+    "approve",
+    "operator-ui",
+  );
+
+  assert.equal(body.session_id, "sess-graph");
+  assert.equal(body.task_id, "task-graph");
+  assert.equal(body.run_id, "run-parent");
+  assert.equal(body.approval_id, "approval-1");
+  assert.equal(body.interrupt_id, "interrupt-1");
+  assert.equal(body.resume_token, "resume-run-parent");
+  assert.equal(body.actor, "operator-ui");
+  assert.match(body.reason ?? "", /Runtime cockpit approve/);
+  assert.deepEqual(body.payload, {
+    source: "dashboard.runtime",
+    control_event_id: "event-interrupt-requested",
+    checkpoint_id: "task-graph:supervisor:checkpoint-1",
+    control_type: "interrupt",
+  });
+});
+
 test("buildRuntimeControlPlaneSnapshot keeps the cold-start session rail muted before runtime data arrives", () => {
   const snapshot = buildRuntimeControlPlaneSnapshot({
     chatStatus: null,
     health: null,
     runtimeGraph: null,
     runtimeInterrupts: null,
+    runtimeAssistants: null,
+    runtimeBackgroundJobs: null,
     chatError: null,
     healthError: null,
     runtimeGraphError: null,
     runtimeInterruptError: null,
+    runtimeAssistantsError: null,
+    runtimeBackgroundJobsError: null,
     error: null,
   });
 

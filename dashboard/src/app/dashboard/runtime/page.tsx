@@ -3,14 +3,27 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Check, RotateCcw, X } from "lucide-react";
 import { ControlPlanePageSummary } from "@/components/dashboard/ControlPlanePageSummary";
 import { ControlPlaneSurfaceGrid } from "@/components/dashboard/ControlPlaneSurfaceGrid";
 import { ControlPlaneStrip } from "@/components/dashboard/ControlPlaneStrip";
-import { API_TRANSPORT_MODE, BASE_URL, runtimeEventsStreamPath } from "@/lib/api";
+import {
+  API_TRANSPORT_MODE,
+  BASE_URL,
+  approveRuntimeInterrupt,
+  rejectRuntimeInterrupt,
+  resumeRuntimeInterrupt,
+  runtimeEventsStreamPath,
+} from "@/lib/api";
 import { buildControlPlanePageMeta } from "@/lib/controlPlanePageMeta";
 import {
   buildControlPlaneSyncState,
 } from "@/lib/controlPlaneShell";
+import {
+  buildRuntimeControlActionRequest,
+  runtimeControlActionOptions,
+  type RuntimeControlActionKind,
+} from "@/lib/runtimeControlPlane";
 import { buildRuntimeOperatorHandbook } from "@/lib/runtimeOperatorHandbook";
 import { buildControlPlaneSurfaces } from "@/lib/controlPlaneSurfaces";
 import { colors, glowText } from "@/lib/theme";
@@ -19,12 +32,21 @@ import type {
   ChatProfileOut,
   RuntimeAssistantsSnapshot,
   RuntimeBackgroundJobsSnapshot,
+  RuntimeControlActionResult,
   RuntimeGraphSnapshot,
+  RuntimeInterruptControlEvent,
   RuntimeInterruptsSnapshot,
 } from "@/lib/types";
 
 const PAGE_META = buildControlPlanePageMeta("runtime");
 const PAGE_ACCENT = colors[PAGE_META.accent];
+
+interface RuntimeControlActionState {
+  eventId: string;
+  action: RuntimeControlActionKind;
+  status: "running" | "ok" | "error";
+  message: string;
+}
 
 function transportLabel(): string {
   if (API_TRANSPORT_MODE === "same-origin") {
@@ -72,6 +94,8 @@ function profileStatusLabel(profile: ChatProfileOut): string {
 
 export default function RuntimePage() {
   const [currentOrigin, setCurrentOrigin] = useState("loading");
+  const [controlActionState, setControlActionState] =
+    useState<RuntimeControlActionState | null>(null);
   const transportMode = API_TRANSPORT_MODE;
   const transportDetail = transportLabel();
   const {
@@ -107,6 +131,48 @@ export default function RuntimePage() {
       }),
     [chatStatus, snapshot],
   );
+
+  async function handleRuntimeControlAction(
+    event: RuntimeInterruptControlEvent,
+    action: RuntimeControlActionKind,
+  ): Promise<void> {
+    const body = buildRuntimeControlActionRequest(event, action);
+    setControlActionState({
+      eventId: event.event_id,
+      action,
+      status: "running",
+      message: `${action} recording`,
+    });
+
+    const response =
+      action === "approve"
+        ? await approveRuntimeInterrupt(body)
+        : action === "reject"
+          ? await rejectRuntimeInterrupt(body)
+          : await resumeRuntimeInterrupt(body);
+    const result: RuntimeControlActionResult | null =
+      response.status === "ok" ? response.data : null;
+
+    if (result?.status) {
+      setControlActionState({
+        eventId: event.event_id,
+        action,
+        status: "ok",
+        message: result.target_found
+          ? `recorded ${result.status}`
+          : `recorded ${result.status}; target not found`,
+      });
+      void refresh();
+      return;
+    }
+
+    setControlActionState({
+      eventId: event.event_id,
+      action,
+      status: "error",
+      message: response.error || `failed to record ${action}`,
+    });
+  }
 
   return (
     <motion.div
@@ -196,6 +262,8 @@ export default function RuntimePage() {
             assistantsDetail={snapshot.runtimeAssistantsDetail}
             backgroundStatusLabel={snapshot.runtimeBackgroundStatusLabel}
             backgroundDetail={snapshot.runtimeBackgroundDetail}
+            controlActionState={controlActionState}
+            onControlAction={handleRuntimeControlAction}
           />
 
           <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
@@ -372,6 +440,8 @@ function RuntimeGraphPanel({
   assistantsDetail,
   backgroundStatusLabel,
   backgroundDetail,
+  controlActionState,
+  onControlAction,
 }: {
   graph: RuntimeGraphSnapshot | null;
   interrupts: RuntimeInterruptsSnapshot | null;
@@ -385,6 +455,11 @@ function RuntimeGraphPanel({
   assistantsDetail: string;
   backgroundStatusLabel: string;
   backgroundDetail: string;
+  controlActionState: RuntimeControlActionState | null;
+  onControlAction: (
+    event: RuntimeInterruptControlEvent,
+    action: RuntimeControlActionKind,
+  ) => Promise<void>;
 }) {
   const topologies = graph?.topology_states.slice(0, 6) ?? [];
   const receipts = graph?.receipts.slice(0, 6) ?? [];
@@ -540,8 +615,16 @@ function RuntimeGraphPanel({
               {controlEvents.length === 0 ? (
                 <div className="text-sm text-sumi-500">No interrupts or approvals in snapshot.</div>
               ) : (
-                controlEvents.map((event) => (
-                  <div key={event.event_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                controlEvents.map((event) => {
+                  const actionOptions = runtimeControlActionOptions(event);
+                  const activeAction =
+                    controlActionState?.eventId === event.event_id
+                      ? controlActionState
+                      : null;
+                  const actionBusy = activeAction?.status === "running";
+
+                  return (
+                    <div key={event.event_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-sm text-sumi-200">{event.event_name}</div>
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(event.status === "pending" ? "warn" : "ok")}`}>
@@ -554,8 +637,42 @@ function RuntimeGraphPanel({
                     <div className="mt-1 text-xs text-sumi-500">
                       {event.control_type} · {event.agent_id || "no-agent"}
                     </div>
+                    {actionOptions.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {actionOptions.map((option) => (
+                          <button
+                            key={option.action}
+                            type="button"
+                            aria-label={option.title}
+                            title={option.title}
+                            disabled={actionBusy}
+                            onClick={() => {
+                              void onControlAction(event, option.action);
+                            }}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-sumi-600/60 bg-sumi-900/70 text-sumi-200 transition-colors hover:border-aozora/50 hover:text-aozora disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <RuntimeControlActionIcon action={option.action} />
+                            <span className="sr-only">{option.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {activeAction ? (
+                      <div
+                        className={`mt-2 text-xs ${
+                          activeAction.status === "error"
+                            ? "text-red-300"
+                            : activeAction.status === "ok"
+                              ? "text-emerald-300"
+                              : "text-sumi-400"
+                        }`}
+                      >
+                        {activeAction.message}
+                      </div>
+                    ) : null}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -651,6 +768,20 @@ function RuntimeGraphPanel({
       </div>
     </section>
   );
+}
+
+function RuntimeControlActionIcon({
+  action,
+}: {
+  action: RuntimeControlActionKind;
+}) {
+  if (action === "approve") {
+    return <Check className="h-4 w-4" aria-hidden="true" />;
+  }
+  if (action === "reject") {
+    return <X className="h-4 w-4" aria-hidden="true" />;
+  }
+  return <RotateCcw className="h-4 w-4" aria-hidden="true" />;
 }
 
 function RuntimeCard({

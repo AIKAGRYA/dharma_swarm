@@ -1117,3 +1117,21 @@
 - Generated artifact:
   - `reports/langgraph_parity/allnight/closeout_governance_repair_20260701T072931Z.json`
 - Scoreboard: raised conservatively to `99/100`. This still is not a 100/100 claim because Phase 7 platform/cockpit evidence remains explicitly partial.
+
+## 2026-07-01T07:48:10Z - Phase 7 Dashboard Runtime Control Actions
+
+- Target gate result: partial success. The dashboard now exposes pending runtime control events as operator actions, but the branch still does not have the final end-to-end live cockpit proof required for 100/100.
+- What changed:
+  - Added `runtimeControlActionOptions()` and `buildRuntimeControlActionRequest()` in `dashboard/src/lib/runtimeControlPlane.ts`.
+  - Added dashboard control-plane tests that prove pending human interrupts expose approve/reject/resume options, resolved events hide actions, and the request payload carries canonical runtime identifiers.
+  - Wired `/dashboard/runtime` control-event rows to compact lucide icon buttons for approve, reject, and resume.
+  - The buttons call the existing typed API helpers for `POST /api/runtime/interrupts/approve`, `/reject`, and `/resume`, then refresh the canonical runtime snapshots after a successful action.
+  - No dashboard-only control store was added; the action boundary remains the RuntimeStateStore-backed backend contract.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/runtime_dashboard_control_actions_20260701T074810Z.json`
+- Verification:
+  - `node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts` from `dashboard/` -> `14 passed`; Node emitted experimental type-stripping warnings only.
+  - `npm run lint -- --quiet` from `dashboard/` -> pass.
+  - `npm run build` from `dashboard/` -> pass; `/dashboard/runtime` prerendered successfully.
+  - `.venv/bin/python -m pytest -q tests/test_runtime_graph_api.py` -> `8 passed in 1.41s`.
+- Scoreboard: remains `99/100`. This round completes the previous next-patch item for dashboard action UI, but 100/100 remains blocked until a complete dashboard/API proof observes a live running multi-agent graph in real time from canonical `RuntimeStateStore` sources.
