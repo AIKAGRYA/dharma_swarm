@@ -1,0 +1,1787 @@
+{
+  "a2a_receipts_dir": "/Users/dhyana/ds_a2a_always_on_spine_20260701/reports/a2a/nats_live_production_matrix/nats-live-20260701T145851Z-44b1cf6d/receipts",
+  "broker_profile": "local-live-jetstream",
+  "broker_url": "nats://127.0.0.1:4222",
+  "command": [
+    "/Users/dhyana/dharma_swarm/.venv/bin/python",
+    "/Users/dhyana/ds_a2a_always_on_spine_20260701/scripts/governance/run_nats_live_production_matrix.py",
+    "--endpoint",
+    "nats://127.0.0.1:4222",
+    "--broker-profile",
+    "local-live-jetstream",
+    "--provider",
+    "deterministic",
+    "--model",
+    "local-deterministic"
+  ],
+  "commands": [
+    {
+      "command": [
+        "/Users/dhyana/dharma_swarm/.venv/bin/python",
+        "/Users/dhyana/ds_a2a_always_on_spine_20260701/scripts/governance/check_nats_live_production_evidence.py",
+        "--evidence",
+        "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/nats-matrix-negative-f7gcgztg/tampered.json",
+        "--max-age-hours",
+        "999999"
+      ],
+      "return_code": 1,
+      "stderr": "NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: missing required rows: ['happy_path', 'governance_negative_path']\n",
+      "stdout": "",
+      "timestamp": "2026-07-01T14:59:59Z"
+    }
+  ],
+  "consumer_name": "a2a_task_handler",
+  "dlq_stream_name": "DS_DLQ",
+  "failed_rows": [],
+  "generated_at": "2026-07-01T14:59:59Z",
+  "missing_rows": [],
+  "model": "local-deterministic",
+  "process": {
+    "cwd": "/Users/dhyana/ds_a2a_always_on_spine_20260701",
+    "pid": 65114,
+    "python": "/Users/dhyana/dharma_swarm/.venv/bin/python"
+  },
+  "provider": "deterministic",
+  "required_rows": [
+    "topology",
+    "happy_path",
+    "duplicate_path",
+    "publish_failure_path",
+    "handler_failure_redelivery_path",
+    "stale_started_idempotency_path",
+    "concurrent_duplicate_path",
+    "ack_failure_path",
+    "max_deliver_path",
+    "dlq_failure_path",
+    "restart_path",
+    "compatibility_bypass_contract",
+    "governance_negative_path"
+  ],
+  "rows": [
+    {
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_ack_floor": {
+        "consumer_seq": 209,
+        "last_active": "2026-07-01T14:57:48.114143+00:00",
+        "stream_seq": 113
+      },
+      "consumer_ack_policy": "explicit",
+      "consumer_ack_wait_seconds": 60.0,
+      "consumer_delivered": {
+        "consumer_seq": 209,
+        "last_active": "2026-07-01T14:57:48.073969+00:00",
+        "stream_seq": 113
+      },
+      "consumer_filter_subject": "dharma.a2a.task.>",
+      "consumer_max_deliver": 3,
+      "consumer_name": "a2a_task_handler",
+      "consumer_num_ack_pending": 0,
+      "consumer_num_pending": 0,
+      "dlq_retention": "limits",
+      "dlq_stream_name": "DS_DLQ",
+      "dlq_subjects": [
+        "dharma.dlq.>"
+      ],
+      "name": "topology",
+      "status": "pass",
+      "stream_duplicate_window_seconds": 600.0,
+      "stream_name": "DS_TASKS",
+      "stream_retention": "limits",
+      "stream_storage": "file",
+      "stream_subjects": [
+        "dharma.a2a.task.>"
+      ],
+      "timestamp": "2026-07-01T14:58:51Z"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consume_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+        "receipt_id": "rr_5ceafca2adcb4dbf",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_happy_path.matrix_happy_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+      },
+      "consumer_name": "a2a_task_handler",
+      "envelope_contract": {
+        "actor": {
+          "execution_agent": "nats-live-matrix-happy_path",
+          "from_agent": "nats_live_matrix",
+          "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+          "to_agent": "nats_live_20260701T145851Z_44b1cf6d_happy_path"
+        },
+        "causality": {
+          "causation_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+          "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+          "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+          "parent_span_id": "nats-live-20260701T145851Z-44b1cf6d",
+          "span_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+          "trace_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+        },
+        "from_agent": "nats_live_matrix",
+        "kind": "task",
+        "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+        "nats_msg_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+        "payload_schema": "dharma.a2a.nats_task.v1",
+        "schema": "dharma.nats.envelope.v1",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_happy_path.matrix_happy_path",
+        "to_agent": "nats_live_20260701T145851Z_44b1cf6d_happy_path"
+      },
+      "headers": {
+        "Dharma-Causation-Id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+        "Dharma-Correlation-Id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+        "Dharma-Idempotency-Key": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30:idem",
+        "Dharma-Nats-Schema": "dharma.nats.envelope.v1",
+        "Dharma-Run-Id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+        "Dharma-Task-Id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+        "Dharma-Trace-Id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+        "Nats-Msg-Id": "nmsg_4276da1cc51939278217768ed965a3d3"
+      },
+      "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+      "metadata": {
+        "consumer_sequence": 210,
+        "num_delivered": 1,
+        "stream_sequence": 114,
+        "timestamp": "2026-07-01T14:58:51.804651+00:00"
+      },
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "happy_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_model.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_model.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "publish_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+        "receipt_id": "rr_f6293b3df0274d44",
+        "seq": 114,
+        "status": "ack",
+        "stream": "DS_TASKS",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_happy_path.matrix_happy_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+      },
+      "receipt_path": "/Users/dhyana/ds_a2a_always_on_spine_20260701/reports/a2a/nats_live_production_matrix/nats-live-20260701T145851Z-44b1cf6d/receipts/nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30.semantic_receipt.json",
+      "side_effect_count": 1,
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+      "timestamp": "2026-07-01T14:58:51Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path",
+      "broker_duplicate_probe": {
+        "duplicate": true,
+        "seq": 114,
+        "stream": "DS_TASKS"
+      },
+      "broker_duplicate_probe_entrypoint": "nats.aio.client.JetStreamContext.publish",
+      "broker_duplicate_probe_purpose": "duplicate-window verification only; not a production task publisher",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_name": "a2a_task_handler",
+      "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "duplicate_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": null,
+        "consumer_class": null,
+        "consumer_require_execution_identity": null,
+        "handler_contract": null,
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "runtime_duplicate_publish_ack": {
+        "action": "ack",
+        "duplicate": true,
+        "message_id": "nmsg_4276da1cc51939278217768ed965a3d3",
+        "receipt_id": "rr_c8ab4fd0b5cf4bc5",
+        "seq": null,
+        "status": "duplicate",
+        "stream": "",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_happy_path.matrix_happy_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+      },
+      "side_effect_count_after_replay": 1,
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+      "timestamp": "2026-07-01T14:58:52Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_publish_failure_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consume_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_031c77f6718c7a810ff232ce631441d2",
+        "receipt_id": "rr_6b069c4210934303",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_publish_failure_path.matrix_publish_failure_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_publish_failure_path_2a399f04"
+      },
+      "consumer_name": "a2a_task_handler",
+      "failure_injection": "JetStream publish raised before broker acceptance",
+      "forced_failure": "NatsTransportError: forced task publish failure for matrix row",
+      "message_id": "nmsg_031c77f6718c7a810ff232ce631441d2",
+      "metadata": {
+        "consumer_sequence": 211,
+        "num_delivered": 1,
+        "stream_sequence": 115,
+        "timestamp": "2026-07-01T14:58:52.193990+00:00"
+      },
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "publish_failure_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "retry_publish_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "message_id": "nmsg_031c77f6718c7a810ff232ce631441d2",
+        "receipt_id": "rr_72d6323814c64fa2",
+        "seq": 115,
+        "status": "ack",
+        "stream": "DS_TASKS",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_publish_failure_path.matrix_publish_failure_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_publish_failure_path_2a399f04"
+      },
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_publish_failure_path_2a399f04",
+      "timestamp": "2026-07-01T14:58:52Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:publish_failure_path:nats_live_20260701T145851Z_44b1cf6d_publish_failure_path_2a399f04"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_name": "a2a_task_handler",
+      "first_consume_ack": {
+        "action": "nack",
+        "dlq_failed": false,
+        "duplicate": false,
+        "error": "forced first handler failure",
+        "message_id": "nmsg_0c9d6fc627811f999525b356e47a93d0",
+        "receipt_id": "rr_8751fa0cff3d4dd9",
+        "runtime_receipts": [
+          {
+            "agent_id": "nats-live-matrix-handler_failure_redelivery_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+            "created_at": "2026-07-01T14:58:52.475579+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "error": "forced first handler failure",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+              "message_id": "nmsg_0c9d6fc627811f999525b356e47a93d0",
+              "operation_hash": "d1fb035ec0d73c873c20f8384bb7c98cc4ec992e31be66f51889945b459b04b6",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_handler_failure_redelivery_path.matrix_handler_failure_redelivery_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_8751fa0cff3d4dd9",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_handler_failure_redelivery_path.matrix_handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+            "status": "nack",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50"
+          }
+        ],
+        "status": "nack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_handler_failure_redelivery_path.matrix_handler_failure_redelivery_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50"
+      },
+      "first_delivery_metadata": {
+        "consumer_sequence": 212,
+        "num_delivered": 1,
+        "stream_sequence": 116,
+        "timestamp": "2026-07-01T14:58:52.388507+00:00"
+      },
+      "first_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_fail_then_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_fail_then_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "handler_attempts": 2,
+      "message_id": "nmsg_0c9d6fc627811f999525b356e47a93d0",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "handler_failure_redelivery_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_fail_then_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_fail_then_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "redelivery_metadata": {
+        "consumer_sequence": 213,
+        "num_delivered": 2,
+        "stream_sequence": 116,
+        "timestamp": "2026-07-01T14:58:52.388507+00:00"
+      },
+      "second_consume_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_0c9d6fc627811f999525b356e47a93d0",
+        "receipt_id": "rr_ff533761aae242c9",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_handler_failure_redelivery_path.matrix_handler_failure_redelivery_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50"
+      },
+      "second_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_fail_then_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_fail_then_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50",
+      "timestamp": "2026-07-01T14:58:52Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:handler_failure_redelivery_path:nats_live_20260701T145851Z_44b1cf6d_handler_failure_redelivery_path_5bf44f50"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_stale_started_idempotency_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consume_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_c427e7edeb6acec4e9fc090de83956c0",
+        "receipt_id": "rr_104c47068e3b47c5",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_stale_started_idempotency_path.matrix_stale_started_idempotency_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_stale_started_idempotency_path_e5f09086"
+      },
+      "consumer_name": "a2a_task_handler",
+      "message_id": "nmsg_c427e7edeb6acec4e9fc090de83956c0",
+      "metadata": {
+        "consumer_sequence": 214,
+        "num_delivered": 1,
+        "stream_sequence": 117,
+        "timestamp": "2026-07-01T14:58:52.667429+00:00"
+      },
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "stale_started_idempotency_path",
+      "preexisting_idempotency_status": "started",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "seeded_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_stale_started_idempotency_path.matrix_stale_started_idempotency_path:nats_live_20260701T145851Z_44b1cf6d_stale_started_idempotency_path_e5f09086",
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_stale_started_idempotency_path_e5f09086",
+      "timestamp": "2026-07-01T14:58:52Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:stale_started_idempotency_path:nats_live_20260701T145851Z_44b1cf6d_stale_started_idempotency_path_e5f09086"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path",
+      "blocked_consume_ack": {
+        "action": "nack",
+        "dlq_failed": false,
+        "duplicate": false,
+        "error": "NATS consume idempotency record is still in progress: nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a status=started receipt=rr_b5b5db106def49c3",
+        "message_id": "nmsg_533fa9bab9a62947dc2fa1e07f846080",
+        "receipt_id": "rr_b5b5db106def49c3",
+        "runtime_receipts": [
+          {
+            "agent_id": "nats-live-matrix-concurrent_duplicate_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+            "created_at": "2026-07-01T14:58:52.989863+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "existing_status": "started",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+              "message_id": "nmsg_533fa9bab9a62947dc2fa1e07f846080",
+              "operation_hash": "7844a5f9f712360d4583b621bbfbee7496454c63a25fa3825f62c38ca40ca955",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_b5b5db106def49c3",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+            "status": "retry_blocked",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a"
+          }
+        ],
+        "status": "retry_blocked",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a"
+      },
+      "blocked_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "broker_url": "nats://127.0.0.1:4222",
+      "cleanup_consume_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_533fa9bab9a62947dc2fa1e07f846080",
+        "receipt_id": "rr_b0bcfe2444f74a0c",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a"
+      },
+      "cleanup_metadata": {
+        "consumer_sequence": 216,
+        "num_delivered": 2,
+        "stream_sequence": 118,
+        "timestamp": "2026-07-01T14:58:52.886842+00:00"
+      },
+      "cleanup_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "consumer_name": "a2a_task_handler",
+      "message_id": "nmsg_533fa9bab9a62947dc2fa1e07f846080",
+      "metadata": {
+        "consumer_sequence": 215,
+        "num_delivered": 1,
+        "stream_sequence": 118,
+        "timestamp": "2026-07-01T14:58:52.886842+00:00"
+      },
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "concurrent_duplicate_path",
+      "preexisting_idempotency_status": "started",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "seeded_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_concurrent_duplicate_path.matrix_concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+      "side_effect_count": 1,
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a",
+      "timestamp": "2026-07-01T14:58:53Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:concurrent_duplicate_path:nats_live_20260701T145851Z_44b1cf6d_concurrent_duplicate_path_dc22094a"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "cleanup_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_c1fe08b29dd4bb6923fbc359336ab33d",
+        "receipt_id": "rr_2af4bcc3f21245d2",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319"
+      },
+      "cleanup_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "consumer_name": "a2a_task_handler",
+      "failed_ack": {
+        "action": "nack",
+        "dlq_failed": false,
+        "duplicate": false,
+        "error": "forced broker ack failure for matrix row",
+        "message_id": "nmsg_c1fe08b29dd4bb6923fbc359336ab33d",
+        "receipt_id": "rr_7180a6fd15484f47",
+        "runtime_receipts": [
+          {
+            "agent_id": "nats-live-matrix-ack_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "created_at": "2026-07-01T14:58:53.252205+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "a2a_status": "completed",
+              "ack_contract": "consumer_ack_intent",
+              "action": "ack_intent",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+              "message_id": "nmsg_c1fe08b29dd4bb6923fbc359336ab33d",
+              "operation_hash": "08d7a639e56d243c41ab3e89fcba0f51adbca541cfa0c3d53aaaeea07be213e9",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_93603df1fcb74c82",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "status": "ack_intent",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319"
+          },
+          {
+            "agent_id": "nats-live-matrix-ack_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "created_at": "2026-07-01T14:58:53.258934+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "error": "forced broker ack failure for matrix row",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+              "message_id": "nmsg_c1fe08b29dd4bb6923fbc359336ab33d",
+              "operation_hash": "08d7a639e56d243c41ab3e89fcba0f51adbca541cfa0c3d53aaaeea07be213e9",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_7180a6fd15484f47",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "status": "nack",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319"
+          }
+        ],
+        "status": "nack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_ack_failure_path.matrix_ack_failure_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319"
+      },
+      "failed_ack_production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "failure_injection": "message.ack raised before broker ack; original was nacked and redelivered",
+      "message_id": "nmsg_c1fe08b29dd4bb6923fbc359336ab33d",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "ack_failure_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "redelivery_metadata": {
+        "consumer_sequence": 218,
+        "num_delivered": 2,
+        "stream_sequence": 119,
+        "timestamp": "2026-07-01T14:58:53.158299+00:00"
+      },
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319",
+      "timestamp": "2026-07-01T14:58:53Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:ack_failure_path:nats_live_20260701T145851Z_44b1cf6d_ack_failure_path_cd841319"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_name": "a2a_task_handler",
+      "deliveries": [
+        {
+          "consume_ack": {
+            "action": "nack",
+            "dlq_failed": false,
+            "duplicate": false,
+            "error": "forced handler failure for max_deliver_path",
+            "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+            "receipt_id": "rr_64a3bfbcb98f46f3",
+            "runtime_receipts": [
+              {
+                "agent_id": "nats-live-matrix-max_deliver_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "created_at": "2026-07-01T14:58:53.532948+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for max_deliver_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+                  "operation_hash": "59622400e4d5d51bc8c45d78477d3f5061655309d1850c88d924fe9b672d62b3",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_64a3bfbcb98f46f3",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+              }
+            ],
+            "status": "nack",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+          },
+          "metadata": {
+            "consumer_sequence": 219,
+            "num_delivered": 1,
+            "stream_sequence": 120,
+            "timestamp": "2026-07-01T14:58:53.453246+00:00"
+          }
+        },
+        {
+          "consume_ack": {
+            "action": "nack",
+            "dlq_failed": false,
+            "duplicate": false,
+            "error": "forced handler failure for max_deliver_path",
+            "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+            "receipt_id": "rr_3ae28b4744594fb6",
+            "runtime_receipts": [
+              {
+                "agent_id": "nats-live-matrix-max_deliver_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "created_at": "2026-07-01T14:58:53.532948+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for max_deliver_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+                  "operation_hash": "59622400e4d5d51bc8c45d78477d3f5061655309d1850c88d924fe9b672d62b3",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_64a3bfbcb98f46f3",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+              },
+              {
+                "agent_id": "nats-live-matrix-max_deliver_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "created_at": "2026-07-01T14:58:53.662459+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for max_deliver_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+                  "operation_hash": "59622400e4d5d51bc8c45d78477d3f5061655309d1850c88d924fe9b672d62b3",
+                  "retry_of_result_receipt_id": "rr_64a3bfbcb98f46f3",
+                  "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "retry_of_status": "failed",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_3ae28b4744594fb6",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:retry:4da55e11f01e",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+              }
+            ],
+            "status": "nack",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+          },
+          "metadata": {
+            "consumer_sequence": 220,
+            "num_delivered": 2,
+            "stream_sequence": 120,
+            "timestamp": "2026-07-01T14:58:53.453246+00:00"
+          }
+        },
+        {
+          "consume_ack": {
+            "action": "dlq",
+            "duplicate": false,
+            "error": "forced handler failure for max_deliver_path",
+            "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+            "receipt_id": "rr_03fc97a0791b42c3",
+            "status": "dlq",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+          },
+          "metadata": {
+            "consumer_sequence": 221,
+            "num_delivered": 3,
+            "stream_sequence": 120,
+            "timestamp": "2026-07-01T14:58:53.453246+00:00"
+          }
+        }
+      ],
+      "dlq_envelope": {
+        "actor": {
+          "execution_agent": "nats-live-matrix-max_deliver_path",
+          "from_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+          "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+          "to_agent": "operator"
+        },
+        "causality": {
+          "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+          "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+          "message_id": "nmsg_f2c11d45b63b703be01c026c1ee6256a",
+          "parent_span_id": "nats-live-20260701T145851Z-44b1cf6d",
+          "span_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+          "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+        },
+        "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+        "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+        "created_at": "2026-07-01T14:58:53.779880+00:00",
+        "from_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+        "kind": "event",
+        "message_id": "nmsg_f2c11d45b63b703be01c026c1ee6256a",
+        "parent_span_id": "nats-live-20260701T145851Z-44b1cf6d",
+        "payload": {
+          "created_at": "2026-07-01T14:58:53.779880+00:00",
+          "delivery_count": 3,
+          "error": "forced handler failure for max_deliver_path",
+          "max_deliveries": 3,
+          "operator_blocker": "NATS_MAX_DELIVER_EXHAUSTED",
+          "original_message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+          "original_payload": {
+            "actor": {
+              "execution_agent": "nats-live-matrix-max_deliver_path",
+              "from_agent": "nats_live_matrix",
+              "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+              "to_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path"
+            },
+            "causality": {
+              "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+              "parent_span_id": "nats-live-20260701T145851Z-44b1cf6d",
+              "span_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+            },
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+            "created_at": "2026-07-01T14:58:53.452772+00:00",
+            "execution_identity": {
+              "agent_id": "nats-live-matrix-max_deliver_path",
+              "artifact_id": "",
+              "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "event_id": "",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+              "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+              "metadata": {},
+              "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+              "proposal_id": "",
+              "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+              "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+            },
+            "from_agent": "nats_live_matrix",
+            "kind": "task",
+            "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+            "parent_span_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "execution_identity": {
+                "agent_id": "nats-live-matrix-max_deliver_path",
+                "artifact_id": "",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "event_id": "",
+                "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+                "metadata": {},
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "proposal_id": "",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+              },
+              "schema": "dharma.a2a.nats_task.v1",
+              "sent_at": "2026-07-01T14:58:53.452772+00:00",
+              "task": {
+                "artifacts": [],
+                "capability": "matrix_max_deliver_path",
+                "context_id": "",
+                "created_at": "2026-07-01T14:58:53.414173+00:00",
+                "dharma_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "error": "",
+                "extensions": [],
+                "from_agent": "nats_live_matrix",
+                "history": [
+                  {
+                    "metadata": {},
+                    "parts": [
+                      {
+                        "_skip_validation": false,
+                        "content": "{\"label\": \"max_deliver_path\", \"run_id\": \"nats-live-20260701T145851Z-44b1cf6d\"}",
+                        "filename": "",
+                        "media_type": "",
+                        "metadata": {},
+                        "type": "text"
+                      }
+                    ],
+                    "role": "user"
+                  }
+                ],
+                "id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "messages": [
+                  {
+                    "metadata": {},
+                    "parts": [
+                      {
+                        "_skip_validation": false,
+                        "content": "{\"label\": \"max_deliver_path\", \"run_id\": \"nats-live-20260701T145851Z-44b1cf6d\"}",
+                        "filename": "",
+                        "media_type": "",
+                        "metadata": {},
+                        "type": "text"
+                      }
+                    ],
+                    "role": "user"
+                  }
+                ],
+                "metadata": {
+                  "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "execution_identity": {
+                    "agent_id": "nats-live-matrix-max_deliver_path",
+                    "artifact_id": "",
+                    "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "event_id": "",
+                    "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                    "message_id": "",
+                    "metadata": {},
+                    "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                    "proposal_id": "",
+                    "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+                    "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                    "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+                  },
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                  "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+                },
+                "result": "",
+                "status": "submitted",
+                "to_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "updated_at": "2026-07-01T14:58:53.414175+00:00"
+              }
+            },
+            "requires_ack": true,
+            "schema": "dharma.nats.envelope.v1",
+            "span_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+            "task": {
+              "artifacts": [],
+              "capability": "matrix_max_deliver_path",
+              "context_id": "",
+              "created_at": "2026-07-01T14:58:53.414173+00:00",
+              "dharma_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "error": "",
+              "extensions": [],
+              "from_agent": "nats_live_matrix",
+              "history": [
+                {
+                  "metadata": {},
+                  "parts": [
+                    {
+                      "_skip_validation": false,
+                      "content": "{\"label\": \"max_deliver_path\", \"run_id\": \"nats-live-20260701T145851Z-44b1cf6d\"}",
+                      "filename": "",
+                      "media_type": "",
+                      "metadata": {},
+                      "type": "text"
+                    }
+                  ],
+                  "role": "user"
+                }
+              ],
+              "id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "messages": [
+                {
+                  "metadata": {},
+                  "parts": [
+                    {
+                      "_skip_validation": false,
+                      "content": "{\"label\": \"max_deliver_path\", \"run_id\": \"nats-live-20260701T145851Z-44b1cf6d\"}",
+                      "filename": "",
+                      "media_type": "",
+                      "metadata": {},
+                      "type": "text"
+                    }
+                  ],
+                  "role": "user"
+                }
+              ],
+              "metadata": {
+                "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "execution_identity": {
+                  "agent_id": "nats-live-matrix-max_deliver_path",
+                  "artifact_id": "",
+                  "causation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "claim_id": "claim-nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "event_id": "",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                  "message_id": "",
+                  "metadata": {},
+                  "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                  "proposal_id": "",
+                  "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "session_id": "nats-live-20260701T145851Z-44b1cf6d",
+                  "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                  "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+                },
+                "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954:idem",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+              },
+              "result": "",
+              "status": "submitted",
+              "to_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+              "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+              "updated_at": "2026-07-01T14:58:53.414175+00:00"
+            },
+            "to_agent": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+          },
+          "original_subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+          "schema": "dharma.nats.dlq_failure.v1",
+          "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+        },
+        "requires_ack": false,
+        "schema": "dharma.nats.envelope.v1",
+        "span_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+        "subject": "dharma.dlq.ds_tasks.a2a_task_handler",
+        "to_agent": "operator",
+        "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+      },
+      "dlq_metadata": {
+        "consumer_sequence": 12,
+        "num_delivered": 1,
+        "stream_sequence": 12,
+        "timestamp": "2026-07-01T14:58:53.780344+00:00"
+      },
+      "dlq_subject": "dharma.dlq.ds_tasks.a2a_task_handler",
+      "final_ack": {
+        "action": "dlq",
+        "duplicate": false,
+        "error": "forced handler failure for max_deliver_path",
+        "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+        "receipt_id": "rr_03fc97a0791b42c3",
+        "status": "dlq",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_max_deliver_path.matrix_max_deliver_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+      },
+      "message_id": "nmsg_40830fdd17a25d15b35366e383053da2",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "max_deliver_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_always_fail.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_always_fail.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954",
+      "timestamp": "2026-07-01T14:58:53Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:max_deliver_path:nats_live_20260701T145851Z_44b1cf6d_max_deliver_path_f876f954"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_name": "a2a_task_handler",
+      "deliveries": [
+        {
+          "consume_ack": {
+            "action": "nack",
+            "dlq_failed": false,
+            "duplicate": false,
+            "error": "forced handler failure for dlq_failure_path",
+            "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+            "receipt_id": "rr_fc59af2c987140e1",
+            "runtime_receipts": [
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:53.949411+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_fc59af2c987140e1",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              }
+            ],
+            "status": "nack",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          "metadata": {
+            "consumer_sequence": 222,
+            "num_delivered": 1,
+            "stream_sequence": 121,
+            "timestamp": "2026-07-01T14:58:53.856104+00:00"
+          }
+        },
+        {
+          "consume_ack": {
+            "action": "nack",
+            "dlq_failed": false,
+            "duplicate": false,
+            "error": "forced handler failure for dlq_failure_path",
+            "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+            "receipt_id": "rr_84414fc1426f45f0",
+            "runtime_receipts": [
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:53.949411+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_fc59af2c987140e1",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              },
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:54.062514+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+                  "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "retry_of_status": "failed",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_84414fc1426f45f0",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:7aa951aaaaec",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              }
+            ],
+            "status": "nack",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          "metadata": {
+            "consumer_sequence": 223,
+            "num_delivered": 2,
+            "stream_sequence": 121,
+            "timestamp": "2026-07-01T14:58:53.856104+00:00"
+          }
+        },
+        {
+          "consume_ack": {
+            "action": "nack",
+            "dlq_failed": true,
+            "duplicate": false,
+            "error": "forced handler failure for dlq_failure_path",
+            "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+            "receipt_id": "rr_fac927de05694b60",
+            "runtime_receipts": [
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:53.949411+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_fc59af2c987140e1",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              },
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:54.062514+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+                  "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "retry_of_status": "failed",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_84414fc1426f45f0",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:7aa951aaaaec",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              },
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:54.175410+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "dlq_error": "forced DLQ publish failure for matrix row",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+                  "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "retry_of_status": "failed",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_28cb1d01c2ba4e3d",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:9e40444382f6",
+                "status": "dlq_failed",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              },
+              {
+                "agent_id": "nats-live-matrix-dlq_failure_path",
+                "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "created_at": "2026-07-01T14:58:54.182487+00:00",
+                "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+                "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+                "payload": {
+                  "action": "nack",
+                  "error": "forced handler failure for dlq_failure_path",
+                  "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+                  "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+                  "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+                  "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                  "retry_of_status": "failed",
+                  "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+                  "surface": "a2a.nats_transport.consume"
+                },
+                "receipt_id": "rr_fac927de05694b60",
+                "receipt_type": "nats_consume",
+                "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:9e40444382f6",
+                "status": "nack",
+                "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+                "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+              }
+            ],
+            "status": "nack",
+            "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          "metadata": {
+            "consumer_sequence": 224,
+            "num_delivered": 3,
+            "stream_sequence": 121,
+            "timestamp": "2026-07-01T14:58:53.856104+00:00"
+          }
+        }
+      ],
+      "failure_injection": "DLQ publish raised at MaxDeliver; original was not acked and remains beyond the consumer ack floor",
+      "final_ack": {
+        "action": "nack",
+        "dlq_failed": true,
+        "duplicate": false,
+        "error": "forced handler failure for dlq_failure_path",
+        "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+        "receipt_id": "rr_fac927de05694b60",
+        "runtime_receipts": [
+          {
+            "agent_id": "nats-live-matrix-dlq_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "created_at": "2026-07-01T14:58:53.949411+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "error": "forced handler failure for dlq_failure_path",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+              "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_fc59af2c987140e1",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "status": "nack",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          {
+            "agent_id": "nats-live-matrix-dlq_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "created_at": "2026-07-01T14:58:54.062514+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "error": "forced handler failure for dlq_failure_path",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+              "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+              "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+              "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "retry_of_status": "failed",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_84414fc1426f45f0",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:7aa951aaaaec",
+            "status": "nack",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          {
+            "agent_id": "nats-live-matrix-dlq_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "created_at": "2026-07-01T14:58:54.175410+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "dlq_error": "forced DLQ publish failure for matrix row",
+              "error": "forced handler failure for dlq_failure_path",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+              "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+              "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+              "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "retry_of_status": "failed",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_28cb1d01c2ba4e3d",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:9e40444382f6",
+            "status": "dlq_failed",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          },
+          {
+            "agent_id": "nats-live-matrix-dlq_failure_path",
+            "causation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "correlation_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "created_at": "2026-07-01T14:58:54.182487+00:00",
+            "idempotency_key": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:idem",
+            "parent_run_id": "nats-live-20260701T145851Z-44b1cf6d",
+            "payload": {
+              "action": "nack",
+              "error": "forced handler failure for dlq_failure_path",
+              "external_a2a_task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+              "operation_hash": "03ea57f25ba6a3519f9888b7ff28d8514a676277fb44fa17ba41d058f12df7ec",
+              "retry_of_result_receipt_id": "rr_fc59af2c987140e1",
+              "retry_of_side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+              "retry_of_status": "failed",
+              "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+              "surface": "a2a.nats_transport.consume"
+            },
+            "receipt_id": "rr_fac927de05694b60",
+            "receipt_type": "nats_consume",
+            "run_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "side_effect_key": "nats_consume:dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2:retry:9e40444382f6",
+            "status": "nack",
+            "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+            "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+          }
+        ],
+        "status": "nack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_dlq_failure_path.matrix_dlq_failure_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+      },
+      "message_id": "nmsg_d32256801ae07fb37e218ea96829e1c9",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "dlq_failure_path",
+      "operator_visible": true,
+      "operator_visible_state": {
+        "ack_floor": {
+          "consumer_seq": 221,
+          "last_active": "2026-07-01T14:58:53.789830+00:00",
+          "stream_seq": 120
+        },
+        "delivered": {
+          "consumer_seq": 224,
+          "last_active": "2026-07-01T14:58:54.098225+00:00",
+          "stream_seq": 121
+        },
+        "final_stream_sequence": 121,
+        "num_ack_pending": 1,
+        "num_pending": 0,
+        "num_redelivered": 16
+      },
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_always_fail.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_always_fail.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2",
+      "timestamp": "2026-07-01T14:58:54Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:dlq_failure_path:nats_live_20260701T145851Z_44b1cf6d_dlq_failure_path_d35d24c2"
+    },
+    {
+      "agent_id": "nats_live_20260701T145851Z_44b1cf6d_restart_path",
+      "broker_url": "nats://127.0.0.1:4222",
+      "cleanup_ack": {
+        "action": "ack",
+        "duplicate": false,
+        "error": "",
+        "message_id": "nmsg_8ab14866dc1e67dd2bfa313b2dd7b607",
+        "receipt_id": "rr_95b96527528f4c63",
+        "status": "ack",
+        "subject": "dharma.a2a.task.nats_live_20260701t145851z_44b1cf6d_restart_path.matrix_restart_path",
+        "task_id": "nats_live_20260701T145851Z_44b1cf6d_restart_path_427aeaff"
+      },
+      "consumer_name": "a2a_task_handler",
+      "first_delivery_metadata": {
+        "consumer_sequence": 225,
+        "num_delivered": 1,
+        "stream_sequence": 122,
+        "timestamp": "2026-07-01T14:58:54.258668+00:00"
+      },
+      "message_id": "nmsg_8ab14866dc1e67dd2bfa313b2dd7b607",
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "restart_path",
+      "production_path_contract": {
+        "compatibility_publishers_can_satisfy_production_gate": false,
+        "consume_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.consume_message",
+        "consumer_class": "dharma_swarm.a2a.a2a_server.A2AServer",
+        "consumer_require_execution_identity": true,
+        "handler_contract": {
+          "callable": "__main__.MatrixRunner.handler_success.<locals>.handler",
+          "module": "__main__",
+          "name": "handler",
+          "qualname": "MatrixRunner.handler_success.<locals>.handler"
+        },
+        "publish_entrypoint": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+        "transport_class": "dharma_swarm.a2a.nats_transport.A2ANatsTransport"
+      },
+      "redelivery_metadata": {
+        "consumer_sequence": 226,
+        "num_delivered": 2,
+        "stream_sequence": 122,
+        "timestamp": "2026-07-01T14:58:54.258668+00:00"
+      },
+      "restart_wait_seconds": 65,
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": "nats_live_20260701T145851Z_44b1cf6d_restart_path_427aeaff",
+      "timestamp": "2026-07-01T14:59:59Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d:restart_path:nats_live_20260701T145851Z_44b1cf6d_restart_path_427aeaff"
+    },
+    {
+      "agent_id": "governance",
+      "broker_url": "nats://127.0.0.1:4222",
+      "canonical_runtime_truth_nats_task_path": "dharma_swarm.a2a.nats_transport.A2ANatsTransport.publish_task",
+      "checks": {
+        "a2a_send_declares_gate_ineligible": true,
+        "a2a_send_marks_noncanonical": true,
+        "a2a_send_names_canonical_transport": true,
+        "domain_reply_worker_does_not_mint_nats_envelope_v1": true,
+        "domain_reply_worker_uses_domain_receipt_schema": true
+      },
+      "compatibility_publishers_can_satisfy_production_gate": false,
+      "compatibility_surfaces": [
+        {
+          "classification": "operator_contact_compatibility_only",
+          "may_satisfy_production_gate": false,
+          "path": "scripts/runtime/a2a_send.py"
+        },
+        {
+          "classification": "domain_reply_publisher_not_task_transport",
+          "may_mint_nats_envelope_v1": false,
+          "may_satisfy_production_gate": false,
+          "path": "scripts/runtime/a2a_domain_reply_worker.py"
+        }
+      ],
+      "consumer_name": "a2a_task_handler",
+      "gate_enforced_by": [
+        "scripts/governance/check_nats_substrate_contract.py",
+        "scripts/governance/check_nats_live_production_evidence.py",
+        "docs/governance/ACTIVE_TRACK.yaml:nats_live_production_evidence_fresh"
+      ],
+      "message_id": null,
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "compatibility_bypass_contract",
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "task_id": null,
+      "timestamp": "2026-07-01T14:59:59Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d"
+    },
+    {
+      "agent_id": "governance",
+      "broker_url": "nats://127.0.0.1:4222",
+      "consumer_name": "a2a_task_handler",
+      "expected_failure_contains": "missing required rows",
+      "message_id": null,
+      "model_provider_id": "deterministic:local-deterministic",
+      "name": "governance_negative_path",
+      "negative_command": [
+        "/Users/dhyana/dharma_swarm/.venv/bin/python",
+        "/Users/dhyana/ds_a2a_always_on_spine_20260701/scripts/governance/check_nats_live_production_evidence.py",
+        "--evidence",
+        "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/nats-matrix-negative-f7gcgztg/tampered.json",
+        "--max-age-hours",
+        "999999"
+      ],
+      "negative_return_code": 1,
+      "negative_stderr": "NATS_LIVE_PRODUCTION_EVIDENCE_FAILED EvidenceError: missing required rows: ['happy_path', 'governance_negative_path']\n",
+      "negative_stdout": "",
+      "status": "pass",
+      "stream_name": "DS_TASKS",
+      "tamper_description": "removed the required happy_path row from otherwise fresh live evidence",
+      "tampered_row_removed": "happy_path",
+      "task_id": null,
+      "timestamp": "2026-07-01T14:59:59Z",
+      "trace_id": "nats-live-20260701T145851Z-44b1cf6d"
+    }
+  ],
+  "run_id": "nats-live-20260701T145851Z-44b1cf6d",
+  "runtime_db": "/Users/dhyana/ds_a2a_always_on_spine_20260701/reports/governance/nats_live_production_matrix/nats-live-20260701T145851Z-44b1cf6d/runtime_state.sqlite",
+  "schema": "dharma.nats.live_production_matrix.v1",
+  "source_fingerprints": {
+    "dharma_swarm/a2a/a2a_bridge.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.129840Z",
+      "sha256": "c4403be7916d85a54b7ca7fa2d833383ab05b299285a4b2e0b082071997ff4c6",
+      "size": 16436
+    },
+    "dharma_swarm/a2a/a2a_cloud_contact.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:56:09.207498Z",
+      "sha256": "8e67b78b4c5e815308b4f64632de641aece34b2f27d53cbcc5ff3a4caebc050e",
+      "size": 6668
+    },
+    "dharma_swarm/a2a/a2a_server.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.130264Z",
+      "sha256": "4b7cb34a2a96dc5ea53d5ada1df0110dd483ad4cf5602c757b5b2fc84f75d2cf",
+      "size": 26197
+    },
+    "dharma_swarm/a2a/nats_transport.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.130582Z",
+      "sha256": "66ddbeb42d2925478768764b54f9d9551e4b5e053238c4809a3b6cac0e70e0a2",
+      "size": 39152
+    },
+    "dharma_swarm/operator_core/nats_live_contact.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.130971Z",
+      "sha256": "c728f8064477894295407ea7b32727ae4f5a0c57e932836965afceecf2bac202",
+      "size": 8126
+    },
+    "dharma_swarm/operator_core/nats_substrate_status.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:19.062182Z",
+      "sha256": "dde9020f72ca67a1ac99296e366192ced80297f03c617a71c28c61323d302446",
+      "size": 5687
+    },
+    "dharma_swarm/runtime_state.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.131460Z",
+      "sha256": "5b8fc39132574e08fccf1c9b4cc1fd600467e07be3fbb5878014f8602ceaff97",
+      "size": 146864
+    },
+    "docs/governance/ACTIVE_TRACK.yaml": {
+      "exists": true,
+      "mtime": "2026-07-01T14:51:09.598444Z",
+      "sha256": "d925975620dc2d4cdefdb832ed9727bed63afeb3fe557abf1cb80456e19028c8",
+      "size": 41603
+    },
+    "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:19.127762Z",
+      "sha256": "6ed8a1221d4964978affe4510160f23cd6ded7b7aa4326ae1e49c10600dd342e",
+      "size": 14746
+    },
+    "scripts/governance/check_nats_live_production_evidence.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.136264Z",
+      "sha256": "fc274e657daf025d203b5fc9607cea769c213c78ef777e82e7c81cda68d2b9c2",
+      "size": 20243
+    },
+    "scripts/governance/check_nats_substrate_contract.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.136907Z",
+      "sha256": "a6a2207b21b907a742bcd11cfa0ea0410c4748a3f5bd79029d1ffa1ad89e7bb8",
+      "size": 17241
+    },
+    "scripts/governance/check_track_status.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:41.137763Z",
+      "sha256": "342c322e778131eb6216d3d77c3b9f6e095e683e3c825777bd60396779c9b6c8",
+      "size": 83858
+    },
+    "scripts/governance/run_nats_live_production_matrix.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:58:23.074691Z",
+      "sha256": "7025971de92402228310c44adc0825c498d57e69b0e161a3e6923b2afe492e0c",
+      "size": 57989
+    },
+    "scripts/runtime/a2a_domain_reply_worker.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:19.374478Z",
+      "sha256": "8255cb1f3f36355bfeddd82b497cdbc18405144612ef1cfb58aa7c2e8715b7e0",
+      "size": 20071
+    },
+    "scripts/runtime/a2a_inbox_bridge.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:19.374630Z",
+      "sha256": "daa714e62cb321345e11f65afd24012edf9e398f722465e3e5c3763f46825530",
+      "size": 16355
+    },
+    "scripts/runtime/a2a_reply_capture.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:49:19.374715Z",
+      "sha256": "68fac6a858525ce35eb23a0732f428fcd82a3c227faf08f7409fb5cc4571693e",
+      "size": 15754
+    },
+    "scripts/runtime/a2a_send.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:51:38.202139Z",
+      "sha256": "f6b738c42615bece966dcdd1f908dc3117d395439602bf5131839b9763e6d3f6",
+      "size": 33241
+    },
+    "tests/test_a2a_cloud_contact.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:56:09.208973Z",
+      "sha256": "e618718df674c91c8ecb8b445a62f1be22cde72b68dff8b39cdb851d602188ca",
+      "size": 6368
+    },
+    "tests/test_nats_substrate_contract.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:58:35.794066Z",
+      "sha256": "ab5082b739c35bdeefd16dbb6761e4d8f901ef1104c268a60932d7ec21f5ce0b",
+      "size": 8961
+    },
+    "tests/test_nats_transport.py": {
+      "exists": true,
+      "mtime": "2026-07-01T14:51:59.742962Z",
+      "sha256": "98f33da49d6192f5b4af762f6d2679bcc9a2e36340314b9e7a44ef9010107721",
+      "size": 24044
+    }
+  },
+  "status": "pass",
+  "stream_name": "DS_TASKS"
+}

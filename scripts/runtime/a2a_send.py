@@ -19,6 +19,11 @@ terminal status:
 
 Consumers signal consumption/reply by publishing any payload to the ack/reply
 subjects named in the envelope.
+
+This is a compatibility/operator contact surface. It is not the canonical
+Runtime Truth NATS task path, cannot publish to ``DS_TASKS`` on behalf of
+``A2ANatsTransport.publish_task``, and its receipts cannot satisfy production
+readiness gates for ``runtime-truth-nats-2026-06``.
 """
 
 from __future__ import annotations
@@ -77,6 +82,11 @@ ACK_TIER_CORE_FLUSH_ONLY = "CORE_FLUSH_ONLY"
 ACK_TIER_HANDLER_ACKED = "HANDLER_ACKED"
 ROUTE_A2A = "a2a"
 ROUTE_AGENT_INBOX = A2A_INBOX_ROUTE_ALIAS
+CANONICAL_RUNTIME_TRUTH_NATS_TASK_PATH = False
+COMPATIBILITY_NATS_BYPASS_CLASS = (
+    "operator_contact_compatibility_only;"
+    " cannot_satisfy_runtime_truth_nats_production_gate"
+)
 
 
 def _validate_subject_token(token: str, *, label: str) -> str:
@@ -794,6 +804,13 @@ def main(argv: list[str] | None = None) -> int:
         "file": envelope["file"],
         "sha256": envelope["sha256"],
         "nats": _redacted_nats_config(config),
+        "production_contract": {
+            "canonical_runtime_truth_nats_task_path": CANONICAL_RUNTIME_TRUTH_NATS_TASK_PATH,
+            "compatibility_bypass_class": COMPATIBILITY_NATS_BYPASS_CLASS,
+            "production_readiness_claim_allowed": False,
+            "canonical_transport": "A2ANatsTransport.publish_task",
+            "canonical_stream": "DS_TASKS",
+        },
     }
     runtime_dispatch: dict[str, Any] | None = None
     if config.missing or not config.endpoint:

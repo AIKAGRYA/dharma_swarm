@@ -1,0 +1,15 @@
+{
+  "content": "{\"digest\": \"1bc2816bb6fb83c0\", \"mode\": \"deterministic_transport_probe\", \"ok\": true, \"task_id\": \"nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30\"}",
+  "provider": "deterministic",
+  "requested_model": "local-deterministic",
+  "response_model": "local-deterministic",
+  "schema": "dharma.nats.live_matrix.semantic_receipt.v1",
+  "started_at": "2026-07-01T14:58:51Z",
+  "task_id": "nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+  "timestamp": "2026-07-01T14:58:51Z",
+  "trace_id": "nats-live-20260701T145851Z-44b1cf6d:happy_path:nats_live_20260701T145851Z_44b1cf6d_happy_path_e8d68f30",
+  "usage": {
+    "completion_chars": 96,
+    "prompt_chars": 199
+  }
+}
