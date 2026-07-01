@@ -23,7 +23,13 @@ SENSITIVE_FILES = (
     ROOT / "dharma_swarm" / "terminal_commands" / "evolution.py",
 )
 FALSE_KEYWORDS = {"shadow", "shadow_mode"}
-LIVE_APPLY_CALLS = {"auto_evolve", "apply_sealed_packet", "apply_diff_and_test", "DGMLoop"}
+LIVE_APPLY_CALLS = {
+    "auto_evolve",
+    "apply_sealed_packet",
+    "apply_diff_and_test",
+    "commit_if_worthy",
+    "DGMLoop",
+}
 
 
 def _iter_sensitive_files(root: Path = ROOT) -> list[Path]:
@@ -85,6 +91,14 @@ def check_file(path: Path) -> list[str]:
         name = _call_name(node)
         if name not in LIVE_APPLY_CALLS:
             continue
+        if name == "commit_if_worthy":
+            keyword_names = {kw.arg for kw in node.keywords if kw.arg}
+            required = {"promotion_verification", "trusted_judge_public_keys"}
+            missing = sorted(required - keyword_names)
+            if missing:
+                findings.append(
+                    f"{rel}:{node.lineno}: commit_if_worthy missing signed promotion args: {', '.join(missing)}"
+                )
         for kw in node.keywords:
             if kw.arg in FALSE_KEYWORDS and _is_false_constant(kw.value):
                 findings.append(

@@ -1634,6 +1634,37 @@ async def test_auto_evolve_refuses_untrusted_judge_signature(engine, tmp_path, m
     assert "verify_promotion packet required" in result.reflection
 
 
+async def test_commit_if_worthy_requires_signed_promotion_verdict(engine, tmp_path, monkeypatch):
+    proposal = Proposal(
+        component="target.py",
+        change_type="mutation",
+        description="direct commit bypass attempt",
+        diff=(
+            "diff --git a/target.py b/target.py\n"
+            "--- a/target.py\n"
+            "+++ b/target.py\n"
+            "@@\n"
+            "-old\n"
+            "+new\n"
+        ),
+        actual_fitness=FitnessScore(correctness=1.0, safety=1.0),
+    )
+
+    async def explode_subprocess(*_args, **_kwargs):
+        raise AssertionError("commit bypass must refuse before any git subprocess")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", explode_subprocess)
+
+    result = await engine.commit_if_worthy(
+        proposal,
+        fitness_threshold=0.1,
+        workspace=tmp_path,
+        promotion_verification=_unsigned_allow_live_packet(),
+    )
+
+    assert result is None
+
+
 async def test_run_cycle_circuit_breaker_after_repeated_failures(engine):
     proposals = [
         _harmful_proposal(component="danger.py", description="rm -rf everything"),

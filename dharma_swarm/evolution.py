@@ -3465,6 +3465,8 @@ class DarwinEngine:
         proposal: Proposal,
         fitness_threshold: float = 0.6,
         workspace: Path | None = None,
+        promotion_verification: dict[str, Any] | None = None,
+        trusted_judge_public_keys: Iterable[str | bytes] = (),
     ) -> str | None:
         """Git commit a proposal's changes if fitness exceeds threshold.
 
@@ -3472,10 +3474,21 @@ class DarwinEngine:
             proposal: An evaluated, archived proposal.
             fitness_threshold: Minimum weighted fitness to commit.
             workspace: Git repo root. Defaults to ~/dharma_swarm.
+            promotion_verification: Signed Forge verify_promotion verdict.
+            trusted_judge_public_keys: Judge public keys accepted for the verdict.
 
         Returns:
             Commit hash if committed, None otherwise.
         """
+        if not _promotion_verification_allows_live(
+            promotion_verification,
+            trusted_judge_public_keys=trusted_judge_public_keys,
+        ):
+            logger.warning(
+                "Refusing to auto-commit proposal %s without signed promotion verification",
+                proposal.id,
+            )
+            return None
         if proposal.actual_fitness is None:
             return None
         weighted_fitness = self.score_fitness(proposal.actual_fitness)
@@ -3668,7 +3681,10 @@ class DarwinEngine:
                                 actual_fitness=entry.fitness,
                             )
                             commit = await self.commit_if_worthy(
-                                p, fitness_threshold=fitness_threshold
+                                p,
+                                fitness_threshold=fitness_threshold,
+                                promotion_verification=promotion_verification,
+                                trusted_judge_public_keys=trusted_judge_public_keys,
                             )
                             if commit:
                                 committed += 1

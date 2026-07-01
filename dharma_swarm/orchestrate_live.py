@@ -638,18 +638,6 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                             mode_label = "shadow" if _shadow else "LIVE"
                             _log("evolution", f"Auto-evolve ({mode_label}): {[s.name for s in selected]}")
 
-                            # Create darwin branch for live mutation
-                            if not _shadow:
-                                _branch = f"darwin/cycle-{cycle_count}"
-                                _br_proc = await asyncio.create_subprocess_exec(
-                                    "git", "checkout", "-b", _branch,
-                                    cwd=str(_src_root.parent),
-                                    stdout=asyncio.subprocess.PIPE,
-                                    stderr=asyncio.subprocess.PIPE,
-                                )
-                                await _br_proc.communicate()
-                                _log("evolution", f"Created branch {_branch}")
-
                             result = await engine.auto_evolve(
                                 provider=provider,
                                 source_files=selected,
@@ -666,49 +654,9 @@ async def run_evolution_loop(shutdown_event: asyncio.Event) -> None:
                                 f"gated={result.proposals_gated}",
                             )
 
-                            # For live mode: commit worthy proposals, then return to main branch
-                            if not _shadow and result.proposals_archived > 0:
-                                _committed = 0
-                                _best_entries = await engine.archive.get_best(n=3)
-                                for entry in _best_entries:
-                                    # Build a Proposal from ArchiveEntry for commit_if_worthy
-                                    from dharma_swarm.evolution import Proposal
-                                    _p = Proposal(
-                                        id=entry.id,
-                                        component=entry.component,
-                                        change_type=entry.change_type,
-                                        description=entry.description,
-                                        diff=entry.diff,
-                                        actual_fitness=entry.fitness,
-                                    )
-                                    sha = await engine.commit_if_worthy(_p)
-                                    if sha:
-                                        _committed += 1
-                                        _log("evolution", f"Committed {sha[:8]} for {entry.component}")
-                                if _committed == 0:
-                                    # No commits — delete the branch
-                                    _del_proc = await asyncio.create_subprocess_exec(
-                                        "git", "checkout", "-",
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                    await _del_proc.communicate()
-                                    await asyncio.create_subprocess_exec(
-                                        "git", "branch", "-D", _branch,
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                else:
-                                    # Return to previous branch, keep darwin branch
-                                    await asyncio.create_subprocess_exec(
-                                        "git", "checkout", "-",
-                                        cwd=str(_src_root.parent),
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.PIPE,
-                                    )
-                                _log("evolution", f"Live cycle: {_committed} commits on {_branch}")
+                            # Live commits are intentionally absent here. A live
+                            # mutation must enter through forge_v2.verify_promotion
+                            # and a signed promotion packet.
                     else:
                         _log("evolution", "Auto-evolve skipped: OPENROUTER_API_KEY not set")
                 except Exception as exc:
