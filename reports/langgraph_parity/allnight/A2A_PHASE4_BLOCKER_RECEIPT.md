@@ -56,6 +56,7 @@ Both moved from `expired` to `blocked_verified` using their existing valid `a2a_
 - `ts-hb0631-credit`
 - `ts-pr-babysit-div-20260610`
 - `yatagarasu-10cceaa8`
+
 - `yatagarasu-20260619-credit-monitor`
 - `yatagarasu-20260619-gap-scan-fix`
 - `yatagarasu-20260619-staging-decay`
@@ -306,6 +307,49 @@ The strict A2A gate is still not green. Remaining blockers are 10 open or claime
 - `reconcile-564-565-20260611`
 - `sab-flywheel-d01-qwen-code-first-spark`
 - `tam-wp-wp_dfa4e1134277`
+- `ts-hb0631-credit`
+- `ts-pr-babysit-div-20260610`
+- `yatagarasu-10cceaa8`
+
+## 2026-07-01 Addendum: SAB Qwen And TAM Darshan Updates
+
+Later Phase 4 slices further reduced the open/claimed blocker set:
+
+- `scripts/governance/a2a_block_sab_qwen_runtime_blockers.py` blocked `sab-flywheel-d01-qwen-code-first-spark` only after verifying that the exact expected Qwen-owned semantic receipt was absent and related SAB semantic refusal receipts proved target runtime/provider unavailability.
+- `tam-wp-wp_dfa4e1134277` was executed directly because the row requested an internal read-only source-pack outline from existing Darshan notes and explicitly forbade outreach, publishing, CMS/paywall work, and exposing the engine to readers.
+
+TAM receipts and artifacts:
+
+- `reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md`
+- `reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json`
+- `reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json`
+
+Live queue backup before TAM mutation:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-tam-darshan-complete-20260701T061529Z.bak`
+
+TAM result:
+
+- Confirmed no pre-existing `reports/tam/packets/darshan-publication/` deliverable existed in this worktree or `/Users/dhyana/dharma_swarm`.
+- Created one outline file listing 8 existing local Darshan source atoms with one-line why-it-matters notes.
+- Built a valid `dharma_a2a_task_receipt.v1` receipt with the outline artifact as evidence.
+- Claimed the unassigned row as `codex_composer`.
+- Closed `tam-wp-wp_dfa4e1134277` as `completed_verified`.
+- Receipt mirrors were written to the `codex_composer` and `tam_operator` inboxes.
+
+Current Phase 4 result:
+
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2 with `ready=false`, `open_tasks=8`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit reports `blocker_count=8`: 5 stale claimed rows and 3 stale unclaimed rows.
+
+Remaining Phase 4 blockers:
+
+- `forge-v0.1-001`
+- `holon-plan-review-cursor-20260612`
+- `holon-plan-review-opus-20260612`
+- `l1-fx-001`
+- `reconcile-564-565-20260611`
 - `ts-hb0631-credit`
 - `ts-pr-babysit-div-20260610`
 - `yatagarasu-10cceaa8`

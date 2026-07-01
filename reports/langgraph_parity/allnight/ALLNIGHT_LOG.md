@@ -976,3 +976,34 @@
   - Remaining A2A blockers: `forge-v0.1-001`, `holon-plan-review-cursor-20260612`, `holon-plan-review-opus-20260612`, `l1-fx-001`, `reconcile-564-565-20260611`, `tam-wp-wp_dfa4e1134277`, `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, and `yatagarasu-10cceaa8`.
   - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T06:15:29Z - Phase 4 TAM Darshan Source-Pack Completion
+
+- Target gate result: partial success. A2A strict remains red, but the stale unclaimed `tam-wp-wp_dfa4e1134277` work packet is now `completed_verified` with a valid embedded A2A task receipt.
+- Task executed:
+  - The row asked for one internal read-only source-pack outline from existing Darshan notes for room `darshan-publication`.
+  - The task forbade live autonomy, external outreach, exposing the engine to readers, autonomous publishing, paywall/CMS work, and publishing without operator review.
+  - No forbidden action was performed; this slice only created the local outline artifact.
+- Generated artifacts:
+  - `reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md`
+  - `reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json`
+  - `reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json`
+- Live queue handling:
+  - Confirmed no pre-existing TAM deliverable directory existed in this worktree or `/Users/dhyana/dharma_swarm`.
+  - Built and validated a `dharma_a2a_task_receipt.v1` receipt with the outline artifact and 8 local Darshan source atoms as evidence.
+  - Backed up the queue before mutation at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-tam-darshan-complete-20260701T061529Z.bak`.
+  - Claimed the unassigned row as `codex_composer`, then closed it as `completed`.
+  - Receipt mirrors were written to `/Users/dhyana/.dharma/a2a_bus/inboxes/codex_composer/receipt_tam-wp-wp_dfa4e1134277.json` and `/Users/dhyana/.dharma/a2a_bus/inboxes/tam_operator/receipt_tam-wp-wp_dfa4e1134277_from_codex_composer.json`.
+- A2A readiness result:
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still exits 2, now with `ready=false`, `open_tasks=8`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Fresh blocker audit reports `blocker_count=8`: 5 stale claimed rows and 3 stale unclaimed rows.
+  - Remaining A2A blockers: `forge-v0.1-001`, `holon-plan-review-cursor-20260612`, `holon-plan-review-opus-20260612`, `l1-fx-001`, `reconcile-564-565-20260611`, `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, and `yatagarasu-10cceaa8`.
+- Verification so far:
+  - `make onboard` -> pass; known governance projection churn restored.
+  - `bash scripts/runtime/codex_toolbelt_status.sh` -> pass with optional credential/tool warnings only.
+  - `.venv/bin/python -m json.tool reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json` -> pass.
+  - `.venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle claim tam-wp-wp_dfa4e1134277 --agent-uid codex_composer` -> claimed row and mirrored inbox task.
+  - `.venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle close tam-wp-wp_dfa4e1134277 --agent-uid codex_composer --status completed --receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json` -> completed row with `receipt_validation.valid=true`.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json` -> `blocker_count=8`.
+- Scoreboard: raised conservatively to `95/100`; still explicitly not 100/100.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T05:49:32Z",
+  "updated_at": "2026-07-01T06:16:31Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 94,
+    "current": 95,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A reconciliation plus replayable blocker audit plus semantic-receipt, legacy-proof, explicit operator-gated stale-row, verified duplicate open-row, and SAB Qwen runtime-blocker adapters that reduced unverified closed rows from 19 to 0 and open/claimed rows from 17 to 9, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, a direct live provider matrix falsification receipt, and a model-status live-probe overlay that prevents failed probed routes from remaining advertised as live-routable when an operator supplies the closeout receipt. Phase 7 runtime platform API/cockpit surfaces include runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green is still blocked by 9 open/claimed rows, and automatic production provider quarantine/freshness policy plus closeout gitleaks governance remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, Phase 4 A2A reconciliation plus replayable blocker audit plus semantic-receipt, legacy-proof, explicit operator-gated stale-row, verified duplicate open-row, SAB Qwen runtime-blocker, and TAM Darshan source-pack task completion evidence that reduced unverified closed rows from 19 to 0 and open/claimed rows from 17 to 8, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, a direct live provider matrix falsification receipt, and a model-status live-probe overlay that prevents failed probed routes from remaining advertised as live-routable when an operator supplies the closeout receipt. Phase 7 runtime platform API/cockpit surfaces include runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green is still blocked by 8 open/claimed rows, and automatic production provider quarantine/freshness policy plus closeout gitleaks governance remain failing or unproven."
   },
   "rounds": [
     {
@@ -910,6 +910,40 @@
         "Fresh blocker audit count is 9: 5 stale claimed rows and 4 stale unclaimed rows.",
         "The SAB Qwen row was blocked, not completed; the receipt explicitly claims no Qwen completion or live-post success."
       ]
+    },
+    {
+      "id": "phase-4-tam-darshan-source-pack-completion",
+      "timestamp": "2026-07-01T06:15:29Z",
+      "status": "completed_partial",
+      "target_gate": "Execute the unclaimed TAM Darshan publication work packet with a local read-only source-pack outline and valid A2A completion receipt",
+      "files_touched": [
+        "reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md",
+        "reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json",
+        "reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json",
+        "reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+        "reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md"
+      ],
+      "tests_run": [
+        "make onboard",
+        "bash scripts/runtime/codex_toolbelt_status.sh",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        "find reports/tam/packets/darshan-publication -maxdepth 2 -type f -print",
+        "find /Users/dhyana/dharma_swarm/reports/tam/packets/darshan-publication -maxdepth 2 -type f -print",
+        ".venv/bin/python -m json.tool reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json",
+        ".venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle claim tam-wp-wp_dfa4e1134277 --agent-uid codex_composer",
+        ".venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle close tam-wp-wp_dfa4e1134277 --agent-uid codex_composer --status completed --receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json",
+        ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+        ".venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=8, unknown_status_tasks=0, unverified_closed_tasks=0.",
+        "Remaining A2A blockers: forge-v0.1-001, holon-plan-review-cursor-20260612, holon-plan-review-opus-20260612, l1-fx-001, reconcile-564-565-20260611, ts-hb0631-credit, ts-pr-babysit-div-20260610, yatagarasu-10cceaa8.",
+        "Provider truth remains partial because live-probe quarantine/freshness is still operator-selected rather than automatic production policy.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -922,7 +956,7 @@
     "phase_2_default_spine_dispatch": "passed_slice_default_on_and_receipt_persisted",
     "phase_3_live_topologies": "passed_dispatch_metadata_plus_restart_readable_swarm_supervisor_and_subagents_proofs",
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_supervisor_final_output_and_subagents_child_runs",
-    "phase_4_a2a_strict_green": "failed_partial_receipts_adapted_operator_gated_duplicate_sab_qwen_blocked_unknown_0_open_9_unverified_0_audit_blocker_count_9",
+    "phase_4_a2a_strict_green": "failed_partial_receipts_adapted_operator_gated_duplicate_sab_qwen_blocked_tam_completed_unknown_0_open_8_unverified_0_audit_blocker_count_8",
     "phase_5_memory_live_retrieval": "passed_current_executable_lane_text_query_topology_agent_isolation_stale_rejection_retrieval_telemetry_curated_source_coverage_tool_exposure_metadata_isolation",
     "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_and_live_probe_receipt_overlay_removes_failed_routes_when_operator_supplies_receipt",
     "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_and_fresh_process_resume_api_cockpit_partial"
@@ -965,9 +999,10 @@
       "langgraph_parity": "20 passed in 0.37s",
       "quality_ratchet": "passed; modules_over_500_lines 207/207, boundary_unfrozen_records 7/7",
       "spine_dispatch_mode_report_strict": "passed",
-      "a2a_readiness_strict": "failed exit 2 before reconciliation: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19; failed exit 2 after embedded receipt reconciliation: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19; failed exit 2 after semantic receipt adapter: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=1; failed exit 2 after legacy proof recovery: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after operator-gated block: open_tasks=11, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after verified duplicate block: open_tasks=10, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after SAB Qwen runtime block: open_tasks=9, unknown_status_tasks=0, unverified_closed_tasks=0",
+      "a2a_readiness_strict": "failed exit 2 before reconciliation: open_tasks=19, unknown_status_tasks=2, unverified_closed_tasks=19; failed exit 2 after embedded receipt reconciliation: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19; failed exit 2 after semantic receipt adapter: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=1; failed exit 2 after legacy proof recovery: open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after operator-gated block: open_tasks=11, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after verified duplicate block: open_tasks=10, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after SAB Qwen runtime block: open_tasks=9, unknown_status_tasks=0, unverified_closed_tasks=0; failed exit 2 after TAM Darshan completion: open_tasks=8, unknown_status_tasks=0, unverified_closed_tasks=0",
       "agent_build_preflight": "passed three times; latest run compileall clean, F821 clean, 12349 tests collected, onboard OK, hygiene integrity OK",
-      "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits"
+      "agent_build_closeout": "failed exit 2; semgrep skipped because it is not installed on PATH; gitleaks found 68 redacted findings after scanning 2720 commits",
+      "a2a_tam_darshan_publication_completion": "Created reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md from 8 existing Darshan wiki/source atoms; wrote validated receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json; backed up live queue to /Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-tam-darshan-complete-20260701T061529Z.bak; claimed and completed tam-wp-wp_dfa4e1134277 as codex_composer; check_a2a_readiness.py --strict still fails with open_tasks=8, unknown_status_tasks=0, unverified_closed_tasks=0; fresh blocker audit reports 5 stale claimed and 3 stale unclaimed rows."
     }
   }
 }

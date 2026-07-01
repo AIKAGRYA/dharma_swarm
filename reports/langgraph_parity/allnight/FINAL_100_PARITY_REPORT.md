@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **94/100**.
+Current score: **95/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime multi-process resume proof, Phase 6 live-provider matrix closeout, model-status overlay artifacts, and Phase 4 semantic/legacy-proof/operator-gated/verified-duplicate/SAB-Qwen runtime-blocker A2A adapters on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof, Phase 6 live-provider matrix closeout, model-status overlay artifacts, and Phase 4 semantic/legacy-proof/operator-gated/verified-duplicate/SAB-Qwen runtime-blocker adapters plus TAM Darshan work-packet completion on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -36,6 +36,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A terminal receipt adaptation now closes the previously audited unverified-closed blocker classes. `scripts/governance/a2a_adapt_semantic_receipts.py` adapted 18 already-terminal validated `sab.semantic_receipt.v1` rows into embedded `dharma_a2a_task_receipt.v1` receipts, preserving the source semantic artifact as receipt evidence. `scripts/governance/a2a_recover_legacy_proof_receipts.py` then recovered the completed `ts-converge-0611` legacy proof-pointer row into an embedded A2A receipt while leaving the duplicate pending mandate row open. A2A strict still fails, but unverified closed rows dropped from 19 to 0.
 - A2A operator-gated stale row blocking now closes six explicit operator-gate rows as valid `blocked_verified` rows. `scripts/governance/a2a_block_operator_gated_tasks.py` is dry-run-first and only targets stale non-terminal rows containing explicit operator-gate phrases such as `operator-gated`, `operator approval required`, or `operator sign-off`; it does not block ordinary stale work or generic forbidden-action wording. A2A strict still fails, but open/claimed rows dropped from 17 to 11.
 - A2A verified-duplicate and SAB-Qwen runtime-blocker adapters now close two more proof-backed stale rows. `scripts/governance/a2a_block_verified_duplicate_open_rows.py` blocked only the open duplicate `ts-converge-0611` row whose same task id already had a terminal verified row. `scripts/governance/a2a_block_sab_qwen_runtime_blockers.py` then blocked `sab-flywheel-d01-qwen-code-first-spark` only after verifying the exact expected Qwen-owned receipt was absent and related SAB semantic refusal receipts proved Qwen CLI/provider runtime unavailability. A2A strict still fails, but open/claimed rows dropped from 11 to 9.
+- The TAM Darshan work packet `tam-wp-wp_dfa4e1134277` is now completed rather than blocked. The task asked for an internal read-only source-pack outline from existing Darshan notes, so this branch added `reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md`, generated a valid `dharma_a2a_task_receipt.v1` receipt, claimed the unassigned row as `codex_composer`, and closed it as `completed_verified`. A2A strict still fails, but open/claimed rows dropped from 9 to 8.
 
 ## Verification
 
@@ -283,13 +284,19 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
 - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
 - `git diff --check` -> pass.
+- Phase 4 TAM Darshan source-pack completion: added `reports/tam/packets/darshan-publication/SOURCE_PACK_OUTLINE_wp_dfa4e1134277.md` from existing local Darshan notes and generated a validated A2A receipt.
+- `.venv/bin/python -m json.tool reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_20260701T061529Z.json` -> pass.
+- `.venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle claim tam-wp-wp_dfa4e1134277 --agent-uid codex_composer` -> claimed and mirrored the unassigned row.
+- `.venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle close tam-wp-wp_dfa4e1134277 --agent-uid codex_composer --status completed --receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json` -> completed row with `receipt_validation.valid=true`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` after TAM completion -> fail exit 2; `ready=false`, `open_tasks=8`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json` -> pass; `blocker_count=8`.
 
 ## Failing Gates
 
-- A2A strict readiness: `ready=false`, `open_tasks=9`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
+- A2A strict readiness: `ready=false`, `open_tasks=8`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
 - A2A remaining blocker receipt: `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`; replayable JSON audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`.
-- A2A fresh blocker audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T054014Z_after_sab_qwen.json`.
-- A2A blocker audit classification after semantic, legacy-proof, operator-gated, verified-duplicate, and SAB-Qwen runtime-blocker adaptation: 5 stale claimed rows without terminal receipts and 4 stale unclaimed rows. The 18 valid SAB semantic receipt rows, the completed `ts-converge-0611` proof-pointer row, six explicit operator-gated stale rows, one same-id verified duplicate open row, and one SAB Qwen runtime-blocked row are now embedded A2A-verified.
+- A2A fresh blocker audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json`.
+- A2A blocker audit classification after semantic, legacy-proof, operator-gated, verified-duplicate, SAB-Qwen runtime-blocker, and TAM Darshan completion work: 5 stale claimed rows without terminal receipts and 3 stale unclaimed rows. The 18 valid SAB semantic receipt rows, the completed `ts-converge-0611` proof-pointer row, six explicit operator-gated stale rows, one same-id verified duplicate open row, one SAB Qwen runtime-blocked row, and the TAM Darshan source-pack row are now embedded A2A-verified.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
 - Provider truth: partial after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix proves several routes work. The model-status overlay now prevents failed probed routes from remaining advertised as live when an operator supplies the closeout receipt. The full gate is still not green because the overlay is not yet an automatic production freshness/quarantine policy, Claude Code needs retest/quarantine, and A2A strict readiness remains red.
@@ -297,7 +304,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 
 ## Next Patch Sequence
 
-1. Continue the safe A2A blocker closure workflow for the remaining 9 blockers: verify/close the 5 stale claimed rows and 4 stale unclaimed rows with task-specific receipts, duplicate/supersession evidence, semantic refusal receipts, or explicit blocked receipts; rerun `check_a2a_readiness.py --strict`.
+1. Continue the safe A2A blocker closure workflow for the remaining 8 blockers: verify/close the 5 stale claimed rows and 3 stale unclaimed rows with task-specific receipts, duplicate/supersession evidence, semantic refusal receipts, or explicit blocked receipts; rerun `check_a2a_readiness.py --strict`.
 2. Promote provider-truth overlay from operator-selected receipt input to a safe production policy with freshness/expiry semantics, then retest or quarantine Claude Code timeouts.
 3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
 4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
