@@ -1,0 +1,90 @@
+{
+  "schema_version": "context-packet-index-v1",
+  "generated_at": "2026-06-30T00:00:00Z",
+  "research_cutoff": "late June 2026",
+  "repo_root": "/Users/dhyana/dharma_swarm",
+  "repo_head_observed": "f1f3e140e3",
+  "packet_directory": "docs/context_engineering/packets",
+  "packets": [
+    {
+      "id": "ctx.command-plane-governance",
+      "file": "packets/01_command_plane_governance.md",
+      "aliases": ["onboard", "orientation", "active track", "governance", "first token"],
+      "primary_surfaces": ["CLAUDE.md", "AGENTS.md", "scripts/governance/agent_onboard.py", "scripts/governance/orientation_graph.py", "docs/governance/ACTIVE_TRACK.yaml"],
+      "commands": ["make onboard", "make orient", "python3 scripts/governance/check_track_status.py"],
+      "authority": "read-only projection over owners"
+    },
+    {
+      "id": "ctx.runtime-spine-a2a-nats",
+      "file": "packets/02_runtime_spine_a2a_nats.md",
+      "aliases": ["spine", "A2A", "NATS", "dispatch", "runtime truth", "receipts"],
+      "primary_surfaces": ["dharma_swarm/spine/**", "dharma_swarm/a2a/**", "dharma_swarm/operator_core/**", "docs/governance/NATS_SUBSTRATE_MASTER_SPEC.md"],
+      "commands": ["make onboard", "python3 scripts/governance/spine_bypass_report.py", "pytest tests/test_spine_persistence_invariant.py"],
+      "authority": "receipts and transport contracts"
+    },
+    {
+      "id": "ctx.memory-semantic-commons",
+      "file": "packets/03_memory_semantic_commons.md",
+      "aliases": ["memory", "wiki", "vector", "semantic commons", "retrieval", "context"],
+      "primary_surfaces": ["dharma_swarm/memory_retrieval.py", "dharma_swarm/wiki_vector_ingest.py", "docs/ontology/**", "reports/memory_kernel/**"],
+      "commands": ["make onboard", "python3 scripts/memory_retrieval_system_gate.py", "python3 scripts/wiki_vector_live_gate.py"],
+      "authority": "governed retrieval projection plus ontology owners"
+    },
+    {
+      "id": "ctx.persistent-agent-holons",
+      "file": "packets/04_persistent_agent_holons.md",
+      "aliases": ["holon", "persistent agent", "codex composer", "tmux", "wake loop", "agent hierarchy"],
+      "primary_surfaces": ["docs/ops/TMUX_AGENT_SUBSTRATE.md", "dharma_swarm/holon_*", "scripts/runtime/codex_composer_wake_loop.py", "reports/agentops/**"],
+      "commands": ["make onboard", "make tmux-status", "dgc agent list"],
+      "authority": "agent registry, health rows, receipts, and tmux as inspectable substrate only"
+    },
+    {
+      "id": "ctx.sab-flywheel",
+      "file": "packets/05_sab_flywheel.md",
+      "aliases": ["SAB", "Dharmic Agora", "flywheel", "First Spark", "agent community"],
+      "primary_surfaces": ["reports/sab_first_six_agent_flywheel/**", "docs/missions/SAB_DHARMIC_AGORA_*"],
+      "commands": ["python3 reports/sab_first_six_agent_flywheel/tools/flywheel_status.py", "python3 reports/sab_first_six_agent_flywheel/tools/sab_flywheel_tick.py --insecure-tls"],
+      "authority": "SAB mission contract, witness chain, tick receipts"
+    },
+    {
+      "id": "ctx.venture-external-value",
+      "file": "packets/06_venture_external_value.md",
+      "aliases": ["venture cell", "Darshan", "Livelihood Loom", "Telos", "revenue", "external humans"],
+      "primary_surfaces": ["docs/governance/VENTURE_CELL_PORTFOLIO.yaml", "dharma_swarm/venture_cell/**", "reports/livelihood_loom/**", "reports/telos_ai/**"],
+      "commands": ["make onboard", "python3 -m dharma_swarm.idea_spark.cli health --json"],
+      "authority": "external acted receipts and venture-cell portfolio"
+    },
+    {
+      "id": "ctx.operator-cockpit-terminal-dashboard",
+      "file": "packets/07_operator_cockpit_terminal_dashboard.md",
+      "aliases": ["dashboard", "terminal", "cockpit", "control plane", "API"],
+      "primary_surfaces": ["api/**", "dashboard/**", "terminal/**", "ACTIVE_SURFACE_MANIFEST.yaml", "docs/ops/LIVE_OPS_COCKPIT.md"],
+      "commands": ["make onboard", "npm --prefix dashboard run test", "npm --prefix terminal test"],
+      "authority": "surface manifest plus runtime/API evidence"
+    },
+    {
+      "id": "ctx.model-provider-routing",
+      "file": "packets/08_model_provider_routing.md",
+      "aliases": ["model", "provider", "keys", "dkeys", "Qwen", "OpenAI", "DeepSeek", "routing"],
+      "primary_surfaces": ["docs/ops/MODEL_KEY_ROUTING.md", "dharma_swarm/runtime_provider.py", "dharma_swarm/providers.py", "dharma_swarm/model_pool_registry.py"],
+      "commands": ["make onboard", "dkeys test", "pytest tests/test_runtime_provider.py tests/test_model_key_routing_guard.py"],
+      "authority": "runtime provider resolver and provider telemetry"
+    },
+    {
+      "id": "ctx.cybernetics-loop-closure",
+      "file": "packets/09_cybernetics_loop_closure.md",
+      "aliases": ["cybernetics", "loop closure", "13 loops", "One Wire", "verification"],
+      "primary_surfaces": ["CYBERNETIC_LOOP_MAP.md", "docs/ops/CYBERNETICS_CODEX.md", "reports/loop_closure/**", "dharma_swarm/loop_supervisor.py"],
+      "commands": ["make onboard", "python3 scripts/agentops/verifier_ranker_v0_verify_package.py", "pytest tests/test_telos_morning_refinery.py"],
+      "authority": "loop receipts and closure checks"
+    },
+    {
+      "id": "ctx.docops-hygiene-repo-governance",
+      "file": "packets/10_docops_hygiene_repo_governance.md",
+      "aliases": ["docops", "hygiene", "anti-slop", "precommit", "PR", "repo governance"],
+      "primary_surfaces": ["docs/governance/**", "docs/docops/**", "scripts/governance/**", ".pre-commit-config.yaml"],
+      "commands": ["make onboard", "make hygiene-check", "make docops-integrity", "git diff --check"],
+      "authority": "governance docs, hygiene baselines, CI gates"
+    }
+  ]
+}
