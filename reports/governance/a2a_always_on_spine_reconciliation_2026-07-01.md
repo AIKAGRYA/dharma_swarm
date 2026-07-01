@@ -46,9 +46,9 @@ It does not prove:
 
 Fresh local-live evidence was generated from this branch:
 
-- `reports/governance/nats_live_production_matrix/nats-live-20260701T152205Z-a82fdddb/evidence.json`
+- `reports/governance/nats_live_production_matrix/nats-live-20260701T152842Z-126a62d0/evidence.json`
 - `reports/governance/nats_live_production_matrix/latest.json`
-- `reports/a2a/nats_live_production_matrix/nats-live-20260701T152205Z-a82fdddb/receipts/nats_live_20260701T152205Z_a82fdddb_happy_path_fa4f36bd.semantic_receipt.json`
+- `reports/a2a/nats_live_production_matrix/nats-live-20260701T152842Z-126a62d0/receipts/nats_live_20260701T152842Z_126a62d0_happy_path_8c1a91e5.semantic_receipt.json`
 
 Provider note: the first live matrix attempt failed because `ollama:glm-5.2:cloud` returned a weekly usage-limit error. The passing evidence uses `--provider deterministic --model local-deterministic`; NATS broker delivery remains live against `nats://127.0.0.1:4222`.
 

@@ -28,8 +28,6 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import nats
-
 from dharma_swarm.a2a.a2a_server import A2AMessage, A2AServer, A2ATask, A2ATaskStatus
 from dharma_swarm.a2a.nats_transport import (
     A2ANatsTransport,
@@ -78,6 +76,14 @@ SOURCE_FRESHNESS_PATHS = [
 
 class MatrixFailure(RuntimeError):
     """Raised when a required live matrix row cannot be proven."""
+
+
+def import_nats_client() -> Any:
+    try:
+        import nats
+    except ImportError as exc:
+        raise MatrixFailure("nats-py is required to run the live NATS production matrix") from exc
+    return nats
 
 
 def utc_now() -> str:
@@ -349,7 +355,8 @@ class MatrixRunner:
         self.js: Any = None
 
     async def connect(self) -> None:
-        self.nc = await nats.connect(self.endpoint)
+        nats_client = import_nats_client()
+        self.nc = await nats_client.connect(self.endpoint)
         self.js = self.nc.jetstream()
 
     async def close(self) -> None:
