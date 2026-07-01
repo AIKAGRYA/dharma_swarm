@@ -1,0 +1,124 @@
+{
+  "report_type": "pr_lifecycle_report",
+  "generated_at": "2026-07-01T18:00:32Z",
+  "repo": "AmitabhainArunachala/dharma_swarm",
+  "summary": {
+    "total_open_before": 12,
+    "total_open_after": 12,
+    "auto_closed_count": 0,
+    "mergeable_count": 7,
+    "conflicting_count": 5,
+    "duplicate_auto_grounding_flagged": 0
+  },
+  "auto_closed": [],
+  "conflicting_prs": [
+    {
+      "number": 734,
+      "title": "feat(forge): add offline production contract harness",
+      "created_at": "2026-06-30T22:16:03Z",
+      "age_hours": 19.7,
+      "action": "monitor — not yet 7 days old (threshold: 168h)"
+    },
+    {
+      "number": 732,
+      "title": "feat: persist LangGraph topology runtime state",
+      "created_at": "2026-06-30T16:37:26Z",
+      "age_hours": 25.4,
+      "action": "monitor — not yet 7 days old (threshold: 168h)"
+    },
+    {
+      "number": 723,
+      "title": "routing: canonicalize Forge benchmark lanes",
+      "created_at": "2026-06-29T16:34:57Z",
+      "age_hours": 49.4,
+      "action": "monitor — not yet 7 days old (threshold: 168h)"
+    },
+    {
+      "number": 719,
+      "title": "feat(sis): SEED-1 — carbon-attribution projector over the swarm's own receipts",
+      "created_at": "2026-06-28T08:10:22Z",
+      "age_hours": 81.8,
+      "action": "monitor — not yet 7 days old (threshold: 168h); eligible 2026-07-05T08:10Z"
+    },
+    {
+      "number": 704,
+      "title": "Pudgala Autopoiesis Protostar: graded evidence gate",
+      "created_at": "2026-06-25T23:43:51Z",
+      "age_hours": 114.3,
+      "action": "monitor — not yet 7 days old (threshold: 168h); eligible 2026-07-02T23:43Z"
+    }
+  ],
+  "green_and_ready": [
+    {
+      "number": 746,
+      "title": "docs: declare LangGraph runtime production candidate [impact-checked] [large-diff-ack]",
+      "created_at": "2026-07-01T15:12:38Z",
+      "additions": 31586,
+      "deletions": 373,
+      "changed_files": 148
+    },
+    {
+      "number": 744,
+      "title": "[codex] port always-on A2A NATS spine evidence [impact-checked] [large-diff-ack]",
+      "created_at": "2026-07-01T15:09:55Z",
+      "additions": 9354,
+      "deletions": 256,
+      "changed_files": 38,
+      "note": "spine-adoption PR — spine comment posted"
+    },
+    {
+      "number": 742,
+      "title": "spike: DharmaVerifier-Ranker v0 scaffolding (schemas/redaction/inventory, NOT a training initiative)",
+      "created_at": "2026-07-01T04:28:14Z",
+      "additions": 3077,
+      "deletions": 0,
+      "changed_files": 21
+    },
+    {
+      "number": 740,
+      "title": "Harden Cybernetic Ratchet Loop evidence gates",
+      "created_at": "2026-07-01T03:53:35Z",
+      "additions": 17094,
+      "deletions": 2,
+      "changed_files": 53
+    },
+    {
+      "number": 738,
+      "title": "Agentic Design Patterns: coverage atlas (Slot 4), recurring ingestion, + zeitgeist→memory promotion proposals",
+      "created_at": "2026-07-01T03:09:50Z",
+      "additions": 5749,
+      "deletions": 7,
+      "changed_files": 31
+    },
+    {
+      "number": 737,
+      "title": "[codex] add metabolization sweep ledger",
+      "created_at": "2026-06-30T23:44:53Z",
+      "additions": 2236,
+      "deletions": 16,
+      "changed_files": 7
+    },
+    {
+      "number": 736,
+      "title": "[codex] fix vector fallback scan guard",
+      "created_at": "2026-06-30T23:31:14Z",
+      "additions": 95,
+      "deletions": 2,
+      "changed_files": 3
+    }
+  ],
+  "duplicate_auto_grounding": [],
+  "recommended_actions": [
+    "PR #704 (Pudgala Autopoiesis Protostar) will be eligible for auto-close on 2026-07-02T23:43Z if still CONFLICTING — track it.",
+    "PR #719 (SEED-1 carbon-attribution) will be eligible for auto-close on 2026-07-05T08:10Z if still CONFLICTING — track it.",
+    "Operator should review 7 green-and-ready PRs for merge priority: #736 (smallest, 3 files), #737, #742, #738, #740, #744 (spine evidence), #746 (large diff, 148 files).",
+    "5 CONFLICTING PRs need rebase/resolution. Consider sequencing merges to clear conflicts in dependency order."
+  ],
+  "spine_adoption_comment": {
+    "pr_number": 744,
+    "comment_url": "https://github.com/AmitabhainArunachala/dharma_swarm/pull/744#issuecomment-4858714668",
+    "adoption_pct": 93.8,
+    "target_pct": 95.0,
+    "gap_pp": 1.2
+  }
+}
