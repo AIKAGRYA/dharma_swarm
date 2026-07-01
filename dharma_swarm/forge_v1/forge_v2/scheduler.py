@@ -65,6 +65,13 @@ def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
         f.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
 
 
+def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "".join(json.dumps(row, sort_keys=True, default=str) + "\n" for row in rows)
+    )
+
+
 def cost_from_attempts(receipt: dict[str, Any]) -> float:
     total = 0.0
     for attempt in receipt.get("attempts", []):
@@ -148,6 +155,293 @@ def ingest_learning_spine(
     from .ingest_learning import ingest_run
 
     return ingest_run(run_dir, store_root=store_root, epoch_id=epoch_id)
+
+
+CANONICAL_PACKET_FILES = (
+    "run_manifest.json",
+    "task_manifest.jsonl",
+    "model_roster.json",
+    "budget_ledger.jsonl",
+    "coordination_edges.jsonl",
+    "results.jsonl",
+    "control_comparison.md",
+    "failure_taxonomy.md",
+    "decision_record.md",
+)
+
+
+def _campaign_task_rows(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, str]] = set()
+    attempts_by_task: dict[str, list[dict[str, Any]]] = {}
+    for attempt in history_attempts:
+        task_id = str(attempt.get("task_id") or "")
+        if task_id:
+            attempts_by_task.setdefault(task_id, []).append(attempt)
+
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        campaign_index = int(campaign.get("campaign_index") or 0)
+        instances = [str(item) for item in campaign.get("instances", []) or [] if item]
+        n_explore = int(campaign.get("n_explore") or 0)
+        for idx, task_id in enumerate(instances):
+            attempt_splits = {
+                str(attempt.get("split"))
+                for attempt in attempts_by_task.get(task_id, [])
+                if attempt.get("split")
+            }
+            split = ",".join(sorted(attempt_splits)) or ("explore" if idx < n_explore else "confirm")
+            key = (task_id, campaign_index, split)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "schema": "forge_v2.task_manifest_row.v1",
+                    "task_id": task_id,
+                    "instance_id": task_id,
+                    "split": split,
+                    "campaign_index": campaign_index,
+                    "source": "forge_v2.scheduler",
+                }
+            )
+    return rows
+
+
+def _canonical_result_rows(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for idx, attempt in enumerate(history_attempts, start=1):
+        invalid = bool(attempt.get("invalid"))
+        grade_error = attempt.get("grade_error")
+        rows.append(
+            {
+                "schema": "forge_v2.result_row.v1",
+                "row_index": idx,
+                "campaign_index": attempt.get("_campaign_index"),
+                "task_id": attempt.get("task_id"),
+                "split": attempt.get("split"),
+                "arm": attempt.get("arm"),
+                "class_null": attempt.get("class_null"),
+                "replicate": attempt.get("replicate"),
+                "candidate_ok": not invalid,
+                "resolved": bool(attempt.get("resolved")),
+                "result": "invalid" if invalid else "resolved" if attempt.get("resolved") else "unresolved",
+                "score": 1.0 if attempt.get("resolved") else 0.0,
+                "grade_seconds": attempt.get("grade_seconds", 0.0),
+                "grade_error": grade_error,
+                "invalid": invalid,
+                "invalid_reason": attempt.get("invalid_reason"),
+            }
+        )
+    if rows:
+        return rows
+
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        status = str(campaign.get("status") or "")
+        rows.append(
+            {
+                "schema": "forge_v2.result_row.v1",
+                "campaign_index": campaign.get("campaign_index"),
+                "task_id": ",".join(str(item) for item in campaign.get("instances", []) or []),
+                "arm": campaign.get("arm"),
+                "candidate_ok": status != "error",
+                "result": campaign.get("closeout") or status,
+                "score": ((campaign.get("lift") or {}) or {}).get("mean", 0.0),
+                "status": status,
+            }
+        )
+    return rows
+
+
+def _canonical_budget_rows(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for idx, attempt in enumerate(history_attempts, start=1):
+        budget = dict(attempt.get("budget", {}) or {})
+        rows.append(
+            {
+                "schema": "forge_v2.budget_ledger_row.v1",
+                "row_index": idx,
+                "campaign_index": attempt.get("_campaign_index"),
+                "task_id": attempt.get("task_id"),
+                "arm": attempt.get("arm"),
+                "cap_tokens": budget.get("cap_tokens"),
+                "spent_tokens": budget.get("spent_tokens"),
+                "cap_usd": budget.get("cap_usd"),
+                "actual_cost_usd": budget.get("total_cost_usd", 0.0),
+                "wall_seconds": budget.get("wall_seconds", 0.0),
+                "invalid": budget.get("invalid", False),
+                "invalid_reason": budget.get("invalid_reason"),
+            }
+        )
+    if rows:
+        return rows
+
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        rows.append(
+            {
+                "schema": "forge_v2.budget_ledger_row.v1",
+                "campaign_index": campaign.get("campaign_index"),
+                "arm": campaign.get("arm"),
+                "actual_cost_usd": campaign.get("cost_usd", 0.0),
+            }
+        )
+    return rows
+
+
+def _canonical_model_roster(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> dict[str, Any]:
+    config = dict(state.get("config", {}) or {})
+    arms = {str(arm) for arm in config.get("arms", []) or [] if arm}
+    for attempt in history_attempts:
+        arm = str(attempt.get("arm") or "")
+        if arm:
+            arms.add(arm)
+        class_null = str(attempt.get("class_null") or "")
+        if class_null:
+            arms.add(class_null)
+    if "self_moa" in arms:
+        arms.add("same_budget_self_moa")
+    return {
+        "schema": "forge_v2.model_roster.v1",
+        "generator": config.get("generator"),
+        "verifier": config.get("verifier"),
+        "mix_models": config.get("mix_models", []),
+        "strategy": config.get("strategy"),
+        "roster_n": config.get("roster_n"),
+        "arms": [{"arm": arm} for arm in sorted(arms)],
+    }
+
+
+def _control_comparison_markdown(state: dict[str, Any]) -> str:
+    lines = [
+        "# Control Comparison",
+        "",
+        f"Run: `{state.get('label')}`",
+        f"Closeout: `{state.get('last_closeout')}`",
+        f"Campaigns: {state.get('completed_campaigns', 0)}",
+        f"Total cost USD: {state.get('total_cost_usd', 0.0)}",
+        "",
+        "| Campaign | Arm | Closeout | n_pairs | Lift mean | Cost USD |",
+        "|---:|---|---|---:|---:|---:|",
+    ]
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        lift = campaign.get("lift") if isinstance(campaign.get("lift"), dict) else {}
+        lines.append(
+            "| {campaign_index} | {arm} | {closeout} | {n_pairs} | {lift_mean} | {cost} |".format(
+                campaign_index=campaign.get("campaign_index", ""),
+                arm=campaign.get("arm", ""),
+                closeout=campaign.get("closeout", ""),
+                n_pairs=campaign.get("n_pairs", 0),
+                lift_mean=lift.get("mean", ""),
+                cost=campaign.get("cost_usd", 0.0),
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _failure_taxonomy_markdown(state: dict[str, Any], result_rows: list[dict[str, Any]]) -> str:
+    invalid = sum(1 for row in result_rows if row.get("invalid") or row.get("candidate_ok") is False)
+    errors = [row for row in state.get("campaigns", []) or [] if isinstance(row, dict) and row.get("status") == "error"]
+    closeouts: dict[str, int] = {}
+    for campaign in state.get("campaigns", []) or []:
+        if not isinstance(campaign, dict):
+            continue
+        closeout = str(campaign.get("closeout") or "unknown")
+        closeouts[closeout] = closeouts.get(closeout, 0) + 1
+    lines = [
+        "# Failure Taxonomy",
+        "",
+        f"Invalid result rows: {invalid}",
+        f"Scheduler error campaigns: {len(errors)}",
+        "",
+        "## Closeouts",
+    ]
+    for closeout, count in sorted(closeouts.items()):
+        lines.append(f"- `{closeout}`: {count}")
+    if errors:
+        lines.extend(["", "## Errors"])
+        for row in errors:
+            lines.append(f"- campaign {row.get('campaign_index')}: {row.get('error')}")
+    return "\n".join(lines) + "\n"
+
+
+def _decision_record_markdown(state: dict[str, Any]) -> str:
+    lines = [
+        "# Forge v2 Scheduler Decision",
+        "",
+        f"Verdict: `{state.get('last_closeout') or state.get('stop_reason')}`",
+        f"Stop reason: `{state.get('stop_reason')}`",
+        f"Campaigns: {state.get('completed_campaigns', 0)}",
+        f"Invalid runs: {state.get('invalid_runs', 0)}",
+        f"Total cost USD: {state.get('total_cost_usd', 0.0)}",
+        "",
+        "This packet records scheduler evidence only. It does not by itself prove promotion.",
+    ]
+    if state.get("last_closeout") == "positive_lift_candidate":
+        lines.append("Promotion still requires verify_promotion, signed receipts, and full fresh CONFIRM power.")
+    return "\n".join(lines) + "\n"
+
+
+def emit_canonical_packet(
+    run_dir: Path,
+    state: dict[str, Any],
+    *,
+    history_attempts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Write the canonical packet files consumed by external guard lanes."""
+    config = dict(state.get("config", {}) or {})
+    task_rows = _campaign_task_rows(state, history_attempts)
+    result_rows = _canonical_result_rows(state, history_attempts)
+    budget_rows = _canonical_budget_rows(state, history_attempts)
+    run_manifest = {
+        "schema_version": "forge_v2.scheduler_canonical_packet.v1",
+        "scheduler_schema": state.get("schema"),
+        "label": state.get("label"),
+        "run_dir": str(run_dir),
+        "started_at": state.get("started_at"),
+        "finished_at": state.get("finished_at"),
+        "benchmark_family": "dry_run" if state.get("dry_run") else "swebench",
+        "status": state.get("last_closeout") or state.get("stop_reason"),
+        "closeout": state.get("last_closeout"),
+        "stop_reason": state.get("stop_reason"),
+        "task_count": len({row.get("task_id") for row in task_rows if row.get("task_id")}),
+        "completed_campaigns": state.get("completed_campaigns", 0),
+        "invalid_runs": state.get("invalid_runs", 0),
+        "total_cost_usd": state.get("total_cost_usd", 0.0),
+        "config": config,
+        "authority": {
+            "trainer_built": False,
+            "production_router_mutated": False,
+            "archive_fitness_mutated": False,
+            "official_score_claimed": False,
+            "public_submission_performed": False,
+            "external_confirmed": False,
+        },
+        "packet_files": list(CANONICAL_PACKET_FILES),
+    }
+    write_json(run_dir / "run_manifest.json", run_manifest)
+    write_jsonl(run_dir / "task_manifest.jsonl", task_rows)
+    write_json(run_dir / "model_roster.json", _canonical_model_roster(state, history_attempts))
+    write_jsonl(run_dir / "budget_ledger.jsonl", budget_rows)
+    write_jsonl(run_dir / "coordination_edges.jsonl", [])
+    write_jsonl(run_dir / "results.jsonl", result_rows)
+    (run_dir / "control_comparison.md").write_text(_control_comparison_markdown(state))
+    (run_dir / "failure_taxonomy.md").write_text(_failure_taxonomy_markdown(state, result_rows))
+    (run_dir / "decision_record.md").write_text(_decision_record_markdown(state))
+    return {
+        "schema": "forge_v2.canonical_packet_emit.v1",
+        "run_dir": str(run_dir),
+        "files": list(CANONICAL_PACKET_FILES),
+        "task_rows": len(task_rows),
+        "result_rows": len(result_rows),
+        "budget_rows": len(budget_rows),
+    }
 
 
 def run_scheduler(
@@ -377,6 +671,24 @@ def run_scheduler(
     state["finished_at"] = now_stamp()
     write_json(out / "state.json", state)
     write_json(out / "decision_record.json", state)
+    try:
+        state["canonical_packet"] = emit_canonical_packet(
+            out,
+            state,
+            history_attempts=history_attempts,
+        )
+        write_json(out / "state.json", state)
+        write_json(out / "decision_record.json", state)
+    except Exception as exc:  # noqa: BLE001 - receipt packet failure should be visible.
+        failure = {
+            "event": "canonical_packet_error",
+            "error": f"{type(exc).__name__}: {exc}",
+            "at": now_stamp(),
+        }
+        state["canonical_packet"] = {"status": "error", **failure}
+        append_jsonl(ledger_path, failure)
+        write_json(out / "state.json", state)
+        write_json(out / "decision_record.json", state)
     try:
         report = build_campaign_report(out, receipt_root=RUN_ROOT.parent)
         write_campaign_report(report, out)

@@ -6,6 +6,7 @@ from dharma_swarm.forge_v1.forge_v2 import scheduler
 
 
 def _fake_receipt(closeout: str = "inconclusive_low_power", cost: float = 0.01) -> dict:
+    invalid = closeout == "invalid_budget"
     return {
         "closeout": closeout,
         "n_pairs": 1,
@@ -15,11 +16,35 @@ def _fake_receipt(closeout: str = "inconclusive_low_power", cost: float = 0.01) 
         "contamination_state": {"state": "possible_pretrain"},
         "budget_matched_proof": {"any_invalid": closeout == "invalid_budget"},
         "attempts": [
-            {"budget": {"total_cost_usd": cost / 2}},
-            {"budget": {"total_cost_usd": cost / 2}},
+            {
+                "task_id": "a",
+                "split": "confirm",
+                "arm": "self_moa",
+                "class_null": "self_moa",
+                "replicate": 0,
+                "resolved": False,
+                "budget": {"total_cost_usd": cost / 2, "spent_tokens": 100, "cap_tokens": 60000},
+                "invalid": invalid,
+                "invalid_reason": "synthetic invalid" if invalid else None,
+            },
+            {
+                "task_id": "a",
+                "split": "confirm",
+                "arm": "verify_chain",
+                "class_null": "self_moa",
+                "replicate": 0,
+                "resolved": False,
+                "budget": {"total_cost_usd": cost / 2, "spent_tokens": 100, "cap_tokens": 60000},
+                "invalid": invalid,
+                "invalid_reason": "synthetic invalid" if invalid else None,
+            },
         ],
         "next_experiment": "test",
     }
+
+
+def _read_jsonl(path):
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
 def test_cost_from_attempts_sums_attempt_budgets() -> None:
@@ -98,6 +123,68 @@ def test_scheduler_dry_run_writes_outer_receipts(tmp_path, monkeypatch) -> None:
     ledger = (run_dir / "campaign_ledger.jsonl").read_text().strip().splitlines()
     assert decision["stop_reason"] == scheduler.STOP_MAX_CAMPAIGNS
     assert len(ledger) == 5
+    assert set(scheduler.CANONICAL_PACKET_FILES).issubset({path.name for path in run_dir.iterdir()})
+    assert json.loads((run_dir / "run_manifest.json").read_text())["task_count"] == 2
+    assert len(_read_jsonl(run_dir / "task_manifest.jsonl")) == 4
+    assert len(_read_jsonl(run_dir / "results.jsonl")) == 2
+    assert "# Control Comparison" in (run_dir / "control_comparison.md").read_text()
+    assert "does not by itself prove promotion" in (run_dir / "decision_record.md").read_text()
+
+
+def test_scheduler_canonical_packet_uses_attempt_rows(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+
+    state = scheduler.run_scheduler(
+        instances=["a"],
+        n_explore=0,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="packet",
+        max_campaigns=1,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        runner=lambda *_args, **_kwargs: _fake_receipt(cost=0.02),
+    )
+
+    run_dir = next(tmp_path.iterdir())
+    assert state["canonical_packet"]["files"] == list(scheduler.CANONICAL_PACKET_FILES)
+    assert state["canonical_packet"]["result_rows"] == 2
+    manifest = json.loads((run_dir / "run_manifest.json").read_text())
+    roster = json.loads((run_dir / "model_roster.json").read_text())
+    results = _read_jsonl(run_dir / "results.jsonl")
+    budgets = _read_jsonl(run_dir / "budget_ledger.jsonl")
+    tasks = _read_jsonl(run_dir / "task_manifest.jsonl")
+
+    assert manifest["schema_version"] == "forge_v2.scheduler_canonical_packet.v1"
+    assert manifest["status"] == "inconclusive_low_power"
+    assert manifest["authority"]["archive_fitness_mutated"] is False
+    assert {row["arm"] for row in roster["arms"]} == {"same_budget_self_moa", "self_moa", "verify_chain"}
+    assert {row["arm"] for row in results} == {"self_moa", "verify_chain"}
+    assert all(row["candidate_ok"] is True for row in results)
+    assert sum(row["actual_cost_usd"] for row in budgets) == 0.02
+    assert tasks == [
+        {
+            "campaign_index": 1,
+            "instance_id": "a",
+            "schema": "forge_v2.task_manifest_row.v1",
+            "source": "forge_v2.scheduler",
+            "split": "confirm",
+            "task_id": "a",
+        }
+    ]
 
 
 def test_scheduler_stops_after_invalid_cap(tmp_path, monkeypatch) -> None:
