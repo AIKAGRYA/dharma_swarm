@@ -57,6 +57,7 @@ class ForgeLearningSignal:
     fdr_positive_significant: bool
     reliability: dict
     contamination_state: str
+    sealed_provenance: dict
     closeout_counts: dict
     null_survived: bool
     # Echoed report flag — NOT a decision. Present so the trap is visible, not trusted.
@@ -211,7 +212,17 @@ def report_to_signals(
     derived_taskbed = taskbed or _derive_taskbed(meta_report)
     # Absent sealed contamination on a public benchmark -> possible_pretrain
     # (a blocker), never caller-supplied "clean".
+    sealed_contam = _sealed_contamination(meta_report)
     derived_contam = _derive_contamination(meta_report, external_hint=contamination_state)
+    sealed_provenance = (
+        {
+            "contamination_state": sealed_contam,
+            "source": "closed_report",
+            "source_report_sha256": source_report_sha256,
+        }
+        if sealed_contam
+        else {}
+    )
     derived_class_null = class_null or _derive_class_null(meta_report)
 
     signals: list[ForgeLearningSignal] = []
@@ -258,6 +269,7 @@ def report_to_signals(
                 fdr_positive_significant=fdr_sig,
                 reliability=dict(reliability_all.get(arm, {}) or {}),
                 contamination_state=derived_contam,
+                sealed_provenance=sealed_provenance,
                 closeout_counts=closeout_counts,
                 null_survived=null_survived,
                 report_positive_promotion_allowed=promo_flag,

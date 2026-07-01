@@ -192,6 +192,58 @@ def test_e4_wide_confirm_ci_is_refused_as_underpowered() -> None:
     assert "promotion_packet:e4_confirm_power_sufficient" in verdict["blockers"]
 
 
+def test_promotion_refuses_clean_contamination_without_sealed_provenance() -> None:
+    signal = {
+        "run_id": "contam-unsealed",
+        "signal_key": "contam:key",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "confirm_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    assert verdict["decision"] == "refused"
+    assert "promotion_packet:contamination_sealed_provenance" in verdict["blockers"]
+
+
+def test_promotion_accepts_sealed_clean_provenance_predicate_before_receipts() -> None:
+    signal = {
+        "run_id": "contam-sealed",
+        "signal_key": "contam:sealed",
+        "arm": "verify_chain",
+        "taskbed": "fresh_taskbed",
+        "mission_class": "verifier_role",
+        "overall_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "explore_ci": {"n": 0, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "confirm_ci": {"n": 500, "mean": 0.06, "lower": 0.02, "upper": 0.1, "p_le_0": 0.01},
+        "fdr_positive_significant": True,
+        "contamination_state": "fresh_heldout",
+        "sealed_provenance": {"contamination_state": "fresh_heldout"},
+        "class_null": "self_moa",
+        "null_survived": False,
+        "evidence_strength": 0.9,
+        "promotion_blockers": [],
+    }
+
+    verdict = verify_promotion(signal, operator_lease={"lease_id": "op-1"})
+
+    predicate = verdict["promotion_packet"]["predicate"]
+    assert predicate["contamination_self_mod_clean"] is True
+    assert predicate["contamination_sealed_provenance"] is True
+    assert "promotion_packet:contamination_sealed_provenance" not in verdict["blockers"]
+    assert verdict["decision"] == "refused"  # missing signed receipts still fail closed
+
+
 def test_e2_green_pytest_red_holdout_is_refused() -> None:
     signal = {
         "run_id": "e2",
@@ -293,6 +345,7 @@ def test_report_to_signals_accepts_sealed_fresh_provenance() -> None:
     sig = signals.report_to_signals(meta, source_report_sha256="sha", run_id="run")[0]
 
     assert sig.contamination_state == "fresh_heldout"
+    assert sig.sealed_provenance["contamination_state"] == "fresh_heldout"
     assert not any(b.startswith("contamination_") for b in sig.promotion_blockers)
 
 

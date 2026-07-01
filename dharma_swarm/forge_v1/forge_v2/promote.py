@@ -65,12 +65,30 @@ def _preregistered_mde(signal: dict) -> float:
     )
 
 
+def _sealed_contamination(signal: dict) -> str | None:
+    candidates = [
+        signal.get("sealed_provenance"),
+        signal.get("provenance_receipt"),
+        signal.get("contamination_provenance"),
+    ]
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        state = candidate.get("contamination_state")
+        if isinstance(state, dict):
+            state = state.get("state")
+        if state:
+            return str(state)
+    return None
+
+
 def _evidence_predicate(signal: dict) -> dict:
     """The substantive checks computable from the signal itself."""
     overall = signal.get("overall_ci", {}) or {}
     explore = signal.get("explore_ci", {}) or {}
     confirm = signal.get("confirm_ci", {}) or {}
     contamination = str(signal.get("contamination_state", "unknown"))
+    sealed_contamination = _sealed_contamination(signal)
     confirm_n = _int(confirm.get("n"))
     explore_n = _int(explore.get("n"))
     overall_n = _int(overall.get("n"))
@@ -86,6 +104,10 @@ def _evidence_predicate(signal: dict) -> dict:
         "e4_confirm_power_sufficient": _ci_half_width(confirm) <= preregistered_mde,
         "fdr_significant": bool(signal.get("fdr_positive_significant", False)),
         "contamination_self_mod_clean": contamination in _CLEAN_CONTAMINATION,
+        "contamination_sealed_provenance": (
+            sealed_contamination == contamination
+            and sealed_contamination in _CLEAN_CONTAMINATION
+        ),
         "class_null_valid": bool(signal.get("class_null")),
         "null_did_not_survive": not bool(signal.get("null_survived", False)),
         "evidence_strength_positive": float(signal.get("evidence_strength", 0.0)) > 0.0,
