@@ -739,7 +739,14 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     pool = MockAgentPool(
         [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
     )
-    pool.set_runner("a1", DummyRunner(error=RuntimeError("Timeout while reading provider stream 1234567890abcdef")))
+    pool.set_runner(
+        "a1",
+        DummyRunner(
+            error=RuntimeError(
+                "Timeout while reading provider stream 1234567890abcdef"
+            )
+        ),
+    )
 
     orch = Orchestrator(
         task_board=board,
@@ -768,6 +775,83 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     sig = failed[0].get("failure_signature", "")
     assert "timeout while reading provider stream" in sig
     assert "<id>" in sig
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_failure_progress_precedes_runtime_lifecycle(tmp_path, monkeypatch):
+    """Failure progress receipts should not wait on runtime-state persistence."""
+    board = MockTaskBoard()
+    board.tasks = [Task(id="t-fail-fast-ledger", title="Fail task", description="safe")]
+    pool = MockAgentPool(
+        [AgentState(id="a1", name="agent-1", role=AgentRole.GENERAL, status=AgentStatus.IDLE)]
+    )
+    pool.set_runner(
+        "a1",
+        DummyRunner(
+            error=RuntimeError(
+                "Timeout while reading provider stream 1234567890abcdef"
+            )
+        ),
+    )
+
+    orch = Orchestrator(
+        task_board=board,
+        agent_pool=pool,
+        ledger_dir=tmp_path,
+        session_id="sess_fail_fast_ledger",
+    )
+    runtime_block = asyncio.Event()
+    runtime_write_started = asyncio.Event()
+
+    async def blocked_runtime_write(*_args, **kwargs):
+        if kwargs.get("status") != "failed":
+            return
+        runtime_write_started.set()
+        await runtime_block.wait()
+
+    monkeypatch.setattr(
+        orch._runtime_lifecycle,
+        "record_task_claim",
+        blocked_runtime_write,
+    )
+    monkeypatch.setattr(
+        orch._runtime_lifecycle,
+        "record_delegation_run",
+        blocked_runtime_write,
+    )
+
+    await orch.route_next()
+    progress_path = tmp_path / "sess_fail_fast_ledger" / "progress_ledger.jsonl"
+
+    try:
+        found = False
+        for _ in range(100):
+            await orch._collect_completed()
+            if progress_path.exists():
+                rows = [
+                    json.loads(line)
+                    for line in progress_path.read_text().splitlines()
+                    if line.strip()
+                ]
+                found = any(
+                    r.get("event") in {"task_failed", "task_retry_scheduled"}
+                    for r in rows
+                )
+                if found:
+                    break
+            await asyncio.sleep(0.01)
+
+        assert found, "Expected failure or retry event before runtime lifecycle finishes"
+        assert orch._running_tasks
+        assert runtime_write_started.is_set()
+    finally:
+        runtime_block.set()
+        for _ in range(100):
+            await orch._collect_completed()
+            if not orch._running_tasks:
+                break
+            await asyncio.sleep(0.01)
+        await orch._collect_completed()
 
 
 @pytest.mark.asyncio
