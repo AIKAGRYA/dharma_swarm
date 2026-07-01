@@ -686,76 +686,6 @@ def _run_frontier_refill(job: dict[str, Any]) -> CronJobExecutionResult:
         )
 
 
-def _run_signal_deep_sweep(job: dict[str, Any]) -> CronJobExecutionResult:
-    """Run the capped, automated deep sweep (separate, lower-cadence cousin
-    of world_scout -- widens to DefaultBeats() and runs a bounded LLM
-    verification+synthesis pass through invoke_agent(), not just cheap API
-    fetches). Disabled by default: see signal_deep_sweep's cron_jobs.json
-    entry -- spending real LLM budget automatically is a bigger decision
-    than free API scraping and should be turned on deliberately.
-    """
-    fetch_enabled = _as_bool(job.get("fetch"), False) or _as_bool(
-        os.environ.get("DHARMA_SIGNAL_DEEP_SWEEP_FETCH"),
-        False,
-    )
-    if not fetch_enabled:
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.WAITING_EXTERNAL,
-            output=(
-                "signal_deep_sweep fetch disabled; set job.fetch=true or "
-                "DHARMA_SIGNAL_DEEP_SWEEP_FETCH=1 to run the capped deep sweep"
-            ),
-            metadata={"fetch_enabled": False},
-        )
-
-    try:
-        from dharma_swarm.knowledge_ops.deep_sweep import (
-            DEFAULT_MAX_VERIFICATIONS,
-            run_deep_sweep,
-        )
-
-        state_dir = job.get("state_dir") or None
-        state_path = Path(str(state_dir)).expanduser() if state_dir else dharma_state_dir()
-        max_verifications = _as_int(job.get("max_verifications"), DEFAULT_MAX_VERIFICATIONS)
-        result = asyncio.run(
-            run_deep_sweep(
-                state_path,
-                max_verifications=max_verifications,
-                scout_timeout_s=_as_int(job.get("scout_timeout_sec"), 300),
-                verification_timeout_s=_as_int(job.get("verification_timeout_sec"), 300),
-                synthesis_timeout_s=_as_int(job.get("synthesis_timeout_sec"), 300),
-            )
-        )
-        output = (
-            "signal_deep_sweep: "
-            f"movements={result['movements_count']} "
-            f"newly_seen={result['newly_seen_count']} "
-            f"verifications={result['verifications_count']} "
-            f"(cap={max_verifications}) "
-            f"likely_fabricated={result['likely_fabricated_count']} "
-            f"digest={result['digest_path']}"
-        )
-        errors = [e for e in (result.get("scout_error"), result.get("verification_error"), result.get("synthesis_error")) if e]
-        if errors:
-            output = f"{output} errors={errors}"
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.COMPLETED,
-            output=output,
-            error="; ".join(errors)[:500] if errors else "",
-            metadata={
-                "fetch_enabled": True,
-                "max_verifications": max_verifications,
-                **{k: v for k, v in result.items() if k not in ("cycle_dir",)},
-            },
-        )
-    except Exception as e:  # noqa: BLE001
-        return CronJobExecutionResult(
-            status=CronJobRunStatus.FAILED,
-            output=str(e),
-            error=str(e),
-        )
-
-
 def _run_store_sync(job: dict[str, Any]) -> CronJobExecutionResult:
     """BR-007: sync ontology.db outcomes → runtime.db artifact_records."""
     try:
@@ -978,7 +908,9 @@ def execute_cron_job(job: dict[str, Any]) -> CronJobExecutionResult:
     if handler == "world_scout":
         return _run_world_scout(job)
     if handler == "signal_deep_sweep":
-        return _run_signal_deep_sweep(job)
+        from dharma_swarm.cron_signal_deep_sweep import run_signal_deep_sweep_job
+
+        return run_signal_deep_sweep_job(job)
     if handler == "store_sync":
         return _run_store_sync(job)
     if handler == "shell":

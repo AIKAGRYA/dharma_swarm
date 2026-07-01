@@ -142,6 +142,7 @@
     - dharma_swarm/coordination/panel_diversity.py
     - dharma_swarm/world_radar/theme_window.py
     - dharma_swarm/knowledge_ops/deep_sweep.py
+    - dharma_swarm/cron_signal_deep_sweep.py
     - dharma_swarm/knowledge_ops/signal_synthesis_desk.py
     - tools/world_scout_go/beats.go
     - docs/architecture/SIGNAL_SYNTHESIS_DESK.md
