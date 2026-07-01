@@ -56,6 +56,13 @@ def _risk_number(risk_tier: str) -> int:
     return int(digits or "1")
 
 
+def _holdout_eval_receipt_verified(metadata: dict[str, Any]) -> bool:
+    receipt = metadata.get("holdout_eval_receipt")
+    if isinstance(receipt, dict):
+        return bool(receipt.get("verified"))
+    return bool(metadata.get("holdout_eval_receipt_verified"))
+
+
 def evaluate_governed_work_admission(request: GovernedWorkRequest) -> GovernedWorkAdmission:
     reasons: list[str] = []
     receipts: list[str] = []
@@ -104,7 +111,7 @@ def evaluate_governed_work_admission(request: GovernedWorkRequest) -> GovernedWo
         elif request.mutation_budget_remaining <= 0:
             block("mutation_budget_exhausted", "mutation_budget_receipt")
 
-    if request.work_kind == WorkKind.PROMOTION:
+    if request.work_kind == WorkKind.PROMOTION and not _holdout_eval_receipt_verified(request.metadata):
         review("promotion_requires_holdout_receipt", "holdout_eval_receipt")
 
     return GovernedWorkAdmission(

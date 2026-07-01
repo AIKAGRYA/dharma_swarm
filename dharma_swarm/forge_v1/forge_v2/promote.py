@@ -2,11 +2,10 @@
 
 Fails closed. A signal is promotable ONLY if every conjunct of the hard
 promotion predicate is true; any missing field is treated as False (not absent =
-not assumed-ok). v0 additionally requires a battery of falsification receipts
-(preregistration, sequential-alpha, scaffold parity, judge, run-level critic,
-mutation sandbox) that the campaign-meta-report-level signal does not yet carry —
-so v0 can never promote, by construction. That is correct: the gradient earns
-write access by passing the gate, not by self-report.
+not assumed-ok). Promotion additionally requires a battery of falsification
+receipts (preregistration, sequential-alpha, scaffold parity, judge, run-level
+critic, mutation sandbox). Those receipt predicates are false unless the sole
+promotion verifier supplies trusted signed-receipt status.
 
 Even a hypothetically-clean signal yields a SHADOW-ONLY packet in v0
 (``live_apply_allowed=false``). The report's ``positive_promotion_allowed`` flag
@@ -117,6 +116,18 @@ def _e4_discrimination_passed(receipt: dict) -> bool:
     return bool(receipt.get("promotion_gate_satisfied")) or receipt.get("decision") == "pass"
 
 
+def _receipt_present(receipt_status: dict | None, name: str) -> bool:
+    status = receipt_status or {}
+    return bool(status.get(name) or status.get(f"receipt_{name}_present"))
+
+
+def _receipt_predicates(receipt_status: dict | None = None) -> dict:
+    return {
+        f"receipt_{name}_present": _receipt_present(receipt_status, name)
+        for name in REQUIRED_RECEIPTS_V0_ABSENT
+    }
+
+
 def _evidence_predicate(signal: dict) -> dict:
     """The substantive checks computable from the signal itself."""
     overall = signal.get("overall_ci", {}) or {}
@@ -155,11 +166,10 @@ def _evidence_predicate(signal: dict) -> dict:
     }
 
 
-def evaluate_promotion(signal: dict) -> dict:
+def evaluate_promotion(signal: dict, *, receipt_status: dict | None = None) -> dict:
     """Return a promotion packet (decision + predicate + blockers + safety)."""
     evidence = _evidence_predicate(signal)
-    # Falsification receipts absent in v0 -> all False (fail closed).
-    receipts = {f"receipt_{name}_present": False for name in REQUIRED_RECEIPTS_V0_ABSENT}
+    receipts = _receipt_predicates(receipt_status)
 
     predicate = {**evidence, **receipts}
     failed = sorted(k for k, v in predicate.items() if not v)
@@ -167,7 +177,11 @@ def evaluate_promotion(signal: dict) -> dict:
     # Surface the signal's own blockers plus the missing receipts, deduped.
     blockers = sorted(
         set(signal.get("promotion_blockers", []) or [])
-        | {f"missing:{name}" for name in REQUIRED_RECEIPTS_V0_ABSENT}
+        | {
+            f"missing:{name}"
+            for name in REQUIRED_RECEIPTS_V0_ABSENT
+            if not _receipt_present(receipt_status, name)
+        }
     )
     guard = _packet_guard_review(signal)
     if not guard:

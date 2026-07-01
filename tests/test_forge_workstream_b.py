@@ -431,10 +431,36 @@ def test_verify_promotion_trusts_receipts_only_from_configured_judge_key(monkeyp
         operator_lease={"lease_id": "op-1"},
     )
 
-    assert verdict["decision"] == "refused"  # v0 promotion packet still marks receipt predicates absent
+    assert verdict["decision"] == "allow"
+    assert verdict["live_apply_allowed"] is True
+    assert verdict["promotion_packet"]["decision"] == "promotable_candidate"
+    assert verdict["promotion_packet"]["failed_conjuncts"] == []
+    assert not verdict["blockers"]
     assert verdict["signed_receipts"]["preregistration"] is True
     assert not any(b.startswith("untrusted_signed_receipt:") for b in verdict["blockers"])
     assert not any(b.startswith("missing_or_invalid_signed_receipt:") for b in verdict["blockers"])
+
+
+def test_verify_promotion_missing_one_trusted_receipt_fails_closed(monkeypatch) -> None:
+    from dharma_swarm.forge_v1.forge_v2 import verify_promotion as verifier
+
+    monkeypatch.setattr(verifier, "verify_signed_receipt", lambda _receipt: True)
+    public_key = "01" * 32
+    receipts = _fake_signed_receipts(public_key)[:-1]
+    missing = promote.REQUIRED_RECEIPTS_V0_ABSENT[-1]
+
+    verdict = verify_promotion(
+        _receipt_ready_signal(),
+        signed_receipts=receipts,
+        trusted_receipt_public_keys=[public_key],
+        operator_lease={"lease_id": "op-1"},
+    )
+
+    assert verdict["decision"] == "refused"
+    assert verdict["live_apply_allowed"] is False
+    assert verdict["signed_receipts"][missing] is False
+    assert f"promotion_packet:receipt_{missing}_present" in verdict["blockers"]
+    assert f"missing_or_invalid_signed_receipt:{missing}" in verdict["blockers"]
 
 
 def test_e2_green_pytest_red_holdout_is_refused() -> None:

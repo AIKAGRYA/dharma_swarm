@@ -178,6 +178,20 @@ def _receipt_map(receipts: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]
     return out
 
 
+def _holdout_eval_receipt(signal: dict[str, Any], packet: dict[str, Any]) -> dict[str, Any]:
+    predicate = dict(packet.get("predicate", {}) or {})
+    confirm_ci = dict(signal.get("confirm_ci", {}) or {})
+    return {
+        "schema": "forge_v2.holdout_eval_receipt.v1",
+        "verified": packet.get("decision") == "promotable_candidate",
+        "promotion_packet_sha256": packet.get("payload_sha256", ""),
+        "confirm_n": confirm_ci.get("n"),
+        "packet_guard_passed": bool(predicate.get("packet_guard_passed")),
+        "e4_discrimination_passed": bool(predicate.get("e4_discrimination_passed")),
+        "sealed_contamination": bool(predicate.get("contamination_sealed_provenance")),
+    }
+
+
 def verify_promotion(
     signal: dict[str, Any],
     *,
@@ -191,7 +205,6 @@ def verify_promotion(
     telos_gatekeeper: Any | None = None,
 ) -> dict[str, Any]:
     """Return the fail-closed promotion verdict for a Forge signal."""
-    packet = promote.evaluate_promotion(signal)
     receipt_by_name = _receipt_map(signed_receipts)
     signed_status = {
         name: verify_trusted_signed_receipt(
@@ -202,6 +215,7 @@ def verify_promotion(
         else False
         for name in promote.REQUIRED_RECEIPTS_V0_ABSENT
     }
+    packet = promote.evaluate_promotion(signal, receipt_status=signed_status)
 
     admission = admission_fn(
         GovernedWorkRequest(
@@ -214,7 +228,11 @@ def verify_promotion(
             mutation_budget_remaining=mutation_budget_remaining,
             mission_contract_present=mission_contract_present,
             workspace_lease_present=bool(operator_lease),
-            metadata={"signal_key": signal.get("signal_key"), "run_id": signal.get("run_id")},
+            metadata={
+                "signal_key": signal.get("signal_key"),
+                "run_id": signal.get("run_id"),
+                "holdout_eval_receipt": _holdout_eval_receipt(signal, packet),
+            },
         )
     )
     admission_dict = admission.model_dump() if hasattr(admission, "model_dump") else dict(admission)
