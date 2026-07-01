@@ -83,6 +83,9 @@ class DGMResult:
     fitness_before: float = 0.0
     fitness_after: float = 0.0
     fitness_delta: float = 0.0           # positive = improvement
+    forge_grade: dict[str, Any] = field(default_factory=dict)
+    promote_eligible: bool = False
+    promotion_blockers: list[str] = field(default_factory=list)
     applied: bool = False                # diff was applied to real code
     rolled_back: bool = False            # diff was rolled back after test failure
     shadow_mode: bool = True             # True means no real mutation occurred
@@ -303,6 +306,51 @@ class DGMLoop:
         self._shadow_mode = True
 
         self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
+
+    async def run_forge_genome_generation(
+        self,
+        genome: dict[str, Any] | Any,
+        instance_ids: list[str],
+        *,
+        split: str = "explore",
+        grade_fn: Any | None = None,
+    ) -> DGMResult:
+        """Score a DGM scaffold genome with the real Forge held-out grader.
+
+        This is the RSI Lab JOIN path: genome fitness comes from
+        ``forge_v2.forge_fitness.grade_genome`` instead of Darwin's local pytest
+        cycle.  It never applies code diffs; promotion remains owned by
+        ``forge_v2.verify_promotion``.
+        """
+        start = time.monotonic()
+        result = DGMResult(shadow_mode=True, source_file="forge_scaffold")
+        try:
+            from dharma_swarm.forge_v1.forge_v2.forge_fitness import grade_genome
+
+            grader = grade_fn or grade_genome
+            arm = getattr(genome, "arm", None)
+            if arm is None and isinstance(genome, dict):
+                arm = genome.get("arm", "verify_chain")
+            result.source_file = f"forge_scaffold::{arm or 'verify_chain'}"
+            fitness = grader(
+                genome,
+                list(instance_ids),
+                split=split,
+            )
+            fitness_dict = fitness.to_dict() if hasattr(fitness, "to_dict") else dict(fitness)
+            result.forge_grade = fitness_dict
+            result.fitness_after = float(fitness_dict.get("fitness", 0.0) or 0.0)
+            result.fitness_delta = result.fitness_after - result.fitness_before
+            result.promote_eligible = bool(fitness_dict.get("promote_eligible", False))
+            result.promotion_blockers = list(fitness_dict.get("blockers", []) or [])
+            result.proposals_submitted = 1
+            result.proposals_gated = 1
+        except Exception as exc:
+            result.error = str(exc)
+            logger.error("DGM Forge genome generation failed: %s", exc, exc_info=True)
+
+        result.duration_seconds = time.monotonic() - start
+        return result
 
     async def run_one_generation(
         self,
@@ -659,6 +707,37 @@ async def run_dgm_evolution_task(
             "archive_growth": (results[-1].archive_size_after - results[0].archive_size_before) if results else 0,
             "shadow_mode": loop._shadow_mode,
         }
+
+
+async def run_dgm_forge_genome_task(
+    genome: dict[str, Any],
+    instance_ids: list[str],
+    *,
+    split: str = "explore",
+    state_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Agent-callable DGM scaffold task whose fitness is Forge-held-out grade."""
+    from dharma_swarm.evolution import DarwinEngine
+
+    state_dir = state_dir or dharma_state_dir()
+    engine = DarwinEngine(archive_path=state_dir / "evolution" / "archive.jsonl")
+    loop = DGMLoop(engine=engine, state_dir=state_dir, shadow_mode=True)
+    result = await loop.run_forge_genome_generation(
+        genome,
+        instance_ids,
+        split=split,
+    )
+    return {
+        "success": result.error is None,
+        "summary": result.summary(),
+        "fitness_after": result.fitness_after,
+        "fitness_delta": result.fitness_delta,
+        "promote_eligible": result.promote_eligible,
+        "promotion_blockers": result.promotion_blockers,
+        "forge_grade": result.forge_grade,
+        "shadow_mode": result.shadow_mode,
+        "error": result.error,
+    }
 
 
 # ---------------------------------------------------------------------------
