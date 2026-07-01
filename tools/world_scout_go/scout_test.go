@@ -116,6 +116,35 @@ func scoutTextResponse(status int, body string, headers map[string]string) *http
 	return resp
 }
 
+func TestDefaultSourcesTrackAgenticDesignPatterns(t *testing.T) {
+	// The world_scout radar must track the agentic-design-patterns /
+	// agentic-engineering knowledge class on its regular cycle (companion to
+	// docs/architecture/AGENTIC_PATTERNS_ATLAS.md). Guards against silent
+	// regression of these default sources.
+	want := map[string]string{
+		"arxiv_agentic_design_patterns":   "arxiv",
+		"arxiv_llm_agent_architecture":    "arxiv",
+		"hacker_news_agentic_engineering": "hn_algolia",
+		"github_agentic_design_patterns":  "github_repos",
+	}
+	got := map[string]Source{}
+	for _, s := range DefaultSources() {
+		got[s.Name] = s
+	}
+	for name, kind := range want {
+		s, ok := got[name]
+		if !ok {
+			t.Fatalf("default source %q missing — agentic-patterns ingestion not configured", name)
+		}
+		if s.Kind != kind {
+			t.Fatalf("source %q kind = %q, want %q", name, s.Kind, kind)
+		}
+		if s.URL == "" {
+			t.Fatalf("source %q has empty URL", name)
+		}
+	}
+}
+
 func TestScoutRetryDelayParsesRetryAfter(t *testing.T) {
 	if delay := scoutRetryDelay("0", 1); delay != 0 {
 		t.Fatalf("Retry-After seconds parsed incorrectly: %s", delay)
