@@ -1007,3 +1007,36 @@
   - `.venv/bin/python -m dharma_swarm.operator_core.a2a_task_lifecycle close tam-wp-wp_dfa4e1134277 --agent-uid codex_composer --status completed --receipt reports/langgraph_parity/allnight/a2a_tam_darshan_publication_completion_receipt_20260701T061529Z.json` -> completed row with `receipt_validation.valid=true`.
   - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T061529Z_after_tam.json` -> `blocker_count=8`.
 - Scoreboard: raised conservatively to `95/100`; still explicitly not 100/100.
+
+## 2026-07-01T06:40:00Z - Phase 4 Stale Hermes Claim Supervisor Block
+
+- Target gate result: partial success. A2A strict remains red, but the five stale `hermes-m5` claimed rows are now `blocked_verified` with supervisor receipts. Open/claimed blockers dropped from 8 to 3.
+- Why this was blocked instead of completed:
+  - Each target row was `claimed` by `hermes-m5`.
+  - Each claim was older than 24 hours; actual claim ages were roughly 346 to 528 hours.
+  - `hermes-m5` presence projected as `heartbeat_status=RED`, last seen `2026-06-29T14:50:57.065783+00:00`, age about 39.8 hours at the receipt timestamp.
+  - No valid terminal `dharma_a2a_task_receipt.v1` existed at the matching claimant inbox receipt paths.
+  - The supervisor receipts explicitly state `block_only_no_task_execution_or_completion_claimed`.
+- Code changes:
+  - Added `scripts/governance/a2a_block_stale_hermes_claims.py`.
+  - Added `tests/test_a2a_stale_hermes_claim_blocker.py`.
+  - The tool only targets explicitly allowed claimant ids, defaulting to `hermes-m5`; it requires `status=claimed`, stale claim age, stale/missing claimant presence, and absence of a valid matching claimant terminal receipt.
+  - It does not touch unclaimed rows, recent claims, non-allowed claimants, or rows with a valid claimant receipt.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_dry_run_20260701T064000Z.json`
+  - `reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_20260701T064000Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T064000Z_after_stale_hermes.json`
+- Live queue handling:
+  - Dry-run found exactly 5 candidates and 0 skips: `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, `reconcile-564-565-20260611`, `l1-fx-001`, and `yatagarasu-10cceaa8`.
+  - The live queue was backed up before apply at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-hermes-claim-block-20260701T064000Z.bak`.
+  - Apply blocked 5/5 candidates as `blocked_verified`.
+- A2A readiness result:
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still exits 2, now with `ready=false`, `open_tasks=3`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+  - Fresh blocker audit reports `blocker_count=3`; all remaining blockers are stale unclaimed rows.
+  - Remaining A2A blockers: `forge-v0.1-001`, `holon-plan-review-cursor-20260612`, and `holon-plan-review-opus-20260612`.
+- Verification so far:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_stale_hermes_claim_blocker.py` -> `4 passed in 0.29s`.
+  - `.venv/bin/python scripts/governance/a2a_block_stale_hermes_claims.py --timestamp 2026-07-01T06:40:00Z --output reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_dry_run_20260701T064000Z.json` -> `candidate_count=5`, `applied_count=0`.
+  - `.venv/bin/python scripts/governance/a2a_block_stale_hermes_claims.py --apply --timestamp 2026-07-01T06:40:00Z --output reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_20260701T064000Z.json` -> `candidate_count=5`, `applied_count=5`.
+  - `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T064000Z_after_stale_hermes.json` -> `blocker_count=3`.
+- Scoreboard: raised conservatively to `96/100`; still explicitly not 100/100.

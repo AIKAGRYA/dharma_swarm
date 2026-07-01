@@ -353,3 +353,44 @@ Remaining Phase 4 blockers:
 - `ts-hb0631-credit`
 - `ts-pr-babysit-div-20260610`
 - `yatagarasu-10cceaa8`
+
+## 2026-07-01 Addendum: Stale Hermes Claimed Row Supervisor Block
+
+After TAM completion, five remaining rows were stale `hermes-m5` claims with no terminal claimant receipt. A sixth narrow tool now handles only that class:
+
+- Added `scripts/governance/a2a_block_stale_hermes_claims.py`
+- Added `tests/test_a2a_stale_hermes_claim_blocker.py`
+- The tool only targets explicitly allowed claimant ids, defaulting to `hermes-m5`.
+- It requires `status=claimed`, claim age above the stale threshold, claimant presence stale/missing, and no valid matching terminal A2A receipt in the claimant inbox.
+- It does not touch unclaimed rows, recent claims, non-allowed claimants, or rows with a valid claimant receipt.
+- It records `blocked`, not `completed`, and the receipt evidence says `block_only_no_task_execution_or_completion_claimed`.
+
+Receipts:
+
+- `reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_dry_run_20260701T064000Z.json`
+- `reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_20260701T064000Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T064000Z_after_stale_hermes.json`
+
+Live queue backup before apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-hermes-claim-block-20260701T064000Z.bak`
+
+Result:
+
+- Dry-run found 5 candidates and 0 skips: `ts-hb0631-credit`, `ts-pr-babysit-div-20260610`, `reconcile-564-565-20260611`, `l1-fx-001`, and `yatagarasu-10cceaa8`.
+- Apply blocked 5/5 candidates as valid `blocked_verified` A2A lifecycle rows with authority `stale_hermes_claim_supervisor_block`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2, now with `ready=false`, `open_tasks=3`, `unknown_status_tasks=0`, `unverified_closed_tasks=0`.
+- Fresh blocker audit now reports `blocker_count=3`; all remaining blockers are stale unclaimed rows.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_stale_hermes_claim_blocker.py` -> `4 passed in 0.29s`
+- `.venv/bin/python scripts/governance/a2a_block_stale_hermes_claims.py --timestamp 2026-07-01T06:40:00Z --output reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_dry_run_20260701T064000Z.json` -> `candidate_count=5`, `applied_count=0`
+- `.venv/bin/python scripts/governance/a2a_block_stale_hermes_claims.py --apply --timestamp 2026-07-01T06:40:00Z --output reports/langgraph_parity/allnight/a2a_stale_hermes_claim_block_20260701T064000Z.json` -> `candidate_count=5`, `applied_count=5`
+- `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T064000Z_after_stale_hermes.json` -> `blocker_count=3`
+
+Remaining Phase 4 blockers:
+
+- `forge-v0.1-001`
+- `holon-plan-review-cursor-20260612`
+- `holon-plan-review-opus-20260612`
