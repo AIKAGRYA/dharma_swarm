@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-01T01:00:03+09:00",
+  "generated_at": "2026-07-01T06:12:23+00:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-reconciliation-2026-06",
-  "shippable": true,
+  "shippable": false,
   "prerequisites_ok": true,
   "completion_progress": {
-    "passed": 12,
+    "passed": 11,
     "total": 12
   },
   "criteria": [
@@ -110,16 +110,16 @@
     {
       "id": "operator_core_contracts_pass",
       "kind": "test_passes",
-      "passed": true,
-      "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.32s",
-      "executed": true
+      "passed": false,
+      "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
+      "executed": false
     }
   ],
   "portfolio_summary": {
     "active": 10,
     "max_active": 10,
     "warn_active": 5,
-    "shippable": 6
+    "shippable": 0
   },
   "spine_objectives": [
     {
@@ -182,17 +182,20 @@
       "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 12,
+        "passed": 11,
         "total": 12
       },
       "criteria": [
@@ -297,9 +300,9 @@
         {
           "id": "operator_core_contracts_pass",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_operator_core_contracts.py: PASS \u2014 7 passed in 0.32s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
+          "executed": false
         }
       ]
     },
@@ -324,17 +327,20 @@
       "verified_at": "2026-06-07",
       "ttl_days": 21,
       "owner": "@codex",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 4,
+        "passed": 2,
         "total": 4
       },
       "criteria": [
@@ -362,16 +368,16 @@
         {
           "id": "nats_transport_tests_pass",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_nats_transport.py: PASS \u2014 6 passed in 0.81s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_nats_transport.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "nats_substrate_contract_test_pass",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_nats_substrate_contract.py: PASS \u2014 1 passed in 0.30s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_nats_substrate_contract.py: pytest not installed (could not execute)",
+          "executed": false
         }
       ]
     },
@@ -655,17 +661,20 @@
       "verified_at": "2026-06-23",
       "ttl_days": 21,
       "owner": "@codex",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 17,
+        "passed": 15,
         "total": 17
       },
       "criteria": [
@@ -798,15 +807,15 @@
         {
           "id": "repo_context_projection_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_truth_graph_repo_context.py: PASS \u2014 1 passed in 1.20s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "truth_graph_projection_on_main",
           "kind": "commit_on_main",
-          "passed": true,
-          "detail": "936d365db is an ancestor of origin/main",
+          "passed": false,
+          "detail": "936d365db is NOT on HEAD \u2014 work not landed",
           "executed": true
         }
       ]
@@ -839,17 +848,20 @@
       "verified_at": "2026-06-23",
       "ttl_days": 14,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 8,
+        "passed": 6,
         "total": 8
       },
       "criteria": [
@@ -919,15 +931,15 @@
         {
           "id": "holon_bridge_verifier_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_holon_bridge.py: PASS \u2014 16 passed in 0.20s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "holon_substrate_on_main",
           "kind": "commit_on_main",
-          "passed": true,
-          "detail": "9c76b210 is an ancestor of origin/main",
+          "passed": false,
+          "detail": "9c76b210 is NOT on HEAD \u2014 work not landed",
           "executed": true
         }
       ]
@@ -963,17 +975,20 @@
       "verified_at": "2026-06-22",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 9,
+        "passed": 7,
         "total": 9
       },
       "criteria": [
@@ -1050,15 +1065,15 @@
         {
           "id": "precedence_invariant_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: PASS \u2014 1 passed in 0.24s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "stage4_precedence_locked_on_main",
           "kind": "commit_on_main",
-          "passed": true,
-          "detail": "bc110d84 is an ancestor of origin/main",
+          "passed": false,
+          "detail": "bc110d84 is NOT on HEAD \u2014 work not landed",
           "executed": true
         }
       ]
@@ -1326,17 +1341,20 @@
       "verified_at": "2026-06-24",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
-      "shippable": true,
-      "criteria_pass": true,
-      "ship_blocks": [],
-      "has_rigorous_evidence": true,
-      "strongest_grade": 2,
-      "strongest_grade_name": "S2_LANDED",
+      "shippable": false,
+      "criteria_pass": false,
+      "ship_blocks": [
+        "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
+        "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
+      ],
+      "has_rigorous_evidence": false,
+      "strongest_grade": 1,
+      "strongest_grade_name": "S1_PRESENT",
       "min_evidence_grade": 2,
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 12,
+        "passed": 7,
         "total": 12
       },
       "criteria": [
@@ -1392,9 +1410,9 @@
         {
           "id": "stage_contract_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_stage_contracts.py: PASS \u2014 13 passed in 0.14s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "okf_projector_exists",
@@ -1406,9 +1424,9 @@
         {
           "id": "okf_roundtrip_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_okf_projection.py: PASS \u2014 8 passed in 0.16s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "semantic_fs_facade_exists",
@@ -1420,9 +1438,9 @@
         {
           "id": "semantic_fs_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_semantic_fs.py: PASS \u2014 5 passed in 0.14s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "organizer_dry_run_first_exists",
@@ -1434,16 +1452,16 @@
         {
           "id": "organizer_test_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_organizer.py: PASS \u2014 5 passed in 0.12s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_organizer.py: pytest not installed (could not execute)",
+          "executed": false
         },
         {
           "id": "fs_substrate_e2e_passes",
           "kind": "test_passes",
-          "passed": true,
-          "detail": "pytest tests/test_fs_substrate_e2e.py: PASS \u2014 4 passed in 4.40s",
-          "executed": true
+          "passed": false,
+          "detail": "pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
+          "executed": false
         }
       ]
     }
@@ -1469,8 +1487,14 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-reconciliation-2026-06",
-      "message": "[runtime-truth-reconciliation-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:runtime-truth-reconciliation-2026-06:operator_core_contracts_pass",
+      "message": "[runtime-truth-reconciliation-2026-06] UNVERIFIED \u2014 'operator_core_contracts_pass' could not run here (not a regression): pytest tests/test_operator_core_contracts.py: pytest not installed (could not execute)",
+      "criterion_id": "operator_core_contracts_pass"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:runtime-truth-reconciliation-2026-06",
+      "message": "[runtime-truth-reconciliation-2026-06] 11/12 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1481,8 +1505,20 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:runtime-truth-nats-2026-06",
-      "message": "[runtime-truth-nats-2026-06] all 4 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:runtime-truth-nats-2026-06:nats_transport_tests_pass",
+      "message": "[runtime-truth-nats-2026-06] UNVERIFIED \u2014 'nats_transport_tests_pass' could not run here (not a regression): pytest tests/test_nats_transport.py: pytest not installed (could not execute)",
+      "criterion_id": "nats_transport_tests_pass"
+    },
+    {
+      "severity": "INFO",
+      "check": "unverified:runtime-truth-nats-2026-06:nats_substrate_contract_test_pass",
+      "message": "[runtime-truth-nats-2026-06] UNVERIFIED \u2014 'nats_substrate_contract_test_pass' could not run here (not a regression): pytest tests/test_nats_substrate_contract.py: pytest not installed (could not execute)",
+      "criterion_id": "nats_substrate_contract_test_pass"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:runtime-truth-nats-2026-06",
+      "message": "[runtime-truth-nats-2026-06] 2/4 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1499,20 +1535,56 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:truth-graph-platform-2026-06",
-      "message": "[truth-graph-platform-2026-06] all 17 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:truth-graph-platform-2026-06:repo_context_projection_passes",
+      "message": "[truth-graph-platform-2026-06] UNVERIFIED \u2014 'repo_context_projection_passes' could not run here (not a regression): pytest tests/test_truth_graph_repo_context.py: pytest not installed (could not execute)",
+      "criterion_id": "repo_context_projection_passes"
+    },
+    {
+      "severity": "ERROR",
+      "check": "regression:truth-graph-platform-2026-06:truth_graph_projection_on_main",
+      "message": "[truth-graph-platform-2026-06] REGRESSION \u2014 'truth_graph_projection_on_main' passed before and now fails: 936d365db is NOT on HEAD \u2014 work not landed",
+      "criterion_id": "truth_graph_projection_on_main"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:truth-graph-platform-2026-06",
+      "message": "[truth-graph-platform-2026-06] 15/17 completion criteria pass.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:composer-holon-spine-longrun-2026-06",
-      "message": "[composer-holon-spine-longrun-2026-06] all 8 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:composer-holon-spine-longrun-2026-06:holon_bridge_verifier_passes",
+      "message": "[composer-holon-spine-longrun-2026-06] UNVERIFIED \u2014 'holon_bridge_verifier_passes' could not run here (not a regression): pytest tests/test_holon_bridge.py: pytest not installed (could not execute)",
+      "criterion_id": "holon_bridge_verifier_passes"
+    },
+    {
+      "severity": "ERROR",
+      "check": "regression:composer-holon-spine-longrun-2026-06:holon_substrate_on_main",
+      "message": "[composer-holon-spine-longrun-2026-06] REGRESSION \u2014 'holon_substrate_on_main' passed before and now fails: 9c76b210 is NOT on HEAD \u2014 work not landed",
+      "criterion_id": "holon_substrate_on_main"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:composer-holon-spine-longrun-2026-06",
+      "message": "[composer-holon-spine-longrun-2026-06] 6/8 completion criteria pass.",
       "criterion_id": null
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:provider-routing-consolidation-2026-06",
-      "message": "[provider-routing-consolidation-2026-06] all 9 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:provider-routing-consolidation-2026-06:precedence_invariant_test_passes",
+      "message": "[provider-routing-consolidation-2026-06] UNVERIFIED \u2014 'precedence_invariant_test_passes' could not run here (not a regression): pytest tests/test_provider_routing_explicit.py::test_precedence_explicit_beats_power_beats_cost: pytest not installed (could not execute)",
+      "criterion_id": "precedence_invariant_test_passes"
+    },
+    {
+      "severity": "ERROR",
+      "check": "regression:provider-routing-consolidation-2026-06:stage4_precedence_locked_on_main",
+      "message": "[provider-routing-consolidation-2026-06] REGRESSION \u2014 'stage4_precedence_locked_on_main' passed before and now fails: bc110d84 is NOT on HEAD \u2014 work not landed",
+      "criterion_id": "stage4_precedence_locked_on_main"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:provider-routing-consolidation-2026-06",
+      "message": "[provider-routing-consolidation-2026-06] 7/9 completion criteria pass.",
       "criterion_id": null
     },
     {
@@ -1529,8 +1601,38 @@
     },
     {
       "severity": "INFO",
-      "check": "track-shippable:filesystem-native-substrate-2026-06",
-      "message": "[filesystem-native-substrate-2026-06] all 12 criteria pass, rigorous evidence present, no open blockers \u2014 SHIPPABLE (rigorous bar). Close it.",
+      "check": "unverified:filesystem-native-substrate-2026-06:stage_contract_test_passes",
+      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'stage_contract_test_passes' could not run here (not a regression): pytest tests/test_stage_contracts.py: pytest not installed (could not execute)",
+      "criterion_id": "stage_contract_test_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "unverified:filesystem-native-substrate-2026-06:okf_roundtrip_test_passes",
+      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'okf_roundtrip_test_passes' could not run here (not a regression): pytest tests/test_okf_projection.py: pytest not installed (could not execute)",
+      "criterion_id": "okf_roundtrip_test_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "unverified:filesystem-native-substrate-2026-06:semantic_fs_test_passes",
+      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'semantic_fs_test_passes' could not run here (not a regression): pytest tests/test_semantic_fs.py: pytest not installed (could not execute)",
+      "criterion_id": "semantic_fs_test_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "unverified:filesystem-native-substrate-2026-06:organizer_test_passes",
+      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'organizer_test_passes' could not run here (not a regression): pytest tests/test_organizer.py: pytest not installed (could not execute)",
+      "criterion_id": "organizer_test_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "unverified:filesystem-native-substrate-2026-06:fs_substrate_e2e_passes",
+      "message": "[filesystem-native-substrate-2026-06] UNVERIFIED \u2014 'fs_substrate_e2e_passes' could not run here (not a regression): pytest tests/test_fs_substrate_e2e.py: pytest not installed (could not execute)",
+      "criterion_id": "fs_substrate_e2e_passes"
+    },
+    {
+      "severity": "INFO",
+      "check": "track-in-progress:filesystem-native-substrate-2026-06",
+      "message": "[filesystem-native-substrate-2026-06] 7/12 completion criteria pass.",
       "criterion_id": null
     }
   ]
