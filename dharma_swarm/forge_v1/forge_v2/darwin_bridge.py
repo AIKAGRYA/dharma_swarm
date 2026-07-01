@@ -18,6 +18,7 @@ Forge measurement module — the ruler is frozen while it judges.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from dharma_swarm.archive import ArchiveEntry, FitnessScore
@@ -29,12 +30,51 @@ SHADOW_ARCHIVE_NAME = "darwin_shadow_archive.jsonl"
 # the single most dangerous move (fake-green by making the test easier). Refused.
 EVALUATOR_MODULES = frozenset(
     {"stats", "critic", "runner", "budget", "provenance", "promote", "signals",
-     "scheduler", "analysis", "receipts"}
+     "scheduler", "analysis", "receipts", "arms", "forge_fitness", "verify_promotion"}
 )
+EVALUATOR_PATH_NAMES = frozenset(f"{name}.py" for name in EVALUATOR_MODULES)
+
+_DIFF_PATH_RE = re.compile(r"^(?:diff --git a/|--- a/|\+\+\+ b/)(\S+)")
 
 
 class EvaluatorMutationRefused(Exception):
     """Raised if a proposal would mutate the frozen evaluator lane."""
+
+
+def _paths_from_diff(diff_text: str) -> list[str]:
+    paths: list[str] = []
+    for line in (diff_text or "").splitlines():
+        match = _DIFF_PATH_RE.match(line.strip())
+        if not match:
+            continue
+        path = match.group(1)
+        if path != "/dev/null":
+            paths.append(path)
+    return paths
+
+
+def evaluator_path_hits(paths: list[str]) -> list[str]:
+    """Return frozen-ruler paths touched by a proposal."""
+    hits: list[str] = []
+    for raw in paths:
+        path = str(raw)
+        name = Path(path).name
+        if name in EVALUATOR_PATH_NAMES:
+            hits.append(path)
+    return sorted(set(hits))
+
+
+def _signal_target_paths(signal: dict) -> list[str]:
+    explicit = []
+    for key in ("target_paths", "diff_paths", "changed_paths"):
+        value = signal.get(key)
+        if isinstance(value, str):
+            explicit.append(value)
+        elif value:
+            explicit.extend(str(v) for v in value)
+    diff_text = str(signal.get("diff", "") or signal.get("patch", "") or "")
+    explicit.extend(_paths_from_diff(diff_text))
+    return explicit
 
 
 def _fitness_from_signal(signal: dict) -> FitnessScore:
@@ -58,6 +98,11 @@ def signal_to_archive_entry(signal: dict) -> ArchiveEntry:
     mission = str(signal.get("mission_class", "unknown"))
     arm = str(signal.get("arm", "unknown"))
     action = str(signal.get("action", ""))
+    frozen_hits = evaluator_path_hits(_signal_target_paths(signal))
+    if frozen_hits:
+        raise EvaluatorMutationRefused(
+            f"refused evaluator-lane path target: {', '.join(frozen_hits)}"
+        )
 
     # v0 mutation target is the coordination/arm-selection policy for this mission
     # class — explicitly NOT an evaluator module.

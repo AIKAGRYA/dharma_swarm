@@ -188,9 +188,10 @@ def report_to_signals(
     """Convert a closed campaign_meta_report into one signal per tested arm.
 
     The meta report is the primary input. ``taskbed``/``mission_class``/
-    ``contamination_state``/``class_null`` may be enriched by the caller (which
-    can read child decision records); when absent they are derived conservatively
-    from the report so the result is still honest and deterministic.
+    ``class_null`` may be enriched by the caller. ``contamination_state`` is kept
+    as a backward-compatible conservative hint only: clean states are ignored
+    unless sealed provenance in the report says the same thing.  A caller kwarg
+    can no longer launder public SWE-bench into ``clean``.
     """
     contrasts = meta_report.get("contrasts", {}) or {}
     closeout_counts = dict(meta_report.get("closeout_counts", {}) or {})
@@ -208,8 +209,9 @@ def report_to_signals(
     label = str((meta_report.get("scheduler", {}) or {}).get("label", "") or "")
     derived_mission = mission_class or (label.split("overnight_", 1)[-1] if label else "unknown")
     derived_taskbed = taskbed or _derive_taskbed(meta_report)
-    # Absent contamination on a public benchmark -> possible_pretrain (a blocker), never "clean".
-    derived_contam = contamination_state or _derive_contamination(meta_report)
+    # Absent sealed contamination on a public benchmark -> possible_pretrain
+    # (a blocker), never caller-supplied "clean".
+    derived_contam = _derive_contamination(meta_report, external_hint=contamination_state)
     derived_class_null = class_null or _derive_class_null(meta_report)
 
     signals: list[ForgeLearningSignal] = []
@@ -279,9 +281,35 @@ def _derive_taskbed(meta_report: dict) -> str:
     return label or "unknown_taskbed"
 
 
-def _derive_contamination(meta_report: dict) -> str:
-    """The meta report carries no top-level contamination field. For the public
-    SWE-bench taskbed the honest default is ``possible_pretrain`` (a blocker)."""
+def _sealed_contamination(meta_report: dict) -> str | None:
+    """Extract contamination only from report/provenance fields that are part of
+    the closed receipt.  This is the promotion-relevant source of truth."""
+    candidates = [
+        meta_report.get("contamination_state"),
+        (meta_report.get("provenance") or {}).get("contamination_state"),
+        (meta_report.get("sealed_provenance") or {}).get("contamination_state"),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            state = candidate.get("state")
+        else:
+            state = candidate
+        if state:
+            return str(state)
+    return None
+
+
+def _derive_contamination(meta_report: dict, *, external_hint: str | None = None) -> str:
+    """Derive contamination fail-closed from sealed provenance and taskbed.
+
+    ``external_hint`` is accepted only when it is conservative.  Clean hints are
+    ignored unless the closed report itself carries sealed clean provenance.
+    """
+    sealed = _sealed_contamination(meta_report)
+    if sealed:
+        return sealed
+    if external_hint and external_hint not in _CLEAN_CONTAMINATION:
+        return str(external_hint)
     if _derive_taskbed(meta_report) == "public_swebench":
         return "possible_pretrain"
     return "unknown"

@@ -42,9 +42,8 @@ Usage as agent task::
      provider timeout — optimize provider retry logic'"
 
 Relationship to existing code:
-    - DarwinEngine.auto_evolve(shadow=False) is the underlying executor.
-      This module wraps it with open-ended archive sampling and a swarm-specific
-      fitness signal rather than a fixed source file list.
+    - DarwinEngine.auto_evolve is the underlying executor.  This module invokes
+      it in shadow mode only; live promotion is owned by Forge verify_promotion.
     - selector.py has _novelty_weight() which is the right primitive but is not
       wired into the auto_evolve source file selection. This module uses it.
     - EvolutionArchive.list_entries() returns all entries with lineage.
@@ -235,6 +234,18 @@ DGM_PROTECTED_FILES = frozenset({
     "dharma_kernel.py",
     "evolution.py",
     "config.py",
+    # Frozen Forge ruler/evaluator lane.  DGM must not mutate the scorer it is
+    # trying to beat.
+    "stats.py",
+    "critic.py",
+    "runner.py",
+    "budget.py",
+    "provenance.py",
+    "promote.py",
+    "signals.py",
+    "arms.py",
+    "forge_fitness.py",
+    "verify_promotion.py",
 })
 
 
@@ -269,7 +280,8 @@ class DGMLoop:
         engine: DarwinEngine instance.
         state_dir: DHARMA state directory (~/.dharma).
         novelty_pressure: 0.0=exploit, 1.0=explore. 0.7 matches Sakana DGM.
-        shadow_mode: If True, propose but don't apply diffs. Env var override.
+        shadow_mode: If True, propose but don't apply diffs.  ``False`` is
+            refused here; Forge verify_promotion is the only live-apply door.
     """
 
     def __init__(
@@ -283,14 +295,12 @@ class DGMLoop:
         self._state_dir = state_dir or dharma_state_dir()
         self._novelty_pressure = novelty_pressure
 
-        import os
-        if shadow_mode is None:
-            # Default: shadow ON unless explicitly disabled AND autonomy >= 2
-            env_shadow = os.environ.get("DHARMA_EVOLUTION_SHADOW", "1")
-            autonomy = int(os.environ.get("DGC_AUTONOMY_LEVEL", "1"))
-            self._shadow_mode = not (env_shadow == "0" and autonomy >= 2)
-        else:
-            self._shadow_mode = shadow_mode
+        if shadow_mode is False:
+            raise ValueError(
+                "DGMLoop live apply is disabled; use forge_v2.verify_promotion "
+                "as the sole promotion/live-apply door."
+            )
+        self._shadow_mode = True
 
         self._src_root = Path.home() / "dharma_swarm" / "dharma_swarm"
 
@@ -569,13 +579,23 @@ async def run_dgm_evolution_task(
         fitness_context: What operational context to guide the evolution
             (e.g. "tasks are timing out on provider calls — improve retry logic").
         n_generations: How many generations to run (1 = quick, 80 = full DGM run).
-        shadow: True=dry-run, False=real mutation. None=use environment defaults.
+        shadow: True=dry-run. False is refused; live mutation must go through
+            forge_v2.verify_promotion.
         state_dir: DHARMA state directory.
 
     Returns:
         Dict with results, summary, and lineage information.
     """
     state_dir = state_dir or dharma_state_dir()
+    if shadow is False:
+        return {
+            "success": False,
+            "error": (
+                "DGMLoop live apply is disabled; use forge_v2.verify_promotion "
+                "as the sole promotion/live-apply door."
+            ),
+            "shadow_mode": True,
+        }
 
     # Load the DarwinEngine from the running swarm
     try:
