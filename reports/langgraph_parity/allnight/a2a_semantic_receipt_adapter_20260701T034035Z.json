@@ -1,0 +1,853 @@
+{
+  "applied": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-setu-sab-agni:97480d087d3a",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-setu-sab-agni:20260627T1812Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-setu-sab-agni",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-codex-composer-mac:d75e4ebdb211",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-composer-mac:20260627T1744Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-codex-composer-mac",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-codex-rushabdev:80f9d4d8803f",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-rushabdev:20260627T1812Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-codex-rushabdev",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-research-scout:286ecdf5b415",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-research-scout:20260627T1754Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-sab-research-scout",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-hardener:fd417aa79723",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-hardener:20260627T1744Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-sab-hardener",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-recruiter-bridge:d522a1627176",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-recruiter-bridge:20260627T1744Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-sab-recruiter-bridge",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-research-spark-3-challenge:d75e4ebdb211",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-research-spark-3-challenge:20260627T1802Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d00-research-spark-3-challenge",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-setu-approve-day1-queue:d75e4ebdb211",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-setu-approve-day1-queue:20260628T1544Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-setu-approve-day1-queue",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-codex-semantic-reply-queue17:d75e4ebdb211",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-semantic-reply-queue17:20260627T1834Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-recruiter-bridge-candidate-draft:d522a1627176",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-recruiter-bridge-candidate-draft:20260627T1834Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-hardener-route-service-runbook:fd417aa79723",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-hardener-route-service-runbook:20260627T1834Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-research-scout-channel-validation:286ecdf5b415",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-research-scout-channel-validation:20260627T1834Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-codex-rushabdev-federation-preflight:80f9d4d8803f",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-rushabdev-federation-preflight:20260627T1834Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-codex-visible-reply-proof:d75e4ebdb211",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-codex-visible-reply-proof:20260627T1925Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d02-codex-visible-reply-proof",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-research-next-spark:286ecdf5b415",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-research-next-spark:20260627T1931Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d02-research-next-spark",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-hardener-top-risks:fd417aa79723",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-hardener-top-risks:20260627T1925Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d02-hardener-top-risks",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-recruiter-first-spark-candidate:d522a1627176",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-recruiter-first-spark-candidate:20260627T1925Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-rushabdev-federation-watch:80f9d4d8803f",
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-rushabdev-federation-watch:20260627T1931Z",
+      "status": "adapted",
+      "task_id": "sab-flywheel-d02-rushabdev-federation-watch",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "applied_count": 18,
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm"
+  ],
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-semantic-adapter-20260701T034035Z.bak",
+  "candidate_count": 18,
+  "candidates": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-setu-sab-agni:97480d087d3a",
+      "agent_uid": "setu-sab-agni",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-setu-sab-agni.semantic_receipt.json",
+      "row_index": 25,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-setu-sab-agni:20260627T1812Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-setu-sab-agni.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-setu-sab-agni",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-codex-composer-mac:d75e4ebdb211",
+      "agent_uid": "codex_composer_mac",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+      "row_index": 26,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-composer-mac:20260627T1744Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-composer-mac.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-codex-composer-mac",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-codex-rushabdev:80f9d4d8803f",
+      "agent_uid": "codex_rushabdev",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-rushabdev.semantic_receipt.json",
+      "row_index": 27,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-codex-rushabdev:20260627T1812Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-codex-rushabdev.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-codex-rushabdev",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-research-scout:286ecdf5b415",
+      "agent_uid": "sab_research_scout",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json",
+      "row_index": 28,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-research-scout:20260627T1754Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-research-scout.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-sab-research-scout",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-hardener:fd417aa79723",
+      "agent_uid": "sab_hardener",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+      "row_index": 29,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-hardener:20260627T1744Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-hardener.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-sab-hardener",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-sab-recruiter-bridge:d522a1627176",
+      "agent_uid": "sab_recruiter_bridge",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+      "row_index": 30,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-sab-recruiter-bridge:20260627T1744Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-sab-recruiter-bridge.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-sab-recruiter-bridge",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d00-research-spark-3-challenge:d75e4ebdb211",
+      "agent_uid": "codex_composer_mac",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-research-spark-3-challenge.semantic_receipt.json",
+      "row_index": 31,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d00-research-spark-3-challenge:20260627T1802Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d00-research-spark-3-challenge.semantic_receipt.json",
+      "task_id": "sab-flywheel-d00-research-spark-3-challenge",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-setu-approve-day1-queue:d75e4ebdb211",
+      "agent_uid": "codex_composer_mac",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-setu-approve-day1-queue-20260628T1539Z.semantic_receipt.json",
+      "row_index": 32,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-setu-approve-day1-queue:20260628T1544Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-setu-approve-day1-queue-20260628T1539Z.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-setu-approve-day1-queue",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-codex-semantic-reply-queue17:d75e4ebdb211",
+      "agent_uid": "codex_composer_mac",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-semantic-reply-queue17.semantic_receipt.json",
+      "row_index": 33,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-semantic-reply-queue17:20260627T1834Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-semantic-reply-queue17.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-codex-semantic-reply-queue17",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-recruiter-bridge-candidate-draft:d522a1627176",
+      "agent_uid": "sab_recruiter_bridge",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-recruiter-bridge-candidate-draft.semantic_receipt.json",
+      "row_index": 34,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-recruiter-bridge-candidate-draft:20260627T1834Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-recruiter-bridge-candidate-draft.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-hardener-route-service-runbook:fd417aa79723",
+      "agent_uid": "sab_hardener",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-hardener-route-service-runbook.semantic_receipt.json",
+      "row_index": 35,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-hardener-route-service-runbook:20260627T1834Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-hardener-route-service-runbook.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-sab-hardener-route-service-runbook",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-sab-research-scout-channel-validation:286ecdf5b415",
+      "agent_uid": "sab_research_scout",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-research-scout-channel-validation.semantic_receipt.json",
+      "row_index": 36,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-sab-research-scout-channel-validation:20260627T1834Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-sab-research-scout-channel-validation.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-sab-research-scout-channel-validation",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d01-codex-rushabdev-federation-preflight:80f9d4d8803f",
+      "agent_uid": "codex_rushabdev",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-rushabdev-federation-preflight.semantic_receipt.json",
+      "row_index": 37,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d01-codex-rushabdev-federation-preflight:20260627T1834Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d01-codex-rushabdev-federation-preflight.semantic_receipt.json",
+      "task_id": "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-codex-visible-reply-proof:d75e4ebdb211",
+      "agent_uid": "codex_composer_mac",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+      "row_index": 39,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-codex-visible-reply-proof:20260627T1925Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-codex-visible-reply-proof.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-codex-visible-reply-proof",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-research-next-spark:286ecdf5b415",
+      "agent_uid": "sab_research_scout",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-research-next-spark.semantic_receipt.json",
+      "row_index": 40,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-research-next-spark:20260627T1931Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-research-next-spark.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-research-next-spark",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-hardener-top-risks:fd417aa79723",
+      "agent_uid": "sab_hardener",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+      "row_index": 41,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-hardener-top-risks:20260627T1925Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-hardener-top-risks.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-hardener-top-risks",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-recruiter-first-spark-candidate:d522a1627176",
+      "agent_uid": "sab_recruiter_bridge",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+      "row_index": 42,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-recruiter-first-spark-candidate:20260627T1925Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-recruiter-first-spark-candidate.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:sab-flywheel-d02-rushabdev-federation-watch:80f9d4d8803f",
+      "agent_uid": "codex_rushabdev",
+      "reason": "validated_terminal_semantic_receipt_without_embedded_a2a_receipt",
+      "resolved_source_receipt_path": "/Users/dhyana/dharma_swarm/reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-rushabdev-federation-watch.semantic_receipt.json",
+      "row_index": 43,
+      "source_receipt_id": "sab.semantic_receipt:sab-flywheel-d02-rushabdev-federation-watch:20260627T1931Z",
+      "source_receipt_path": "reports/sab_first_six_agent_flywheel/receipts/sab-flywheel-d02-rushabdev-federation-watch.semantic_receipt.json",
+      "task_id": "sab-flywheel-d02-rushabdev-federation-watch",
+      "terminal_status": "completed",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "generated_at": "2026-07-01T03:40:35Z",
+  "mode": "apply",
+  "post_readiness": {
+    "blocker_task_id_coverage_complete": true,
+    "blocker_task_ids": {
+      "open_or_claimed_tasks_present": [
+        "forge-v0.1-001",
+        "holon-plan-review-cursor-20260612",
+        "holon-plan-review-opus-20260612",
+        "l1-fx-001",
+        "reconcile-564-565-20260611",
+        "sab-flywheel-d01-qwen-code-first-spark",
+        "tam-wp-wp_dfa4e1134277",
+        "ts-converge-0611",
+        "ts-evo-0611-1",
+        "ts-evo-0611-2",
+        "ts-evo-0611-3",
+        "ts-hb0631-credit",
+        "ts-pr-babysit-div-20260610",
+        "yatagarasu-10cceaa8",
+        "yatagarasu-20260619-credit-monitor",
+        "yatagarasu-20260619-gap-scan-fix",
+        "yatagarasu-20260619-staging-decay"
+      ],
+      "unverified_closed_tasks_present": [
+        "ts-converge-0611"
+      ]
+    },
+    "gate_status": "DEGRADED",
+    "open_tasks": 17,
+    "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present",
+      "unverified_closed_tasks_present"
+    ],
+    "tasks": [
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:collector:hermes-m5",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:analyst:codex_composer",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:reviewer:opus_composer",
+        "lifecycle_state": "blocked_verified",
+        "status": "blocked",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "collab:fleet-health-collab-20260528:infra-audit:devin-roaming-2987d222",
+        "lifecycle_state": "blocked_verified",
+        "status": "blocked",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "forge-v0.1-001",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "qwen-code-review-001",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "ts-hb0631-credit",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "review-holon-drift-1781002954",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "ts-pr-babysit-div-20260610",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-1",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-2",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-evo-0611-3",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "reconcile-564-565-20260611",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "ts-converge-0611",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "ts-converge-0611",
+        "lifecycle_state": "completed_unverified",
+        "status": "completed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "holon-plan-review-codex-20260612",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "holon-plan-review-opus-20260612",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "holon-plan-review-cursor-20260612",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "tg-001",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "l1-fx-001",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "tam-wp-wp_dfa4e1134277",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-10cceaa8",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-gap-scan-fix",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-credit-monitor",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": false,
+        "id": "yatagarasu-20260619-staging-decay",
+        "lifecycle_state": "claimed_open",
+        "status": "claimed",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-setu-sab-agni",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-codex-composer-mac",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-codex-rushabdev",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-research-scout",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-hardener",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-sab-recruiter-bridge",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d00-research-spark-3-challenge",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-setu-approve-day1-queue",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-codex-semantic-reply-queue17",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-recruiter-bridge-candidate-draft",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-hardener-route-service-runbook",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-sab-research-scout-channel-validation",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d01-codex-rushabdev-federation-preflight",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": false,
+        "id": "sab-flywheel-d01-qwen-code-first-spark",
+        "lifecycle_state": "open_unclaimed",
+        "status": "pending",
+        "verified": false
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-codex-visible-reply-proof",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-research-next-spark",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-hardener-top-risks",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-recruiter-first-spark-candidate",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      },
+      {
+        "closed": true,
+        "id": "sab-flywheel-d02-rushabdev-federation-watch",
+        "lifecycle_state": "completed_verified",
+        "status": "completed",
+        "verified": true
+      }
+    ],
+    "total_tasks": 44,
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 1
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": []
+}

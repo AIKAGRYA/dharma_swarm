@@ -118,3 +118,47 @@ Verification:
 ## Blocker
 
 Phase 4 is not green. The live queue still contains open/claimed work and completed rows without embedded A2A task receipts. The SAB rows carry `sab.semantic_receipt` pointers or stale `receipt_validation` metadata, but the strict A2A gate correctly requires an embedded valid `dharma_a2a_task_receipt.v1` receipt or terminal closure through the governed lifecycle.
+
+## 2026-07-01 Addendum: Semantic Receipt Adapter
+
+Timestamp: `2026-07-01T03:45:52Z`
+
+Added a second narrow normalization tool:
+
+`scripts/governance/a2a_adapt_semantic_receipts.py`
+
+The tool only adapts rows that are already terminal, still unverified by the strict A2A lifecycle classifier, and backed by a validated `sab.semantic_receipt.v1` artifact. It does not close open work, claimed work, unsupported terminal statuses, identity mismatches, or receipt-less rows.
+
+Receipts:
+
+- `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json`
+- `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json`
+- `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json`
+- `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json`
+
+Live queue backup before adapter apply:
+
+- `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-semantic-adapter-20260701T034035Z.bak`
+
+Result:
+
+- Dry-run found 18 candidates and 0 skips.
+- Apply adapted 18 already-terminal SAB semantic rows into embedded valid `dharma_a2a_task_receipt.v1` receipts.
+- Post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still fails exit 2, now with `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
+- Fresh blocker audit now reports `blocker_count=18`: 11 stale claimed rows, 6 stale unclaimed rows, and one completed `ts-converge-0611` row with no receipt pointer.
+
+Verification:
+
+- `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py` -> `3 passed in 0.87s`
+- `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `26 passed in 0.87s`
+- `.venv/bin/ruff check scripts/governance/a2a_adapt_semantic_receipts.py tests/test_a2a_semantic_receipt_adapter.py` -> pass
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_adapt_semantic_receipts.py scripts/governance/a2a_readiness_blocker_audit.py scripts/governance/check_a2a_readiness.py tests/test_a2a_semantic_receipt_adapter.py` -> pass
+- `jq -e . reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`
+- `git diff --check` -> pass
+
+Remaining Phase 4 blocker:
+
+The strict A2A gate is still not green. Remaining blockers are the 17 open or claimed rows and the completed no-pointer `ts-converge-0611` row. They require task-specific execution, operator-gated closure, or recovered evidence; the semantic adapter intentionally does not infer those outcomes.

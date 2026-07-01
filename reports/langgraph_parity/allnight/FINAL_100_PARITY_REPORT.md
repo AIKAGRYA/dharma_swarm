@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **88/100**.
+Current score: **90/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime multi-process resume proof plus Phase 6 live-provider matrix closeout and model-status overlay artifacts on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof, Phase 6 live-provider matrix closeout, model-status overlay artifacts, and Phase 4 semantic-receipt A2A adapter on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -33,6 +33,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
 - Provider truth now has direct live-matrix falsification evidence: the dry-run planned 12 live routes and skipped 3 unavailable models; the full live matrix attempted 24 calls with 16 ok and 8 failed; a scoped Codex outside-sandbox retest passed 2/2 and supersedes the sandbox-only Codex failure in the full matrix. The gate still fails because Claude Code timed out in the full matrix and NVIDIA NIM `moonshotai/kimi-k2.6` failed both schema-bound probes.
 - Model-status projection now consumes live-probe evidence when an operator supplies `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`. It supports legacy provider-matrix receipts, direct `dharma.model_routing_live_probe.v1` top-level `results`, and provider-live-matrix closeout receipts that reference child artifacts. With the Phase 6 closeout receipt overlay, Claude Opus/Sonnet are not advertised as live-routable after timeout failures, NIM Kimi K2.6 is unavailable after schema failures, Codex GPT-5.5 remains verified from the outside-sandbox retest, and passing Ollama/NIM DeepSeek/Minimax routes stay live.
+- A2A semantic receipt adaptation now closes the previously audited `closed_semantic_receipt_present_non_a2a` blocker class. `scripts/governance/a2a_adapt_semantic_receipts.py` adapted 18 already-terminal validated `sab.semantic_receipt.v1` rows into embedded `dharma_a2a_task_receipt.v1` receipts, preserving the source semantic artifact as receipt evidence and backing up the live queue before mutation. A2A strict still fails, but unverified closed rows dropped from 19 to 1.
 
 ## Verification
 
@@ -214,12 +215,27 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/ruff check tests/test_orchestrator.py` -> pass.
 - `.venv/bin/python -m pytest -q tests/test_orchestrator.py` -> `40 passed in 27.06s`.
 - `.venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py tests/test_orchestrator.py` -> `71 passed in 68.87s`.
+- Phase 4 semantic receipt adapter: added `scripts/governance/a2a_adapt_semantic_receipts.py` and `tests/test_a2a_semantic_receipt_adapter.py`.
+- `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py` -> `3 passed in 0.87s`.
+- `.venv/bin/python scripts/governance/a2a_adapt_semantic_receipts.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --timestamp 2026-07-01T03:40:35Z --output reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json` -> dry-run found 18 candidates and 0 skips.
+- `.venv/bin/python scripts/governance/a2a_adapt_semantic_receipts.py --apply --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --timestamp 2026-07-01T03:40:35Z --output reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json` -> adapted 18/18 candidates; backup written at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-semantic-adapter-20260701T034035Z.bak`.
+- `.venv/bin/python scripts/governance/a2a_adapt_semantic_receipts.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --timestamp 2026-07-01T03:40:35Z --output reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json` -> post-apply dry-run found `candidate_count=0`.
+- `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` after semantic adaptation -> fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
+- `.venv/bin/python scripts/governance/a2a_readiness_blocker_audit.py --artifact-root /Users/dhyana/ds_langgraph_parity_20260701 --artifact-root /Users/dhyana/dharma_swarm --output reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json` -> pass; `blocker_count=18`.
+- `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `26 passed in 0.87s`.
+- `.venv/bin/ruff check scripts/governance/a2a_adapt_semantic_receipts.py tests/test_a2a_semantic_receipt_adapter.py` -> pass.
+- `.venv/bin/python -m compileall -q scripts/governance/a2a_adapt_semantic_receipts.py scripts/governance/a2a_readiness_blocker_audit.py scripts/governance/check_a2a_readiness.py tests/test_a2a_semantic_receipt_adapter.py` -> pass.
+- `jq -e . reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+- `git diff --check` -> pass.
 
 ## Failing Gates
 
-- A2A strict readiness: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
+- A2A strict readiness: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`; queue path `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl`.
 - A2A remaining blocker receipt: `reports/langgraph_parity/allnight/A2A_PHASE4_BLOCKER_RECEIPT.md`; replayable JSON audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json`.
-- A2A blocker audit classification: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, 18 valid SAB semantic receipts that are still non-A2A evidence, and 1 completed `ts-converge-0611` row with no receipt pointer.
+- A2A fresh blocker audit: `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json`.
+- A2A blocker audit classification after semantic adaptation: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, and 1 completed `ts-converge-0611` row with no receipt pointer. The 18 valid SAB semantic receipt rows are now embedded A2A-verified.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
 - Provider truth: partial after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix proves several routes work. The model-status overlay now prevents failed probed routes from remaining advertised as live when an operator supplies the closeout receipt. The full gate is still not green because the overlay is not yet an automatic production freshness/quarantine policy, Claude Code needs retest/quarantine, and A2A strict readiness remains red.
@@ -227,7 +243,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 
 ## Next Patch Sequence
 
-1. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
+1. Build a safe A2A blocker closure workflow for the remaining 18 blockers: verify/close the 17 open or claimed task IDs with task-specific receipts, and recover or create evidence for the completed `ts-converge-0611` no-pointer row; rerun `check_a2a_readiness.py --strict`.
 2. Promote provider-truth overlay from operator-selected receipt input to a safe production policy with freshness/expiry semantics, then retest or quarantine Claude Code timeouts.
 3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
 4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.

@@ -678,3 +678,61 @@
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T03:40:35Z - Phase 4 Semantic Receipt Adapter Start
+
+- Target gate: reduce A2A strict-readiness blockers without weakening the strict gate by adapting only already-terminal rows that have validated `sab.semantic_receipt.v1` artifacts into embedded `dharma_a2a_task_receipt.v1` receipts.
+- Current branch state:
+  - Worktree clean at `codex/langgraph-orchestration-parity-20260701`.
+  - PR #732 head `55dcf5252` is mergeable and all GitHub checks pass, including `pytest (3.11)` and `pytest (3.12)`.
+- Tests/checks run at round start:
+  - `git status --short --branch` -> clean and aligned with origin.
+  - `gh pr checks 732` -> all checks passing on `55dcf5252`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` -> expected fail exit 2; `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260630T174529Z.json` -> 18 `closed_semantic_receipt_present_non_a2a` rows, 1 `closed_missing_a2a_receipt_no_pointer` row, 11 stale claimed rows, 6 stale unclaimed rows.
+- Planned files:
+  - `scripts/governance/a2a_adapt_semantic_receipts.py`
+  - `tests/test_a2a_semantic_receipt_adapter.py`
+  - `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json`
+  - `reports/langgraph_parity/allnight/ALLNIGHT_LOG.md`
+  - `reports/langgraph_parity/allnight/SCOREBOARD.json`
+  - `reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md`
+- Current blockers:
+  - Seventeen open/claimed rows still need task-specific execution or external blocker receipts.
+  - One completed row still lacks any A2A receipt or supported external receipt pointer.
+  - Adapter must preserve source semantic artifacts as evidence and stamp row-level closer identity consistently with the embedded A2A receipt.
+
+## 2026-07-01T03:45:52Z - Phase 4 Semantic Receipt Adapter Closeout
+
+- Target gate result: partial success. A2A strict remains red, but the validated semantic-receipt blocker class is closed without weakening the strict gate.
+- Code changes landed locally:
+  - Added `scripts/governance/a2a_adapt_semantic_receipts.py`.
+  - Added `tests/test_a2a_semantic_receipt_adapter.py`.
+  - The adapter only targets already-terminal rows that are unverified by `task_lifecycle_state()`, have `sab.semantic_receipt.v1` receipt pointers, and validate against the SAB semantic receipt contract.
+  - Adapted receipts embed a `dharma_a2a_task_receipt.v1` receipt, preserve the source semantic receipt as an artifact/evidence pointer, preserve the semantic receipt fields under `semantic_receipt_*`, and stamp row-level receipt validation consistently with `closed_by`/`completed_by`.
+  - The live queue was backed up before apply at `/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-semantic-adapter-20260701T034035Z.bak`.
+- Generated artifacts:
+  - `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json`
+  - `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json`
+  - `reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json`
+  - `reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json`
+- A2A readiness result:
+  - Dry-run found 18 candidates and 0 skips, exactly matching the prior `closed_semantic_receipt_present_non_a2a` blocker class.
+  - Apply adapted 18/18 terminal semantic rows into embedded A2A receipts.
+  - Post-apply adapter dry-run found `candidate_count=0`.
+  - `.venv/bin/python scripts/governance/check_a2a_readiness.py --strict` still exits 2, now with `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
+  - Fresh blocker audit now reports `blocker_count=18`: 11 stale claimed rows, 6 stale unclaimed rows, and one completed `ts-converge-0611` no-pointer row.
+- Verification:
+  - `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py` -> `3 passed in 0.87s`.
+  - `.venv/bin/ruff check scripts/governance/a2a_adapt_semantic_receipts.py tests/test_a2a_semantic_receipt_adapter.py` -> pass.
+  - `.venv/bin/python -m compileall -q scripts/governance/a2a_adapt_semantic_receipts.py tests/test_a2a_semantic_receipt_adapter.py` -> pass.
+  - `.venv/bin/python -m pytest -q tests/test_a2a_semantic_receipt_adapter.py tests/test_a2a_readiness_blocker_audit.py tests/test_a2a_embedded_receipt_reconciler.py tests/test_a2a_readiness_gate.py tests/test_a2a_task_lifecycle.py` -> `26 passed in 0.87s`.
+  - `jq -e . reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.dry_run.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_semantic_receipt_adapter_post_apply_dry_run_20260701T034035Z.json reports/langgraph_parity/allnight/a2a_readiness_blocker_audit_20260701T034035Z.json reports/langgraph_parity/allnight/SCOREBOARD.json` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+  - `git diff --check` -> pass.
+- Scoreboard: raised conservatively to `90/100`; still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=1`.
+  - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.
