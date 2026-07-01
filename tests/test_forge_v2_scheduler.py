@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
-from dharma_swarm.forge_v1.forge_v2 import scheduler
+import pytest
+
+from dharma_swarm.forge_v1.forge_v2 import scheduler, taskbed_ledger
 
 
 def _fake_receipt(closeout: str = "inconclusive_low_power", cost: float = 0.01) -> dict:
@@ -45,6 +47,15 @@ def _fake_receipt(closeout: str = "inconclusive_low_power", cost: float = 0.01) 
 
 def _read_jsonl(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _task(task_id: str, contamination_state: str = "fresh_heldout") -> dict:
+    return {
+        "task_id": task_id,
+        "created_at": "2026-07-01T00:00:00Z",
+        "contamination_state": contamination_state,
+        "provenance": {"contamination_state": contamination_state},
+    }
 
 
 def test_cost_from_attempts_sums_attempt_budgets() -> None:
@@ -185,6 +196,148 @@ def test_scheduler_canonical_packet_uses_attempt_rows(tmp_path, monkeypatch) -> 
             "task_id": "a",
         }
     ]
+
+
+def test_scheduler_confirm_can_be_allocated_from_taskbed_ledger(tmp_path, monkeypatch) -> None:
+    run_root = tmp_path / "runs"
+    db = tmp_path / "taskbed.db"
+    monkeypatch.setattr(scheduler, "RUN_ROOT", run_root)
+    taskbed_ledger.register_tasks(
+        [_task("fresh-0"), _task("fresh-1")],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+        taskbed="fresh_pr_suite",
+    )
+
+    state = scheduler.run_scheduler(
+        instances=["legacy"],
+        n_explore=99,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="confirm",
+        max_campaigns=1,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        dry_run=True,
+        epoch_id="epoch-1",
+        taskbed_db=db,
+        taskbed_split="confirm",
+        taskbed_count=2,
+        taskbed_min_confirm_count=2,
+        taskbed_allocation_id="confirm-alloc",
+    )
+
+    run_dir = next(run_root.iterdir())
+    manifest = json.loads((run_dir / "run_manifest.json").read_text())
+    tasks = _read_jsonl(run_dir / "task_manifest.jsonl")
+    assert state["config"]["instances"] == ["fresh-0", "fresh-1"]
+    assert state["campaigns"][0]["n_explore"] == 0
+    assert state["taskbed_allocation"]["promotion_eligible_taskbed"] is True
+    assert manifest["taskbed_allocation"]["allocation_id"] == "confirm-alloc"
+    assert {row["split"] for row in tasks} == {"confirm"}
+    assert {row["taskbed_allocation_id"] for row in tasks} == {"confirm-alloc"}
+
+
+def test_scheduler_explore_can_be_allocated_from_taskbed_ledger(tmp_path, monkeypatch) -> None:
+    run_root = tmp_path / "runs"
+    db = tmp_path / "taskbed.db"
+    monkeypatch.setattr(scheduler, "RUN_ROOT", run_root)
+    taskbed_ledger.register_tasks(
+        [_task("public-0", "possible_pretrain"), _task("public-1", "possible_pretrain")],
+        db_path=db,
+        source="public_swebench",
+        taskbed="public_swebench",
+    )
+
+    state = scheduler.run_scheduler(
+        instances=["legacy"],
+        n_explore=0,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="explore",
+        max_campaigns=1,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        dry_run=True,
+        epoch_id="epoch-1",
+        taskbed_db=db,
+        taskbed_split="explore",
+        taskbed_count=2,
+        taskbed_allocation_id="explore-alloc",
+    )
+
+    run_dir = next(run_root.iterdir())
+    tasks = _read_jsonl(run_dir / "task_manifest.jsonl")
+    assert state["campaigns"][0]["n_explore"] == 2
+    assert state["taskbed_allocation"]["split"] == "explore"
+    assert state["taskbed_allocation"]["promotion_eligible_taskbed"] is False
+    assert {row["split"] for row in tasks} == {"explore"}
+
+
+def test_scheduler_refuses_adaptive_sampling_with_taskbed_allocation(tmp_path, monkeypatch) -> None:
+    run_root = tmp_path / "runs"
+    db = tmp_path / "taskbed.db"
+    monkeypatch.setattr(scheduler, "RUN_ROOT", run_root)
+    taskbed_ledger.register_tasks([_task("fresh-0")], db_path=db)
+
+    with pytest.raises(ValueError, match="adaptive sampling is disabled"):
+        scheduler.run_scheduler(
+            instances=["legacy"],
+            n_explore=0,
+            replicates=1,
+            budget_cap=60000,
+            campaign_budget_usd=0.25,
+            per_call_tokens=3500,
+            k_self_moa=1,
+            grade_timeout=1200,
+            timeout_s=240,
+            strategy="explore",
+            roster_n=14,
+            generator="glm-5.2",
+            verifier="moonshotai/kimi-k2.6",
+            arms=["verify_chain"],
+            mix_models=[],
+            label="refuse",
+            max_campaigns=1,
+            duration_hours=None,
+            total_budget_usd=5.0,
+            invalid_run_cap=2,
+            sleep_seconds=0.0,
+            dry_run=True,
+            adaptive=True,
+            taskbed_db=db,
+            taskbed_split="confirm",
+            taskbed_count=1,
+            taskbed_min_confirm_count=1,
+            taskbed_allocation_id="should-not-allocate",
+        )
+    assert taskbed_ledger.allocation_rows("should-not-allocate", db_path=db) == []
 
 
 def test_scheduler_stops_after_invalid_cap(tmp_path, monkeypatch) -> None:

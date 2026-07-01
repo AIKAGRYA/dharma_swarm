@@ -24,6 +24,7 @@ from dharma_swarm.daemon_config import dharma_state_dir  # noqa: E402
 
 from .analysis import build_campaign_report, choose_adaptive_instances, write_campaign_report  # noqa: E402
 from .runner import run as runner_run  # noqa: E402
+from . import taskbed_ledger  # noqa: E402
 
 RUN_ROOT = dharma_state_dir() / "forge_v1" / "forge_v2" / "scheduler"
 
@@ -170,6 +171,51 @@ CANONICAL_PACKET_FILES = (
 )
 
 
+def resolve_taskbed_allocation(
+    *,
+    split: str | None,
+    count: int | None,
+    epoch_id: str,
+    lane_id: str,
+    db_path: Path | str | None,
+    allocation_id: str | None = None,
+    candidate_id: str = "",
+    min_confirm_count: int = taskbed_ledger.MIN_CONFIRM_TASKS,
+) -> dict[str, Any] | None:
+    if not split:
+        return None
+    if split not in {"explore", "confirm"}:
+        raise ValueError("taskbed_split must be explore or confirm")
+    if split == "confirm":
+        return taskbed_ledger.allocate_confirm(
+            count=count or taskbed_ledger.MIN_CONFIRM_TASKS,
+            min_count=min_confirm_count,
+            epoch_id=epoch_id,
+            lane_id=lane_id,
+            db_path=db_path or taskbed_ledger.DEFAULT_DB,
+            allocation_id=allocation_id,
+            candidate_id=candidate_id,
+        )
+    if not count:
+        raise ValueError("taskbed_count is required for explore allocation")
+    return taskbed_ledger.allocate_explore(
+        count=count,
+        epoch_id=epoch_id,
+        lane_id=lane_id,
+        db_path=db_path or taskbed_ledger.DEFAULT_DB,
+        allocation_id=allocation_id,
+        candidate_id=candidate_id,
+    )
+
+
+def campaign_n_explore(*, requested_n_explore: int, instance_count: int, taskbed_split: str | None) -> int:
+    if taskbed_split == "confirm":
+        return 0
+    if taskbed_split == "explore":
+        return instance_count
+    return min(requested_n_explore, max(0, instance_count - 1))
+
+
 def _campaign_task_rows(state: dict[str, Any], history_attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     seen: set[tuple[str, int, str]] = set()
@@ -185,6 +231,7 @@ def _campaign_task_rows(state: dict[str, Any], history_attempts: list[dict[str, 
         campaign_index = int(campaign.get("campaign_index") or 0)
         instances = [str(item) for item in campaign.get("instances", []) or [] if item]
         n_explore = int(campaign.get("n_explore") or 0)
+        taskbed = dict(state.get("taskbed_allocation", {}) or {})
         for idx, task_id in enumerate(instances):
             attempt_splits = {
                 str(attempt.get("split"))
@@ -196,16 +243,17 @@ def _campaign_task_rows(state: dict[str, Any], history_attempts: list[dict[str, 
             if key in seen:
                 continue
             seen.add(key)
-            rows.append(
-                {
-                    "schema": "forge_v2.task_manifest_row.v1",
-                    "task_id": task_id,
-                    "instance_id": task_id,
-                    "split": split,
-                    "campaign_index": campaign_index,
-                    "source": "forge_v2.scheduler",
-                }
-            )
+            row = {
+                "schema": "forge_v2.task_manifest_row.v1",
+                "task_id": task_id,
+                "instance_id": task_id,
+                "split": split,
+                "campaign_index": campaign_index,
+                "source": taskbed.get("source", "forge_v2.scheduler"),
+            }
+            if taskbed.get("allocation_id"):
+                row["taskbed_allocation_id"] = taskbed["allocation_id"]
+            rows.append(row)
     return rows
 
 
@@ -411,6 +459,7 @@ def emit_canonical_packet(
         "closeout": state.get("last_closeout"),
         "stop_reason": state.get("stop_reason"),
         "task_count": len({row.get("task_id") for row in task_rows if row.get("task_id")}),
+        "taskbed_allocation": state.get("taskbed_allocation"),
         "completed_campaigns": state.get("completed_campaigns", 0),
         "invalid_runs": state.get("invalid_runs", 0),
         "total_cost_usd": state.get("total_cost_usd", 0.0),
@@ -475,12 +524,34 @@ def run_scheduler(
     ingest_learning: bool = False,
     learning_store_root: Path | str | None = None,
     epoch_id: str = "epoch_0",
+    taskbed_db: Path | str | None = None,
+    taskbed_split: str | None = None,
+    taskbed_count: int | None = None,
+    taskbed_allocation_id: str | None = None,
+    taskbed_lane_id: str | None = None,
+    taskbed_candidate_id: str = "",
+    taskbed_min_confirm_count: int = taskbed_ledger.MIN_CONFIRM_TASKS,
     runner: Callable[..., dict[str, Any]] = runner_run,
     learning_ingester: Callable[..., dict[str, Any]] = ingest_learning_spine,
 ) -> dict[str, Any]:
     out = RUN_ROOT / f"{label}_{now_stamp()}"
     out.mkdir(parents=True, exist_ok=True)
     ledger_path = out / "campaign_ledger.jsonl"
+
+    if taskbed_split and adaptive:
+        raise ValueError("adaptive sampling is disabled for taskbed-ledger allocations")
+    taskbed_allocation = resolve_taskbed_allocation(
+        split=taskbed_split,
+        count=taskbed_count,
+        epoch_id=epoch_id,
+        lane_id=taskbed_lane_id or label,
+        db_path=taskbed_db,
+        allocation_id=taskbed_allocation_id,
+        candidate_id=taskbed_candidate_id,
+        min_confirm_count=taskbed_min_confirm_count,
+    )
+    if taskbed_allocation:
+        instances = list(taskbed_allocation["task_ids"])
 
     arms = [arm for arm in arms if arm] or ["verify_chain"]
     pool = list(dict.fromkeys(instance_pool or instances))
@@ -518,7 +589,20 @@ def run_scheduler(
             "adaptive": adaptive,
             "adaptive_target_count": target_count,
             "hard_self_moa_threshold": hard_self_moa_threshold,
+            "taskbed": {
+                "enabled": bool(taskbed_allocation),
+                "db_path": str(taskbed_db or taskbed_ledger.DEFAULT_DB) if taskbed_allocation else "",
+                "split": taskbed_split or "",
+                "count": taskbed_count or 0,
+                "allocation_id": (taskbed_allocation or {}).get("allocation_id", ""),
+                "min_confirm_count": taskbed_min_confirm_count,
+            },
         },
+        "taskbed_allocation": (
+            {**taskbed_allocation, "source": "forge_v2.taskbed_ledger"}
+            if taskbed_allocation
+            else None
+        ),
         "completed_campaigns": 0,
         "invalid_runs": 0,
         "total_cost_usd": 0.0,
@@ -563,7 +647,11 @@ def run_scheduler(
                 target_count=target_count,
                 hard_self_moa_threshold=hard_self_moa_threshold,
             )
-        current_n_explore = min(n_explore, max(0, len(current_instances) - 1))
+        current_n_explore = campaign_n_explore(
+            requested_n_explore=n_explore,
+            instance_count=len(current_instances),
+            taskbed_split=(taskbed_allocation or {}).get("split"),
+        )
         row: dict[str, Any] = {
             "campaign_index": campaign_index,
             "campaign_label": campaign_label,
@@ -735,6 +823,20 @@ def main(argv: list[str] | None = None) -> int:
                         help="Learning spine store root (default: ~/.dharma/forge_v1/learning_signals).")
     parser.add_argument("--epoch-id", default="epoch_0",
                         help="Epoch tag for learning signals written by this scheduler run.")
+    parser.add_argument("--taskbed-db", default=None,
+                        help="SQLite taskbed ledger path. Used only with --taskbed-split.")
+    parser.add_argument("--taskbed-split", choices=["explore", "confirm"], default=None,
+                        help="Allocate scheduler instances from the durable taskbed ledger.")
+    parser.add_argument("--taskbed-count", type=int, default=0,
+                        help="Number of ledger tasks to allocate. CONFIRM defaults to 500 when omitted.")
+    parser.add_argument("--taskbed-allocation-id", default=None,
+                        help="Optional explicit taskbed allocation id.")
+    parser.add_argument("--taskbed-lane-id", default=None,
+                        help="Taskbed lane id for allocation accounting. Defaults to scheduler label.")
+    parser.add_argument("--taskbed-candidate-id", default="",
+                        help="Candidate id associated with this taskbed allocation.")
+    parser.add_argument("--taskbed-min-confirm-count", type=int, default=taskbed_ledger.MIN_CONFIRM_TASKS,
+                        help="Minimum CONFIRM tasks required by the ledger allocation.")
     args = parser.parse_args(argv)
 
     ids = [x.strip() for x in args.instances.split(",") if x.strip()]
@@ -771,6 +873,13 @@ def main(argv: list[str] | None = None) -> int:
         ingest_learning=not args.no_ingest_learning,
         learning_store_root=args.learning_store_root,
         epoch_id=args.epoch_id,
+        taskbed_db=args.taskbed_db,
+        taskbed_split=args.taskbed_split,
+        taskbed_count=args.taskbed_count or None,
+        taskbed_allocation_id=args.taskbed_allocation_id,
+        taskbed_lane_id=args.taskbed_lane_id,
+        taskbed_candidate_id=args.taskbed_candidate_id,
+        taskbed_min_confirm_count=args.taskbed_min_confirm_count,
     )
     print(
         f"[forge_v2_scheduler] stop={state['stop_reason']} campaigns={state['completed_campaigns']} "
