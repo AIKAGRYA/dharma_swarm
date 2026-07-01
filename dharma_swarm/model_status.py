@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from dharma_swarm import key_oracle
+from dharma_swarm.model_live_results import (
+    TRANSIENT_LIVE_FAILURES as _TRANSIENT_LIVE_FAILURES,
+    load_live_call_results,
+)
 from dharma_swarm import model_pool
 from dharma_swarm.daemon_config import dharma_state_dir
 from dharma_swarm.model_pool import ModelEntry, Route
@@ -69,9 +73,6 @@ _SAFE_DKEYS_FIELDS = (
     "status",
     "env_var",
 )
-
-_TRANSIENT_LIVE_FAILURES = frozenset({"rate_limited"})
-
 
 @dataclass(frozen=True, slots=True)
 class RouteStatus:
@@ -199,62 +200,9 @@ def _live_call_matrix_path() -> Path | None:
     return Path(raw).expanduser()
 
 
-def _merge_live_result(
-    existing: dict[str, Any] | None,
-    candidate: dict[str, Any],
-) -> dict[str, Any]:
-    if existing is None:
-        return candidate
-    existing_status = str(existing.get("status", "")).strip()
-    candidate_status = str(candidate.get("status", "")).strip()
-    candidate_failure = str(candidate.get("failure_class") or "").strip()
-    existing_failure = str(existing.get("failure_class") or "").strip()
-    if candidate_status == "ok":
-        return candidate
-    if candidate_status == "failed" and candidate_failure in _TRANSIENT_LIVE_FAILURES:
-        return existing
-    if existing_status == "failed" and existing_failure in _TRANSIENT_LIVE_FAILURES:
-        return candidate
-    if existing_status == "failed":
-        return candidate if candidate_status == "failed" else existing
-    if candidate_status == "failed":
-        return candidate
-    return candidate
-
-
 def _live_call_results(path: Path | None = None) -> dict[str, dict[str, Any]]:
     target = path or _live_call_matrix_path()
-    if target is None:
-        return {}
-    try:
-        data = json.loads(target.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    results: dict[str, dict[str, Any]] = {}
-    models = data.get("models")
-    if not isinstance(models, list):
-        return results
-    for model in models:
-        if not isinstance(model, dict):
-            continue
-        actual = model.get("actual_live_call")
-        if not isinstance(actual, dict):
-            actual = None
-        actual_items: list[Any] = []
-        if actual is not None:
-            actual_items.append(actual)
-        actual_many = model.get("actual_live_calls")
-        if isinstance(actual_many, list):
-            actual_items.extend(actual_many)
-        for item in actual_items:
-            if not isinstance(item, dict):
-                continue
-            route = item.get("route")
-            if isinstance(route, str) and route:
-                results[route] = _merge_live_result(results.get(route), item)
-    return results
+    return load_live_call_results(target)
 
 
 def _provider_row_key(provider: ProviderType | str) -> str | None:

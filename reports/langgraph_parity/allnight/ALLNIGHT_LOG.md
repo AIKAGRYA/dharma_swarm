@@ -643,3 +643,38 @@
   - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
   - Provider truth remains red until every live-routable route either passes the bounded probe contract or is downgraded/quarantined by explicit routing policy.
   - Closeout governance remains blocked by aggregate full-history gitleaks findings.
+
+## 2026-07-01T03:15:15Z - Phase 6 Live Provider Matrix Projection Overlay
+
+- Target gate: make the canonical `floor_model_status()` projection consume direct live-probe receipts so failed routes are not advertised as live-routable after a red matrix run.
+- Code changes landed locally:
+  - Added `dharma_swarm/model_live_results.py` as a leaf parser for safe live-result receipts.
+  - Kept legacy `models[].actual_live_call(s)` receipt support.
+  - Added support for direct `dharma.model_routing_live_probe.v1` top-level `results`.
+  - Added support for `dharma.provider_live_matrix_closeout.v1` receipts that reference child probe artifacts, including the Codex outside-sandbox retest.
+  - Wired `dharma_swarm/model_status.py` to use the parser without hardcoding provider/model failures.
+  - Added projection tests proving direct live-probe failures override green `dkeys` rows and closeout receipts can supersede a sandbox-only Codex failure with a later passing retest.
+- Generated artifact:
+  - `reports/langgraph_parity/allnight/provider_live_matrix_projection_overlay_20260701T031515Z.json`
+- Verification:
+  - `dkeys test` -> 10 live provider/key rows, 2 valid-but-no-funds, 2 auth-fail, 0 no-key-yet.
+  - `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH=reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json .venv/bin/python - <<'PY' ... floor_model_status() route status probe ... PY` -> fresh oracle; Claude Opus/Sonnet unavailable due timeout; Codex `gpt-5.5` verified and live-routable from the outside-sandbox retest; Kimi K2.6 live only through Ollama while NVIDIA NIM `moonshotai/kimi-k2.6` is unavailable due schema failure; DeepSeek and Minimax keep passing Ollama/NIM routes live.
+  - `.venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py` -> `31 passed in 20.64s`.
+  - `.venv/bin/ruff check dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py` -> pass.
+  - `.venv/bin/python -m compileall -q dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py` -> pass.
+  - `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+  - `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+  - `git diff --check` -> pass.
+- CI repair folded into this round:
+  - `gh pr checks 732` on previous head `1a460d761` showed `pytest (3.11)` failed in `tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers`: task ledger had `dispatch_assigned` but not `result_persisted`.
+  - Local focused test passed alone, indicating the failure was timing-sensitive under the full 3.11 suite.
+  - Updated the orchestrator tests to use the existing `_drain_running_tasks()` helper with a longer bounded wait instead of short hand-rolled 0.5s polling loops.
+  - `.venv/bin/python -m pytest -q tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_orchestrator.py::test_orchestrator_fail_closes_when_honors_checkpoint_missing tests/test_orchestrator.py::test_orchestrator_failure_records_signature tests/test_orchestrator.py::test_orchestrator_timeout_marks_failed_without_retry tests/test_orchestrator.py::test_orchestrator_timeout_requeues_with_retry_budget tests/test_orchestrator.py::test_orchestrator_connection_error_auto_requeues_transient_failure tests/test_orchestrator.py::test_orchestrator_long_timeout_auto_requeues_and_expands_timeout --tb=short` -> `8 passed in 11.81s`.
+  - `.venv/bin/python -m pytest -q tests/test_orchestrator.py` -> `40 passed in 27.06s`.
+  - `.venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py tests/test_orchestrator.py` -> `71 passed in 68.87s`.
+  - `.venv/bin/ruff check tests/test_orchestrator.py` -> pass.
+- Scoreboard: raised conservatively to `88/100`; still explicitly not 100/100.
+- Current blockers:
+  - A2A strict readiness remains red: `ready=false`, `open_tasks=17`, `unknown_status_tasks=0`, `unverified_closed_tasks=19`.
+  - Provider truth remains partial because the live-probe overlay is operator-selected through `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`; production default freshness/expiry/quarantine policy is not yet automatic.
+  - Closeout governance remains blocked by aggregate full-history gitleaks findings.

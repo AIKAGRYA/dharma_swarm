@@ -1,0 +1,124 @@
+{
+  "schema_version": "dharma.provider_live_matrix_projection_overlay.v1",
+  "generated_at": "2026-07-01T03:15:15Z",
+  "status": "passed_partial",
+  "claim": "The model-status projection now consumes direct live-probe receipts and provider-live-matrix closeout receipts. With fresh key status and the Phase 6 closeout receipt overlay, failed provider routes are no longer advertised as live-routable while passing alternate routes remain available.",
+  "input_receipt": "reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json",
+  "code_paths": [
+    "dharma_swarm/model_live_results.py",
+    "dharma_swarm/model_status.py",
+    "tests/test_model_status_projection.py",
+    "tests/test_orchestrator.py"
+  ],
+  "fresh_key_status": {
+    "command": "dkeys test",
+    "summary": "10 live provider/key rows, 2 valid-but-no-funds, 2 auth-fail, 0 no-key-yet"
+  },
+  "projection_command": "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH=reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json .venv/bin/python - <<'PY' ... floor_model_status() route status probe ... PY",
+  "projection_summary": {
+    "oracle_state": "fresh",
+    "claude-opus-4.8": {
+      "status": "unavailable",
+      "available_routes": [],
+      "unavailable_reason": "timeout",
+      "verification": "failed",
+      "route_statuses": {
+        "claude_code:claude-opus-4.8": "unavailable:timeout"
+      }
+    },
+    "claude-sonnet-4.6": {
+      "status": "unavailable",
+      "available_routes": [],
+      "unavailable_reason": "timeout",
+      "verification": "failed",
+      "route_statuses": {
+        "claude_code:claude-sonnet-4.6": "unavailable:timeout"
+      }
+    },
+    "gpt-5.5": {
+      "status": "live_routable",
+      "available_routes": [
+        "codex:gpt-5.5"
+      ],
+      "verification": "verified",
+      "route_statuses": {
+        "codex:gpt-5.5": "live_routable",
+        "openai:gpt-5.5": "unavailable:rate_limited"
+      }
+    },
+    "kimi-k2.6": {
+      "status": "live_routable",
+      "available_routes": [
+        "ollama:kimi-k2.6:cloud"
+      ],
+      "verification": "verified",
+      "route_statuses": {
+        "ollama:kimi-k2.6:cloud": "live_routable",
+        "nvidia_nim:moonshotai/kimi-k2.6": "unavailable:schema_failure",
+        "openrouter:moonshotai/kimi-k2.6": "unavailable:provider_dead"
+      }
+    },
+    "deepseek-v4-pro": {
+      "status": "live_routable",
+      "available_routes": [
+        "ollama:deepseek-v4-pro:cloud",
+        "nvidia_nim:deepseek-ai/deepseek-v4-pro"
+      ],
+      "verification": "verified"
+    },
+    "minimax-m3": {
+      "status": "live_routable",
+      "available_routes": [
+        "ollama:minimax-m3:cloud",
+        "nvidia_nim:minimaxai/minimax-m3"
+      ],
+      "verification": "verified"
+    }
+  },
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py",
+      "result": "31 passed in 20.64s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass with existing warnings"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD",
+      "result": "pass; REGRESSIONS (0)"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_orchestrator.py::test_orchestrator_fail_closes_when_honors_checkpoint_missing tests/test_orchestrator.py::test_orchestrator_failure_records_signature tests/test_orchestrator.py::test_orchestrator_timeout_marks_failed_without_retry tests/test_orchestrator.py::test_orchestrator_timeout_requeues_with_retry_budget tests/test_orchestrator.py::test_orchestrator_connection_error_auto_requeues_transient_failure tests/test_orchestrator.py::test_orchestrator_long_timeout_auto_requeues_and_expands_timeout --tb=short",
+      "result": "8 passed in 11.81s"
+    },
+    {
+      "command": ".venv/bin/ruff check tests/test_orchestrator.py",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_orchestrator.py",
+      "result": "40 passed in 27.06s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py tests/test_orchestrator.py",
+      "result": "71 passed in 68.87s"
+    }
+  ],
+  "remaining_blockers": [
+    "Provider truth is still not globally green because Claude Code routes need either a successful retest or explicit quarantine policy, and A2A strict readiness remains red.",
+    "The live-probe overlay is currently operator-selected through DHARMA_MODEL_LIVE_CALL_MATRIX_PATH; production default policy still needs a safe freshness/expiry decision before auto-applying probe receipts."
+  ]
+}

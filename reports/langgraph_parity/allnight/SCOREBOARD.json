@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-01T02:58:57Z",
+  "updated_at": "2026-07-01T03:15:15Z",
   "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
   "branch": "codex/langgraph-orchestration-parity-20260701",
   "base": {
@@ -10,9 +10,9 @@
     "pr_727_merge_is_ancestor": true
   },
   "score": {
-    "current": 86,
+    "current": 88,
     "target": 100,
-    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice plus a direct live provider matrix falsification receipt, and a broader Phase 7 runtime platform API/cockpit slice: runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof are inspectable or executable through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, full live-provider served-model proof, and closeout gitleaks governance remain failing or unproven."
+    "claim": "Not 100/100. Score reflects Phase 1 complete, runtime spine default-on slice passing, RuntimeStateStore-backed SWARM handoff, SUPERVISOR final-output, and SUBAGENTS_AS_TOOLS restart proofs, a small Phase 4 A2A reconciliation plus replayable blocker audit, Phase 5 MemoryKernel improvements including text-query live recall, topology-derived agent memory isolation, stale-memory rejection, retrieval telemetry, curated-source admission coverage, and tool-exposure metadata isolation, a Phase 6 provider-truth spine receipt slice, a direct live provider matrix falsification receipt, and a model-status live-probe overlay that prevents failed probed routes from remaining advertised as live-routable when an operator supplies the closeout receipt. Phase 7 runtime platform API/cockpit surfaces include runtime graph, sessions/threads, runs, run detail, checkpoint snapshots, runtime events, SSE runtime-event transport, interrupt/resume/human-approval state, Agent Server-style assistants/configurations, background/cron snapshots, auditable approve/reject/resume runtime control actions, and fresh-process runtime resume proof through RuntimeStateStore-backed operator/API/dashboard-client surfaces. A2A strict green, automatic production provider quarantine/freshness policy, and closeout gitleaks governance remain failing or unproven."
   },
   "rounds": [
     {
@@ -671,6 +671,42 @@
         "Provider truth remains red after direct live evidence: full matrix attempted 24 live calls with 16 ok and 8 failed; Codex retest outside the sandbox passed 2/2 but Claude Code timed out and NVIDIA NIM moonshotai/kimi-k2.6 failed both schema-bound probes.",
         "Closeout governance remains blocked by aggregate full-history gitleaks findings."
       ]
+    },
+    {
+      "id": "phase-6-live-provider-matrix-projection-overlay",
+      "timestamp": "2026-07-01T03:15:15Z",
+      "status": "completed_partial",
+      "target_gate": "Make canonical floor_model_status consume direct live-probe receipts so failed probed routes stop being advertised as live-routable",
+      "files_touched": [
+        "dharma_swarm/model_live_results.py",
+        "dharma_swarm/model_status.py",
+        "tests/test_model_status_projection.py",
+        "tests/test_orchestrator.py",
+        "reports/langgraph_parity/allnight/provider_live_matrix_projection_overlay_20260701T031515Z.json",
+        "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+        "reports/langgraph_parity/allnight/SCOREBOARD.json",
+        "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md"
+      ],
+      "tests_run": [
+        "dkeys test",
+        "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH=reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json .venv/bin/python - <<'PY' ... floor_model_status() route status probe ... PY",
+        ".venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py",
+        ".venv/bin/ruff check dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py",
+        ".venv/bin/python -m compileall -q dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py",
+        ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+        ".venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD",
+        "git diff --check",
+        "gh pr checks 732",
+        ".venv/bin/python -m pytest -q tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_orchestrator.py::test_orchestrator_fail_closes_when_honors_checkpoint_missing tests/test_orchestrator.py::test_orchestrator_failure_records_signature tests/test_orchestrator.py::test_orchestrator_timeout_marks_failed_without_retry tests/test_orchestrator.py::test_orchestrator_timeout_requeues_with_retry_budget tests/test_orchestrator.py::test_orchestrator_connection_error_auto_requeues_transient_failure tests/test_orchestrator.py::test_orchestrator_long_timeout_auto_requeues_and_expands_timeout --tb=short",
+        ".venv/bin/ruff check tests/test_orchestrator.py",
+        ".venv/bin/python -m pytest -q tests/test_orchestrator.py",
+        ".venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py tests/test_orchestrator.py"
+      ],
+      "blockers": [
+        "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+        "Provider truth remains partial: failed routes are quarantined only when DHARMA_MODEL_LIVE_CALL_MATRIX_PATH points at the receipt; production default freshness/expiry/quarantine policy is not yet automatic.",
+        "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+      ]
     }
   ],
   "gates": {
@@ -685,7 +721,7 @@
     "phase_3_runtime_state_restart_resume": "passed_topology_states_table_restart_read_swarm_handoff_supervisor_final_output_and_subagents_child_runs",
     "phase_4_a2a_strict_green": "failed_partial_reconciled_unknown_0_open_17_unverified_19_audit_blocker_count_36",
     "phase_5_memory_live_retrieval": "passed_current_executable_lane_text_query_topology_agent_isolation_stale_rejection_retrieval_telemetry_curated_source_coverage_tool_exposure_metadata_isolation",
-    "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_from_agent_runner_route_decision_and_response",
+    "phase_6_provider_truth": "partial_spine_receipts_bind_requested_planned_actual_served_provider_model_and_live_probe_receipt_overlay_removes_failed_routes_when_operator_supplies_receipt",
     "phase_7_platform_surface": "partial_runtime_graph_sessions_runs_run_detail_checkpoint_snapshots_events_sse_interrupts_human_approval_state_assistants_configurations_background_cron_control_action_endpoints_and_fresh_process_resume_api_cockpit_partial"
   },
   "latest_verification": {
@@ -709,6 +745,8 @@
       "memory_stale_rejection_telemetry": "MemoryContextBudget.reject_stale blocks snapshot/dormant/missing/unknown freshness and expired valid_until atoms from default live ContextCompiler Memory Kernel packs; metadata now includes retrieval_telemetry with admitted/omitted surface IDs and selection/omission/warning reason counts; focused acceptance 1 passed in 0.38s; memory subset 30 passed in 0.63s; context compiler subset 55 passed in 0.80s; focused ruff, compileall, and diff-check pass",
       "memory_curated_source_tool_isolation": "MemoryContextBudget now enforces require_source_digest, require_source_row_key, and block_tool_exposure for default live ContextCompiler Memory Kernel packs; structured tool exposure metadata such as visible_tools/tool_calls/tool_plan is omitted with tool_exposure_blocked; tool exposure detection split into dharma_swarm/memory_kernel/tool_exposure.py to keep modules_over_500_lines at 207 -> 207; focused acceptance 1 passed in 0.22s; memory/context subset 86 passed in 0.94s; focused ruff, compileall, ratchet, and diff-check pass",
       "provider_truth_spine_receipt": "AgentRunner now exposes last route request/decision/response/usage; dharma_swarm/provider_truth.py normalizes requested/planned/actual/served provider-model truth; orchestrator spine EvidenceReceipt prefers LLMResponse served provider/model, falls back to ProviderRouteDecision, then runner config; focused spine/provider tests 8 passed in 0.35s; adjacent dispatch/topology tests 2 passed in 7.42s; module budget, hygiene ratchet, focused ruff, compileall, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
+      "provider_live_matrix_projection_overlay": "model_status now consumes legacy provider matrix receipts, direct model_routing_live_probe.v1 top-level results, and provider_live_matrix_closeout.v1 artifact references via dharma_swarm/model_live_results.py; with DHARMA_MODEL_LIVE_CALL_MATRIX_PATH=reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json and fresh dkeys, Claude Opus/Sonnet are unavailable due timeout, Codex gpt-5.5 remains verified through the outside-sandbox retest, Kimi K2.6 keeps only Ollama live while NVIDIA NIM moonshotai/kimi-k2.6 is unavailable due schema_failure, and DeepSeek/Minimax keep passing Ollama/NIM routes live; focused provider/model status tests 31 passed in 20.64s; focused ruff, compileall, module budget, delta ratchet, and diff-check pass",
+      "orchestrator_py311_ci_polling_repair": "PR #732 previous head 1a460d761 had pytest (3.11) fail in tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers because the short 0.5s polling loop observed dispatch_assigned before result_persisted; tests now use _drain_running_tasks with a longer bounded wait; focused affected orchestrator subset 8 passed in 11.81s; full tests/test_orchestrator.py 40 passed in 27.06s; provider/model-status plus orchestrator combined subset 71 passed in 68.87s; focused ruff pass",
       "runtime_graph_api_cockpit": "RuntimeGraphViews projects RuntimeStateStore topology_states, delegation_runs, and runtime_receipts into nodes/edges plus active_agents/checkpoints/topology_states/runs/receipts; GET /api/runtime/graph is registered and honors DHARMA_RUNTIME_DB; /dashboard/runtime fetches and renders graph summary/topology rows/recent receipts; focused backend/operator tests 4 passed in 0.95s; broader runtime/API/topology subset 55 passed in 31.54s; LangGraph parity plus runtime graph subset 23 passed in 0.82s; npm lint passed with existing warnings only; npm build passed; hygiene ratchet, module budget, compileall, ruff, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "runtime_platform_surfaces": "RuntimePlatformViews adds RuntimeStateStore-backed session/thread state, run listing, run detail via describe_run, checkpoint snapshots, and session/runtime event history; GET /api/runtime/sessions, /runs, /runs/{run_id}, /checkpoints, and /events are registered and honor DHARMA_RUNTIME_DB; focused runtime API tests 5 passed in 0.68s; broader runtime/API/topology subset 57 passed in 34.45s; LangGraph parity plus runtime API subset 25 passed in 1.10s; compileall, focused ruff, module budget, hygiene ratchet, diff-check, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",
       "supervisor_restart_final_output": "SUPERVISOR topology persists delegated_agent_ids, supervisor_final_output_only=true, and user_visible_output=supervisor_final in topology_states.state; topology_state receipts include persisted state; fresh RuntimeStateStore readback, describe_run(), and receipt assertions pass; focused topology acceptance 4 passed in 2.30s; compileall pass; adjacent runtime/orchestrator/topology subset 51 passed in 46.26s; focused ruff and orchestrator F821 pass; module budget, hygiene ratchet, diff-check, onboard, and spine strict pass; A2A strict remains red at open_tasks=17 and unverified_closed_tasks=19",

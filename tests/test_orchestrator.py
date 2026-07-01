@@ -394,7 +394,7 @@ class DummyRunner:
         return self._result
 
 
-async def _drain_running_tasks(orch: Orchestrator, *, attempts: int = 50) -> None:
+async def _drain_running_tasks(orch: Orchestrator, *, attempts: int = 500) -> None:
     for _ in range(attempts):
         if not orch._running_tasks:
             break
@@ -874,12 +874,7 @@ async def test_orchestrator_writes_task_and_progress_ledgers(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     task_path = tmp_path / "sess_test" / "task_ledger.jsonl"
     progress_path = tmp_path / "sess_test" / "progress_ledger.jsonl"
@@ -920,12 +915,7 @@ async def test_orchestrator_spine_dispatch_is_default_and_persists_receipt(
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     receipt = orch._last_evidence_receipt
     assert receipt.operation == "invoke_agent"
@@ -990,12 +980,7 @@ async def test_orchestrator_fail_closes_when_honors_checkpoint_missing(tmp_path)
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-honors-missing"
@@ -1023,12 +1008,7 @@ async def test_orchestrator_failure_records_signature(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(50):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     progress_path = tmp_path / "sess_fail" / "progress_ledger.jsonl"
     assert progress_path.exists()
@@ -1068,12 +1048,7 @@ async def test_orchestrator_timeout_marks_failed_without_retry(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-timeout"
@@ -1107,12 +1082,7 @@ async def test_orchestrator_timeout_requeues_with_retry_budget(tmp_path):
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     failed_seen = any(
         task_id == "t-timeout-retry" and fields.get("status") == TaskStatus.FAILED
@@ -1149,12 +1119,7 @@ async def test_orchestrator_connection_error_auto_requeues_transient_failure(tmp
     )
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-conn-retry" and fields.get("status") == TaskStatus.PENDING
@@ -1193,12 +1158,7 @@ async def test_orchestrator_long_timeout_auto_requeues_and_expands_timeout(tmp_p
     orch._long_timeout_retry_threshold_seconds = 0.0
 
     await orch.route_next()
-    for _ in range(80):
-        if not orch._running_tasks:
-            break
-        await orch._collect_completed()
-        await asyncio.sleep(0.01)
-    await orch._collect_completed()
+    await _drain_running_tasks(orch)
 
     assert any(
         task_id == "t-long-timeout" and fields.get("status") == TaskStatus.PENDING

@@ -2,11 +2,11 @@
 
 Status: **not 100/100**.
 
-Current score: **86/100**.
+Current score: **88/100**.
 
 Branch: `codex/langgraph-orchestration-parity-20260701`.
 
-Implementation commits: branch history through the current runtime multi-process resume proof plus Phase 6 live-provider matrix closeout artifacts on this branch.
+Implementation commits: branch history through the current runtime multi-process resume proof plus Phase 6 live-provider matrix closeout and model-status overlay artifacts on this branch.
 
 Remote branch: `origin/codex/langgraph-orchestration-parity-20260701`.
 
@@ -32,6 +32,7 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - Runtime resume now has fresh-process proof: a child Python process calls the configured `runtime_interrupt_resume` API route against `DHARMA_RUNTIME_DB`, then the parent process reopens the same `RuntimeStateStore` and verifies the `runtime_resume_requested` event, `runtime_control.resume` action row, resume token, and checkpoint detail.
 - Supervisor restart-readable proof now exists: `SUPERVISOR` topology persists delegated agent IDs, `supervisor_final_output_only: true`, and `user_visible_output: supervisor_final` in `TopologyStateRecord.state`; `describe_run()` and `topology_state` receipts expose the same persisted state.
 - Provider truth now has direct live-matrix falsification evidence: the dry-run planned 12 live routes and skipped 3 unavailable models; the full live matrix attempted 24 calls with 16 ok and 8 failed; a scoped Codex outside-sandbox retest passed 2/2 and supersedes the sandbox-only Codex failure in the full matrix. The gate still fails because Claude Code timed out in the full matrix and NVIDIA NIM `moonshotai/kimi-k2.6` failed both schema-bound probes.
+- Model-status projection now consumes live-probe evidence when an operator supplies `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH`. It supports legacy provider-matrix receipts, direct `dharma.model_routing_live_probe.v1` top-level `results`, and provider-live-matrix closeout receipts that reference child artifacts. With the Phase 6 closeout receipt overlay, Claude Opus/Sonnet are not advertised as live-routable after timeout failures, NIM Kimi K2.6 is unavailable after schema failures, Codex GPT-5.5 remains verified from the outside-sandbox retest, and passing Ollama/NIM DeepSeek/Minimax routes stay live.
 
 ## Verification
 
@@ -198,6 +199,21 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - `.venv/bin/python -m compileall -q dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py` -> pass.
 - `.venv/bin/ruff check dharma_swarm/model_routing_live_probe.py scripts/verify/model_routing_live_probe.py` -> pass.
 - `git diff --check` -> pass.
+- Phase 6 live-provider matrix projection overlay: added `dharma_swarm/model_live_results.py` and model-status projection support for direct live-probe receipts.
+- `dkeys test` -> 10 live provider/key rows, 2 valid-but-no-funds, 2 auth-fail, 0 no-key-yet.
+- `DHARMA_MODEL_LIVE_CALL_MATRIX_PATH=reports/langgraph_parity/allnight/provider_live_matrix_20260701T010345Z.json .venv/bin/python - <<'PY' ... floor_model_status() route status probe ... PY` -> fresh oracle; Claude Opus/Sonnet unavailable due timeout, Codex GPT-5.5 verified/live-routable, Kimi K2.6 live only through Ollama with NIM route unavailable due schema failure, and DeepSeek/Minimax keep passing Ollama/NIM routes live.
+- `.venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py` -> `31 passed in 20.64s`.
+- `.venv/bin/ruff check dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py` -> pass.
+- `.venv/bin/python -m compileall -q dharma_swarm/model_status.py dharma_swarm/model_live_results.py tests/test_model_status_projection.py` -> pass.
+- `.venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD` -> pass with existing warnings.
+- `.venv/bin/python scripts/governance/hygiene/delta_ratchet.py --base-ref dd02c1e03abb9348d442156c727f036b4bd65343 --head-ref HEAD` -> pass; `REGRESSIONS (0)`.
+- Provider projection overlay receipt: `reports/langgraph_parity/allnight/provider_live_matrix_projection_overlay_20260701T031515Z.json`.
+- CI repair after `1a460d761`: `pytest (3.11)` failed in `tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers` because the short polling loop saw `dispatch_assigned` before `result_persisted`.
+- Affected orchestrator tests now use `_drain_running_tasks()` with a longer bounded wait instead of short hand-rolled polling.
+- `.venv/bin/python -m pytest -q tests/test_orchestrator.py::test_orchestrator_writes_task_and_progress_ledgers tests/test_orchestrator.py::test_orchestrator_spine_dispatch_is_default_and_persists_receipt tests/test_orchestrator.py::test_orchestrator_fail_closes_when_honors_checkpoint_missing tests/test_orchestrator.py::test_orchestrator_failure_records_signature tests/test_orchestrator.py::test_orchestrator_timeout_marks_failed_without_retry tests/test_orchestrator.py::test_orchestrator_timeout_requeues_with_retry_budget tests/test_orchestrator.py::test_orchestrator_connection_error_auto_requeues_transient_failure tests/test_orchestrator.py::test_orchestrator_long_timeout_auto_requeues_and_expands_timeout --tb=short` -> `8 passed in 11.81s`.
+- `.venv/bin/ruff check tests/test_orchestrator.py` -> pass.
+- `.venv/bin/python -m pytest -q tests/test_orchestrator.py` -> `40 passed in 27.06s`.
+- `.venv/bin/python -m pytest -q tests/test_model_status_projection.py tests/test_model_routing_live_probe.py tests/test_model_pool_e2e_live_gate.py tests/test_orchestrator.py` -> `71 passed in 68.87s`.
 
 ## Failing Gates
 
@@ -206,13 +222,13 @@ This branch made real progress but does not satisfy the definition of 100/100. T
 - A2A blocker audit classification: 11 stale claimed rows without terminal receipts, 6 stale unclaimed rows, 18 valid SAB semantic receipts that are still non-A2A evidence, and 1 completed `ts-converge-0611` row with no receipt pointer.
 - Closeout governance: `make agent-build-closeout` fails at the secrets scan gate (`gitleaks` aggregate: 68 redacted findings). Findings were not expanded in this report to avoid exposing secret material.
 - Memory live retrieval: current executable lane passed. MemoryKernel text-query selection now feeds live `ContextCompiler` bundles with safety filters preserved, topology-derived agent memory isolation is proven across `SWARM`, `SUPERVISOR`, and `SUBAGENTS_AS_TOOLS` compiler metadata, stale/expired atoms are rejected from default live packs, retrieval telemetry is emitted, source digest/row key admission is enforced, and structured tool-exposure metadata is blocked.
-- Provider truth: failed after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix now proves several routes work. The full gate is still red: Claude Code timed out in the full matrix, NVIDIA NIM `moonshotai/kimi-k2.6` failed both schema-bound probes, and unavailable models remain skipped as provider-dead.
+- Provider truth: partial after direct live evidence. Orchestrator spine receipts capture actual served provider/model from `LLMResponse`/`ProviderRouteDecision` when `AgentRunner` has telemetry, with runner config as fallback, and the live matrix proves several routes work. The model-status overlay now prevents failed probed routes from remaining advertised as live when an operator supplies the closeout receipt. The full gate is still not green because the overlay is not yet an automatic production freshness/quarantine policy, Claude Code needs retest/quarantine, and A2A strict readiness remains red.
 - Cockpit/API: partial. Runtime graph inspection is wired for active agent, handoffs, checkpoints, runs, and receipts; sessions/threads, run listings, run detail, checkpoint snapshots, runtime event history, SSE runtime-event transport, interrupt/resume/human-approval state, assistants/configurations, background/cron runs, approve/reject/resume action endpoints, and fresh-process resume persistence are visible through `RuntimeStateStore`-backed API/operator views, with dashboard summary coverage and typed action helpers.
 
 ## Next Patch Sequence
 
 1. Build a safe A2A blocker closure workflow that verifies or externally quarantines each listed task ID with receipts; rerun `check_a2a_readiness.py --strict`.
-2. Close the provider-truth red routes: retest or quarantine Claude Code timeouts, downgrade or route around NVIDIA NIM `moonshotai/kimi-k2.6`, and require every `live_routable` route to pass bounded probe contracts before it counts as live.
+2. Promote provider-truth overlay from operator-selected receipt input to a safe production policy with freshness/expiry semantics, then retest or quarantine Claude Code timeouts.
 3. Add dashboard action UI on top of the accepted approve/reject/resume backend contract without creating dashboard-only control state.
 4. Keep widening cockpit/API proof only from canonical `RuntimeStateStore` sources.
 

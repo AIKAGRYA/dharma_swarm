@@ -277,6 +277,145 @@ def test_live_call_matrix_keeps_route_failed_when_later_case_passes(
     assert minimax.verification.status == "verified"
 
 
+def test_direct_live_probe_receipt_overrides_dkeys_live_routes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(
+        tmp_path,
+        {
+            "claude_code": _row("✓", status="oauth present"),
+            "ollama_cloud": _row("✓"),
+            "nvidia_nim": _row("✓"),
+        },
+    )
+    live_probe = tmp_path / "model_routing_live_probe.json"
+    live_probe.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "claude-opus-4.8",
+                        "route": "claude_code:claude-opus-4.8",
+                        "status": "failed",
+                        "failure_class": "timeout",
+                        "started_at": "2026-07-01T01:09:06Z",
+                    },
+                    {
+                        "logical_model_id": "kimi-k2.6",
+                        "route": "ollama:kimi-k2.6:cloud",
+                        "status": "ok",
+                        "response_preview": "PONG",
+                        "started_at": "2026-07-01T01:15:00Z",
+                    },
+                    {
+                        "logical_model_id": "kimi-k2.6",
+                        "route": "nvidia_nim:moonshotai/kimi-k2.6",
+                        "status": "failed",
+                        "failure_class": "schema_failure",
+                        "error": "expected 'PONG'",
+                        "started_at": "2026-07-01T01:15:01Z",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_PATH_ENV, str(live_probe))
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    by_id = {model.id: model for model in projection.models}
+    opus = by_id["claude-opus-4.8"]
+    kimi = by_id["kimi-k2.6"]
+    kimi_routes = {route.route: route for route in kimi.route_statuses}
+
+    assert opus.available is False
+    assert opus.unavailable_reason == "timeout"
+    assert opus.verification.status == "failed"
+    assert kimi.available is True
+    assert kimi.available_routes == ["ollama:kimi-k2.6:cloud"]
+    assert kimi_routes["nvidia_nim:moonshotai/kimi-k2.6"].status == "unavailable"
+    assert kimi_routes["nvidia_nim:moonshotai/kimi-k2.6"].reason == "schema_failure"
+    assert kimi.verification.status == "verified"
+
+
+def test_live_probe_closeout_receipt_merges_referenced_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    _write_status(
+        tmp_path,
+        {
+            "codex (openai-pro)": _row("✓", status="oauth present"),
+            "openai": _row("~", status="HTTP 429 rate-limited", http="429"),
+        },
+    )
+    full_live = tmp_path / "full_live.json"
+    codex_retest = tmp_path / "codex_retest.json"
+    closeout = tmp_path / "provider_live_matrix.json"
+    full_live.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "gpt-5.5",
+                        "route": "codex:gpt-5.5",
+                        "status": "failed",
+                        "failure_class": "routing_bug",
+                        "error": "Operation not permitted",
+                        "started_at": "2026-07-01T01:10:00Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    codex_retest.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.model_routing_live_probe.v1",
+                "results": [
+                    {
+                        "logical_model_id": "gpt-5.5",
+                        "route": "codex:gpt-5.5",
+                        "status": "ok",
+                        "response_preview": "PONG",
+                        "started_at": "2026-07-01T02:53:01Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    closeout.write_text(
+        json.dumps(
+            {
+                "schema_version": "dharma.provider_live_matrix_closeout.v1",
+                "artifacts": {
+                    "full_live_matrix": str(full_live),
+                    "codex_outside_sandbox_retest": str(codex_retest),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(key_oracle.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setenv(LIVE_CALL_MATRIX_PATH_ENV, str(closeout))
+
+    projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
+    gpt = {model.id: model for model in projection.models}["gpt-5.5"]
+    by_route = {route.route: route for route in gpt.route_statuses}
+
+    assert gpt.available is True
+    assert "codex:gpt-5.5" in gpt.available_routes
+    assert by_route["codex:gpt-5.5"].status == "live_routable"
+    assert gpt.verification.status == "verified"
+    assert gpt.verification.verified_at == "2026-07-01T02:53:01Z"
+
+
 def test_missing_key_status_is_unverified_not_advertised_callable(
     tmp_path: Path,
     monkeypatch,
