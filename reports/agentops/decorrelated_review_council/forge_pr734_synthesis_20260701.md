@@ -226,6 +226,12 @@ sell, promote, or cite the current `0.3333` lift.
 - Ran 10 role-specific council critics; result:
   `conviction_gate=hold_blockers`, `score_min=18`, `score_avg=46.2`,
   persistent `palantir-pilot` witness fresh.
+- Closeout impact check: local diffs against
+  `f84f40344cbdfab9d236239b0d3ec00718e10bf9` and `origin/main...HEAD`
+  showed the Forge production-contract package, two governance/docops files,
+  council artifacts, one governance report, and the focused Forge test; no
+  active runtime router, provider, Darwin apply, archive-fitness, or active
+  Forge v1/v2 scheduler files were touched.
 
 ## Sources
 
