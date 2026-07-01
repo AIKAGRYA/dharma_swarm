@@ -1,0 +1,265 @@
+from __future__ import annotations
+
+import json
+
+from dharma_swarm.forge_v1.forge_v2 import scheduler
+
+
+def _fake_receipt(closeout: str = "inconclusive_low_power", cost: float = 0.01) -> dict:
+    return {
+        "closeout": closeout,
+        "n_pairs": 1,
+        "contrast_vs_class_null": {"n": 1, "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+        "split_contrasts": {"explore": {"n": 0}, "confirm": {"n": 1}},
+        "critic_verdict": {"ran": False},
+        "contamination_state": {"state": "possible_pretrain"},
+        "budget_matched_proof": {"any_invalid": closeout == "invalid_budget"},
+        "attempts": [
+            {"budget": {"total_cost_usd": cost / 2}},
+            {"budget": {"total_cost_usd": cost / 2}},
+        ],
+        "next_experiment": "test",
+    }
+
+
+def test_cost_from_attempts_sums_attempt_budgets() -> None:
+    assert scheduler.cost_from_attempts(_fake_receipt(cost=0.123456)) == 0.123456
+
+
+def test_stop_reason_order_and_caps() -> None:
+    assert scheduler.stop_reason(
+        completed=3,
+        invalid_runs=0,
+        total_cost_usd=0.0,
+        start=0.0,
+        max_campaigns=3,
+        invalid_run_cap=2,
+        cost_cap_usd=1.0,
+        duration_hours=None,
+    ) == scheduler.STOP_MAX_CAMPAIGNS
+
+    assert scheduler.stop_reason(
+        completed=1,
+        invalid_runs=2,
+        total_cost_usd=0.0,
+        start=0.0,
+        max_campaigns=10,
+        invalid_run_cap=2,
+        cost_cap_usd=1.0,
+        duration_hours=None,
+    ) == scheduler.STOP_INVALID
+
+    assert scheduler.stop_reason(
+        completed=1,
+        invalid_runs=0,
+        total_cost_usd=1.0,
+        start=0.0,
+        max_campaigns=10,
+        invalid_run_cap=2,
+        cost_cap_usd=1.0,
+        duration_hours=None,
+    ) == scheduler.STOP_COST
+
+
+def test_scheduler_dry_run_writes_outer_receipts(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+
+    state = scheduler.run_scheduler(
+        instances=["a", "b"],
+        n_explore=1,
+        replicates=2,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="dry",
+        max_campaigns=2,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        dry_run=True,
+    )
+
+    assert state["stop_reason"] == scheduler.STOP_MAX_CAMPAIGNS
+    assert state["completed_campaigns"] == 2
+    assert state["total_cost_usd"] == 0.0
+
+    run_dir = next(tmp_path.iterdir())
+    decision = json.loads((run_dir / "decision_record.json").read_text())
+    ledger = (run_dir / "campaign_ledger.jsonl").read_text().strip().splitlines()
+    assert decision["stop_reason"] == scheduler.STOP_MAX_CAMPAIGNS
+    assert len(ledger) == 5
+
+
+def test_scheduler_stops_after_invalid_cap(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+
+    def fake_runner(*args, **kwargs):
+        return _fake_receipt(closeout="invalid_budget", cost=0.02)
+
+    state = scheduler.run_scheduler(
+        instances=["a"],
+        n_explore=0,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="invalid",
+        max_campaigns=10,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        runner=fake_runner,
+    )
+
+    assert state["stop_reason"] == scheduler.STOP_INVALID
+    assert state["completed_campaigns"] == 2
+    assert state["invalid_runs"] == 2
+
+
+def test_scheduler_rotates_arms_and_adapts_from_attempts(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+    seen = []
+
+    def fake_runner(instances, *args, **kwargs):
+        arm = kwargs["arm"]
+        seen.append((arm, tuple(instances)))
+        attempts = []
+        for task in instances:
+            self_pass = task == "easy"
+            arm_pass = task == "hard" and arm == "mixed_moa"
+            for attempt_arm, resolved in (("self_moa", self_pass), (arm, arm_pass)):
+                attempts.append(
+                    {
+                        "task_id": task,
+                        "split": "explore",
+                        "arm": attempt_arm,
+                        "class_null": "self_moa",
+                        "replicate": 0,
+                        "resolved": resolved,
+                        "budget": {"total_cost_usd": 0.001},
+                    }
+                )
+        return {
+            "arm": arm,
+            "class_null": "self_moa",
+            "closeout": "measured_negative",
+            "n_pairs": len(instances),
+            "contrast_vs_class_null": {"n": len(instances), "mean": 0.0, "lower": 0.0, "upper": 0.0, "p_le_0": 1.0},
+            "split_contrasts": {},
+            "critic_verdict": {"ran": False},
+            "contamination_state": {"state": "possible_pretrain"},
+            "budget_matched_proof": {"any_invalid": False},
+            "attempts": attempts,
+            "next_experiment": "test",
+        }
+
+    state = scheduler.run_scheduler(
+        instances=["easy", "hard"],
+        n_explore=1,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain", "mixed_moa"],
+        mix_models=["glm-5.2", "moonshotai/kimi-k2.6"],
+        label="adaptive",
+        max_campaigns=2,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        instance_pool=["easy", "hard", "new"],
+        adaptive=True,
+        adaptive_target_count=2,
+        runner=fake_runner,
+    )
+
+    assert state["stop_reason"] == scheduler.STOP_MAX_CAMPAIGNS
+    assert seen[0][0] == "verify_chain"
+    assert seen[1][0] == "mixed_moa"
+    assert seen[1][1] == ("hard", "new")
+
+
+def test_scheduler_ingests_learning_after_each_campaign(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(scheduler, "RUN_ROOT", tmp_path)
+    ingested = []
+
+    def fake_learning_ingester(run_dir, *, store_root, epoch_id):
+        ingested.append((run_dir.name, store_root, epoch_id))
+        assert (run_dir / "campaign_meta_report.json").exists()
+        return {
+            "ok": True,
+            "run_id": run_dir.name,
+            "n_signals": 1,
+            "store": {"n_new": len(ingested)},
+        }
+
+    state = scheduler.run_scheduler(
+        instances=["a", "b"],
+        n_explore=1,
+        replicates=1,
+        budget_cap=60000,
+        campaign_budget_usd=0.25,
+        per_call_tokens=3500,
+        k_self_moa=1,
+        grade_timeout=1200,
+        timeout_s=240,
+        strategy="explore",
+        roster_n=14,
+        generator="glm-5.2",
+        verifier="moonshotai/kimi-k2.6",
+        arms=["verify_chain"],
+        mix_models=[],
+        label="learn",
+        max_campaigns=2,
+        duration_hours=None,
+        total_budget_usd=5.0,
+        invalid_run_cap=2,
+        sleep_seconds=0.0,
+        dry_run=True,
+        ingest_learning=True,
+        learning_store_root=tmp_path / "learning",
+        epoch_id="overnight_test",
+        learning_ingester=fake_learning_ingester,
+    )
+
+    assert len(ingested) == 2
+    assert all(row[1] == tmp_path / "learning" for row in ingested)
+    assert all(row[2] == "overnight_test" for row in ingested)
+    assert state["learning_spine"]["ingests"] == 2
+    assert state["learning_spine"]["failures"] == 0
+
+    run_dir = next(p for p in tmp_path.iterdir() if p.is_dir() and p.name.startswith("learn_"))
+    ledger_events = [
+        json.loads(line)["event"]
+        for line in (run_dir / "campaign_ledger.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert ledger_events.count("learning_spine_ingest") == 2
