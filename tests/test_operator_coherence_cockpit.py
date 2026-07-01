@@ -18,9 +18,9 @@ def _write(path: Path, text: str) -> None:
 def test_operator_coherence_projection_is_probe_backed(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
-    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True, timeout=30)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True, timeout=30)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True, timeout=30)
 
     _write(
         repo / "docs/governance/ACTIVE_TRACK.yaml",
@@ -88,14 +88,15 @@ closed_tracks: []
     (repo / "reports/a2a").mkdir(parents=True)
     (repo / ".dharma/preservation").mkdir(parents=True)
 
-    subprocess.run(["git", "add", "."], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-m", "seed"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True, timeout=30)
+    subprocess.run(["git", "commit", "-m", "seed"], cwd=repo, check=True, capture_output=True, timeout=30)
     _write(repo / "rogue.txt", "untracked local work\n")
 
     # A local-only branch that is NOT checked out in any worktree — the kind of
     # rogue/unpushed work the branch census must surface (worktree probe misses).
     subprocess.run(
-        ["git", "branch", "rogue/local-only-feature"], cwd=repo, check=True, capture_output=True
+        ["git", "branch", "rogue/local-only-feature"], cwd=repo, check=True, capture_output=True,
+        timeout=30,
     )
 
     payload = build_operator_coherence_cockpit(

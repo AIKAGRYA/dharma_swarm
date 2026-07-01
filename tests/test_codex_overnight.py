@@ -71,14 +71,14 @@ def test_build_cycle_prompt_mentions_mission_and_dirty_tree(tmp_path: Path) -> N
 def test_gather_git_snapshot_counts_untracked_and_unstaged_changes(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True, timeout=30)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo_root, check=True, capture_output=True, text=True, timeout=30)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo_root, check=True, capture_output=True, text=True, timeout=30)
 
     tracked = repo_root / "tracked.txt"
     tracked.write_text("base\n", encoding="utf-8")
-    subprocess.run(["git", "add", "tracked.txt"], cwd=repo_root, check=True, capture_output=True, text=True)
-    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_root, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo_root, check=True, capture_output=True, text=True, timeout=30)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo_root, check=True, capture_output=True, text=True, timeout=30)
 
     tracked.write_text("base\nchange\n", encoding="utf-8")
     (repo_root / "new.txt").write_text("hello\n", encoding="utf-8")

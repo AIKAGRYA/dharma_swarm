@@ -13,7 +13,7 @@ def test_a2a_inbox_bridge_tmux_scripts_are_syntax_valid() -> None:
         "scripts/status_a2a_inbox_bridge_tmux.sh",
         "scripts/stop_a2a_inbox_bridge_tmux.sh",
     ]:
-        subprocess.run(["bash", "-n", str(ROOT / script)], check=True)
+        subprocess.run(["bash", "-n", str(ROOT / script)], check=True, timeout=30)
 
 
 def test_a2a_inbox_bridge_start_script_uses_receipt_bridge_not_ad_hoc_bus() -> None:

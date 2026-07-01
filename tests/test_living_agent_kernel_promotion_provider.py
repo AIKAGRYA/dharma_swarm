@@ -322,7 +322,8 @@ def test_provider_worker_cli_and_os_status_surface(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     ran = subprocess.run(
         [
             sys.executable,
@@ -350,7 +351,8 @@ def test_provider_worker_cli_and_os_status_surface(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     status = subprocess.run(
         [
             sys.executable,
@@ -364,7 +366,8 @@ def test_provider_worker_cli_and_os_status_surface(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     promoted_payload = json.loads(promoted.stdout)
     ran_payload = json.loads(ran.stdout)
     status_payload = json.loads(status.stdout)

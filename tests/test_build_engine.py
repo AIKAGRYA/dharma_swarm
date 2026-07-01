@@ -41,15 +41,16 @@ def sample_task(tmp_path):
         "from main import hello\ndef test_hello():\n    assert hello() == 'hello'\n"
     )
     # Init git repo
-    subprocess.run(["git", "init"], cwd=repo, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True)
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, timeout=30)
+    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, timeout=30)
     subprocess.run(
         ["git", "commit", "-m", "init"],
         cwd=repo,
         capture_output=True,
         env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
              "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-    )
+timeout=30,
+)
     return BuildTask(
         queue_item_id="q1",
         initiative_id="init1",
@@ -69,15 +70,16 @@ def git_repo(tmp_path):
     repo = tmp_path / "git_test"
     repo.mkdir()
     (repo / "file.py").write_text("x = 1\n")
-    subprocess.run(["git", "init"], cwd=repo, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True)
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, timeout=30)
+    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, timeout=30)
     subprocess.run(
         ["git", "commit", "-m", "init"],
         cwd=repo,
         capture_output=True,
         env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
              "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-    )
+timeout=30,
+)
     return repo
 
 
@@ -180,7 +182,8 @@ class TestGitSafety:
         result = subprocess.run(
             ["git", "log", "--oneline", "-1"],
             capture_output=True, text=True, cwd=git_repo,
-        )
+timeout=30,
+)
         assert "test commit" in result.stdout
 
 

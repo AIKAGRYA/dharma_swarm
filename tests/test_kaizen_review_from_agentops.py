@@ -50,7 +50,8 @@ def _run_cli(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
-    )
+timeout=30,
+)
 
 
 def test_bridge_generates_json_and_markdown_from_reports_directory(tmp_path: Path) -> None:

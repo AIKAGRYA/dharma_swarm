@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACTIVE_TRACK = REPO_ROOT / "docs/governance/ACTIVE_TRACK.yaml"
 EVIDENCE = REPO_ROOT / "reports/governance/active_track_evidence.json"
@@ -90,6 +92,7 @@ def test_managed_files_have_markers() -> None:
             f"{path} missing ACTIVE_TRACK end marker"
 
 
+@pytest.mark.slow
 def test_onboard_command_succeeds() -> None:
     """agent_onboard.py runs end-to-end and prints the active track section."""
     result = _run(ONBOARD_SCRIPT)

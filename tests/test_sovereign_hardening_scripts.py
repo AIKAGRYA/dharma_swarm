@@ -108,7 +108,8 @@ def _run_script(script_name: str, *, home_dir: Path, bin_dir: Path, env: dict[st
         text=True,
         env=base_env,
         check=False,
-    )
+timeout=30,
+)
 
 
 def test_status_sovereign_hardening_reports_legacy_tmux_fallbacks(tmp_path: Path) -> None:

@@ -184,7 +184,8 @@ def test_recovery_cli_snapshot_and_recover(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     recovered = subprocess.run(
         [
             sys.executable,
@@ -201,7 +202,8 @@ def test_recovery_cli_snapshot_and_recover(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     snapshot_payload = json.loads(snapshot.stdout)
     recovered_payload = json.loads(recovered.stdout)
 

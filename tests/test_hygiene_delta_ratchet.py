@@ -34,7 +34,8 @@ def _git(cwd: Path, *args: str) -> str:
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     return out.stdout
 
 

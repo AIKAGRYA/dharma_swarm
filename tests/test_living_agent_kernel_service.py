@@ -145,7 +145,8 @@ def test_service_cli_json_runs_one_cycle(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     payload = json.loads(completed.stdout)
 
     assert payload["status"] == "completed"

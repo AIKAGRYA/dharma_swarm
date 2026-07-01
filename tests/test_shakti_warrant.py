@@ -169,7 +169,8 @@ def test_check_shakti_warrant_cli_json_output():
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     payload = json.loads(proc.stdout)
     assert payload["verdict"] in {"allow", "warn"}
@@ -319,7 +320,8 @@ def test_check_shakti_warrant_cli_binds_to_git_diff_and_untracked_files(tmp_path
             check=True,
             capture_output=True,
             text=True,
-        )
+timeout=30,
+)
 
     git("init")
     git("config", "user.email", "test@example.invalid")
@@ -359,7 +361,8 @@ def test_check_shakti_warrant_cli_binds_to_git_diff_and_untracked_files(tmp_path
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     payload = json.loads(proc.stdout)
     evidence = payload["evidence"][0]
@@ -378,7 +381,8 @@ def test_check_shakti_warrant_cli_passes_empty_staged_diff(tmp_path):
             check=True,
             capture_output=True,
             text=True,
-        )
+timeout=30,
+)
 
     git("init")
     git("config", "user.email", "test@example.invalid")
@@ -410,7 +414,8 @@ def test_check_shakti_warrant_cli_passes_empty_staged_diff(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     assert "No changed paths for diff scope staged" in proc.stdout
 
@@ -422,7 +427,8 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
             check=True,
             capture_output=True,
             text=True,
-        )
+timeout=30,
+)
 
     git("init")
     git("config", "user.email", "test@example.invalid")
@@ -469,7 +475,8 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
         check=False,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     assert blocked.returncode == 1
     assert "hot-path changes lack impact_checked" in blocked.stdout
@@ -482,7 +489,8 @@ def test_check_shakti_warrant_cli_honors_env_impact_ack_for_hot_paths(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     payload = json.loads(allowed.stdout)
 
     assert payload["verdict"] in {"allow", "warn"}
@@ -521,7 +529,8 @@ def test_check_shakti_warrant_cli_writes_report_and_json_outputs(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
 

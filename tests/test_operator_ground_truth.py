@@ -183,7 +183,7 @@ def test_parse_worktree_porcelain_handles_trailing_no_blank(ogt):
 
 
 def _git(args, cwd):
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, timeout=30)
 
 
 def _make_minimal_repo(tmp_path: Path) -> Path:

@@ -19,7 +19,7 @@ spec.loader.exec_module(agentops)
 
 
 def run(cmd: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False, timeout=30)
 
 
 def init_repo(tmp_path: Path) -> Path:

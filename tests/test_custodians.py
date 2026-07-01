@@ -70,14 +70,15 @@ def git_repo(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
     (repo / "main.py").write_text("x = 1\n")
-    subprocess.run(["git", "init"], cwd=repo, capture_output=True)
-    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True)
+    subprocess.run(["git", "init"], cwd=repo, capture_output=True, timeout=30)
+    subprocess.run(["git", "add", "-A"], cwd=repo, capture_output=True, timeout=30)
     subprocess.run(
         ["git", "commit", "-m", "init"],
         cwd=repo, capture_output=True,
         env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
              "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-    )
+timeout=30,
+)
     return repo
 
 
@@ -536,15 +537,17 @@ class TestAutoMerge:
         subprocess.run(
             ["git", "checkout", "-b", "custodians/test-branch"],
             cwd=git_repo, capture_output=True,
-        )
+timeout=30,
+)
         (git_repo / "main.py").write_text("x = 2\n")
-        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True, timeout=30)
         subprocess.run(
             ["git", "commit", "-m", "test change"],
             cwd=git_repo, capture_output=True,
             env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
                  "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-        )
+timeout=30,
+)
 
         merged = _git_merge_to_main(str(git_repo), "custodians/test-branch")
         assert merged is True
@@ -553,33 +556,37 @@ class TestAutoMerge:
         result = subprocess.run(
             ["git", "branch", "--show-current"],
             cwd=git_repo, capture_output=True, text=True,
-        )
+timeout=30,
+)
         assert result.stdout.strip() == "main"
         assert (git_repo / "main.py").read_text() == "x = 2\n"
 
     def test_merge_conflict_aborts(self, git_repo):
         # Make conflicting changes on both branches
         (git_repo / "main.py").write_text("x = 100\n")
-        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True, timeout=30)
         subprocess.run(
             ["git", "commit", "-m", "main change"],
             cwd=git_repo, capture_output=True,
             env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
                  "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-        )
+timeout=30,
+)
 
         subprocess.run(
             ["git", "checkout", "-b", "custodians/conflict-branch", "HEAD~1"],
             cwd=git_repo, capture_output=True,
-        )
+timeout=30,
+)
         (git_repo / "main.py").write_text("x = 999\n")
-        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=git_repo, capture_output=True, timeout=30)
         subprocess.run(
             ["git", "commit", "-m", "conflict change"],
             cwd=git_repo, capture_output=True,
             env={**os.environ, "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "t@t",
                  "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "t@t"},
-        )
+timeout=30,
+)
 
         merged = _git_merge_to_main(str(git_repo), "custodians/conflict-branch")
         assert merged is False

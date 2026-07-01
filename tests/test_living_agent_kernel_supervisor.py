@@ -141,7 +141,8 @@ def test_supervisor_cli_plan_and_status_json(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     status = subprocess.run(
         [
             sys.executable,
@@ -158,7 +159,8 @@ def test_supervisor_cli_plan_and_status_json(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     plan_payload = json.loads(planned.stdout)
     status_payload = json.loads(status.stdout)

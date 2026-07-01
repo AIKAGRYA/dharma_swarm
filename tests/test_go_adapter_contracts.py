@@ -30,7 +30,7 @@ def _go_toolchain_available() -> bool:
     try:
         out = subprocess.run(
             [go_bin, "version"], text=True, capture_output=True, check=False
-        ).stdout
+, timeout=30).stdout
     except OSError:
         return False
     installed_match = re.search(r"go(\d+)\.(\d+)", out)
@@ -65,7 +65,8 @@ def test_go_adapter_contracts_pass_without_network() -> None:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,
-    )
+timeout=30,
+)
     assert result.returncode == 0, result.stdout
 
 

@@ -196,7 +196,8 @@ def test_worker_cli_register_heartbeat_status_and_verify(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     subprocess.run(
         [
             sys.executable,
@@ -213,7 +214,8 @@ def test_worker_cli_register_heartbeat_status_and_verify(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     status = subprocess.run(
         [
             sys.executable,
@@ -228,7 +230,8 @@ def test_worker_cli_register_heartbeat_status_and_verify(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     verified = subprocess.run(
         [
             sys.executable,
@@ -241,7 +244,8 @@ def test_worker_cli_register_heartbeat_status_and_verify(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     registered_payload = json.loads(registered.stdout)
     status_payload = json.loads(status.stdout)

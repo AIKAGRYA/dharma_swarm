@@ -222,12 +222,12 @@ def test_cli_emits_json_and_strict_fails_on_warnings(tmp_path: Path) -> None:
         "--track-file",
         str(track_file),
     ]
-    default = subprocess.run(base_cmd + ["--json"], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    default = subprocess.run(base_cmd + ["--json"], cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30)
     assert default.returncode == 0
     payload = json.loads(default.stdout)
     assert payload["summary"]["declaration_complete_tracks"] == 1
     assert payload["tracks"][0]["warnings"]
 
-    strict = subprocess.run(base_cmd + ["--strict"], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    strict = subprocess.run(base_cmd + ["--strict"], cwd=REPO_ROOT, capture_output=True, text=True, check=False, timeout=30)
     assert strict.returncode == 1
     assert "declaration-complete" in strict.stdout

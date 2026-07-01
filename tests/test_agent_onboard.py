@@ -41,6 +41,7 @@ def _load_module():
 # End-to-end: the command must exit 0 even when state is stale
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 def test_onboard_exits_zero_in_repo():
     """agent_onboard.py must always exit 0; staleness is informational."""
     result = subprocess.run(
@@ -53,6 +54,7 @@ def test_onboard_exits_zero_in_repo():
     )
 
 
+@pytest.mark.slow
 def test_onboard_renders_required_sections():
     """All owner-section headers must appear in the rendered output."""
     result = subprocess.run(
@@ -80,6 +82,7 @@ def test_onboard_renders_required_sections():
         assert header in result.stdout, f"missing onboarding section: {header}"
 
 
+@pytest.mark.slow
 def test_tooling_first_includes_wiki_and_memory():
     """The TOOLING-FIRST section must list wiki and memory MCP tools."""
     result = subprocess.run(
@@ -92,6 +95,7 @@ def test_tooling_first_includes_wiki_and_memory():
     assert "Tool availability" in result.stdout, "TOOLING-FIRST must probe tool availability"
 
 
+@pytest.mark.slow
 def test_onboard_prints_single_command_memory():
     """The first screen must make make onboard the only command to remember."""
     result = subprocess.run(
@@ -103,6 +107,7 @@ def test_onboard_prints_single_command_memory():
     assert "If unsure    : rerun make onboard" in result.stdout
 
 
+@pytest.mark.slow
 def test_onboard_surfaces_ai_hygiene_tranche():
     """The front door must surface AI-agent hygiene, not only VC-* signals."""
     result = subprocess.run(
@@ -224,6 +229,7 @@ Stashes remain untouched:
 # Active track surface
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 def test_active_track_evidence_is_consumed_when_present():
     """When evidence JSON exists, the script must reference its ID."""
     if not (REPO_ROOT / "reports/governance/active_track_evidence.json").exists():
@@ -241,6 +247,7 @@ def test_active_track_evidence_is_consumed_when_present():
 # The onboarding command must not own any fact
 # ---------------------------------------------------------------------------
 
+@pytest.mark.slow
 def test_onboard_does_not_write_to_owners(tmp_path):
     """Run the script and ensure none of the owner files are mutated.
 

@@ -15,7 +15,8 @@ def test_hygiene_integrity_gate_passes() -> None:
         capture_output=True,
         text=True,
         check=True,
-    )
+timeout=30,
+)
     assert "Hygiene integrity OK" in result.stdout
 
 
@@ -34,7 +35,8 @@ def test_hygiene_scan_single_pattern_writes_output(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         check=True,
-    )
+timeout=30,
+)
 
     text = output.read_text(encoding="utf-8")
     assert "VC-A2 - Trivially true tests" in text
@@ -56,7 +58,8 @@ def test_hygiene_scan_ai_agent_pattern_writes_output(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         check=True,
-    )
+timeout=30,
+)
 
     text = output.read_text(encoding="utf-8")
     assert "AI-A1 - Untrusted text treated as agent instruction" in text

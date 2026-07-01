@@ -1,5 +1,10 @@
 """Shared test fixtures for DHARMA SWARM."""
 
+import sys
+
+if sys.version_info < (3, 11):
+    raise SystemExit("dharma_swarm requires Python >=3.11; activate .venv. Current: " + sys.version)
+
 import os
 
 import pytest

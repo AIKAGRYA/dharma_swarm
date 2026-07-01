@@ -149,7 +149,7 @@ def test_worker_process_activation_launches_bounded_subprocess_and_verifies_hear
     )
 
     def run_launcher(command: list[str], cwd: Path) -> KernelProcessLaunch:
-        completed = subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True)
+        completed = subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True, timeout=30)
         return KernelProcessLaunch(
             status="completed",
             return_code=completed.returncode,
@@ -210,7 +210,8 @@ def test_worker_process_cli_and_activation_cli_review_path(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     process_payload = json.loads(completed.stdout)
     assert process_payload["completed_cycles"] == 1
     assert process_payload["heartbeat_refs"][0]["record_hash"].startswith("sha256:")
@@ -237,7 +238,8 @@ def test_worker_process_cli_and_activation_cli_review_path(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     plan_payload = json.loads(planned.stdout)
     reviewed = subprocess.run(
         [
@@ -263,7 +265,8 @@ def test_worker_process_cli_and_activation_cli_review_path(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     reviewed_payload = json.loads(reviewed.stdout)
 
     assert reviewed_payload["status"] == "reviewed"
@@ -304,7 +307,8 @@ def test_worker_process_cli_executes_leased_wake_with_kernel_result_ref(tmp_path
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     payload = json.loads(completed.stdout)
     latest = KernelRunStore(store_dir).latest_wake_records()["wake-execute"]
 
@@ -349,7 +353,8 @@ def test_supervisor_activation_cli_records_reviewed_plan(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     payload = json.loads(completed.stdout)
 
     assert payload["status"] == "reviewed"
@@ -468,7 +473,8 @@ def test_supervisor_install_cli_writes_reviewed_artifact(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     payload = json.loads(completed.stdout)
 
     assert payload["status"] == "installed"
@@ -633,7 +639,8 @@ def test_supervisor_start_and_status_cli_review_path(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     status = subprocess.run(
         [
             sys.executable,
@@ -650,7 +657,8 @@ def test_supervisor_start_and_status_cli_review_path(tmp_path):
         check=True,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     reviewed_payload = json.loads(reviewed.stdout)
     status_payload = json.loads(status.stdout)
 

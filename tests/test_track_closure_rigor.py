@@ -38,7 +38,7 @@ def test_commit_on_main_true_for_ancestor():
     root = subprocess.run(
         ["git", "rev-list", "--max-parents=0", "HEAD"],
         capture_output=True, text=True, cwd=REPO_ROOT,
-    ).stdout.split()[0]
+    ).stdout.split(timeout=30)[0]
     assert check_commit_on_main(root).passed is True
 
 
@@ -171,7 +171,7 @@ def _root_commit() -> str:
     return subprocess.run(
         ["git", "rev-list", "--max-parents=0", "HEAD"],
         capture_output=True, text=True, cwd=REPO_ROOT,
-    ).stdout.split()[0]
+    ).stdout.split(timeout=30)[0]
 
 
 def test_open_blocker_blocks_shippable_even_with_rigorous_evidence():

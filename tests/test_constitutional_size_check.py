@@ -86,7 +86,8 @@ def test_constitutional_size_check_cli():
         cwd=Path(__file__).parent.parent,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
 
     assert result.returncode == 0
     assert "Layer 0" in result.stdout

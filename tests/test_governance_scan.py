@@ -27,7 +27,8 @@ def test_governance_scan_help_is_available() -> None:
         capture_output=True,
         text=True,
         check=True,
-    )
+timeout=30,
+)
 
     assert "--base-ref" in result.stdout
     assert "--skip-module-budget" in result.stdout

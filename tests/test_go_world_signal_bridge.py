@@ -72,7 +72,8 @@ def _run_ingestor(
         check=False,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     if expect_rejected:
         assert output_path.exists(), (
             f"rejected receipt was not written: stderr={completed.stderr}"

@@ -77,7 +77,8 @@ def _run_go_ingestor(input_name: str, output_path: Path, source_url: str) -> Non
         cwd=GO_MODULE,
         env=env,
         check=True,
-    )
+timeout=30,
+)
 
 
 def _decision_from_go_receipt(path: Path):

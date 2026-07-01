@@ -2,6 +2,7 @@
 
 import asyncio
 import pytest
+import sys
 from pathlib import Path
 from dharma_swarm.canonical_replay import (
     CanonicalReplayEngine,
@@ -288,10 +289,11 @@ async def test_canonical_replay_cli():
     import subprocess
 
     result = subprocess.run(
-        ["python3", "-m", "dharma_swarm.canonical_replay"],
+        [sys.executable, "-m", "dharma_swarm.canonical_replay"],
         cwd=Path(__file__).parent.parent,
         capture_output=True,
         text=True,
+        timeout=30,
     )
 
     assert result.returncode == 0

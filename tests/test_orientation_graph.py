@@ -66,14 +66,15 @@ def test_custody_counts_registered_canon():
 def test_orientation_graph_render_is_read_only(tmp_path):
     before = subprocess.run(
         ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+, timeout=30).stdout
     result = subprocess.run(
-        [sys.executable, str(SCRIPT)], cwd=REPO_ROOT, capture_output=True, text=True
+        [sys.executable, str(SCRIPT)], cwd=REPO_ROOT, capture_output=True, text=True,
+        timeout=30,
     )
     assert result.returncode == 0
     after = subprocess.run(
         ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+, timeout=30).stdout
     assert before == after, "orientation graph must not write owner files"
 
 
@@ -83,7 +84,8 @@ def test_json_mode_is_machine_parseable():
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert "identity" in payload and "organs" in payload
@@ -147,7 +149,8 @@ def test_graph_json_mode_is_machine_parseable():
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert "nodes" in payload and "edges" in payload
@@ -157,17 +160,18 @@ def test_graph_json_mode_is_machine_parseable():
 def test_graph_mode_is_read_only(tmp_path):
     before = subprocess.run(
         ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+, timeout=30).stdout
     result = subprocess.run(
         [sys.executable, str(SCRIPT), "--graph"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     assert result.returncode == 0
     after = subprocess.run(
         ["git", "status", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True
-    ).stdout
+, timeout=30).stdout
     assert before == after, "graph mode must not write owner files"
 
 
@@ -190,7 +194,8 @@ def test_measure_cli_writes_receipt():
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
-    )
+timeout=30,
+)
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["event"] == "orientation_timing"

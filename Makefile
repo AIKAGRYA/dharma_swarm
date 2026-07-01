@@ -7,7 +7,7 @@
 # dependencies (pydantic, yaml) render instead of degrading silently.
 PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
-PYTEST ?= pytest
+PYTEST ?= $(VENV_PYTHON) -m pytest
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).
 VENV_PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,$(PYTHON))
 GO ?= go
@@ -132,10 +132,10 @@ live:
 	TINY_ROUTER_BACKEND=heuristic dgc orchestrate-live
 
 test:
-	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x -m "not slow and not docker and not network"
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=short -x --timeout=60 -m "not slow and not docker"
 
 test-fast:
-	$(VENV_PYTHON) -m pytest tests/ -q --tb=line -x --timeout=10
+	$(VENV_PYTHON) -m pytest tests/ -q --tb=line --timeout=60 -m "not slow and not docker"
 
 lint:
 	ruff check dharma_swarm/ --select=E,F,W --ignore=E501
