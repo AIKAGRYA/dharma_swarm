@@ -69,6 +69,28 @@ def _isolate_stigmergy(tmp_path, monkeypatch):
     monkeypatch.setattr("dharma_swarm.stigmergy._default_store", None)
 
 
+@pytest.fixture(autouse=True)
+def _prevent_lancedb_connection():
+    """Prevent LanceDB from starting its background event loop during tests.
+
+    LanceDB starts a daemon-thread asyncio event loop that persists across tests
+    and accumulates pending tasks, eventually causing hangs at ~65% of the suite.
+    This fixture patches _LanceDBAdapter._connect to skip the actual connection,
+    so MemoryPalace still works but LanceDB never starts.
+    """
+    try:
+        from dharma_swarm.memory_palace import _LanceDBAdapter
+        original_connect = _LanceDBAdapter._connect
+        def _noop_connect(self):
+            self._db = None
+            self._table = None
+        _LanceDBAdapter._connect = _noop_connect
+        yield
+        _LanceDBAdapter._connect = original_connect
+    except Exception:
+        yield
+
+
 @pytest.fixture
 def fast_gate():
     """Mock telos gate to return ALLOW instantly.
