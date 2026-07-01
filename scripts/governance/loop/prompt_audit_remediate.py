@@ -38,6 +38,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -325,8 +326,14 @@ def extract_changed_paths(diff_text: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _worktree_path(worktree_root: Path, finding_id: str) -> Path:
-    return worktree_root / f"ds_loop_fix_{finding_id}"
+def _run_scratch_token(run_dir: Path) -> str:
+    """Stable per-run token for scratch refs that must not collide cross-run."""
+    return hashlib.sha256(str(run_dir).encode("utf-8")).hexdigest()[:12]
+
+
+def _worktree_path(worktree_root: Path, finding_id: str, run_dir: Path) -> Path:
+    token = _run_scratch_token(run_dir)
+    return worktree_root / f"ds_loop_fix_{_branch_safe(finding_id)}-{token}"
 
 
 @dataclass
@@ -342,8 +349,9 @@ def _branch_safe(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-") or "unknown"
 
 
-def _fix_branch_name(run_id: str, finding_id: str) -> str:
-    return f"fix/{_branch_safe(run_id)}-{_branch_safe(finding_id)}"
+def _fix_branch_name(run_id: str, finding_id: str, run_dir: Path) -> str:
+    token = _run_scratch_token(run_dir)
+    return f"fix/{_branch_safe(run_id)}-{_branch_safe(finding_id)}-{token}"
 
 
 def create_worktree(
@@ -500,8 +508,8 @@ def _process_finding(
 
     # 2. Create isolated worktree off base_ref.
     base_ref = warrant.scope.get("base_ref", "HEAD")
-    wt_path = _worktree_path(worktree_root, finding_id)
-    branch_name = _fix_branch_name(run.run_id, finding_id)
+    wt_path = _worktree_path(worktree_root, finding_id, run.run_dir)
+    branch_name = _fix_branch_name(run.run_id, finding_id, run.run_dir)
 
     created = create_worktree(repo_root, wt_path, branch_name, base_ref)
     if not created.ok:

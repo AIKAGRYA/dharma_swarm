@@ -242,6 +242,37 @@ def test_stub_produces_fix_proposal_and_cleans_up(tmp_path):
     assert leftover == [], f"orphaned worktrees: {leftover}"
 
 
+def test_existing_legacy_fix_branch_does_not_block_new_run(tmp_path):
+    """A stale legacy fix branch must not block fresh remediation work."""
+    repo = _make_temp_repo(tmp_path)
+    wt_root = tmp_path / "worktrees"
+    wt_root.mkdir()
+    finding = _make_finding(fid="F-STUB-001")
+    warrant_path, run_id, runs_root = _setup_run_with_findings(tmp_path, [finding])
+    legacy_branch = f"fix/{run_id}-F-STUB-001"
+    subprocess.run(
+        ["git", "branch", legacy_branch, "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    proc = _run_remediate_cli(warrant_path, run_id, runs_root, repo, wt_root)
+    assert proc.returncode == 0, f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+
+    branch_check = subprocess.run(
+        ["git", "branch", "--list", legacy_branch],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert legacy_branch in branch_check.stdout
+    leftover = list(wt_root.glob("ds_loop_fix_*"))
+    assert leftover == [], f"orphaned worktrees: {leftover}"
+
+
 def test_worktree_is_isolated_path(tmp_path):
     """VAL-REMEDIATE-001: the fix worktree is at a /tmp-style path, not the user's tree."""
     repo = _make_temp_repo(tmp_path)
