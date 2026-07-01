@@ -741,12 +741,30 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 state_dir=Path(str(state_dir)).expanduser() if state_dir else None
             ).scan()
         )
+        # Read-only follow-on: turn promotion-ready zeitgeist signals into
+        # MemoryKernel promotion PROPOSALS (READY_FOR_REVIEW, human-gated).
+        # Never mutates memory; defensively wrapped so it can't break the scout.
+        promotion_summary: dict[str, Any] = {}
+        try:
+            from dharma_swarm.knowledge_ops.zeitgeist_promotion import (
+                run_zeitgeist_promotion,
+            )
+
+            promotion_state = (
+                Path(str(state_dir)).expanduser()
+                if state_dir
+                else Path.home() / ".dharma"
+            )
+            promotion_summary = run_zeitgeist_promotion(promotion_state)
+        except Exception as promo_exc:  # noqa: BLE001
+            promotion_summary = {"error": str(promo_exc)[:200]}
         output = (
             "world_scout: "
             f"raw={result.raw_observations} signals={result.emitted_signals} "
             f"promotion_ready={result.promotion_ready} "
             f"incubations={result.incubations_written} "
             f"zeitgeist={len(canonical_signals)} "
+            f"promotion_proposals={promotion_summary.get('proposal_count', 0)} "
             f"brief={result.brief_path} health={result.health_path}"
         )
         if result.errors:
@@ -762,6 +780,8 @@ def _run_world_scout(job: dict[str, Any]) -> CronJobExecutionResult:
                 "promotion_ready": result.promotion_ready,
                 "incubations_written": result.incubations_written,
                 "canonical_zeitgeist_signals": len(canonical_signals),
+                "promotion_proposals": promotion_summary.get("proposal_count", 0),
+                "promotion_review_md": promotion_summary.get("review_md", ""),
                 "board_path": result.board_path,
                 "brief_path": result.brief_path,
                 "health_path": result.health_path,
