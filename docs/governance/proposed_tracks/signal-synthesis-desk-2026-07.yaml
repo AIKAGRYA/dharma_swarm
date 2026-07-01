@@ -120,13 +120,34 @@
     a Skeptic-lens finding that DPI's correctness-gated decorrelation math is
     structurally inapplicable here, confirmed and respected by this design).
 
+    STATUS UPDATE (2026-07-01, later same day): the automated SWEEP side is
+    now real, tested, and wired -- tools/world_scout_go/beats.go (a capped
+    ~10-beat set, reusing the existing SourcesForQueries helper, no new fetch
+    logic), theme_window.py (rolling-window persistence), and
+    dharma_swarm/knowledge_ops/deep_sweep.py (a capped verification+synthesis
+    orchestrator, dispatching every LLM call through invoke_agent() -- the
+    spine's one blessed path, never a bespoke dispatch mechanism), wired to a
+    NEW, separate, lower-cadence (daily) cron job (signal_deep_sweep) that
+    defaults to disabled=false/fetch=false: turning on real, automated,
+    recurring LLM spend is a bigger decision than the free API scraping
+    world_scout already does, and stays an explicit operator action, not a
+    silent default. This is deliberately still short of the full desk: it
+    verifies and synthesizes a digest (written under the runtime state dir,
+    never git, per CLAUDE.md's "loop-generated artifacts never enter git"
+    rule) but does NOT yet run the panel_diversity-gated judge panel or write
+    a proposed_tracks draft -- Phase 3 (signal_synthesis_desk.py) below is
+    still the deliberately-deferred, higher-stakes piece.
+
   owned_surfaces:
     - dharma_swarm/coordination/panel_diversity.py
     - dharma_swarm/world_radar/theme_window.py
+    - dharma_swarm/knowledge_ops/deep_sweep.py
     - dharma_swarm/knowledge_ops/signal_synthesis_desk.py
+    - tools/world_scout_go/beats.go
     - docs/architecture/SIGNAL_SYNTHESIS_DESK.md
     - tests/test_panel_diversity.py
     - tests/test_theme_window.py
+    - tests/test_deep_sweep.py
     - tests/test_signal_synthesis_desk.py
     - reports/research/**
 
@@ -141,6 +162,21 @@
     - id: theme_window_rolling_state
       kind: file_exists
       file: dharma_swarm/world_radar/theme_window.py
+    - id: automated_capped_deep_sweep_exists
+      kind: file_exists
+      file: dharma_swarm/knowledge_ops/deep_sweep.py
+    - id: deep_sweep_dispatches_through_the_spine
+      kind: file_contains
+      file: dharma_swarm/knowledge_ops/deep_sweep.py
+      pattern: "invoke_agent"
+    - id: deep_sweep_cron_registered_disabled_by_default
+      kind: file_contains
+      file: cron_jobs.json
+      pattern: '"id": "signal_deep_sweep"'
+    - id: beats_are_capped_not_unbounded
+      kind: file_contains
+      file: tools/world_scout_go/scout_test.go
+      pattern: "TestDefaultBeatsAreWellFormedAndCapped"
     - id: desk_never_writes_memory
       kind: file_contains
       file: dharma_swarm/knowledge_ops/signal_synthesis_desk.py
@@ -194,7 +230,7 @@
       kind: docs
       blocker: true
     - id: 2
-      what: "Phase 2: dharma_swarm/world_radar/theme_window.py — rolling-window persistence over world_zeitgeist_inbox.jsonl's already-clustered movements (keyed by the existing movement_id), so themes accumulate occurrence/recency across cycles instead of re-deriving from scratch each hour."
+      what: "DONE (2026-07-01): dharma_swarm/world_radar/theme_window.py — rolling-window persistence over movements (keyed by the existing movement_id), 9/9 tests. Plus beyond original scope: tools/world_scout_go/beats.go (capped ~10-beat set) + dharma_swarm/knowledge_ops/deep_sweep.py (capped verification+synthesis via invoke_agent, 7/7 tests) + a new disabled-by-default daily cron job (signal_deep_sweep). This is the automated SWEEP; the judge-panel/draft-writer (Phase 3) is still deliberately not built."
       kind: code
       blocker: false
     - id: 3

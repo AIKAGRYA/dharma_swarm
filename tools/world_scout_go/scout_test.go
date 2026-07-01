@@ -145,6 +145,56 @@ func TestDefaultSourcesTrackAgenticDesignPatterns(t *testing.T) {
 	}
 }
 
+func TestDefaultBeatsAreWellFormedAndCapped(t *testing.T) {
+	beats := DefaultBeats()
+	if len(beats) == 0 {
+		t.Fatal("DefaultBeats() must not be empty")
+	}
+	// "Capped for now": intentionally far smaller than the ~28-angle manual
+	// research sweep this was modeled on. Guards against silently growing
+	// unbounded (widen via a runtime override, not by editing this literal).
+	if len(beats) > 15 {
+		t.Fatalf("DefaultBeats() has %d entries, expected a capped set (<=15) for the deep-sweep tier", len(beats))
+	}
+	seenIDs := map[string]bool{}
+	for _, b := range beats {
+		if b.ID == "" {
+			t.Fatalf("beat has empty ID: %+v", b)
+		}
+		if seenIDs[b.ID] {
+			t.Fatalf("duplicate beat ID: %s", b.ID)
+		}
+		seenIDs[b.ID] = true
+		if b.Name == "" {
+			t.Fatalf("beat %s has empty Name", b.ID)
+		}
+		if len(b.Queries) == 0 {
+			t.Fatalf("beat %s has no queries", b.ID)
+		}
+	}
+}
+
+func TestBeatSourcesTagsEachSourceWithItsBeatID(t *testing.T) {
+	beats := []Beat{
+		{ID: "test_beat_a", Name: "A", Queries: []string{"query a"}},
+		{ID: "test_beat_b", Name: "B", Queries: []string{"query b"}},
+	}
+	sources := BeatSources(beats)
+	if len(sources) == 0 {
+		t.Fatal("expected BeatSources to produce sources")
+	}
+	seenBeatIDs := map[string]bool{}
+	for _, s := range sources {
+		if s.CascadeFor == "" {
+			t.Fatalf("source %s missing CascadeFor beat attribution: %+v", s.Name, s)
+		}
+		seenBeatIDs[s.CascadeFor] = true
+	}
+	if !seenBeatIDs["test_beat_a"] || !seenBeatIDs["test_beat_b"] {
+		t.Fatalf("expected sources attributed to both beats, got: %+v", seenBeatIDs)
+	}
+}
+
 func TestScoutRetryDelayParsesRetryAfter(t *testing.T) {
 	if delay := scoutRetryDelay("0", 1); delay != 0 {
 		t.Fatalf("Retry-After seconds parsed incorrectly: %s", delay)

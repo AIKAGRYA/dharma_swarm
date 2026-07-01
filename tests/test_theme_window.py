@@ -1,0 +1,98 @@
+"""Tests for the rolling-window theme persistence layer."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from dharma_swarm.world_radar.theme_window import (
+    load_theme_window,
+    run_theme_window_update,
+    save_theme_window,
+    update_theme_window,
+)
+
+
+def _movement(movement_id: str, title: str, score: float) -> dict[str, object]:
+    return {"movement_id": movement_id, "title": title, "weighted_score": score}
+
+
+def test_new_movement_is_recorded_as_newly_seen() -> None:
+    window, newly_seen = update_theme_window({}, [_movement("m1", "Theme One", 0.7)])
+    assert "m1" in window
+    assert window["m1"].occurrence_count == 1
+    assert newly_seen == ("m1",)
+
+
+def test_recurring_movement_increments_occurrence_and_is_not_newly_seen() -> None:
+    window, _ = update_theme_window({}, [_movement("m1", "Theme One", 0.7)])
+    window, newly_seen = update_theme_window(window, [_movement("m1", "Theme One", 0.9)])
+    assert window["m1"].occurrence_count == 2
+    assert window["m1"].best_weighted_score == 0.9  # max across cycles
+    assert newly_seen == ()
+
+
+def test_best_weighted_score_never_decreases() -> None:
+    window, _ = update_theme_window({}, [_movement("m1", "Theme One", 0.9)])
+    window, _ = update_theme_window(window, [_movement("m1", "Theme One", 0.3)])
+    assert window["m1"].best_weighted_score == 0.9
+
+
+def test_movement_without_id_is_skipped_not_crashed() -> None:
+    window, newly_seen = update_theme_window({}, [{"title": "no id here"}])
+    assert window == {}
+    assert newly_seen == ()
+
+
+def test_save_and_load_round_trip(tmp_path: Path) -> None:
+    window, _ = update_theme_window({}, [_movement("m1", "Theme One", 0.7)])
+    path = tmp_path / "theme_window.json"
+    save_theme_window(path, window)
+    reloaded = load_theme_window(path)
+    assert reloaded["m1"].movement_id == "m1"
+    assert reloaded["m1"].occurrence_count == 1
+
+
+def test_load_missing_file_is_empty(tmp_path: Path) -> None:
+    assert load_theme_window(tmp_path / "nope.json") == {}
+
+
+def test_load_garbled_file_is_empty_not_a_crash(tmp_path: Path) -> None:
+    path = tmp_path / "theme_window.json"
+    path.write_text("not json at all {{{", encoding="utf-8")
+    assert load_theme_window(path) == {}
+
+
+def test_run_theme_window_update_end_to_end(tmp_path: Path) -> None:
+    meta = tmp_path / "meta"
+    meta.mkdir(parents=True)
+    board = {
+        "movements": [
+            {"movement_id": "m1", "title": "Theme One", "weighted_score": 0.8},
+            {"movement_id": "m2", "title": "Theme Two", "weighted_score": 0.6},
+        ]
+    }
+    (meta / "world_signal_board.json").write_text(json.dumps(board), encoding="utf-8")
+
+    summary = run_theme_window_update(tmp_path)
+    assert summary["total_tracked_themes"] == 2
+    assert summary["newly_seen_count"] == 2
+
+    # Second cycle: m1 recurs, m3 is new.
+    board2 = {
+        "movements": [
+            {"movement_id": "m1", "title": "Theme One", "weighted_score": 0.85},
+            {"movement_id": "m3", "title": "Theme Three", "weighted_score": 0.5},
+        ]
+    }
+    (meta / "world_signal_board.json").write_text(json.dumps(board2), encoding="utf-8")
+    summary2 = run_theme_window_update(tmp_path)
+    assert summary2["total_tracked_themes"] == 3  # m1, m2 (persisted), m3
+    assert summary2["newly_seen_count"] == 1
+    assert summary2["newly_seen_movement_ids"] == ["m3"]
+
+
+def test_run_theme_window_update_missing_board_is_defensive(tmp_path: Path) -> None:
+    summary = run_theme_window_update(tmp_path)
+    assert summary["movements_this_cycle"] == 0
+    assert summary["total_tracked_themes"] == 0

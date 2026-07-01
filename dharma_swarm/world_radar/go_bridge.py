@@ -485,6 +485,7 @@ def _run_go_scout(
     timeout_s: int,
     queries: list[str] | None = None,
     cascade_for: str = "",
+    beats: bool = False,
     archive: bool = False,
     archive_dir: Path | None = None,
     archive_urls: list[str] | None = None,
@@ -527,6 +528,8 @@ def _run_go_scout(
         cmd.extend(["--cascade-for", cascade_for])
     for query in queries or []:
         cmd.extend(["--query", query])
+    if beats:
+        cmd.append("--beats")
     if archive:
         effective_archive_dir = archive_dir or (state / "meta" / "world_radar" / "archive" / "world_scout")
         cmd.extend(["--archive", "--archive-dir", str(effective_archive_dir)])
