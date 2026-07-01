@@ -11,9 +11,21 @@ from dharma_swarm.knowledge_ops.memory_promotion_queue import (
 )
 from dharma_swarm.knowledge_ops.zeitgeist_promotion import (
     build_zeitgeist_promotion_queue,
+    load_settled_atom_ids,
     load_zeitgeist_inbox,
     run_zeitgeist_promotion,
 )
+
+
+def _decision(atom_id: str, kind: str) -> dict[str, object]:
+    return {
+        "proposal_id": f"p-{atom_id}",
+        "atom_id": atom_id,
+        "surface_id": "world_zeitgeist",
+        "decision": kind,
+        "reviewer": "operator",
+        "rationale": "test",
+    }
 
 
 def _signal(signal_id: str, **over: object) -> dict[str, object]:
@@ -85,6 +97,72 @@ def test_load_inbox_is_defensive(tmp_path: Path) -> None:
 
 def test_missing_inbox_yields_empty(tmp_path: Path) -> None:
     assert load_zeitgeist_inbox(tmp_path / "nope.jsonl") == []
+
+
+def test_accounting_invariant_holds() -> None:
+    # total == proposals + blocker_occurrence_count, counting no-id, settled, dups
+    rows = [
+        _signal("world-1"),
+        _signal("world-1"),  # duplicate
+        _signal(""),  # blocked
+        _signal("world-2"),
+        _signal("world-3"),  # will be settled
+    ]
+    queue = build_zeitgeist_promotion_queue(rows, settled_atom_ids=frozenset({"world-3"}))
+    assert queue.total_atoms_reviewed == (
+        queue.promotion_proposal_count + queue.blocker_occurrence_count
+    )
+    assert queue.promotion_proposal_count == 2  # world-1, world-2
+
+
+def test_settled_signals_are_not_reproposed() -> None:
+    rows = [_signal("world-1"), _signal("world-2"), _signal("world-3")]
+    queue = build_zeitgeist_promotion_queue(
+        rows, settled_atom_ids=frozenset({"world-1", "world-2"})
+    )
+    ids = {p.atom_id for p in queue.proposals}
+    assert ids == {"world-3"}
+    assert "prior_operator_decisions_honored" in queue.warnings
+
+
+def test_load_settled_reads_accept_and_reject_not_defer(tmp_path: Path) -> None:
+    ledger = tmp_path / "zeitgeist_promotion_decisions.json"
+    ledger.write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    _decision("world-accepted", "accept"),
+                    _decision("world-rejected", "reject"),
+                    _decision("world-deferred", "defer"),
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    settled = load_settled_atom_ids(ledger)
+    assert settled == frozenset({"world-accepted", "world-rejected"})
+    # DEFER intentionally resurfaces
+    assert "world-deferred" not in settled
+
+
+def test_missing_decision_ledger_is_empty(tmp_path: Path) -> None:
+    assert load_settled_atom_ids(tmp_path / "nope.json") == frozenset()
+
+
+def test_run_honors_prior_decisions_across_cycles(tmp_path: Path) -> None:
+    meta = tmp_path / "meta"
+    (meta / "knowledge_ops").mkdir(parents=True)
+    (meta / "world_zeitgeist_inbox.jsonl").write_text(
+        json.dumps(_signal("world-1")) + "\n" + json.dumps(_signal("world-2")) + "\n",
+        encoding="utf-8",
+    )
+    # operator rejected world-1 in a prior cycle
+    (meta / "knowledge_ops" / "zeitgeist_promotion_decisions.json").write_text(
+        json.dumps({"decisions": [_decision("world-1", "reject")]}), encoding="utf-8"
+    )
+    summary = run_zeitgeist_promotion(tmp_path)
+    assert summary["proposal_count"] == 1  # only world-2 re-proposed
+    assert summary["settled_skipped"] == 1
 
 
 def test_run_writes_review_artifacts_but_not_memory(tmp_path: Path) -> None:

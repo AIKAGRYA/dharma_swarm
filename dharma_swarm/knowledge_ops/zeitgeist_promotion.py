@@ -25,6 +25,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.knowledge_ops.memory_decision_ledger import (
+    MemoryPromotionDecisionKind,
+    load_memory_promotion_decisions,
+)
 from dharma_swarm.knowledge_ops.memory_promotion_queue import (
     MemoryPromotionGate,
     MemoryPromotionProposal,
@@ -69,36 +73,72 @@ def load_zeitgeist_inbox(inbox_path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def load_settled_atom_ids(decisions_path: Path) -> frozenset[str]:
+    """atom_ids an operator has already ACCEPTed or REJECTed — never re-propose.
+
+    ACCEPT means the signal is already in (or on its way into) memory; REJECT
+    means the operator refused it. Either way, resurfacing it every cycle wastes
+    review time and buries the prior decision. DEFER is intentionally NOT settled:
+    a deferred signal is meant to come back. Missing/garbled ledger -> empty set
+    (degrade to prior behaviour, never crash the scout).
+    """
+    if not decisions_path.exists():
+        return frozenset()
+    try:
+        decisions = load_memory_promotion_decisions(decisions_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return frozenset()
+    return frozenset(
+        d.atom_id
+        for d in decisions
+        if d.decision
+        in (MemoryPromotionDecisionKind.ACCEPT, MemoryPromotionDecisionKind.REJECT)
+    )
+
+
 def build_zeitgeist_promotion_queue(
     rows: list[dict[str, Any]],
+    settled_atom_ids: frozenset[str] = frozenset(),
 ) -> MemoryPromotionProposalQueue:
     """Convert zeitgeist inbox rows into a read-only promotion proposal queue.
 
-    Rows with no usable id are skipped (counted as blocked). Duplicate signal
-    ids collapse to a single proposal (last write wins) so a signal that
-    reappears across cycles does not stack duplicate proposals.
+    Accounting invariant (holds exactly):
+      total_atoms_reviewed == promotion_proposal_count + blocker_occurrence_count
+    where blocker_occurrence_count = rows-with-no-id + already-settled + duplicates.
+    Rows with no usable id are blocked. Signals the operator already decided
+    (settled_atom_ids) are skipped so a REJECT is not re-proposed next cycle.
+    Duplicate signal ids within one batch collapse to a single proposal.
     """
     proposals: dict[str, MemoryPromotionProposal] = {}
     blocked = 0
+    settled = 0
+    duplicates = 0
     for row in rows:
         proposal = _proposal_from_signal(row)
         if proposal is None:
             blocked += 1
             continue
+        if proposal.atom_id in settled_atom_ids:
+            settled += 1
+            continue
+        if proposal.atom_id in proposals:
+            duplicates += 1
         proposals[proposal.atom_id] = proposal
     ordered = tuple(proposals.values())
-    warnings = (
+    warnings = [
         "read_only_queue_not_authority",
         "no_canon_or_memory_writes",
         "external_unverified_signals_need_human_review",
-    )
+    ]
+    if settled:
+        warnings.append("prior_operator_decisions_honored")
     return MemoryPromotionProposalQueue(
         total_atoms_reviewed=len(rows),
         promotion_proposal_count=len(ordered),
-        blocked_atom_count=blocked,
-        blocker_occurrence_count=blocked,
+        blocked_atom_count=blocked + settled,
+        blocker_occurrence_count=blocked + settled + duplicates,
         proposals=ordered,
-        warnings=warnings,
+        warnings=tuple(warnings),
     )
 
 
@@ -112,29 +152,31 @@ def run_zeitgeist_promotion(
     Returns a small summary dict suitable for a cron result. Never raises on
     ordinary IO problems — a broken inbox yields an empty queue, not a crash.
     """
-    meta = state_dir.expanduser() / "meta"
+    # resolve() canonicalizes any '..' segments so a misconfigured state_dir
+    # cannot traverse outside its own tree.
+    meta = state_dir.expanduser().resolve() / "meta"
     inbox_path = meta / "world_zeitgeist_inbox.jsonl"
-    rows = load_zeitgeist_inbox(inbox_path)
-    queue = build_zeitgeist_promotion_queue(rows)
-
     out_dir = meta / "knowledge_ops"
+    decisions_path = out_dir / "zeitgeist_promotion_decisions.json"
+
+    rows = load_zeitgeist_inbox(inbox_path)
+    settled = load_settled_atom_ids(decisions_path)
+    queue = build_zeitgeist_promotion_queue(rows, settled_atom_ids=settled)
+
     json_path = out_dir / "zeitgeist_promotion_proposals.json"
     md_path = out_dir / "zeitgeist_promotion_proposals.md"
     if write:
         out_dir.mkdir(parents=True, exist_ok=True)
-        json_path.write_text(
-            json.dumps(queue.to_json(), indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-        md_path.write_text(
-            render_memory_promotion_queue_markdown(queue),
-            encoding="utf-8",
-        )
+        proposals_json = json.dumps(queue.to_json(), indent=2, sort_keys=True)
+        proposals_markdown = render_memory_promotion_queue_markdown(queue)
+        json_path.write_text(proposals_json, encoding="utf-8")
+        md_path.write_text(proposals_markdown, encoding="utf-8")
     return {
         "inbox_path": str(inbox_path),
         "rows_read": len(rows),
         "proposal_count": queue.promotion_proposal_count,
         "blocked_count": queue.blocked_atom_count,
+        "settled_skipped": len(settled),
         "review_json": str(json_path) if write else "",
         "review_md": str(md_path) if write else "",
     }
