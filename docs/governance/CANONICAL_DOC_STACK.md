@@ -82,7 +82,7 @@ is no longer a forced first-read surface.
 | Action warrant | `docs/governance/FOURFOLD_ACTION_WARRANT.md` | — |
 | Cybernetic loop closure state | `CYBERNETIC_LOOP_MAP.md` | Generated from `scripts/governance/cybernetics_codex_audit.py --json`; per-loop packets defer to it for current closure verdicts |
 | Cybernetics Codex operating protocol | `docs/agents/cybernetics_codex/PROTOCOLS.md` | Defers to Cybernetics Codex audit, `CYBERNETIC_LOOP_MAP.md`, and `reports/loop_closure/cybernetics_codex/` for live loop truth |
-| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md` | — |
+| Agent onboarding (ops) | `docs/ops/AGENT_ONBOARDING.md`, `docs/ops/CODEX_TOOLBELT_ONBOARDING.md`, `docs/ops/A2A_AGENT_ONBOARDING.md`, `docs/ops/A2A_QUICKSTART.md` | — |
 | Module-level what-does-what | `docs/architecture/NAVIGATION.md` | — |
 | Router/TaskBoard domain pinning | `docs/architecture/ROUTERS_AND_TASKBOARD.md` | — |
 | VentureCell portfolio (which cells exist, status, instrument, separation) | `docs/governance/VENTURE_CELL_PORTFOLIO.yaml` | per-cell `VENTURE_CELL_*.md` declarations defer to it |

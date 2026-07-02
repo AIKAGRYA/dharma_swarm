@@ -39,7 +39,7 @@ Read in this order:
 
 1. `make onboard` output: live branch, active tracks, dirty tree, stale docs, and next command.
 2. [`CLAUDE.md`](../../CLAUDE.md): repo behavior, engineering rules, architecture summary, build/test commands.
-3. [`SOVEREIGN_MANIFEST.md`](../governance/SOVEREIGN_MANIFEST.md): architecture, axioms, and invariants.
+3. [`SWARM_GENOME.md`](../governance/SWARM_GENOME.md): compact first-token map and claim-language guard. Per [`CANONICAL_DOC_STACK.md`](../governance/CANONICAL_DOC_STACK.md)'s first-read list, this is the forced first-read surface; `SOVEREIGN_MANIFEST.md` remains the deeper architecture/doctrine authority but is depth-on-demand, not forced.
 4. [`ACTIVE_TRACK.yaml`](../governance/ACTIVE_TRACK.yaml): current build portfolio and owned surfaces.
 5. [`ANTI_SLOP_RULES.md`](../governance/ANTI_SLOP_RULES.md): hard and advisory anti-slop gates.
 
@@ -65,6 +65,8 @@ Use this stack before inventing a new search/indexing path:
 | SQL/schema inspection | Postgres MCP, after DSN | SQLite/read-only local probes |
 
 Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgres MCPs were removed from global Codex config because they were unprovisioned and caused repeated scout startup warnings. Re-add them only through the gates in [`CODEX_TOOLBELT_ONBOARDING.md`](CODEX_TOOLBELT_ONBOARDING.md).
+
+GitNexus, Context+, Context7, Sourcebot, and the `/Users/dhyana/.local/bin/src` binary are Mac-operator-machine tools. They may be absent for cloud/web/GitHub-only agents; fall back to `rg`/`git grep`, official docs, or web search per the table above rather than treating their absence as a failure.
 
 ## Task Routes
 
@@ -108,11 +110,12 @@ Sourcegraph Enterprise MCP is not a dependency. Sourcegraph, GDrive, and Postgre
 Use this for a new Codex agent:
 
 ```text
-Repo: /Users/dhyana/dharma_swarm
+Repo: <repo-root>
+(substitute the local checkout path, e.g. /Users/dhyana/dharma_swarm on the operator Mac)
 
 Start by running:
 
-cd /Users/dhyana/dharma_swarm
+cd <repo-root>
 make onboard
 
 Read `docs/ops/AGENT_ONBOARDING.md`, then follow the task route that matches the assignment.
