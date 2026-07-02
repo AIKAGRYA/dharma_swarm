@@ -60,7 +60,7 @@ repo so any agent (including my future self) can read it cold.
 **Repo structure:**
 - 610 Python modules, 260K LOC, 585 test files, 705 markdown files
 - 20 dashboard pages: 7 LIVE, 7 DEGRADED, 6 STUB/BROKEN
-- 0/13 cybernetic loops closed in production
+- Historical note: 0/13 cybernetic loops closed in production. Supersession 2026-07-01: 4/13 bounded-replay closed, 7 partial, 2 blocked, still 0/13 all-history daemon clean.
 - 19 API routers, 14 adapters, 23 bridge files, 4 orchestrators
 - CI gauntlet: 22 gates (DocOps, governance, semgrep, gitleaks, Rule 8/9/10, etc.)
 - `make onboard` is the single remembered gate — run it before any work

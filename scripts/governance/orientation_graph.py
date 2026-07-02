@@ -39,6 +39,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -146,6 +147,22 @@ class Loop1Closure:
 
 
 @dataclass
+class LoopClosureSummary:
+    """13-loop closure ledger projection from cybernetics_codex."""
+    observed_at: str = ""
+    total: int = 0
+    closed_bounded_replay: int = 0
+    partial: int = 0
+    blocked: int = 0
+    all_history_clean: int = 0
+    dispatch_dropoff: int = 0
+    one_wire: str = ""
+    source: str = "scripts/governance/cybernetics_codex_audit.py --json"
+    error: str = ""
+    statuses: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
 class Lane:
     path: str
     branch: str
@@ -189,6 +206,7 @@ class OrientationPacket:
     liveness: Liveness
     broken: list[BrokenItem]
     loop1: Loop1Closure
+    loop_closure: LoopClosureSummary
     lanes: list[Lane] = field(default_factory=list)
     agents: list[dict[str, Any]] = field(default_factory=list)
     receipts_tail: list[ReceiptTail] = field(default_factory=list)
@@ -698,6 +716,60 @@ def build_loop1_closure(db_path: Any = None) -> Loop1Closure:
     return Loop1Closure(live=live, provider=provider, model=model, detail=detail)
 
 
+def build_loop_closure_summary() -> LoopClosureSummary:
+    """Project the 13-loop closure ledger from the cybernetics_codex owner."""
+    try:
+        from dharma_swarm.cybernetics_codex import build_audit
+        from dharma_swarm.daemon_config import dharma_state_dir
+
+        report = build_audit(repo_root=REPO_ROOT, state_dir=dharma_state_dir())
+    except Exception as exc:
+        return LoopClosureSummary(error=f"{type(exc).__name__}: {exc}")
+
+    statuses = [
+        item for item in report.get("loop_statuses", [])
+        if isinstance(item, dict)
+    ]
+    counts = Counter(str(item.get("verdict") or "UNKNOWN") for item in statuses)
+    failure_codes = (
+        ((report.get("runtime") or {}).get("failure_codes") or [])
+        if isinstance(report.get("runtime"), dict)
+        else []
+    )
+    dispatch_dropoff = 0
+    for item in failure_codes:
+        if isinstance(item, dict) and item.get("failure_code") == "dispatch_dropoff":
+            dispatch_dropoff = int(item.get("count") or 0)
+            break
+    one_wire = report.get("one_wire") or {}
+    one_wire_text = ""
+    if isinstance(one_wire, dict):
+        one_wire_text = (
+            f"N={one_wire.get('confirmed', '?')}/{one_wire.get('required_confirmed', '?')}, "
+            f"M={one_wire.get('domains', '?')}/{one_wire.get('required_domains', '?')}"
+        )
+    return LoopClosureSummary(
+        observed_at=str(report.get("observed_at") or ""),
+        total=len(statuses),
+        closed_bounded_replay=int(counts.get("CLOSED_BOUNDED_REPLAY", 0)),
+        partial=int(counts.get("PARTIAL", 0)),
+        blocked=int(counts.get("BLOCKED", 0)),
+        all_history_clean=int(
+            counts.get("CLOSED_PRODUCTION", 0) + counts.get("CLOSED_ALL_HISTORY", 0)
+        ),
+        dispatch_dropoff=dispatch_dropoff,
+        one_wire=one_wire_text,
+        statuses=[
+            {
+                "number": item.get("number"),
+                "label": item.get("label"),
+                "verdict": item.get("verdict"),
+            }
+            for item in statuses
+        ],
+    )
+
+
 def build_lanes() -> list[Lane]:
     """Project parallel lane state from the ops lane map or git worktrees."""
     lanes: list[Lane] = []
@@ -856,6 +928,7 @@ def build_packet() -> OrientationPacket:
         liveness=build_liveness(),
         broken=build_broken(),
         loop1=build_loop1_closure(),
+        loop_closure=build_loop_closure_summary(),
         lanes=build_lanes(),
         agents=build_agents(),
         receipts_tail=build_receipts_tail(),
@@ -894,6 +967,13 @@ def _repo_context_markdown(packet: OrientationPacket) -> str:
         f"- agents: {len(packet.agents)}",
         f"- receipts_tail: {len(packet.receipts_tail)}",
         f"- loop1_live: {packet.loop1.live}",
+        (
+            "- cybernetic_loop_closure: "
+            f"{packet.loop_closure.closed_bounded_replay}/{packet.loop_closure.total} "
+            "bounded-replay closed; "
+            f"{packet.loop_closure.all_history_clean}/{packet.loop_closure.total} "
+            "all-history clean"
+        ),
         "",
         "## Tracks",
     ]
@@ -1001,6 +1081,29 @@ def render(packet: OrientationPacket) -> None:
         print(f"    latest receipt: provider={c.provider!r} model={c.model!r}")
     if c.detail:
         print(f"    {c.detail}")
+
+    _section("13 CYBERNETIC LOOP CLOSURE — owner: cybernetics_codex audit")
+    s = packet.loop_closure
+    if s.error:
+        print(f"  unavailable: {s.error}")
+    else:
+        print(
+            "  Current ledger: "
+            f"{s.closed_bounded_replay}/{s.total} bounded-replay closed; "
+            f"{s.partial} partial; {s.blocked} blocked; "
+            f"{s.all_history_clean}/{s.total} all-history clean"
+        )
+        print(f"  Observed: {s.observed_at or '(unknown)'}")
+        print(f"  Historical dispatch_dropoff rows still present: {s.dispatch_dropoff}")
+        if s.one_wire:
+            print(f"  One Wire quorum: {s.one_wire}")
+        print("  Closed bounded replay: loops "
+              + ", ".join(
+                  str(item["number"])
+                  for item in s.statuses
+                  if item.get("verdict") == "CLOSED_BOUNDED_REPLAY"
+              ))
+        print("  Rule: bounded replay is progress; all-history daemon closure is stricter.")
 
     _section(f"BROKEN REGISTER — open-like items ({len(packet.broken)})")
     for item in packet.broken:

@@ -100,8 +100,10 @@
 - `dharma_swarm/sakshi/` — 281 LOC, append-only provenance chain
 
 ### Cybernetic Loops
-- **0 of 9 closed in production**
-- Single gate: configured LLM provider with running agents (partially resolved — keys exist locally, env alias normalization shipped in #323)
+- **4 of 13 closed in bounded replay** (Loops 1, 2, 5, 6)
+- **0 of 13 all-history daemon clean**; historical dispatch_dropoff rows remain
+- **7 partial, 2 blocked**; Loops 12/13 remain blocked behind One Wire quorum
+- Canon: `CYBERNETIC_LOOP_MAP.md` and `scripts/governance/cybernetics_codex_audit.py --json`
 
 ### Broken Register
 - 5 open items: BR-003 (evolution gate, PARTIAL), BR-004, BR-005 + others

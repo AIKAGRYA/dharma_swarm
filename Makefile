@@ -4,8 +4,10 @@
 .PHONY: help boot stop logs health metrics test lint lint-blockers verifier-selfcheck clean install docker-up docker-down gh-auth semgrep semgrep-strict gitleaks precommit-install precommit-run governance-baseline test-hygiene mypy-strict-ratchet test-contracts nats-substrate-contract uplift-guards module-budget hygiene-audit hygiene-check docops-integrity docops-report ci-truth pr-queue pr-packet pr-gate pr-reviewers pr-run-codex pr-run-claude pr-merge pr-mike mike-wake mike-status mike-cycle mike-tmux-start mike-tmux-stop memory-kernel-readiness memory-kernel-readiness-strict memory-kernel-burn-in memory-kernel-write-receipt-smoke memory-kernel-promotion-smoke memory-kernel-knowledgeops-bridge-smoke memory-kernel-full-power-preflight operator-prod-smoke governance-all agent-build-preflight agent-build-closeout spine-check onboard orient status a2a-status a2a-up a2a-send go-fmt-check go-test go-vet go-ci verify-corral verify-corral-strict hygiene-delta-ratchet claim-evidence-check claim-evidence mutation-test
 
 # Prefer the repo venv when present so onboarding sections that need repo
-# dependencies (pydantic, yaml) render instead of degrading silently.
-PYTHON ?= $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
+# dependencies (pydantic, yaml) render instead of degrading silently. If a
+# disposable worktree has no venv, prefer uv's project interpreter over macOS
+# system python3; the latter is often 3.9 and cannot import current models.
+PYTHON ?= $(shell if test -x .venv/bin/python; then echo .venv/bin/python; elif command -v uv >/dev/null 2>&1; then echo "uv run python"; else echo python3; fi)
 REPO_PYTHON ?= PYTHONPATH=. $(PYTHON)
 PYTEST ?= pytest
 # Test targets need the repo venv (pytest-timeout etc. live there, not in system pythons).

@@ -1232,6 +1232,106 @@ def render_runtime_truth(
     return rows
 
 
+def _cybernetic_loop_closure_summary() -> dict[str, Any]:
+    """Read the current 13-loop closure ledger from its owner."""
+    try:
+        from dharma_swarm.cybernetics_codex import build_audit
+        from dharma_swarm.daemon_config import dharma_state_dir
+
+        report = build_audit(repo_root=REPO_ROOT, state_dir=dharma_state_dir())
+    except Exception as exc:
+        return {
+            "source": "scripts/governance/cybernetics_codex_audit.py --json",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    statuses = [
+        item for item in report.get("loop_statuses", [])
+        if isinstance(item, dict)
+    ]
+    counts = Counter(str(item.get("verdict") or "UNKNOWN") for item in statuses)
+    failure_codes = (
+        ((report.get("runtime") or {}).get("failure_codes") or [])
+        if isinstance(report.get("runtime"), dict)
+        else []
+    )
+    dispatch_dropoff = 0
+    for item in failure_codes:
+        if isinstance(item, dict) and item.get("failure_code") == "dispatch_dropoff":
+            dispatch_dropoff = int(item.get("count") or 0)
+            break
+
+    one_wire = report.get("one_wire") or {}
+    one_wire_summary = {}
+    if isinstance(one_wire, dict):
+        one_wire_summary = {
+            "confirmed": one_wire.get("confirmed"),
+            "required_confirmed": one_wire.get("required_confirmed"),
+            "domains": one_wire.get("domains"),
+            "required_domains": one_wire.get("required_domains"),
+            "eligible": one_wire.get("eligible"),
+        }
+
+    return {
+        "source": "scripts/governance/cybernetics_codex_audit.py --json",
+        "observed_at": report.get("observed_at"),
+        "total": len(statuses),
+        "closed_bounded_replay": int(counts.get("CLOSED_BOUNDED_REPLAY", 0)),
+        "partial": int(counts.get("PARTIAL", 0)),
+        "blocked": int(counts.get("BLOCKED", 0)),
+        "all_history_clean": int(
+            counts.get("CLOSED_PRODUCTION", 0) + counts.get("CLOSED_ALL_HISTORY", 0)
+        ),
+        "dispatch_dropoff": dispatch_dropoff,
+        "one_wire": one_wire_summary,
+        "statuses": [
+            {
+                "number": item.get("number"),
+                "label": item.get("label"),
+                "verdict": item.get("verdict"),
+            }
+            for item in statuses
+        ],
+    }
+
+
+def render_cybernetic_loop_closure(summary: dict[str, Any]) -> None:
+    section("13 CYBERNETIC LOOP CLOSURE (owner: cybernetics_codex audit)")
+    if summary.get("error"):
+        print(f"  unavailable: {summary['error']}")
+        print("  Run: python3 scripts/governance/cybernetics_codex_audit.py --json")
+        return
+
+    total = int(summary.get("total") or 0)
+    closed = int(summary.get("closed_bounded_replay") or 0)
+    partial = int(summary.get("partial") or 0)
+    blocked = int(summary.get("blocked") or 0)
+    all_history = int(summary.get("all_history_clean") or 0)
+    print(
+        "  Current ledger: "
+        f"{closed}/{total} bounded-replay closed; "
+        f"{partial} partial; {blocked} blocked; "
+        f"{all_history}/{total} all-history clean"
+    )
+    print(f"  Observed: {summary.get('observed_at') or '(unknown)'}")
+    print(f"  Historical dispatch_dropoff rows still present: {summary.get('dispatch_dropoff') or 0}")
+    one_wire = summary.get("one_wire") or {}
+    if one_wire:
+        print(
+            "  One Wire quorum: "
+            f"N={one_wire.get('confirmed', '?')}/{one_wire.get('required_confirmed', '?')}, "
+            f"M={one_wire.get('domains', '?')}/{one_wire.get('required_domains', '?')}, "
+            f"eligible={one_wire.get('eligible')}"
+        )
+    closed_nums = [
+        str(item.get("number"))
+        for item in summary.get("statuses") or []
+        if isinstance(item, dict) and item.get("verdict") == "CLOSED_BOUNDED_REPLAY"
+    ]
+    print(f"  Closed bounded replay: loops {', '.join(closed_nums) or '(none)'}")
+    print("  Do not cite old 0/13 prose unless scoped to all-history daemon cleanliness.")
+
+
 def render_decay_watch() -> None:
     section("KNOWN-DECAY DOCS — verify before citing")
     for doc in KNOWN_DECAY_DOCS:
@@ -1714,7 +1814,10 @@ def main(argv: list[str] | None = None) -> int:
             render_swarm_bulletins()
             rows = render_runtime_truth(evidence, track)
             prs = render_pr_hygiene(net=net)
-        payload = _receipt_payload(repo_state, lanes, rows, prs, evidence, track)
+        loop_summary = _cybernetic_loop_closure_summary()
+        payload = _receipt_payload(
+            repo_state, lanes, rows, prs, evidence, track, loop_summary
+        )
         _write_receipt(payload)
         print(json.dumps(payload, sort_keys=True, indent=1))
         return 0
@@ -1723,6 +1826,8 @@ def main(argv: list[str] | None = None) -> int:
     render_trust_check(evidence)
     render_identity()
     render_active_track(evidence, track)
+    loop_summary = _cybernetic_loop_closure_summary()
+    render_cybernetic_loop_closure(loop_summary)
     lanes = render_parallel_work_lanes()
     render_swarm_bulletins()
     render_live_ops()
@@ -1779,7 +1884,7 @@ def main(argv: list[str] | None = None) -> int:
     print("  When in doubt: trust the filesystem, git log, and ACTIVE_TRACK.yaml.")
 
     receipt_path = _write_receipt(
-        _receipt_payload(repo_state, lanes, rows, prs, evidence, track))
+        _receipt_payload(repo_state, lanes, rows, prs, evidence, track, loop_summary))
     if receipt_path:
         print(f"  Machine receipt: {receipt_path}  (fleet-readable; also: --json)")
 
@@ -1794,6 +1899,7 @@ def _receipt_payload(
     prs: list[dict[str, Any]],
     evidence: dict[str, Any] | None,
     track: dict[str, Any],
+    loop_summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     active_tracks = (evidence or {}).get("active_tracks") or []
     broken = _parse_broken_register()
@@ -1823,6 +1929,7 @@ def _receipt_payload(
                 if isinstance(t, dict)
             ],
         },
+        "cybernetic_loop_closure": loop_summary or {},
         "next_items": _collect_next_items(evidence, track)[:10],
         "swarm_bulletins": _collect_swarm_bulletins()[:10],
         "broken_register": {

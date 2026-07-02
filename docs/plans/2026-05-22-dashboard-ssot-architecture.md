@@ -66,7 +66,7 @@ Any agent picking up dashboard work must read these 6 documents before writing c
 | 3 | `ACTIVE_SURFACE_MANIFEST.yaml` | Machine-readable surface map: every page, router, agent, integration, loop |
 | 4 | `docs/governance/ACTIVE_TRACK.yaml` | Current build track and non-goals |
 | 5 | `INTERFACE_MISMATCH_MAP.md` | Every known interface mismatch (0 BLOCKERs, 4 DEGRADED) |
-| 6 | `CYBERNETIC_LOOP_MAP.md` | Every feedback loop's closure status (0/13 closed in production) |
+| 6 | `CYBERNETIC_LOOP_MAP.md` | Every feedback loop's closure status (latest: 4/13 bounded-replay closed; 0/13 all-history daemon clean) |
 
 After those six, the depth-on-demand surface is:
 
@@ -109,7 +109,7 @@ What the live runtime actually does: agent execution, telemetry streams, economi
 | Sakshi provenance | `sakshi/provenance_log.py` → `~/.dharma/sakshi/provenance_log.jsonl` | 10 actor kinds, 10+ action kinds; governance snapshot hash per entry |
 | Dhyana drift triage | `dhyana/drift_triage.py` | Wired to control surface; ranks findings alongside degraded evidence |
 | Chetana | Referenced in MemoryKernel (`write_receipts.py`, `surface_specs_core.py`, `context_parity.py`, `identity.py`) | Name only; no standalone module. Chetana is a MemoryKernel concept, not a separate subsystem. |
-| Cybernetic loops | `CYBERNETIC_LOOP_MAP.md` | 0/13 closed in production; 1 closed in test (Witness); 7 PARTIAL; 5 NO |
+| Cybernetic loops | `CYBERNETIC_LOOP_MAP.md` | 4/13 bounded-replay closed (Loops 1, 2, 5, 6); 7 PARTIAL; 2 BLOCKED behind One Wire; 0/13 all-history daemon clean |
 | Mission state | `~/.dharma/state/runtime.db` | 27 sessions, 42 task claims (all failed), Loop 1 is the gate |
 
 ---

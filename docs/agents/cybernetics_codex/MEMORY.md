@@ -2,6 +2,14 @@
 
 Newest entries first.
 
+## 2026-07-01 - Latest loop ledger projection
+
+- Current audit owner: `scripts/governance/cybernetics_codex_audit.py --json`.
+- Latest ledger: 4/13 CLOSED_BOUNDED_REPLAY (Loops 1, 2, 5, 6), 7/13 PARTIAL (Loops 3, 4, 7, 8, 9, 10, 11), 2/13 BLOCKED (Loops 12, 13).
+- Standing all-history daemon closure remains 0/13 clean because historical `dispatch_dropoff` rows remain.
+- One Wire remains below archive-fitness authority threshold (`N=3/5`, `M=1/3`).
+- Stale "0/13 cybernetic loops wired" claims must be read as historical or as all-history-clean only; they are no longer the bounded-replay status.
+
 ## 2026-06-13 - Seed and registration packet
 
 - Created the repo-native nest at `docs/agents/cybernetics_codex/`.

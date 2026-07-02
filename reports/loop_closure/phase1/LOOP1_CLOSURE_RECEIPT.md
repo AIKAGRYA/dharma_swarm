@@ -12,6 +12,8 @@
 
 Loop 1 is **NOT closed through the spine on the surface the operator actually orients on.**
 
+**Supersession note (2026-07-01):** this Phase 1 receipt remains useful history for the old canonical-db mismatch, but it is no longer the current closure ledger. `CYBERNETIC_LOOP_MAP.md` and `scripts/governance/cybernetics_codex_audit.py --json` now project Loop 1 as CLOSED_BOUNDED_REPLAY while still keeping all-history daemon closure unclean because historical `dispatch_dropoff` rows remain.
+
 The dispatch-layer patch is real and the isolated proof is real, but the
 operator-facing closure check (`make orient`) reads the **canonical**
 `~/.dharma/state/runtime.db` — whose latest receipt is still the stale

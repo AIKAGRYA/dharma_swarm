@@ -94,7 +94,7 @@ This is asynchronous stigmergy — indirect coordination via environmental marks
 - SOVEREIGN_MANIFEST.md — axioms, verified counts, substrate-nativeness ~10-15%
 - ANTI_SLOP_RULES.md — referenced but not yet deep-read
 - INTERFACE_MISMATCH_MAP.md — 0 BLOCKERs, 4 DEGRADED
-- CYBERNETIC_LOOP_MAP.md — 0/13 closed in production
+- CYBERNETIC_LOOP_MAP.md — historical 2026-05 status was 0/13 closed in production; supersession 2026-07-01: 4/13 bounded-replay closed, 7 partial, 2 blocked, still 0/13 all-history daemon clean
 - ACTIVE_SURFACE_MANIFEST.yaml — 657 lines, 20 dashboard surfaces, 13 agents
 - BROKEN_REGISTER.md — 9 items, 5 OPEN/PARTIAL
 

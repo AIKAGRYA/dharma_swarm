@@ -45,6 +45,8 @@ See `make help` for the complete, authoritative target list — it is regenerate
 
 A 5-stage governance pipeline (`scripts/governance/loop/`) that audits code for slop, triages findings, remediates with anti-gaming enforcement, re-audits with a fresh verifier, and ratchets CI gates to prevent recurrence. Core invariant: **LLM proposes, deterministic oracle disposes** — no LLM opinion is ever recorded as truth.
 
+This is separate from the 13 runtime cybernetic loops in `CYBERNETIC_LOOP_MAP.md`. Current runtime-loop status is projected by `scripts/governance/cybernetics_codex_audit.py --json`: 4/13 bounded-replay closed, 7 partial, 2 blocked, and 0/13 all-history daemon clean as of 2026-07-01.
+
 **Stages:** `prompt_audit_run` (Auditor) → `prompt_audit_triage` (deterministic triage) → `prompt_audit_remediate` (Implementer + §8 anti-gaming) → `prompt_audit_reaudit` (Verifier, falsification-first) → `prompt_audit_learn` (Ratcheter, drives existing ratchet engine)
 
 **Run the loop:**

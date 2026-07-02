@@ -1,6 +1,6 @@
 # Cybernetic Loop Map — dharma_swarm
 
-**Last audit:** 2026-06-23T14:15:48Z by `scripts/governance/cybernetics_codex_audit.py --json`
+**Last audit:** 2026-07-01T14:15:33Z by `scripts/governance/cybernetics_codex_audit.py --json`
 **Previous version:** 2026-05-20 (stale BR-012 surface, retained below as historical context)
 **Purpose:** Document every feedback loop's sense→act→evaluate→adapt path.
 Each loop is "closed" only when its output feeds back as input to a future cycle.
@@ -33,13 +33,13 @@ Live runtime truth from the latest audit:
 
 | Surface | Current value |
 |---------|---------------|
-| `delegation_runs` | 6,441 total, 3,034 completed, 3,349 failed, 57 running, 1 claimed |
-| `runtime_receipts` | 47,895 rows, latest 2026-06-23T14:15:48Z |
-| `receipt_json` | 1,225 rows, orchestrator surface only |
-| served provider/model truth | 999 completed delegation runs, 7,018 runtime receipts |
-| `dispatch_dropoff` | 1,486 failures, latest 2026-06-23T11:04:36Z |
+| `delegation_runs` | 8,667 total, 4,158 completed, 4,401 failed, 107 running, 1 claimed |
+| `runtime_receipts` | 98,470 rows, latest 2026-07-01T13:53:33Z |
+| `receipt_json` | 2,572 rows, orchestrator surface only |
+| served provider/model truth | 1,917 completed delegation runs, 20,535 runtime receipts |
+| `dispatch_dropoff` | 2,135 historical failures, latest 2026-07-01T03:42:49Z |
 | One Wire quorum | N=3/5, M=1/3, not eligible |
-| evolution archive | 11,726 entries, 11,227 internal-positive-fitness risk rows, 0 external authority markers |
+| evolution archive | 12,235 entries, 11,369 internal-positive-fitness risk rows, 0 external authority markers |
 
 Bounded Loop 1 replay proof (current code/provider lane):
 
@@ -61,7 +61,7 @@ Bounded Loop 1 replay proof (current code/provider lane):
 
 | # | Loop | Interval | Closed? | Remaining Blocker |
 |---|------|----------|---------|-------------------|
-| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=1486`, so do not call the whole daemon history clean. |
+| 1 | Swarm Task Loop | 60s | **CLOSED in bounded replay; PARTIAL in all-history audit** | Current bounded replay closes with 3/3 completed tasks, zero dropoff, 3 ok evidence receipts, and served provider/model truth. Standing all-history audit still includes historical `dispatch_dropoff=2135`, so do not call the whole daemon history clean. |
 | 2 | Organism Heartbeat | 300s | **CLOSED in bounded replay; PARTIAL in standing daemon history** | `reports/loop_closure/cybernetics_codex/2026-06-23_loop2_heartbeat_closure.json` proves 3 cycles, all transitions receipted, and algedonic adaptive state feeding the next cycle; the always-on daemon history is still not cleanly closed. |
 | 3 | Evolution Loop / DarwinEngine | every 3rd tick | **PARTIAL** | Activity exists, but adaptation/fitness authority is not closure-proven. |
 | 4 | Consolidation Loop / Memory | configurable | **PARTIAL** | Runtime substrate is active, but this loop lacks a dedicated closure receipt. |
@@ -75,7 +75,7 @@ Bounded Loop 1 replay proof (current code/provider lane):
 | 12 | Self-Improvement | 3600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 | 13 | Free Evolution Grind | 600s | **BLOCKED** | One Wire guardian quorum below threshold: N=3/5, M=1/3. |
 
-**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, and 6 (with Loop 5 explicitly internal-arm-only); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence.**
+**Summary: standing all-history audit is still 0 fully clean. Bounded replay currently closes Loops 1, 2, 5, and 6 (with Loop 5 explicitly internal-arm-only); Loops 3/4/7/8/9/10/11 remain PARTIAL; Loops 12/13 remain BLOCKED behind One Wire. Do not promote bounded-replay closure to always-on daemon closure without fresh live-loop evidence. The stale "0/13 closed" shorthand is now correct only when explicitly scoped to all-history daemon cleanliness.**
 
 ---
 
@@ -344,4 +344,4 @@ ls ~/.dharma/witness/  # witness log files exist with real agent actions
 
 ---
 
-*This document was last audited on 2026-05-05 against HEAD `74d015c`. Previous version: 2026-04-04. See `INTERFACE_MISMATCH_MAP.md` for the current mismatch status (0 BLOCKERs, 4 DEGRADED).*
+*This document was last projected from `scripts/governance/cybernetics_codex_audit.py --json` on 2026-07-01. See `INTERFACE_MISMATCH_MAP.md` for interface mismatch history; current loop closure truth is owned by the cybernetics-codex audit command above.*

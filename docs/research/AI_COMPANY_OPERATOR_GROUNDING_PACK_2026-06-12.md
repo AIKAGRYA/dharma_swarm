@@ -176,7 +176,7 @@ fractal_room.py code surfaces). Operator directive: in-repo primary docs FIRST, 
 - **$0 external receipts;** Campaign X-Ray HELD 28/100; Darshan only ACTIVE_SEASON_0 (`:57`)
 - **Polsia "interview" was chatbot** — propagated as canon 6+ days; phantom postmortem (`evidence:21`, `:230`)
 - **Handoff 02:** first dispatch since 2026-05-27; SeatedCheckpoint EXISTS; fail-closed (`:97-107`)
-- **Evidence run:** 0 cybernetic loops closed prod; evolution archive vacuous; $0 revenue (`evidence:4-5`, `:109-115`)
+- **Evidence run:** historical 2026-06-10 snapshot: 0 cybernetic loops closed prod; evolution archive vacuous; $0 revenue (`evidence:4-5`, `:109-115`). Supersession 2026-07-01: 4/13 CLOSED_BOUNDED_REPLAY, 7 PARTIAL, 2 BLOCKED, still 0/13 all-history daemon clean.
 
 ### 17. `docs/governance/VENTURE_CELL_REVENUE_WEDGE.md`
 

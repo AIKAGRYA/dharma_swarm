@@ -246,7 +246,7 @@ active_tracks:
     name: Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
     status: ACTIVE
     opened_at: "2026-06-11"
-    verified_at: "2026-06-11"
+    verified_at: "2026-07-01"
     ttl_days: 21
     owner: "@AmitabhainArunachala"
     serves: substrate-nativeness
@@ -273,6 +273,12 @@ active_tracks:
       Invariant that must hold throughout:
         Internal artifacts never touch archive fitness; only countersigned
         external acted receipts above quorum do.
+
+      Current projection (2026-07-01, cybernetics_codex audit):
+        4/13 loops are CLOSED_BOUNDED_REPLAY (1, 2, 5, 6), 7/13 are
+        PARTIAL (3, 4, 7, 8, 9, 10, 11), and 2/13 are BLOCKED behind One
+        Wire quorum (12, 13). Standing all-history daemon closure remains
+        0/13 clean because historical dispatch_dropoff rows remain.
 
     prerequisites:
       - id: loop_map_exists
@@ -329,16 +335,20 @@ active_tracks:
 
     next_items:
       - id: 1
-        what: "Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required)."
+        what: "Add dedicated closure receipts/scripts for Loops 3, 4, 7, 8, 9, 10, and 11; each must prove sense->interpret->constrain->act->adapt on real data with an adaptive state change read by a later cycle."
         kind: code
         blocker: true
       - id: 2
-        what: "CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster."
+        what: "Keep Loop 1 bounded replay green while reducing all-history dispatch_dropoff; do not promote bounded replay to always-on daemon closure until the audited scope is clean."
         kind: ops
-        blocker: false
+        blocker: true
       - id: 3
-        what: "Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient."
+        what: "Add One Wire archive-fitness guard tests before enabling Loops 12/13; archive fitness may move only on countersigned external acted receipts above N>=5, M>=3."
         kind: code
+        blocker: true
+      - id: 4
+        what: "Regenerate or refresh CYBERNETIC_LOOP_MAP.md from scripts/governance/cybernetics_codex_audit.py so stale prose cannot reintroduce the old 0/13 shorthand."
+        kind: docs
         blocker: false
 
   - id: orchestration-arena-v1-2026-06

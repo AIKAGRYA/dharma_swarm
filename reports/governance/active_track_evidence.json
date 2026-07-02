@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-01T07:27:23+09:00",
+  "generated_at": "2026-07-01T23:41:19+09:00",
   "schema_version": 2,
   "active_track_id": "runtime-truth-spine-adoption-2026-06",
   "shippable": false,
@@ -265,13 +265,13 @@
         "quality_gates",
         "eval_coverage"
       ],
-      "verified_at": "2026-06-11",
+      "verified_at": "2026-07-01",
       "ttl_days": 21,
       "owner": "@AmitabhainArunachala",
       "shippable": false,
-      "criteria_pass": false,
+      "criteria_pass": true,
       "ship_blocks": [
-        "1 open blocker next-item(s)",
+        "3 open blocker next-item(s)",
         "no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid)",
         "strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification)"
       ],
@@ -283,7 +283,7 @@
       "min_evidence_grade_name": "S2_LANDED",
       "prerequisites_ok": true,
       "completion_progress": {
-        "passed": 10,
+        "passed": 11,
         "total": 11
       },
       "criteria": [
@@ -332,8 +332,8 @@
         {
           "id": "campaign_retrospective_exists",
           "kind": "file_exists",
-          "passed": false,
-          "detail": "reports/loop_closure/RETROSPECTIVE.md MISSING",
+          "passed": true,
+          "detail": "reports/loop_closure/RETROSPECTIVE.md present",
           "executed": true
         },
         {
@@ -643,8 +643,8 @@
     },
     {
       "severity": "INFO",
-      "check": "track-in-progress:loop-closure-2026-06",
-      "message": "[loop-closure-2026-06] 10/11 completion criteria pass.",
+      "check": "track-provisional:loop-closure-2026-06",
+      "message": "[loop-closure-2026-06] 11/11 criteria pass but NOT shippable under the rigorous bar: 3 open blocker next-item(s); no rigorous evidence (criteria are existence-only: file_exists/file_contains \u2014 add test_passes / commit_on_main / receipt_valid); strongest evidence S1_PRESENT < required S2_LANDED (raise evidence strength or lower min_evidence_grade with justification). Existence checks are not closure (see REALITY_DEBT_LEDGER.md / cybernetics_codex._evaluate_loop_closure_replay).",
       "criterion_id": null
     },
     {

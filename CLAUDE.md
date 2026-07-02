@@ -69,7 +69,7 @@ status is main's standing declaration and is left to the operator.
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-01 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06
 **Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
 **Moves vital signs:** quality_gates, eval_coverage
@@ -88,11 +88,18 @@ Invariant that must hold throughout:
   Internal artifacts never touch archive fitness; only countersigned
   external acted receipts above quorum do.
 
+Current projection (2026-07-01, cybernetics_codex audit):
+  4/13 loops are CLOSED_BOUNDED_REPLAY (1, 2, 5, 6), 7/13 are
+  PARTIAL (3, 4, 7, 8, 9, 10, 11), and 2/13 are BLOCKED behind One
+  Wire quorum (12, 13). Standing all-history daemon closure remains
+  0/13 clean because historical dispatch_dropoff rows remain.
+
 **Next items:**
 
-- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
-- [ops] CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster.
-- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+- [code] (blocker) Add dedicated closure receipts/scripts for Loops 3, 4, 7, 8, 9, 10, and 11; each must prove sense->interpret->constrain->act->adapt on real data with an adaptive state change read by a later cycle.
+- [ops] (blocker) Keep Loop 1 bounded replay green while reducing all-history dispatch_dropoff; do not promote bounded replay to always-on daemon closure until the audited scope is clean.
+- [code] (blocker) Add One Wire archive-fitness guard tests before enabling Loops 12/13; archive fitness may move only on countersigned external acted receipts above N>=5, M>=3.
+- [docs] Regenerate or refresh CYBERNETIC_LOOP_MAP.md from scripts/governance/cybernetics_codex_audit.py so stale prose cannot reintroduce the old 0/13 shorthand.
 
 **Non-goals:**
 

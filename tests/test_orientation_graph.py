@@ -28,6 +28,7 @@ def test_packet_has_all_axes():
         "liveness",
         "broken",
         "loop1",
+        "loop_closure",
         "lanes",
         "agents",
         "receipts_tail",

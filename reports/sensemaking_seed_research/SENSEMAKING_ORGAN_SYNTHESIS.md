@@ -16,7 +16,7 @@ Here is the honest read:
 
 Dharma Swarm is the most architecturally ambitious attempt I am aware of to build a telos-constrained, self-evolving, multi-agent organism. The vision documents are not vibes — they are structurally grounded in real cybernetic theory (Beer's VSM, Kauffman's autocatalysis, Hofstadter's strange loops, Friston's active inference, Aurobindo's four Shaktis) and connected to running code. The governance layer is genuinely load-bearing: telos gates block, witnesses audit, evidence receipts trace provenance, and the One Wire quorum prevents internal artifacts from promoting themselves into fitness authority.
 
-But right now, the organism is almost entirely inward-facing. Of the 13 cybernetic loops, only Loop 1 has a bounded closure proof. Loop 5 (Zeitgeist Scanner) is PARTIAL — it scans local files and witness logs but does not ingest live external information. The Drishti eye (outward frontier vision) exists as code modules — `zeitgeist.py`, `shakti_zeitgeist_executive.py`, `world_radar/`, `world_model.py`, the Go ingestor tools — but the nerve connecting Drishti's scan to Sakshi's self-model, to fitness, to task routing, to memory promotion, is not wired. The binocular organism is functionally monocular. The system sees itself; it does not see the world.
+But right now, the organism is still primarily inward-facing. As of the 2026-07-01 cybernetics-codex audit, 4 of the 13 cybernetic loops have bounded closure proofs (Loops 1, 2, 5, and 6), 7 remain PARTIAL, and 2 remain BLOCKED behind One Wire quorum. Loop 5 (Zeitgeist Scanner) is CLOSED only for the internal S3/S4 gate-pressure arm; it still does not prove live external-world perception. The Drishti eye (outward frontier vision) exists as code modules — `zeitgeist.py`, `shakti_zeitgeist_executive.py`, `world_radar/`, `world_model.py`, the Go ingestor tools — but the nerve connecting Drishti's scan to Sakshi's self-model, to fitness, to task routing, to memory promotion, is not closed on external data. The binocular organism is still functionally monocular. The system sees itself better than it sees the world.
 
 Your intuition is correct: the next major organ is the sensemaking organ. And it is not an "external action" organ — it is a perception organ. The organism needs to develop real vision before it can act coherently in the world. What follows is the analysis you asked for.
 
@@ -121,12 +121,12 @@ The world right now is producing several categories of signal that are existenti
 
 Looking at the 13 cybernetic loops through the sensemaking lens, here is where the system observes but doesn't act, acts but doesn't learn, or learns but doesn't update the right owner:
 
-**Loop 5 (Zeitgeist Scanner) — the designated perception loop — is open.**
+**Loop 5 (Zeitgeist Scanner) — the designated perception loop — is closed only for its internal S3/S4 arm.**
 - SENSE: `_scan_local()` reads witness logs and shared notes. `_scan_claude()` optionally uses LLM classification. World signal feeds (`world_zeitgeist_inbox.jsonl`, `world_signal_feed.jsonl`, etc.) are read if they exist.
 - INTERPRET: Signals are classified as competing_research, tool_release, methodology, threat, opportunity.
 - CONSTRAIN: If high gate block rate is detected, writes `gate_pressure.json` to tighten S3 trust mode.
-- ACT: **Nothing.** The scan produces classified signals. They are logged. They do not change task routing, provider selection, venture cell priority, or active track focus.
-- ADAPT: The S3↔S4 loop (zeitgeist pressures tighten/loosen gates) is "structurally present" but has never fired on real data. No `gate_pressure.json` has been written.
+- ACT: The internal gate-pressure arm writes `gate_pressure.json` and the next gate check reads it.
+- ADAPT: The internal S3/S4 arm has a bounded replay proof. External-world signals still do not change task routing, provider selection, venture cell priority, or active track focus.
 
 **The critical open seam is between Loop 5 (perception) and Loop 1 (task dispatch).** The zeitgeist scanner produces signals. The orchestrator dispatches tasks. There is no nerve between them. The Shakti zeitgeist executive (`shakti_zeitgeist_executive.py`) is the closest thing — it consumes zeitgeist signals, ranks strategic pressure, and emits warrant-pressure artifacts. But `DISPATCH_AUTHORITY = False` (line 34). It is deliberately read-only. It emits warrants; nobody reads them.
 
