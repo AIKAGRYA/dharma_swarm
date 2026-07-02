@@ -562,6 +562,48 @@ def test_run_cron_job_dispatches_algedonic_triage(tmp_path):
     assert mock_run.call_args.kwargs["env"]["DHARMA_STATE_DIR"] == str(tmp_path / ".dharma")
 
 
+def test_run_cron_job_dispatches_provider_starvation_alert(tmp_path):
+    repo_root = cron_runner.Path(cron_runner.__file__).resolve().parent.parent
+    script = repo_root / "scripts" / "runtime" / "provider_starvation_alert.py"
+    with patch(
+        "subprocess.run",
+        return_value=SimpleNamespace(
+            returncode=0,
+            stdout="provider_starvation: total=30 failures=29 fraction=0.967 alert=True emitted=True\n",
+            stderr="",
+        ),
+    ) as mock_run:
+        success, output, error = run_cron_job(
+            {
+                "handler": "provider_starvation_alert",
+                "timeout_sec": 11,
+                "state_dir": str(tmp_path / ".dharma"),
+                "since_date": "2026-07-02",
+                "threshold": 0.5,
+                "min_count": 3,
+            }
+        )
+
+    assert success is True
+    assert "alert=True" in output
+    assert error is None
+    args = mock_run.call_args.args[0]
+    assert args == [
+        sys.executable,
+        str(script),
+        "--state-dir",
+        str(tmp_path / ".dharma"),
+        "--since-date",
+        "2026-07-02",
+        "--threshold",
+        "0.5",
+        "--min-count",
+        "3",
+    ]
+    assert mock_run.call_args.kwargs["cwd"] == str(repo_root)
+    assert mock_run.call_args.kwargs["timeout"] == 11
+
+
 def test_run_cron_job_dispatches_tcs_heartbeat(tmp_path):
     class FakeIdentityMonitor:
         def __init__(self, state_dir):

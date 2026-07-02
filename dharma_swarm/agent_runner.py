@@ -633,11 +633,10 @@ def _allow_provider_routing(task: Task, config: AgentConfig) -> bool:
     override = _metadata_bool(metadata, "allow_provider_routing", "routed_execution", "use_router")
     if override is not None:
         return override
-    # Keep agents pinned to their configured lane unless the task/config
-    # explicitly widens execution. A global env toggle is too coarse here:
-    # it can silently hijack dedicated seats such as cyber-glm5 onto a
-    # primary-driver lane and invalidate model/provider provenance.
-    return False
+    # Default daemon agents must not collapse the router to a single provider.
+    # Dedicated seats can still pin explicitly with allow_provider_routing=false
+    # or provider_allowlist/available_provider_types metadata.
+    return True
 
 
 def _parse_provider_types(value: Any) -> list[ProviderType]:

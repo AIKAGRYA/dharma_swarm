@@ -28,11 +28,27 @@ from scripts.runtime.a2a_domain_reply_worker import DEFAULT_OUTBOX_ROOT  # noqa:
 from scripts.runtime.model_critic_runner import DEFAULT_OUT_DIR as DEFAULT_SEMANTIC_RECEIPT_DIR  # noqa: E402
 from scripts.runtime.model_critic_runner import run_model_critic  # noqa: E402
 from scripts.runtime.pr_merge_control import stamp, utc_now  # noqa: E402
+from dharma_swarm.models import ProviderType  # noqa: E402
+from dharma_swarm.runtime_provider import (  # noqa: E402
+    PREFERRED_LOW_COST_RUNTIME_PROVIDERS,
+    preferred_runtime_provider_configs,
+    resolve_runtime_provider_config,
+)
 
 DEFAULT_DRAIN_RECEIPT_DIR = REPO_ROOT / "reports" / "a2a" / "semantic_inbox_drains"
 DEFAULT_AGENT_UID = "codex_composer"
 LEGACY_SCHEMA_VERSION = "dharma.a2a.codex_composer_semantic_inbox_drain.v1"
 GENERIC_SCHEMA_VERSION = "dharma.a2a.semantic_inbox_drain.v1"
+_DIRECT_RUNTIME_PROVIDER_ORDER = tuple(
+    provider
+    for provider in PREFERRED_LOW_COST_RUNTIME_PROVIDERS
+    if provider
+    not in {
+        ProviderType.OLLAMA,
+        ProviderType.CLAUDE_CODE,
+        ProviderType.CODEX,
+    }
+)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -122,6 +138,39 @@ def _semantic_audit_depth(*, semantic_claim: bool, source_audit_claim: bool) -> 
     return "typed_failure"
 
 
+def _resolve_runtime_critic_defaults(
+    *,
+    provider: str | None,
+    model: str | None,
+) -> tuple[str, str]:
+    """Resolve semantic-critic provider/model through runtime_provider."""
+
+    if provider:
+        try:
+            provider_type = ProviderType(provider)
+        except ValueError as exc:
+            raise ValueError(f"unsupported runtime provider: {provider}") from exc
+        cfg = resolve_runtime_provider_config(provider_type, model=model or None)
+        if not cfg.available:
+            raise RuntimeError(f"semantic inbox provider is not available: {provider}")
+        resolved_model = cfg.default_model or model
+        if not resolved_model:
+            raise RuntimeError(f"semantic inbox provider has no resolved model: {provider}")
+        return cfg.provider.value, resolved_model
+
+    configs = preferred_runtime_provider_configs(
+        model=model or None,
+        provider_order=_DIRECT_RUNTIME_PROVIDER_ORDER,
+    )
+    if not configs:
+        raise RuntimeError("no direct API runtime provider available for semantic inbox drain")
+    cfg = configs[0]
+    resolved_model = cfg.default_model or model
+    if not resolved_model:
+        raise RuntimeError(f"semantic inbox provider has no resolved model: {cfg.provider.value}")
+    return cfg.provider.value, resolved_model
+
+
 def drain_semantic_inbox(
     *,
     delivery_record_path: Path,
@@ -133,8 +182,8 @@ def drain_semantic_inbox(
     artifact_receipt_dir: Path = DEFAULT_ARTIFACT_RECEIPT_DIR,
     drain_receipt_dir: Path = DEFAULT_DRAIN_RECEIPT_DIR,
     agent_uid: str = DEFAULT_AGENT_UID,
-    provider: str = "ollama",
-    model: str = "glm-5:cloud",
+    provider: str | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     delivery_record_path = delivery_record_path.expanduser().resolve()
     delivery_record = _read_json(delivery_record_path)
@@ -159,10 +208,14 @@ def drain_semantic_inbox(
     if prompt_file.exists():
         prompt_file.chmod(0o600)
 
-    critic_result = run_model_critic(
-        prompt_file=prompt_file,
+    critic_provider, critic_model = _resolve_runtime_critic_defaults(
         provider=provider,
         model=model,
+    )
+    critic_result = run_model_critic(
+        prompt_file=prompt_file,
+        provider=critic_provider,
+        model=critic_model,
         out_dir=semantic_receipt_dir,
         agent_uid=agent_uid,
         review_target=f"a2a:{packet_id}",
@@ -267,8 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--artifact-receipt-dir", default=str(DEFAULT_ARTIFACT_RECEIPT_DIR))
     parser.add_argument("--drain-receipt-dir", default=str(DEFAULT_DRAIN_RECEIPT_DIR))
     parser.add_argument("--agent-uid", default=DEFAULT_AGENT_UID)
-    parser.add_argument("--provider", default="ollama")
-    parser.add_argument("--model", default="glm-5:cloud")
+    parser.add_argument("--provider", default="")
+    parser.add_argument("--model", default="")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -283,8 +336,8 @@ def main(argv: list[str] | None = None) -> int:
             artifact_receipt_dir=Path(args.artifact_receipt_dir),
             drain_receipt_dir=Path(args.drain_receipt_dir),
             agent_uid=args.agent_uid,
-            provider=args.provider,
-            model=args.model,
+            provider=args.provider or None,
+            model=args.model or None,
         )
     except Exception as exc:
         print(f"ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)

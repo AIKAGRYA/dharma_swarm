@@ -5,8 +5,16 @@ from pathlib import Path
 
 import pytest
 
+from dharma_swarm.models import ProviderType
 from dharma_swarm.operator_core.semantic_receipt import SCHEMA_VERSION
-from scripts.runtime.codex_composer_semantic_inbox_drain import drain_semantic_inbox
+from dharma_swarm.runtime_provider import RuntimeProviderConfig
+from scripts.runtime.codex_composer_semantic_inbox_drain import (
+    _resolve_runtime_critic_defaults,
+    drain_semantic_inbox,
+)
+
+
+MOCK_CRITIC_KWARGS = {"provider": "ollama", "model": "glm-5:cloud"}
 
 
 def _delivery_record(tmp_path: Path, *, agent_uid: str = "codex_composer") -> Path:
@@ -85,6 +93,7 @@ def test_drain_semantic_inbox_writes_semantic_receipt_and_domain_artifact(tmp_pa
         semantic_receipt_dir=tmp_path / "semantic_receipts",
         artifact_receipt_dir=tmp_path / "artifact_receipts",
         drain_receipt_dir=tmp_path / "drain_receipts",
+        **MOCK_CRITIC_KWARGS,
     )
 
     assert receipt["status"] == "SEMANTIC_INBOX_DRAINED"
@@ -107,6 +116,34 @@ def test_drain_semantic_inbox_writes_semantic_receipt_and_domain_artifact(tmp_pa
     assert str(semantic_path) in artifact["evidence_refs"]
 
 
+def test_runtime_critic_default_uses_direct_provider_chain(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    def fake_preferred_runtime_provider_configs(**kwargs: object) -> list[RuntimeProviderConfig]:
+        calls.update(kwargs)
+        return [
+            RuntimeProviderConfig(
+                provider=ProviderType.GROQ,
+                default_model="qwen/qwen3-32b",
+                available=True,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "scripts.runtime.codex_composer_semantic_inbox_drain.preferred_runtime_provider_configs",
+        fake_preferred_runtime_provider_configs,
+    )
+
+    provider, model = _resolve_runtime_critic_defaults(provider=None, model=None)
+
+    assert provider == ProviderType.GROQ.value
+    assert model == "qwen/qwen3-32b"
+    provider_order = calls["provider_order"]
+    assert isinstance(provider_order, tuple)
+    assert ProviderType.OLLAMA not in provider_order
+    assert ProviderType.CLAUDE_CODE not in provider_order
+
+
 def test_drain_semantic_inbox_supports_non_codex_target_identity(tmp_path: Path) -> None:
     receipt = drain_semantic_inbox(
         delivery_record_path=_delivery_record(tmp_path, agent_uid="hermes-m5"),
@@ -116,6 +153,7 @@ def test_drain_semantic_inbox_supports_non_codex_target_identity(tmp_path: Path)
         artifact_receipt_dir=tmp_path / "artifact_receipts",
         drain_receipt_dir=tmp_path / "drain_receipts",
         agent_uid="hermes-m5",
+        **MOCK_CRITIC_KWARGS,
     )
 
     assert receipt["status"] == "SEMANTIC_INBOX_DRAINED"
@@ -143,6 +181,7 @@ def test_drain_semantic_inbox_marks_typed_failures_without_source_audit_depth(tm
         artifact_receipt_dir=tmp_path / "artifact_receipts",
         drain_receipt_dir=tmp_path / "drain_receipts",
         agent_uid="hermes-m5",
+        **MOCK_CRITIC_KWARGS,
     )
 
     assert receipt["status"] == "SEMANTIC_INBOX_DRAIN_TYPED_FAILURE"
