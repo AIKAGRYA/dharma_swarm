@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from dharma_swarm.archive import read_one_wire_fitness_authority
 from dharma_swarm.daemon_config import dharma_state_dir
 
 try:  # pragma: no cover - exercised by repo runtime; tests run with PyYAML.
@@ -78,6 +79,7 @@ VERIFIER_COMMANDS = [
 SERVED_PROVIDER_KEYS = ("actual_served_provider", "served_provider", "provider")
 SERVED_MODEL_KEYS = ("actual_served_model", "served_model", "model")
 NON_PROVIDER_VALUES = {"", "none", "null", "unknown", "orchestrator"}
+SQLITE_IN_CHUNK_SIZE = 500
 
 LOOPS = [
     (1, "swarm_task_loop", "Swarm Task Loop"),
@@ -703,16 +705,12 @@ def _routing_adaptation_after_truth_summary(
             )
             columns = _table_columns(conn, table)
             if "run_id" in columns and truth_run_ids:
-                placeholders = ",".join("?" for _ in truth_run_ids)
-                correlated_after_truth = int(
-                    conn.execute(
-                        (
-                            f"select count(*) from {table} "
-                            f"where {timestamp_column} > ? and run_id in ({placeholders})"
-                        ),
-                        (latest_truth, *sorted(truth_run_ids)),
-                    ).fetchone()[0]
-                    or 0
+                correlated_after_truth = _count_correlated_rows_after_truth(
+                    conn,
+                    table=table,
+                    timestamp_column=timestamp_column,
+                    latest_truth=latest_truth,
+                    truth_run_ids=truth_run_ids,
                 )
         out["tables"][table] = {
             "exists": True,
@@ -727,71 +725,62 @@ def _routing_adaptation_after_truth_summary(
     return out
 
 
+def _count_correlated_rows_after_truth(
+    conn: sqlite3.Connection,
+    *,
+    table: str,
+    timestamp_column: str,
+    latest_truth: str,
+    truth_run_ids: set[str],
+) -> int:
+    total = 0
+    ordered = sorted(truth_run_ids)
+    for offset in range(0, len(ordered), SQLITE_IN_CHUNK_SIZE):
+        chunk = ordered[offset : offset + SQLITE_IN_CHUNK_SIZE]
+        placeholders = ",".join("?" for _ in chunk)
+        total += int(
+            conn.execute(
+                (
+                    f"select count(*) from {table} "
+                    f"where {timestamp_column} > ? and run_id in ({placeholders})"
+                ),
+                (latest_truth, *chunk),
+            ).fetchone()[0]
+            or 0
+        )
+    return total
+
+
 def read_one_wire_summary(state_dir: Path) -> dict[str, Any]:
-    path = state_dir / "forge_measurement_guardian" / "cycle-003-fitness-quorum-guard.json"
+    authority = read_one_wire_fitness_authority(state_dir)
     out: dict[str, Any] = {
-        "guardian_receipt": str(path),
-        "exists": path.exists(),
-        "required_confirmed": 5,
-        "required_domains": 3,
-        "eligible": False,
-        "fitness_authority_granted": False,
+        "guardian_receipt": str(authority.receipt_path),
+        "exists": authority.exists,
+        "required_confirmed": authority.required_confirmed,
+        "required_domains": authority.required_domains,
+        "confirmed": authority.confirmed,
+        "domains": authority.domains,
+        "eligible": authority.allowed,
+        "eligible_to_set_archive_fitness": authority.eligible_to_set_archive_fitness,
+        "fitness_authority_granted": authority.fitness_authority_granted,
+        "archive_fitness_changed": authority.archive_fitness_changed,
     }
-    if not path.exists():
-        out["blocker"] = "guardian quorum receipt missing"
+    if authority.blocker:
+        out["blocker"] = authority.blocker
+    if not authority.exists:
         return out
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(authority.receipt_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         out["blocker"] = f"guardian receipt unreadable: {type(exc).__name__}"
         return out
 
+    if not isinstance(payload, dict):
+        return out
     out["payload_keys"] = sorted(payload)[:20]
-    authority = payload.get("authority_result") if isinstance(payload, dict) else {}
     threshold = payload.get("threshold_guard") if isinstance(payload, dict) else {}
-    if isinstance(authority, dict):
-        out["confirmed"] = authority.get("confirmed_receipt_count", out.get("confirmed", 0))
-        out["domains"] = authority.get("domain_count", out.get("domains", 0))
-        out["eligible"] = authority.get("eligible_to_set_archive_fitness", out.get("eligible", False))
-        out["archive_fitness_changed"] = authority.get(
-            "archive_fitness_changed",
-            out.get("archive_fitness_changed", False),
-        )
-        out["fitness_authority_granted"] = authority.get(
-            "fitness_authority_granted",
-            out.get("fitness_authority_granted", False),
-        )
     if isinstance(threshold, dict):
-        out["required_confirmed"] = threshold.get(
-            "required_confirmed_receipts",
-            out["required_confirmed"],
-        )
-        out["required_domains"] = threshold.get(
-            "required_distinct_domains",
-            out["required_domains"],
-        )
-        out["confirmed"] = threshold.get("observed_confirmed_receipts", out.get("confirmed", 0))
-        out["domains"] = threshold.get("observed_distinct_domains", out.get("domains", 0))
         out["observed_domains"] = threshold.get("observed_domains", [])
-    for key in ("confirmed", "domains", "eligible", "archive_fitness_changed", "fitness_authority_granted"):
-        if key in payload:
-            out[key] = payload[key]
-    confirmed = int(out.get("confirmed") or 0)
-    domains = int(out.get("domains") or 0)
-    required_confirmed = int(out.get("required_confirmed") or 5)
-    required_domains = int(out.get("required_domains") or 3)
-    eligible = (
-        bool(out.get("eligible"))
-        and bool(out.get("fitness_authority_granted"))
-        and confirmed >= required_confirmed
-        and domains >= required_domains
-    )
-    out["eligible"] = eligible
-    if not eligible:
-        out["blocker"] = (
-            f"guardian quorum below threshold: "
-            f"N={confirmed}/{required_confirmed}, M={domains}/{required_domains}"
-        )
     return out
 
 

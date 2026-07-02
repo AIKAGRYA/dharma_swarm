@@ -8,8 +8,10 @@ import yaml
 from dharma_swarm.cybernetics_codex import (
     AGENT_ID,
     CALLSIGN,
+    _routing_adaptation_after_truth_summary,
     build_audit,
     build_loop_statuses,
+    read_one_wire_summary,
 )
 from dharma_swarm.cybernetics_codex_format import format_markdown
 from dharma_swarm.cybernetics_codex_registration import build_external_worker_registration
@@ -277,6 +279,64 @@ def test_one_wire_reads_nested_guardian_threshold(tmp_path):
     assert report["one_wire"]["confirmed"] == 3
     assert report["one_wire"]["domains"] == 1
     assert report["one_wire"]["blocker"] == "guardian quorum below threshold: N=3/5, M=1/3"
+
+
+def test_one_wire_audit_uses_archive_quorum_floors(tmp_path):
+    state = tmp_path / ".dharma"
+    guard = state / "forge_measurement_guardian" / "cycle-003-fitness-quorum-guard.json"
+    guard.parent.mkdir(parents=True)
+    guard.write_text(
+        json.dumps(
+            {
+                "authority_result": {
+                    "confirmed_receipt_count": 4,
+                    "domain_count": 2,
+                    "eligible_to_set_archive_fitness": True,
+                    "fitness_authority_granted": True,
+                },
+                "threshold_guard": {
+                    "required_confirmed_receipts": 0,
+                    "observed_confirmed_receipts": 4,
+                    "required_distinct_domains": 0,
+                    "observed_distinct_domains": 2,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    one_wire = read_one_wire_summary(state)
+
+    assert one_wire["required_confirmed"] == 5
+    assert one_wire["required_domains"] == 3
+    assert one_wire["eligible"] is False
+    assert one_wire["blocker"] == "guardian quorum below threshold: N=4/5, M=2/3"
+
+
+def test_routing_adaptation_chunks_large_truth_run_sets():
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(
+        """
+        create table routing_decisions (
+            id text primary key,
+            run_id text,
+            created_at text
+        );
+        insert into routing_decisions
+        values ('rd1', 'run_1100', '2026-06-13T00:02:00Z');
+        """
+    )
+    truth_run_ids = {f"run_{index}" for index in range(1200)}
+
+    summary = _routing_adaptation_after_truth_summary(
+        conn,
+        latest_truth="2026-06-13T00:01:00Z",
+        truth_run_ids=truth_run_ids,
+    )
+
+    table = summary["tables"]["routing_decisions"]
+    assert table["correlated_rows_after_served_truth"] == 1
+    assert summary["has_later_causal_read"] is True
 
 
 def test_steward_declares_forbidden_actions_and_verifier_commands(tmp_path):
