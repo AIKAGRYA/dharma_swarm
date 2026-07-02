@@ -1,0 +1,48 @@
+{
+  "schema_version": "langgraph_parity.memory_live_retrieval_text_query.v1",
+  "created_at": "2026-06-30T18:10:38Z",
+  "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "status": "partial_pass",
+  "claim": "MemoryKernel text_query now filters normalized atoms and the ContextCompiler default Memory Kernel section passes recall_query into that live memory lane.",
+  "implemented": {
+    "memory_query_text_field": "dharma_swarm/memory_kernel/atoms.py::MemoryQuery.text_query",
+    "central_atom_filter": "dharma_swarm/memory_kernel/atoms.py::MemoryQuery.allows_atom",
+    "live_context_entrypoint": "dharma_swarm/memory_kernel/default_context.py::build_memory_kernel_default_context",
+    "runtime_bundle_path": "dharma_swarm/context_compiler.py::ContextCompiler.compile_bundle"
+  },
+  "proof": {
+    "facade_test": "tests/test_memory_kernel_readiness.py::test_memory_query_filters_atoms_by_text_query",
+    "live_context_test": "tests/test_context_compiler_memory_kernel.py::test_context_compiler_uses_memory_kernel_text_query_for_live_context",
+    "positive_control": "matching witness atom content appears in the compiled Memory Kernel section",
+    "negative_control": "unrelated witness atom content is absent from the compiled bundle",
+    "source_ref_control": "bundle source_refs include memory_kernel:home.witness"
+  },
+  "commands": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py::test_memory_query_filters_atoms_by_text_query tests/test_context_compiler_memory_kernel.py",
+      "exit_code": 0,
+      "summary": "4 passed in 0.40s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py",
+      "exit_code": 0,
+      "summary": "26 passed in 0.47s"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py tests/test_memory_context_eval.py tests/test_memory_kernel_prod_bar.py tests/test_context_compiler.py",
+      "exit_code": 0,
+      "summary": "69 passed in 0.48s"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/memory_kernel/atoms.py dharma_swarm/memory_kernel/default_context.py tests/test_memory_kernel_readiness.py tests/test_context_compiler_memory_kernel.py",
+      "exit_code": 0,
+      "summary": "pass"
+    }
+  ],
+  "remaining_blockers": [
+    "Phase 5 is not fully green: this proves text-query live context selection, not topology-wide memory/tool isolation for every live graph mode.",
+    "A2A strict readiness remains red and blocks any 100/100 claim.",
+    "Provider served-model truth and cockpit/API graph inspection remain pending."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "artifact_roots": [
+    "/Users/dhyana/ds_langgraph_parity_20260701",
+    "/Users/dhyana/dharma_swarm"
+  ],
+  "blocker_count": 0,
+  "blockers": [],
+  "classification_counts": {},
+  "generated_at": "2026-07-01T06:59:47.893502Z",
+  "lifecycle_counts": {},
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "stale_after_hours": 24.0,
+  "total_tasks": 44
+}

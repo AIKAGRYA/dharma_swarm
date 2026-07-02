@@ -38,6 +38,11 @@ from dharma_swarm.models import (
 )
 from dharma_swarm.runtime_lifecycle import RuntimeLifecycle
 from dharma_swarm.runtime_contract import RuntimeEnvelope, RuntimeEventType
+from dharma_swarm.runtime_topology import (
+    resolve_swarm_handoff,
+    subagent_tool_metadata,
+    swarm_dispatch_metadata,
+)
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.sheaf import (
     CoordinationProtocol,
@@ -182,8 +187,20 @@ class Orchestrator:
         if not idle:
             return []
 
-        if topology in (TopologyType.FAN_OUT, TopologyType.BROADCAST):
+        if topology == TopologyType.FAN_OUT:
             return await self.fan_out(task, idle)
+
+        if topology == TopologyType.BROADCAST:
+            return await self.fan_out(task, idle, topology=TopologyType.BROADCAST)
+
+        if topology == TopologyType.SWARM:
+            return await self._dispatch_swarm(task, idle)
+
+        if topology == TopologyType.SUPERVISOR:
+            return await self._dispatch_supervisor(task, idle)
+
+        if topology == TopologyType.SUBAGENTS_AS_TOOLS:
+            return await self._dispatch_subagents_as_tools(task, idle)
 
         # PIPELINE / FAN_IN: single agent per step
         selected = self._select_idle_agent(task, list(idle))
@@ -247,7 +264,11 @@ class Orchestrator:
         return dispatches
 
     async def fan_out(
-        self, task: Task, agents: list[AgentState]
+        self,
+        task: Task,
+        agents: list[AgentState],
+        *,
+        topology: TopologyType = TopologyType.FAN_OUT,
     ) -> list[TaskDispatch]:
         """Split task across multiple agents, one dispatch per agent."""
         dispatches: list[TaskDispatch] = []
@@ -255,7 +276,7 @@ class Orchestrator:
             td = TaskDispatch(
                 task_id=task.id,
                 agent_id=agent.id,
-                topology=TopologyType.FAN_OUT,
+                topology=topology,
                 timeout_seconds=self._resolve_timeout_seconds(
                     task,
                     self._default_timeout_seconds,
@@ -265,6 +286,133 @@ class Orchestrator:
             await self._assign_dispatch(td)
             dispatches.append(td)
         return dispatches
+
+    async def _dispatch_swarm(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
+        """Dispatch to the current active swarm agent and persist handoff state."""
+        meta = self._task_meta(task)
+        selected = self._select_topology_agent(task, agents)
+        if selected is None:
+            return []
+        active_before = selected.id
+        allowed_before = self._allowed_handoff_targets(task, selected, agents)
+        requested_handoff = str(
+            meta.get("handoff_to_agent") or meta.get("requested_handoff") or ""
+        ).strip()
+        checkpoint_id = self._topology_checkpoint_id(task, TopologyType.SWARM)
+        selected_id, handoff_receipts = resolve_swarm_handoff(
+            active_before=active_before,
+            known_agent_ids={agent.id for agent in agents},
+            allowed_before=allowed_before,
+            requested_handoff=requested_handoff,
+            handoff_reason=str(meta.get("handoff_reason") or ""),
+            checkpoint_id=checkpoint_id,
+        )
+        if selected_id != selected.id:
+            selected = next(agent for agent in agents if agent.id == selected_id)
+        allowed_targets = self._allowed_handoff_targets(task, selected, agents)
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=selected.id,
+            topology=TopologyType.SWARM,
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
+            metadata=swarm_dispatch_metadata(
+                active_agent=selected.id,
+                active_before=active_before,
+                allowed_before=allowed_before,
+                allowed_targets=allowed_targets,
+                requested_handoff=requested_handoff,
+                handoff_receipts=handoff_receipts,
+                checkpoint_id=checkpoint_id,
+                topology_mode=TopologyType.SWARM.value,
+            ),
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    async def _dispatch_supervisor(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
+        """Dispatch through one supervisor while preserving delegated agents."""
+        supervisor = self._select_topology_agent(task, agents)
+        if supervisor is None:
+            return []
+        delegated = tuple(agent.id for agent in agents if agent.id != supervisor.id)
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=supervisor.id,
+            topology=TopologyType.SUPERVISOR,
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
+            metadata={
+                "active_agent": supervisor.id,
+                "current_node": "supervisor",
+                "delegated_agent_ids": list(delegated),
+                "supervisor_final_output_only": True,
+                "checkpoint_id": self._topology_checkpoint_id(
+                    task,
+                    TopologyType.SUPERVISOR,
+                ),
+                "topology_state": {
+                    "mode": TopologyType.SUPERVISOR.value,
+                    "active_agent": supervisor.id,
+                    "delegated_agent_ids": list(delegated),
+                    "supervisor_final_output_only": True,
+                    "user_visible_output": "supervisor_final",
+                },
+            },
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    async def _dispatch_subagents_as_tools(self, task: Task, agents: list[AgentState]) -> list[TaskDispatch]:
+        """Dispatch parent graph run with child agents exposed as tools."""
+        parent = self._select_topology_agent(task, agents)
+        if parent is None:
+            return []
+        td = TaskDispatch(
+            task_id=task.id,
+            agent_id=parent.id,
+            topology=TopologyType.SUBAGENTS_AS_TOOLS,
+            timeout_seconds=self._resolve_timeout_seconds(task, self._default_timeout_seconds),
+            metadata=subagent_tool_metadata(
+                parent_agent_id=parent.id,
+                child_agent_ids=[agent.id for agent in agents if agent.id != parent.id],
+                checkpoint_id=self._topology_checkpoint_id(
+                    task,
+                    TopologyType.SUBAGENTS_AS_TOOLS,
+                ),
+                topology_mode=TopologyType.SUBAGENTS_AS_TOOLS.value,
+            ),
+        )
+        await self._assign_dispatch(td)
+        return [td]
+
+    def _select_topology_agent(
+        self,
+        task: Task,
+        agents: list[AgentState],
+    ) -> AgentState | None:
+        preferred = str(self._task_meta(task).get("active_agent", "") or "")
+        if preferred:
+            for agent in agents:
+                if agent.id == preferred:
+                    return agent
+        return self._select_idle_agent(task, list(agents))
+
+    def _allowed_handoff_targets(
+        self,
+        task: Task,
+        selected: AgentState,
+        agents: list[AgentState],
+    ) -> list[str]:
+        raw = self._task_meta(task).get("allowed_handoffs")
+        if isinstance(raw, dict):
+            targets = raw.get(selected.id, ())
+            if isinstance(targets, (list, tuple, set)):
+                known = {agent.id for agent in agents}
+                return [str(target) for target in targets if str(target) in known]
+        return [agent.id for agent in agents if agent.id != selected.id]
+
+    @staticmethod
+    def _topology_checkpoint_id(task: Task, topology: TopologyType) -> str:
+        return f"{task.id}:{topology.value}:checkpoint"
 
     async def fan_in(self, dispatches: list[TaskDispatch]) -> str:
         """Collect results from completed dispatches, concatenate them."""
@@ -2271,33 +2419,38 @@ class Orchestrator:
         dispatch. Mirrors ``a2a_bridge.submit_via_spine``: the real execution
         runs inside the invoker, the result is captured for downstream use, and
         any exception is re-raised so the caller's timeout/failure handling is
-        unchanged. Gated by ``DHARMA_SPINE_DISPATCH=1`` (default OFF)."""
+        unchanged."""
         from datetime import datetime, timezone
+        from dharma_swarm.provider_truth import build_provider_truth_snapshot
         from dharma_swarm.spine.invoke import invoke_agent
         from dharma_swarm.spine.receipt import EvidenceReceipt
         from dharma_swarm.spine.routing import RoutingDecision
 
         ident = td.metadata.get("execution_identity")
         ident = ident if isinstance(ident, dict) else {}
-        routing = RoutingDecision(
-            agent_id=td.agent_id,
-            reason=f"orchestrator dispatch: {getattr(td.topology, 'value', 'dispatch')}",
-            router_name="orchestrator_dispatch",
-            context_id=str(ident.get("session_id", "") or ""),
-            task_id=td.task_id,
-        )
-        # Dispatch-time source of truth for provider/model: the runner's static
-        # config (AgentRunner._config) — config.provider is a ProviderType
-        # (string via .value, exactly as agent_runner.py:885) and config.model is
-        # the model string (agent_runner.py:886). run_task() returns only the
-        # completion text, so it cannot supply these; the config is the only
-        # available dispatch-time source. Tolerant of a missing/partial config
-        # (falls back to the empty-string EvidenceReceipt defaults).
+        # Dispatch-time requested provider/model: the runner's static config.
+        # AgentRunner may later expose actual served provider/model from the
+        # route decision and LLMResponse; stubs/direct runners fall back here.
         _cfg = getattr(runner, "_config", None)
         _prov = getattr(_cfg, "provider", None)
         provider = getattr(_prov, "value", _prov) if _prov is not None else "orchestrator"
         provider = str(provider) if provider else "orchestrator"
         model = str(getattr(_cfg, "model", "") or "")
+        routing = RoutingDecision(
+            agent_id=td.agent_id,
+            provider=provider,
+            model=model,
+            reason=f"orchestrator dispatch: {getattr(td.topology, 'value', 'dispatch')}",
+            router_name="orchestrator_dispatch",
+            context_id=str(ident.get("session_id", "") or ""),
+            task_id=td.task_id,
+            attributes={
+                "planned_provider": provider,
+                "planned_model": model,
+            },
+        )
+        topology_value = str(getattr(td.topology, "value", td.topology) or "dispatch")
+        side_effect_key = f"invoke_agent:{td.task_id}:{td.agent_id}"
         started = datetime.now(timezone.utc)
         captured: dict[str, Any] = {}
 
@@ -2317,19 +2470,22 @@ class Orchestrator:
                 captured["exc"] = exc
                 status, err_source, err_detail = "failed", "internal_error", str(exc)
             finished = datetime.now(timezone.utc)
-            # Surface token usage only when the runner's last-completion state
-            # exposes it (no fabrication — None stays None when absent).
-            _usage = getattr(runner, "_last_usage", None)
-            if isinstance(_usage, dict):
-                in_tokens = _usage.get("input_tokens")
-                out_tokens = _usage.get("output_tokens")
+            truth = build_provider_truth_snapshot(
+                runner,
+                requested_provider=provider,
+                requested_model=model,
+            )
+            in_tokens = truth.input_tokens
+            out_tokens = truth.output_tokens
             return EvidenceReceipt(
                 trace_id=str(ident.get("trace_id", "") or ""),
                 context_id=context_id,
                 task_id=td.task_id,
                 agent_id=agent_id,
-                provider=provider,
-                model=model,
+                claim_id=str(ident.get("claim_id", "") or "") or None,
+                claim_status=str(ident.get("claim_status", "") or "") or None,
+                provider=truth.actual_provider,
+                model=truth.actual_model,
                 operation="invoke_agent",
                 provider_attempted=True,
                 status=status,
@@ -2341,7 +2497,16 @@ class Orchestrator:
                 input_tokens=in_tokens,
                 output_tokens=out_tokens,
                 routing_decision_id=routing.decision_id,
-                attributes={"router": "orchestrator_dispatch"},
+                attributes={
+                    "router": "orchestrator_dispatch",
+                    "run_id": str(ident.get("run_id", "") or ""),
+                    "idempotency_key": str(ident.get("idempotency_key", "") or ""),
+                    "side_effect_key": side_effect_key,
+                    "topology": topology_value,
+                    "agent_identity": agent_id,
+                    "route_reason": routing.reason,
+                    **truth.receipt_attributes(),
+                },
             )
 
         captured["_task_obj"] = task
@@ -2396,6 +2561,18 @@ class Orchestrator:
             raise captured["exc"]
         return captured["result"]
 
+    @staticmethod
+    def _spine_dispatch_enabled() -> bool:
+        """Return whether live execution should traverse ``invoke_agent``.
+
+        The runtime truth spine is the default path. Operators can still opt
+        out for emergency compatibility with explicit false-like values.
+        """
+        raw = os.environ.get("DHARMA_SPINE_DISPATCH")
+        if raw is None:
+            return True
+        return raw.strip().lower() not in {"0", "false", "no", "off", "legacy", "direct"}
+
     async def _execute_task(self, runner: Any, task: Task, td: TaskDispatch) -> None:
         """Run agent.run_task() in background, update board on completion/failure."""
         # Yield immediately so the dispatching coroutine can finish its loop
@@ -2444,11 +2621,11 @@ class Orchestrator:
                 task=task,
                 status="running",
             )
-            if os.environ.get("DHARMA_SPINE_DISPATCH") == "1":
-                # WS3: route execution through the Runtime Truth Spine's one
-                # blessed path (invoke_agent), emitting exactly one EvidenceReceipt.
-                # Default OFF: when unset, the direct call below is byte-identical
-                # to prior behavior. Preserves timeout + exception semantics.
+            if self._spine_dispatch_enabled():
+                # Route execution through the Runtime Truth Spine's one blessed
+                # path (invoke_agent), emitting exactly one EvidenceReceipt.
+                # Explicit false-like DHARMA_SPINE_DISPATCH values preserve the
+                # legacy direct path as a rollback lane.
                 result = await self._run_task_via_spine(runner, task, td, timeout_seconds)
             else:
                 result = await asyncio.wait_for(

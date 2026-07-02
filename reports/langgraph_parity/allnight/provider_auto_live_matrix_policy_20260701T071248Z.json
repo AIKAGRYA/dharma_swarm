@@ -1,0 +1,68 @@
+{
+  "schema_version": "dharma.langgraph_parity.provider_auto_live_matrix_policy.v1",
+  "generated_at": "2026-07-01T07:12:48Z",
+  "target_gate": "Phase 6 provider truth automatic freshness/quarantine policy",
+  "claim": "model_status now automatically discovers fresh provider live-matrix closeout receipts without DHARMA_MODEL_LIVE_CALL_MATRIX_PATH, expires stale auto-discovered receipts, and lets fresh live receipt evidence determine model-level live_routable/unavailable status even when the key-oracle cache is stale.",
+  "implementation": {
+    "changed_files": [
+      "dharma_swarm/model_status.py",
+      "tests/test_model_status_projection.py"
+    ],
+    "new_env": {
+      "DHARMA_MODEL_LIVE_CALL_MATRIX_DIR": "optional override for automatic provider live-matrix receipt discovery directory",
+      "DHARMA_MODEL_LIVE_CALL_MATRIX_MAX_AGE_HOURS": "optional TTL for auto-discovered provider live-matrix receipts; default 24 hours"
+    },
+    "explicit_env_precedence": "DHARMA_MODEL_LIVE_CALL_MATRIX_PATH still wins when set."
+  },
+  "live_projection_smoke_without_explicit_matrix_env": {
+    "command": "env -u DHARMA_MODEL_LIVE_CALL_MATRIX_PATH .venv/bin/python -c 'from dharma_swarm.model_status import floor_model_status; p=floor_model_status(); ids={m.id:m for m in p.models}; ...'",
+    "results": [
+      {
+        "model_id": "claude-opus-4.8",
+        "status": "unavailable",
+        "available_routes": [],
+        "unavailable_reason": "timeout",
+        "verification_status": "failed",
+        "verified_at": "2026-07-01T01:10:36Z"
+      },
+      {
+        "model_id": "kimi-k2.6",
+        "status": "live_routable",
+        "available_routes": [
+          "ollama:kimi-k2.6:cloud"
+        ],
+        "unavailable_reason": null,
+        "verification_status": "verified",
+        "verified_at": "2026-07-01T01:15:09Z"
+      },
+      {
+        "model_id": "gpt-5.5",
+        "status": "live_routable",
+        "available_routes": [
+          "codex:gpt-5.5"
+        ],
+        "unavailable_reason": null,
+        "verification_status": "verified",
+        "verified_at": "2026-07-01T02:53:17Z"
+      }
+    ]
+  },
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_model_status_projection.py",
+      "result": "12 passed in 20.20s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/model_status.py tests/test_model_status_projection.py",
+      "result": "All checks passed"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/model_status.py tests/test_model_status_projection.py",
+      "result": "pass"
+    }
+  ],
+  "residual_risks": [
+    "This uses fresh local live-probe receipts; it does not run new live provider calls.",
+    "Aggregate closeout governance remains blocked by historical gitleaks findings."
+  ]
+}

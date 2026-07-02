@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from typing import Iterable
 
 from dharma_swarm.memory_kernel.atoms import (
@@ -21,6 +22,7 @@ from dharma_swarm.memory_kernel.atoms import (
     SurfaceCategory,
     TruthState,
 )
+from dharma_swarm.memory_kernel.tool_exposure import has_tool_exposure
 
 
 _HIGH_RISKS = {RiskLevel.HIGH, RiskLevel.CRITICAL}
@@ -45,6 +47,7 @@ _DEFAULT_ALLOWED_TRUTH_STATES = (
     TruthState.CURATED,
     TruthState.CANONICAL,
 )
+_STALE_FRESHNESS_VALUES = {"snapshot", "dormant", "missing", "unknown"}
 
 
 @dataclass(frozen=True)
@@ -59,8 +62,13 @@ class MemoryContextBudget:
     require_context_admissible: bool = True
     allow_projections: bool = False
     allow_high_risk: bool = False
+    reject_stale: bool = False
+    require_source_digest: bool = False
+    require_source_row_key: bool = False
+    block_tool_exposure: bool = False
     allowed_truth_states: tuple[TruthState, ...] = _DEFAULT_ALLOWED_TRUTH_STATES
     allowed_scopes: tuple[MemoryScope, ...] = ()
+    allowed_agent_ids: tuple[str, ...] = ()
     allowed_memory_lanes: tuple[MemoryLane, ...] = ()
     allowed_atom_types: tuple[MemoryAtomType, ...] = ()
 
@@ -70,6 +78,7 @@ class MemoryContextBudget:
             item.value for item in self.allowed_truth_states
         )
         payload["allowed_scopes"] = tuple(item.value for item in self.allowed_scopes)
+        payload["allowed_agent_ids"] = tuple(self.allowed_agent_ids)
         payload["allowed_memory_lanes"] = tuple(
             item.value for item in self.allowed_memory_lanes
         )
@@ -309,6 +318,12 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append("atom_type_not_allowed")
     if budget.allowed_scopes and atom.scope not in budget.allowed_scopes:
         reasons.append("scope_not_allowed")
+    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+        atom_agent_ids = _atom_agent_ids(atom)
+        if not atom_agent_ids:
+            reasons.append("agent_owner_unknown")
+        elif not set(atom_agent_ids).intersection(budget.allowed_agent_ids):
+            reasons.append("agent_not_allowed")
     if budget.allowed_memory_lanes and atom.memory_lane not in budget.allowed_memory_lanes:
         reasons.append("memory_lane_not_allowed")
     if budget.require_context_admissible and not atom.context_admissible:
@@ -317,6 +332,17 @@ def _omission_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[st
         reasons.append(f"truth_state_{atom.truth_state.value}")
     elif budget.allowed_truth_states and atom.truth_state not in budget.allowed_truth_states:
         reasons.append("truth_state_not_allowed")
+    if budget.reject_stale:
+        if str(atom.freshness or "").lower() in _STALE_FRESHNESS_VALUES:
+            reasons.append("stale_memory_rejected")
+        if _is_expired(atom.valid_until):
+            reasons.append("valid_until_expired")
+    if budget.require_source_digest and not atom.source_digest:
+        reasons.append("source_digest_required")
+    if budget.require_source_row_key and not atom.source_row_key:
+        reasons.append("source_row_key_required")
+    if budget.block_tool_exposure and has_tool_exposure(atom):
+        reasons.append("tool_exposure_blocked")
     if (
         not budget.allow_projections
         and (
@@ -343,6 +369,8 @@ def _selection_reasons(atom: MemoryAtom, budget: MemoryContextBudget) -> tuple[s
         reasons.append("bounded_content_included")
     else:
         reasons.append("reference_only")
+    if budget.allowed_agent_ids and atom.scope == MemoryScope.AGENT:
+        reasons.append("agent_scope_allowed")
     return tuple(reasons)
 
 
@@ -399,7 +427,46 @@ def _is_local_path(value: str) -> bool:
     )
 
 
+def _is_expired(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed <= datetime.now(timezone.utc)
+
+
 def _stable_pack_id(atom_ids: Iterable[str]) -> str:
     payload = "\n".join(atom_ids)
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return f"memory_context_pack:{digest[:24]}"
+
+
+def _atom_agent_ids(atom: MemoryAtom) -> tuple[str, ...]:
+    ids: list[str] = []
+    _extend_agent_ids(ids, atom.metadata)
+    for nested_key in ("payload", "row"):
+        nested = atom.metadata.get(nested_key)
+        if isinstance(nested, dict):
+            _extend_agent_ids(ids, nested)
+    return tuple(dict.fromkeys(ids))
+
+
+def _extend_agent_ids(ids: list[str], payload: dict[str, object]) -> None:
+    for key in (
+        "agent_id",
+        "agent",
+        "agent_name",
+        "owner_agent_id",
+        "assigned_to",
+        "assigned_agent_id",
+        "worker_agent_id",
+    ):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            ids.append(value.strip())
+        elif isinstance(value, (list, tuple, set)):
+            ids.extend(str(item).strip() for item in value if str(item).strip())

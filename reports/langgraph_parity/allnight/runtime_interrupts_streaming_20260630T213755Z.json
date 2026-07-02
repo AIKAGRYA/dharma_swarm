@@ -1,0 +1,106 @@
+{
+  "schema_version": "langgraph_parity_slice_receipt.v1",
+  "timestamp": "2026-06-30T21:37:55Z",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "head_before_commit": "8422692df4",
+  "target_gate": "Phase 7 runtime streaming event transport and interrupt/human-approval state",
+  "status": "completed_partial",
+  "score_delta": {
+    "from": 67,
+    "to": 70,
+    "rationale": "Runtime events now have a persisted SSE transport, and interrupt/resume/human-approval state is projected from RuntimeStateStore session_events through operator views, API routes, tests, and the dashboard runtime panel. This closes the state/transport proof slice but does not implement assistant/configuration parity, background/cron runs, approval action execution, A2A strict readiness, or remaining memory/provider gates."
+  },
+  "implemented": [
+    "Added RuntimePlatformViews.runtime_interrupts(), deriving control events from canonical session_events instead of a new store.",
+    "Added OperatorViews.runtime_interrupts() facade.",
+    "Added FastAPI GET /api/runtime/events/stream for server-sent persisted runtime events with filters and finite max_events test support.",
+    "Added FastAPI GET /api/runtime/interrupts for interrupt, resume, and human-approval state snapshots.",
+    "Extended runtime graph API tests to seed interrupt_requested and human_approval_granted runtime events and prove API/operator/SSE readback.",
+    "Added dashboard RuntimeInterruptsSnapshot types, fetchRuntimeInterrupts(), and runtimeEventsStreamPath().",
+    "Extended useRuntimeControlPlane() and /dashboard/runtime to show pending interrupt, human approval, approved, resumed, and recent control-event state."
+  ],
+  "files_touched": [
+    "api/routers/runtime.py",
+    "dharma_swarm/operator_views.py",
+    "dharma_swarm/runtime_platform_views.py",
+    "tests/test_runtime_graph_api.py",
+    "dashboard/src/lib/types.ts",
+    "dashboard/src/lib/api.ts",
+    "dashboard/src/lib/runtimeControlPlane.ts",
+    "dashboard/src/lib/runtimeControlPlane.test.ts",
+    "dashboard/src/hooks/useRuntimeControlPlane.ts",
+    "dashboard/src/app/dashboard/runtime/page.tsx"
+  ],
+  "verification": [
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py",
+      "result": "pass",
+      "summary": "7 passed in 1.66s"
+    },
+    {
+      "command": ".venv/bin/ruff check dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass",
+      "summary": "All checks passed"
+    },
+    {
+      "command": ".venv/bin/python -m compileall -q dharma_swarm/runtime_platform_views.py dharma_swarm/operator_views.py api/routers/runtime.py tests/test_runtime_graph_api.py",
+      "result": "pass",
+      "summary": "compileall clean"
+    },
+    {
+      "command": "npm run lint -- --quiet",
+      "cwd": "dashboard",
+      "result": "pass",
+      "summary": "dashboard ESLint quiet mode passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "dashboard",
+      "result": "pass",
+      "summary": "Next.js production build passed; /dashboard/runtime prerendered"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_langgraph_parity_swarm.py tests/test_langgraph_parity_isolation_benchmark.py tests/test_langgraph_parity_readiness.py tests/test_langgraph_parity_supervisor.py tests/test_runtime_state.py tests/test_runtime_state_invariants.py tests/test_runtime_state_recovery.py tests/test_orchestrator.py tests/test_orchestrator_v1.py tests/test_orchestrator_spine_dispatch.py tests/test_topology_execution.py tests/test_runtime_graph_api.py tests/test_operator_views.py tests/test_api_main_bootstrap.py",
+      "result": "pass",
+      "summary": "98 passed in 34.54s"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_module_budget.py --base-ref origin/main --head-ref HEAD",
+      "result": "pass",
+      "summary": "Module line-budget check OK with existing warnings"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/hygiene/ratchet.py --json --max-baseline-age-days 45",
+      "result": "pass",
+      "summary": "green=true"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/spine_dispatch_mode_report.py --strict",
+      "result": "pass",
+      "summary": "orchestrator_mode=spine_default_on"
+    },
+    {
+      "command": ".venv/bin/python scripts/governance/check_a2a_readiness.py --strict",
+      "result": "expected_fail",
+      "summary": "ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19"
+    },
+    {
+      "command": "make onboard",
+      "result": "pass",
+      "summary": "passed; known governance projection churn restored"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass",
+      "summary": "whitespace clean"
+    }
+  ],
+  "remaining_blockers": [
+    "A2A strict readiness remains red: ready=false, open_tasks=17, unknown_status_tasks=0, unverified_closed_tasks=19.",
+    "Runtime platform parity still lacks assistants/configurations and background/cron run surfaces.",
+    "This slice exposes interrupt/resume/human-approval state but does not implement action endpoints for approving, rejecting, or resuming runs.",
+    "Memory stale rejection, curated-source coverage, retrieval telemetry, and full tool-exposure isolation remain unproven.",
+    "Provider truth remains partial; there is no exhaustive live-provider matrix proof yet.",
+    "Closeout governance remains blocked by aggregate full-history gitleaks findings."
+  ]
+}

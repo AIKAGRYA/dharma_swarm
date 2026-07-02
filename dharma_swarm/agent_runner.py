@@ -15,7 +15,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 from dharma_swarm.contracts.intelligence_agents import communication_topics
 from dharma_swarm.models import (
@@ -1648,6 +1648,10 @@ class AgentRunner:
         # Sprint 3: Economic tracking
         self._economic_spine: Any = None
         self._tokens_used_total: int = 0
+        self._last_route_request: Optional[Any] = None
+        self._last_route_decision: Optional[Any] = None
+        self._last_response: Optional[LLMResponse] = None
+        self._last_usage: Dict[str, int] = {}
 
     def set_economic_spine(self, spine: Any) -> None:
         """Attach an EconomicSpine for cost tracking."""
@@ -2125,6 +2129,10 @@ class AgentRunner:
         active_inference_engine: Any | None = None
         active_inference_prediction: Any | None = None
         observed_quality_score: float | None = None
+        self._last_route_request = None
+        self._last_route_decision = None
+        self._last_response = None
+        self._last_usage = {}
 
         _task_tracer = _jikoku_tracer()
         _task_span = _task_tracer.start(
@@ -2377,6 +2385,10 @@ class AgentRunner:
                 result_text=result,
                 quality_score_override=observed_quality_score,
             )
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
 
             # ── Langfuse / local observability trace ──
             try:
@@ -2601,6 +2613,10 @@ class AgentRunner:
                 result_text=str(exc),
                 quality_score_override=observed_quality_score,
             )
+            self._last_route_request = route_request
+            self._last_route_decision = route_decision
+            self._last_response = response
+            self._last_usage = dict(response.usage or {}) if response else {}
             self._observe_active_inference(
                 active_inference_engine,
                 active_inference_prediction,

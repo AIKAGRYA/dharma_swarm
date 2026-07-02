@@ -8,20 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from dharma_swarm.models import Task, TaskDispatch, _new_id
-from dharma_swarm.runtime_state import (
-    ArtifactRecord,
-    DelegationRun,
-    RuntimeReceipt,
-    TaskClaim,
-)
-from dharma_swarm.runtime_lifecycle_identity import (
-    ensure_execution_identity_for_dispatch,
-)
-from dharma_swarm.runtime_lifecycle_payloads import (
-    mission_payload,
-    route_truth,
-    runtime_metadata,
-)
+from dharma_swarm.runtime_state import ArtifactRecord, DelegationRun, RuntimeReceipt, TaskClaim
+from dharma_swarm.runtime_topology import record_subagent_tool_children, record_topology_state
+from dharma_swarm.runtime_lifecycle_identity import ensure_execution_identity_for_dispatch
+from dharma_swarm.runtime_lifecycle_payloads import mission_payload, route_truth, runtime_metadata
 from dharma_swarm.session_ledger import SessionLedger
 from dharma_swarm.spine.identity import ExecutionIdentity, MissingExecutionIdentity
 
@@ -325,6 +315,24 @@ class RuntimeLifecycle:
                 metadata=receipt_payload,
             )
             await store.record_delegation_run(run)
+            await record_subagent_tool_children(
+                store=store,
+                identity=identity,
+                td=td,
+                session_id=self._ledger.session_id,
+                status=status,
+                started_at=started_at,
+                mission=mission,
+                route_payload=route_payload,
+            )
+            await record_topology_state(
+                store=store,
+                identity=identity,
+                td=td,
+                task_meta=task_meta,
+                session_id=self._ledger.session_id,
+                status=status,
+            )
             await store.record_runtime_receipt(
                 RuntimeReceipt(
                     receipt_id=receipt_id,

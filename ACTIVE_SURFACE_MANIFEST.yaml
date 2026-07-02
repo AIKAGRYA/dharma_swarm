@@ -91,6 +91,9 @@ api_routers:
   - id: operator_coherence
     prefix: /api/operator-coherence
     module: api.routers.operator_coherence
+  - id: runtime
+    prefix: /api/runtime
+    module: api.routers.runtime
   - id: revenue
     prefix: /api/revenue
     module: api.routers.revenue
