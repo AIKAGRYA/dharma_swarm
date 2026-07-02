@@ -929,8 +929,11 @@ def _source_counts(health: Any) -> dict[str, int | str]:
 def _partial_source_error(health: Any) -> str | None:
     if not isinstance(health, dict):
         return None
+    successful = int(float(health.get("successful_sources", 0) or 0))
     failed = int(float(health.get("failed_sources", 0) or 0))
     if failed <= 0:
+        return None
+    if successful > 0:
         return None
     errors = health.get("errors") if isinstance(health.get("errors"), list) else []
     detail = "; ".join(str(item) for item in errors[:3])
