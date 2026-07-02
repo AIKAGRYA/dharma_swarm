@@ -250,6 +250,28 @@ func TestDeepSweepBeatSourcesCapsSequentialFanout(t *testing.T) {
 	}
 }
 
+func TestDeepSweepBeatSourcesCoversAllBeatsNotJustTheFirstFew(t *testing.T) {
+	// Copilot review finding: each beat expands to 4 sources
+	// (hn/github/arxiv/reddit), so a flat truncation of the concatenated
+	// list only ever covers the first cap/4 beats and silently starves the
+	// rest of DefaultBeats() forever. Round-robin selection must give every
+	// beat at least one source once the cap covers at least len(beats).
+	beats := DefaultBeats()
+	capped := DeepSweepBeatSources(beats, MaxDeepSweepBeatSources)
+	if MaxDeepSweepBeatSources < len(beats) {
+		t.Fatalf("test assumes the cap covers every beat at least once; cap=%d beats=%d", MaxDeepSweepBeatSources, len(beats))
+	}
+	seenBeatIDs := map[string]bool{}
+	for _, s := range capped {
+		seenBeatIDs[s.CascadeFor] = true
+	}
+	for _, b := range beats {
+		if !seenBeatIDs[b.ID] {
+			t.Fatalf("beat %q has zero sources in the capped set; got beat IDs: %+v", b.ID, seenBeatIDs)
+		}
+	}
+}
+
 func TestScoutRetryDelayParsesRetryAfter(t *testing.T) {
 	if delay := scoutRetryDelay("0", 1); delay != 0 {
 		t.Fatalf("Retry-After seconds parsed incorrectly: %s", delay)

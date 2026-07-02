@@ -49,9 +49,32 @@ func DeepSweepBeatSources(beats []Beat, maxSources int) []Source {
 	if maxSources <= 0 {
 		return []Source{}
 	}
-	sources := BeatSources(beats)
-	if len(sources) > maxSources {
-		return sources[:maxSources]
+	// Round-robin across beats (one source per beat per round) rather than
+	// truncating BeatSources' beat-by-beat concatenation: each beat expands
+	// into 4 sources (SourcesForQueries: hn/github/arxiv/reddit), so a flat
+	// sources[:maxSources] only ever covers the first maxSources/4 beats and
+	// silently starves the rest of DefaultBeats() forever (Copilot review
+	// finding, beats.go:57).
+	perBeat := make([][]Source, len(beats))
+	for i, beat := range beats {
+		perBeat[i] = SourcesForQueries(beat.Queries, beat.ID)
 	}
-	return sources
+	out := make([]Source, 0, maxSources)
+	for round := 0; len(out) < maxSources; round++ {
+		addedThisRound := false
+		for _, sources := range perBeat {
+			if round >= len(sources) {
+				continue
+			}
+			out = append(out, sources[round])
+			addedThisRound = true
+			if len(out) == maxSources {
+				return out
+			}
+		}
+		if !addedThisRound {
+			break
+		}
+	}
+	return out
 }

@@ -144,7 +144,10 @@ def run_theme_window_update(state_dir: Path) -> dict[str, object]:
     Defensive: a missing/garbled board yields an empty-movements update
     (window unchanged, no crash) rather than raising.
     """
-    meta = state_dir.expanduser() / "meta"
+    # .resolve() canonicalizes '..' segments/symlinks, matching the other
+    # write-producing entrypoints in this PR (deep_sweep, zeitgeist_promotion)
+    # (Copilot review finding, theme_window.py:147).
+    meta = state_dir.expanduser().resolve() / "meta"
     board_path = meta / "world_signal_board.json"
     window_path = meta / "world_radar" / "theme_window.json"
 

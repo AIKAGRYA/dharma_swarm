@@ -102,6 +102,17 @@ def test_run_theme_window_update_end_to_end(tmp_path: Path) -> None:
     assert summary2["newly_seen_movement_ids"] == ["m3"]
 
 
+def test_run_theme_window_update_resolves_state_dir(tmp_path: Path) -> None:
+    # Copilot review finding: state_dir must be canonicalized ('..' segments
+    # resolved), matching deep_sweep/zeitgeist_promotion's write-site handling
+    # of the same kind of write-driving state dir.
+    aliased_state = tmp_path / "nested" / ".."
+    summary = run_theme_window_update(aliased_state)
+    window_path = Path(summary["window_path"])
+    assert window_path.is_relative_to(tmp_path.resolve() / "meta")
+    assert ".." not in window_path.parts
+
+
 def test_run_theme_window_update_missing_board_is_defensive(tmp_path: Path) -> None:
     summary = run_theme_window_update(tmp_path)
     assert summary["movements_this_cycle"] == 0
