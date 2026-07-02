@@ -35,6 +35,8 @@ from typing import Any, Iterator
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from dharma_swarm.cybernetics_codex_format import sanitize_audit_paths
+
 TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 
 
@@ -580,7 +582,8 @@ def _receipt_path(receipt_dir: Path, loop_number: int, slug: str) -> Path:
 
 def _write_receipt(path: Path, receipt: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_json_clone(receipt), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output = sanitize_audit_paths(_json_clone(receipt))
+    path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _closed_by_generic_predicate(receipt: dict[str, Any]) -> bool:

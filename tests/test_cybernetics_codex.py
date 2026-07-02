@@ -451,6 +451,15 @@ def test_audit_output_normalizes_local_paths(tmp_path):
     report["bounded_replays"]["loop1"]["path"] = (
         "/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex/loop1.json"
     )
+    report["active_track"]["owned_surfaces"] = [
+        "/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex",
+        "/opt/foreign/private-surface",
+    ]
+    report["runtime"]["raw_status"] = (
+        "heartbeat=/Users/dhyana/.dharma/a2a_bus/worker.json\n"
+        "log=/var/folders/zz/random/T/worker.log\n"
+        "fallback=/opt/foreign/private.log"
+    )
 
     output_report = sanitize_audit_paths(report)
     text = format_markdown(report)
@@ -461,6 +470,15 @@ def test_audit_output_normalizes_local_paths(tmp_path):
     )
     assert "$DHARMA_STATE/state/runtime.db" in text
     assert "$REPO_ROOT/reports/loop_closure/cybernetics_codex/loop1.json" in text
+    assert output_report["active_track"]["owned_surfaces"] == [
+        "$REPO_ROOT/reports/loop_closure/cybernetics_codex",
+        "<absolute-path>",
+    ]
+    assert output_report["runtime"]["raw_status"] == (
+        "heartbeat=$DHARMA_STATE/a2a_bus/worker.json\n"
+        "log=$TMPDIR\n"
+        "fallback=<absolute-path>"
+    )
     assert "/Users/dhyana" not in text
 
 
@@ -469,11 +487,15 @@ def test_committed_cybernetics_audit_artifacts_do_not_commit_machine_paths():
     artifacts = (
         repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.md",
         repo_root / "reports/loop_closure/cybernetics_codex/latest_audit.json",
+        repo_root / "reports/loop_closure/cybernetics_codex/2026-07-01_loop7_training_flywheel_closure.json",
+        repo_root / "reports/loop_closure/cybernetics_codex/2026-07-01_loop9_conductor_closure.json",
+        repo_root / "reports/agentops/decorrelated_review_council/20260702T051005Z-pr749-closed-loop-claim-red-team-compact-after-json-gates-hold_blockers.json",
     )
     for artifact in artifacts:
         text = artifact.read_text(encoding="utf-8")
         assert "/Users/dhyana" not in text
         assert "/private/tmp" not in text
+        assert "/var/folders" not in text
 
 
 def test_manifest_registers_cybernetics_codex():

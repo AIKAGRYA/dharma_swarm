@@ -14,7 +14,7 @@
     "memory_entries": 2,
     "surface": "PersistentAgent.wake witness/stigmergy/memory writes",
     "witness_entries_after": 1,
-    "witness_path": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma/witness/conductor_conductor_codex.jsonl"
+    "witness_path": "$TMPDIR/.dharma/witness/conductor_conductor_codex.jsonl"
   },
   "adapt_evidence": {
     "cron_after_wake": {
@@ -194,7 +194,7 @@
     "seeded_signal_path": "runtime/conductor_signal.py",
     "surface": "StigmergyStore.hot_paths/high_salience"
   },
-  "state_dir": "/var/folders/2n/h27kz83n6dn90pzkb_8v3pm80000gn/T/loop9_11_closure_home_tw6m7hgr/.dharma",
+  "state_dir": "$TMPDIR/.dharma",
   "tick_errors": [],
   "transitions_receipted": {
     "act": true,

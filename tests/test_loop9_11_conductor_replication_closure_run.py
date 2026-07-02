@@ -33,6 +33,9 @@ def test_loop9_and_loop11_replay_writes_strict_closure_receipts(tmp_path: Path) 
     assert loop11["loop"] == 11
     assert loop9["provider_truth"]["external_provider_called"] is False
     assert loop11["provider_truth"]["external_provider_called"] is False
+    written = loop9_path.read_text(encoding="utf-8")
+    assert "$DHARMA_STATE" in written or "$TMPDIR" in written
+    assert str(state_dir) not in written
 
 
 def test_loop9_receipt_proves_conductor_action_and_later_scheduler_read(

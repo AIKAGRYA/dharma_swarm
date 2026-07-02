@@ -254,6 +254,8 @@ async def _run_with_scratch(scratch_root: Path) -> dict[str, Any]:
         experiment_log_path=experiment_log_path,
         archive_enforce_one_wire=False,
     )
+    engine.archive.enforce_one_wire = False
+    engine.archive.fitness_guard_state_dir = None
 
     try:
         await engine.init()

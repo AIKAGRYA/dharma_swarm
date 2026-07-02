@@ -1,6 +1,6 @@
 {
   "act_evidence": {
-    "dataset_file": "/private/tmp/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
+    "dataset_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
     "dataset_file_sha256": "174410c24fab9c4fa87857c24949fa0266c2fdbc3f6630dbcc51cf899b84db36",
     "dataset_lines_after": 5,
     "dataset_lines_before": 0,
@@ -10,7 +10,7 @@
       "by_source": {
         "trajectory": 5
       },
-      "output_path": "/private/tmp/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
+      "output_path": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/datasets/loop7-training-flywheel.jsonl",
       "total_samples": 5,
       "total_tokens_approx": 985
     },
@@ -25,7 +25,7 @@
       "total_trajectories_scored": 5,
       "training_ready": false
     },
-    "pattern_file": "/private/tmp/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/strategies/patterns.jsonl",
+    "pattern_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/strategies/patterns.jsonl",
     "pattern_file_sha256": "fd7bd42c19e9d6f6148a940fa1b99648edbd0f2e3a0ba8842d96f96ca0d90511",
     "pattern_lines_after": 1,
     "pattern_lines_before": 0,
@@ -160,7 +160,7 @@
       "loop7-traj-0004",
       "loop7-traj-0005"
     ],
-    "trajectory_file": "/private/tmp/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/trajectories/trajectories.jsonl",
+    "trajectory_file": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure/trajectories/trajectories.jsonl",
     "trajectory_file_sha256": "13b79ba576e88007d5d5787f767fd6d37ca9d332721db0b218fb282a5565dfc3",
     "trajectory_jsonl_lines": 5
   },
@@ -172,5 +172,5 @@
     "interpret": true,
     "sense": true
   },
-  "work_dir": "/private/tmp/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure"
+  "work_dir": "$TMPDIR/dharma_loop7_training_flywheel_closure/2026-07-01_loop7_training_flywheel_closure"
 }

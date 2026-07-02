@@ -33,6 +33,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from dharma_swarm.cybernetics_codex_format import sanitize_audit_paths
+
 TRANSITIONS = ("sense", "interpret", "constrain", "act", "adapt")
 DEFAULT_TRACE_COUNT = 5
 REINFORCEMENT_THRESHOLD = 0.3
@@ -433,10 +435,11 @@ def main(argv: list[str] | None = None) -> int:
         trace_count=args.trace_count,
         fresh=not args.no_fresh,
     )
-    print(json.dumps(report, indent=2, sort_keys=True))
+    output_report = sanitize_audit_paths(report)
+    print(json.dumps(output_report, indent=2, sort_keys=True))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n",
+        json.dumps(output_report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     print(f"\nwrote closure receipt: {args.report}")

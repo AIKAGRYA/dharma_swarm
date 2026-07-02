@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -28,6 +29,31 @@ def _normalize_local_paths(value: str, replacements: list[tuple[str, str]]) -> s
     normalized = value
     for source, replacement in replacements:
         normalized = normalized.replace(source, replacement)
+    normalized = re.sub(
+        r"/Users/[^/\s:=`'\"]+",
+        "$HOME",
+        normalized,
+    )
+    normalized = re.sub(
+        r"/home/[^/\s:=`'\"]+",
+        "$HOME",
+        normalized,
+    )
+    normalized = re.sub(
+        r"/(?:private/)?tmp(?:/[^\s:=`'\"]+)?",
+        "$TMPDIR",
+        normalized,
+    )
+    normalized = re.sub(
+        r"/var/folders(?:/[^\s:=`'\"]+)?",
+        "$TMPDIR",
+        normalized,
+    )
+    normalized = re.sub(
+        r"(^|(?<=[\s:=`'\"]))(/[^\s:=`'\"]+)",
+        lambda match: f"{match.group(1)}<absolute-path>",
+        normalized,
+    )
     return normalized
 
 
