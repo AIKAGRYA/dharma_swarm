@@ -69,9 +69,11 @@ def format_markdown(report: dict[str, Any]) -> str:
     ])
     bounded_replays = report.get("bounded_replays") or {}
     loop1_replay = (bounded_replays.get("loop1") or {})
+    loop1_harness_proven = bool(loop1_replay.get("harness_proven") or loop1_replay.get("closed"))
     lines.extend([
         f"- loop1_report: `{loop1_replay.get('path')}`",
-        f"- loop1_closed: `{loop1_replay.get('closed')}`",
+        f"- loop1_harness_proven: `{loop1_harness_proven}`",
+        f"- loop1_closed_live: `{loop1_replay.get('closed_live', False)}`",
         f"- loop1_tasks: `{loop1_replay.get('tasks_completed', 0)}/"
         f"{loop1_replay.get('tasks_requested', 0)}`",
         f"- loop1_dispatch_dropoffs: `{loop1_replay.get('dispatch_dropoffs', 0)}`",

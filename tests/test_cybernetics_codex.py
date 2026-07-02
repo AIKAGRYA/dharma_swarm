@@ -362,6 +362,8 @@ def test_markdown_report_contains_all_13_loops(tmp_path):
 
     assert "# cybernetics_codex Audit" in text
     assert text.count("| ") >= 13
+    assert "loop1_harness_proven" in text
+    assert "loop1_closed:" not in text
     assert "Swarm Task Loop" in text
     assert "Free Evolution Grind" in text
 

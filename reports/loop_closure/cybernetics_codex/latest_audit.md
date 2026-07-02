@@ -28,7 +28,8 @@
 ## Harness Replays
 
 - loop1_report: `/Users/dhyana/dw-worktrees/g/reports/loop_closure/cybernetics_codex/2026-06-23_loop1_ollama_fresh_spine_dispatch.json`
-- loop1_closed: `True`
+- loop1_harness_proven: `True`
+- loop1_closed_live: `False`
 - loop1_tasks: `3/3`
 - loop1_dispatch_dropoffs: `0`
 - loop1_evidence_receipts_ok: `3`

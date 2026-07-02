@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -91,8 +92,8 @@ def test_run_python_with_repo_env_falls_back_to_path_python3_not_sibling_worktre
     shim = shim_dir / "python3"
     shim.write_text(
         "#!/usr/bin/env sh\n"
-        f"printf 'used\\n' > {marker}\n"
-        f"exec {sys.executable} \"$@\"\n",
+        f"printf 'used\\n' > {shlex.quote(str(marker))}\n"
+        f"exec {shlex.quote(sys.executable)} \"$@\"\n",
         encoding="utf-8",
     )
     shim.chmod(0o755)
