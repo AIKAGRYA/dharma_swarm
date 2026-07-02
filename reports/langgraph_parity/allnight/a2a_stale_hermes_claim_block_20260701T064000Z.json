@@ -1,0 +1,205 @@
+{
+  "actions": [
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-hb0631-credit:c56366a1e0f7",
+      "age_hours": 527.699,
+      "checked_receipt_paths": [
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/receipt_ts-hb0631-credit.json",
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/claimed_ts-hb0631-credit.json"
+      ],
+      "claimant_presence": {
+        "age_hours": 39.817,
+        "agent_uid": "hermes-m5",
+        "callsign": "hermes-m5",
+        "harness": "hermes",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+        "model": "",
+        "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
+        "status": "active"
+      },
+      "claimed_at": "2026-06-09T06:58:03.700816+00:00",
+      "claimed_by": "hermes-m5",
+      "reason": "stale_hermes_claim_without_terminal_receipt",
+      "row_index": 6,
+      "task_id": "ts-hb0631-credit",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:ts-pr-babysit-div-20260610:c56366a1e0f7",
+      "age_hours": 505.716,
+      "checked_receipt_paths": [
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/receipt_ts-pr-babysit-div-20260610.json",
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/claimed_ts-pr-babysit-div-20260610.json"
+      ],
+      "claimant_presence": {
+        "age_hours": 39.817,
+        "agent_uid": "hermes-m5",
+        "callsign": "hermes-m5",
+        "harness": "hermes",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+        "model": "",
+        "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
+        "status": "active"
+      },
+      "claimed_at": "2026-06-10T04:57:01.667278+00:00",
+      "claimed_by": "hermes-m5",
+      "reason": "stale_hermes_claim_without_terminal_receipt",
+      "row_index": 8,
+      "task_id": "ts-pr-babysit-div-20260610",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:reconcile-564-565-20260611:c56366a1e0f7",
+      "age_hours": 485.636,
+      "checked_receipt_paths": [
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/receipt_reconcile-564-565-20260611.json",
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/claimed_reconcile-564-565-20260611.json"
+      ],
+      "claimant_presence": {
+        "age_hours": 39.817,
+        "agent_uid": "hermes-m5",
+        "callsign": "hermes-m5",
+        "harness": "hermes",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+        "model": "",
+        "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
+        "status": "active"
+      },
+      "claimed_at": "2026-06-11T01:01:49.052113+00:00",
+      "claimed_by": "hermes-m5",
+      "reason": "stale_hermes_claim_without_terminal_receipt",
+      "row_index": 12,
+      "task_id": "reconcile-564-565-20260611",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:l1-fx-001:c56366a1e0f7",
+      "age_hours": 457.79,
+      "checked_receipt_paths": [
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/receipt_l1-fx-001.json",
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/claimed_l1-fx-001.json"
+      ],
+      "claimant_presence": {
+        "age_hours": 39.817,
+        "agent_uid": "hermes-m5",
+        "callsign": "hermes-m5",
+        "harness": "hermes",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+        "model": "",
+        "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
+        "status": "active"
+      },
+      "claimed_at": "2026-06-12T04:52:36.513465+00:00",
+      "claimed_by": "hermes-m5",
+      "reason": "stale_hermes_claim_without_terminal_receipt",
+      "row_index": 19,
+      "task_id": "l1-fx-001",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    },
+    {
+      "a2a_receipt_id": "a2a-task-receipt:yatagarasu-10cceaa8:c56366a1e0f7",
+      "age_hours": 346.671,
+      "checked_receipt_paths": [
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/receipt_yatagarasu-10cceaa8.json",
+        "/Users/dhyana/.dharma/a2a_bus/inboxes/hermes-m5/claimed_yatagarasu-10cceaa8.json"
+      ],
+      "claimant_presence": {
+        "age_hours": 39.817,
+        "agent_uid": "hermes-m5",
+        "callsign": "hermes-m5",
+        "harness": "hermes",
+        "heartbeat_status": "RED",
+        "last_seen_at": "2026-06-29T14:50:57.065783+00:00",
+        "model": "",
+        "source_path": "/Users/dhyana/.dharma/agents/hermes-m5/living_agent.json",
+        "status": "active"
+      },
+      "claimed_at": "2026-06-16T19:59:45.840398+00:00",
+      "claimed_by": "hermes-m5",
+      "reason": "stale_hermes_claim_without_terminal_receipt",
+      "row_index": 21,
+      "task_id": "yatagarasu-10cceaa8",
+      "validation": {
+        "errors": [],
+        "valid": true,
+        "warnings": []
+      }
+    }
+  ],
+  "agent_uid": "a2a_supervisor",
+  "applied": true,
+  "applied_count": 5,
+  "applied_rows": [
+    {
+      "claimed_by": "hermes-m5",
+      "receipt_id": "a2a-task-receipt:ts-hb0631-credit:c56366a1e0f7",
+      "status": "blocked",
+      "task_id": "ts-hb0631-credit"
+    },
+    {
+      "claimed_by": "hermes-m5",
+      "receipt_id": "a2a-task-receipt:ts-pr-babysit-div-20260610:c56366a1e0f7",
+      "status": "blocked",
+      "task_id": "ts-pr-babysit-div-20260610"
+    },
+    {
+      "claimed_by": "hermes-m5",
+      "receipt_id": "a2a-task-receipt:reconcile-564-565-20260611:c56366a1e0f7",
+      "status": "blocked",
+      "task_id": "reconcile-564-565-20260611"
+    },
+    {
+      "claimed_by": "hermes-m5",
+      "receipt_id": "a2a-task-receipt:l1-fx-001:c56366a1e0f7",
+      "status": "blocked",
+      "task_id": "l1-fx-001"
+    },
+    {
+      "claimed_by": "hermes-m5",
+      "receipt_id": "a2a-task-receipt:yatagarasu-10cceaa8:c56366a1e0f7",
+      "status": "blocked",
+      "task_id": "yatagarasu-10cceaa8"
+    }
+  ],
+  "backup_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl.a2a-stale-hermes-claim-block-20260701T064000Z.bak",
+  "candidate_count": 5,
+  "claimant_uids": [
+    "hermes-m5"
+  ],
+  "generated_at": "2026-07-01T06:40:00Z",
+  "heartbeat_stale_hours": 24.0,
+  "post_readiness": {
+    "open_tasks": 3,
+    "ready": false,
+    "reasons": [
+      "open_or_claimed_tasks_present"
+    ],
+    "unknown_status_tasks": 0,
+    "unverified_closed_tasks": 0
+  },
+  "queue_path": "/Users/dhyana/.dharma/a2a_bus/tasks/queue.jsonl",
+  "schema_version": 1,
+  "skip_count": 0,
+  "skips": [],
+  "stale_after_hours": 24.0
+}

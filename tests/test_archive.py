@@ -332,6 +332,24 @@ async def test_update_status_persists(archive_path):
 
 
 @pytest.mark.asyncio
+async def test_update_status_rebuilds_grid_when_entry_stops_bearing_fitness(archive_path):
+    archive = EvolutionArchive(path=archive_path)
+    await archive.load()
+    entry = _make_entry(
+        description="fitness-bearing entry",
+        fitness=FitnessScore(correctness=0.8, elegance=0.7),
+        status="applied",
+    )
+    eid = await archive.add_entry(entry)
+    assert archive.grid.occupied_bins == 1
+
+    await archive.update_status(eid, "proposed")
+
+    assert archive.grid.occupied_bins == 0
+    assert await archive.get_diverse(n=3) == []
+
+
+@pytest.mark.asyncio
 async def test_update_status_with_reason(archive):
     entry = _make_entry(description="will rollback")
     eid = await archive.add_entry(entry)

@@ -34,12 +34,35 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts.runtime.pr_merge_control import (  # noqa: E402
+    _is_publish_permission_violation,
+    _resolve_nats_ca_pem,
+)
+
 REGISTRATION_FILE = REPO_ROOT / "examples" / "agents" / "devin.registration.json"
-BUNDLED_CA = REPO_ROOT / "dharma_swarm" / "a2a" / "nats" / "agni-ws-ca.pem"
 
 DEFAULT_URL = "wss://157.245.193.15:8443"
 STREAM = "DHARMA_A2A"
 CONSUMER = "devin_inbox"
+DEFAULT_PROBE_TIMEOUT_S = 5.0
+_PROBE_SUBJECT_BY_LANE = {
+    "devin": "dharma.a2a.devin",
+    "devin-roaming-2987d222": "dharma.a2a.devin",
+    "merge_master_mike": "dharma.a2a.merge_master_mike",
+    "codex": "dharma.a2a.codex",
+    "codex_composer": "dharma.a2a.codex",
+    "hermes": "dharma.a2a.hermes",
+    "hermes-m5": "dharma.a2a.hermes",
+    "perplexity": "dharma.a2a.perplexity",
+    "perplexity-computer": "dharma.a2a.perplexity",
+    "fleet": "dharma.a2a.fleet",
+    "fable_5_cursor": "dharma.a2a.fable_5_cursor",
+    "fable_composer": "dharma.a2a.fable_composer",
+    "warp_oz": "dharma.a2a.warp_oz",
+}
 
 
 def _load_registration() -> dict[str, Any]:
@@ -50,17 +73,13 @@ def _load_registration() -> dict[str, Any]:
 
 
 def _ca_pem() -> str:
-    pem = (
-        os.environ.get("DEVIN_NATS_CA_PEM")
-        or os.environ.get("DHARMA_NATS_CA_PEM")
-        or os.environ.get("NATS_CA_PEM")
-        or ""
-    ).strip()
-    if not pem and BUNDLED_CA.exists():
-        pem = BUNDLED_CA.read_text().strip()
-    if "\\n" in pem and "\n" not in pem:
-        pem = pem.replace("\\n", "\n")
-    return pem
+    return _resolve_nats_ca_pem(
+        dict(os.environ),
+        "DEVIN_NATS_CA_PEM",
+        "DHARMA_NATS_CA_PEM",
+        "NATS_CA_PEM",
+        endpoint=os.environ.get("DEVIN_NATS_URL", DEFAULT_URL),
+    )
 
 
 def _tls_context() -> ssl.SSLContext:
@@ -78,6 +97,154 @@ def _creds() -> tuple[str, str, str]:
     return url, user, pw
 
 
+def _probe_targets(reg: dict[str, Any]) -> list[dict[str, str]]:
+    metadata = reg.get("metadata", {})
+    peers = metadata.get("coordination_peers", [])
+    if not isinstance(peers, list):
+        return []
+
+    grouped: dict[str, dict[str, list[str] | str]] = {}
+    order: list[str] = []
+    for peer in peers:
+        lane = str(peer).strip()
+        if not lane:
+            continue
+        subject = _PROBE_SUBJECT_BY_LANE.get(lane, f"dharma.a2a.{lane}")
+        if subject not in grouped:
+            grouped[subject] = {"lane": [], "subject": subject}
+            order.append(subject)
+        lanes = grouped[subject]["lane"]
+        assert isinstance(lanes, list)
+        if lane not in lanes:
+            lanes.append(lane)
+
+    return [
+        {
+            "lane": ", ".join(grouped[subject]["lane"]),  # type: ignore[index]
+            "subject": subject,
+        }
+        for subject in order
+    ]
+
+
+async def _probe_outbound_reachability(
+    reg: dict[str, Any],
+    live_subjects: list[str] | set[str] | tuple[str, ...],
+    *,
+    timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
+) -> list[dict[str, Any]]:
+    import nats
+
+    url, user, pw = _creds()
+    live_subject_set = {str(subject) for subject in live_subjects if str(subject)}
+    probe_from = str(reg.get("callsign") or reg.get("agent_uid") or "devin")
+    probes: list[dict[str, Any]] = []
+    for target in _probe_targets(reg):
+        subject = target["subject"]
+        if subject not in live_subject_set:
+            probes.append(
+                {
+                    "lane": target["lane"],
+                    "subject": subject,
+                    "status": "NO_STREAM",
+                    "detail": "subject is not present in the live DHARMA_A2A stream",
+                }
+            )
+            continue
+
+        permission_detail: str | None = None
+        permission_seen = asyncio.Event()
+        permission_wait_guard_error: str | None = None
+        close_guard_error: str | None = None
+
+        async def error_cb(exc: Exception) -> None:
+            nonlocal permission_detail
+            message = str(exc)
+            if _is_publish_permission_violation(message, subject):
+                permission_detail = message
+                permission_seen.set()
+
+        nc = await nats.connect(
+            servers=[url],
+            user=user,
+            password=pw,
+            tls=_tls_context(),
+            connect_timeout=timeout_s,
+            allow_reconnect=False,
+            max_reconnect_attempts=0,
+            error_cb=error_cb,
+        )
+        try:
+            payload = {
+                "kind": "reachability_probe",
+                "from": probe_from,
+                "note": "a2a_doctor --probe-send authorization probe",
+                "subject": subject,
+            }
+            try:
+                await nc.jetstream().publish(
+                    subject,
+                    json.dumps(payload, sort_keys=True).encode("utf-8"),
+                    timeout=timeout_s,
+                )
+            except Exception as exc:  # noqa: BLE001
+                message = str(exc)
+                if permission_detail is None:
+                    try:
+                        await asyncio.wait_for(permission_seen.wait(), timeout=0.5)
+                    except Exception as wait_exc:
+                        permission_wait_guard_error = type(wait_exc).__name__
+                if permission_detail is not None:
+                    row = {
+                        "lane": target["lane"],
+                        "subject": subject,
+                        "status": "DENIED(permissions)",
+                        "detail": permission_detail or message,
+                    }
+                    if permission_wait_guard_error:
+                        row["debug"] = {"permission_wait_guard_error": permission_wait_guard_error}
+                    probes.append(row)
+                elif "no response from stream" in message.lower() or type(exc).__name__ == "NoStreamResponseError":
+                    probes.append(
+                        {
+                            "lane": target["lane"],
+                            "subject": subject,
+                            "status": "NO_STREAM",
+                            "detail": message,
+                        }
+                    )
+                else:
+                    probes.append(
+                        {
+                            "lane": target["lane"],
+                            "subject": subject,
+                            "status": "PUBLISH_FAILED",
+                            "detail": message,
+                        }
+                    )
+                continue
+        finally:
+            try:
+                await asyncio.wait_for(nc.close(), timeout=2.0)
+            except Exception as close_exc:
+                close_guard_error = type(close_exc).__name__
+
+        probes.append(
+            {
+                "lane": target["lane"],
+                "subject": subject,
+                "status": "ALLOWED",
+                "detail": "",
+                **(
+                    {"debug": {"close_guard_error": close_guard_error}}
+                    if close_guard_error
+                    else {}
+                ),
+            }
+        )
+    return probes
+
+
 async def _gather(scan: int) -> dict[str, Any]:
     import nats
 
@@ -90,10 +257,12 @@ async def _gather(scan: int) -> dict[str, Any]:
     try:
         js = nc.jetstream()
         si = await js.stream_info(STREAM)
+        subjects = [str(subject) for subject in (si.config.subjects or [])]
         out["hub"].update(
             messages=si.state.messages,
             first_seq=si.state.first_seq,
             last_seq=si.state.last_seq,
+            subjects=subjects,
         )
 
         try:
@@ -177,11 +346,31 @@ def _print_human(reg: dict[str, Any], live: dict[str, Any] | None, err: str | No
     print("\n  tip: send a packet with `make a2a-send TO=<agent> FILE=<packet.md>`")
 
 
-def main() -> int:
+def _print_outbound_reachability(rows: list[dict[str, Any]]) -> None:
+    print("\n=== Outbound reachability ===")
+    if not rows:
+        print("  (probe-send not requested)")
+        return
+    for row in rows:
+        lane = str(row.get("lane") or "?")
+        status = str(row.get("status") or "?")
+        detail = str(row.get("detail") or "")
+        if detail:
+            print(f"  {lane:32s}  {status}  {detail}")
+        else:
+            print(f"  {lane:32s}  {status}")
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="A2A doctor for the Devin lane")
     parser.add_argument("--scan", type=int, default=120, help="how many recent stream msgs to scan for the roster")
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--probe-send",
+        action="store_true",
+        help="probe outbound publish authorization for known peer lanes with a small probe packet",
+    )
+    args = parser.parse_args(argv)
 
     reg = _load_registration()
 
@@ -193,15 +382,35 @@ def main() -> int:
 
     live: dict[str, Any] | None = None
     err: str | None = None
+    outbound: list[dict[str, Any]] = []
     try:
         live = asyncio.run(_gather(args.scan))
     except Exception as exc:  # noqa: BLE001
         err = str(exc)
+    if err is None and args.probe_send:
+        try:
+            live_subjects: list[str] = []
+            if live is not None:
+                hub = live.get("hub", {})
+                if isinstance(hub, dict):
+                    subjects = hub.get("subjects", [])
+                    if isinstance(subjects, list):
+                        live_subjects = [str(subject) for subject in subjects]
+            outbound = asyncio.run(_probe_outbound_reachability(reg, live_subjects))
+        except Exception as exc:  # noqa: BLE001
+            outbound = [{"lane": "probe", "subject": "", "status": "ERROR", "detail": str(exc)}]
 
     if args.json:
-        print(json.dumps({"registration": reg, "live": live, "error": err}, indent=2))
+        print(
+            json.dumps(
+                {"registration": reg, "live": live, "error": err, "outbound_reachability": outbound},
+                indent=2,
+            )
+        )
     else:
         _print_human(reg, live, err)
+        if args.probe_send:
+            _print_outbound_reachability(outbound)
     return 0 if err is None else 2
 
 

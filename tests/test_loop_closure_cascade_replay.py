@@ -3,9 +3,9 @@ when its replay receipt structurally proves a full sense->interpret->constrain->
 act->adapt cycle on real data — never on a bare "closed" boolean, a missing
 transition, an adapt that did not change state, or a run with tick errors.
 
-This pins the keystone that lets loops 2..11 close via the same proven
+This pins the keystone that lets loops 2..11 earn HARNESS_PROVEN via the same
 bounded-replay pattern as Loop 1. It exercises the audit logic with fixtures;
-it does NOT assert any real loop is closed.
+it does NOT assert any real loop is CLOSED_LIVE.
 """
 from __future__ import annotations
 
@@ -37,7 +37,10 @@ def _valid_replay() -> dict:
 
 
 def test_valid_replay_is_closed():
-    assert _evaluate_loop_closure_replay(_valid_replay())["closed"] is True
+    result = _evaluate_loop_closure_replay(_valid_replay())
+    assert result["harness_proven"] is True
+    assert result["closed"] is True  # backward-compatible alias for harness proof
+    assert result["closed_live"] is False
 
 
 def test_bare_closed_boolean_is_not_trusted():
@@ -77,13 +80,16 @@ def test_reader_closes_loop_with_valid_receipt(tmp_path):
         json.dumps(_valid_replay()), encoding="utf-8"
     )
     replays = read_loop_closure_replays(tmp_path)
-    assert replays["loop2"]["closed"] is True
+    assert replays["loop2"]["harness_proven"] is True
+    assert replays["loop2"]["closed_live"] is False
     assert replays["loop3"]["closed"] is False  # no receipt
 
 
-def test_build_loop_statuses_closes_loop_with_verified_replay():
+def test_build_loop_statuses_marks_harness_proven_with_verified_replay():
     bounded = {"loop2": {"closed": True, "cycles": 3}}
     rows = {r["number"]: r for r in build_loop_statuses({}, {}, {}, bounded_replays=bounded)}
-    assert rows[2]["verdict"] == "CLOSED_BOUNDED_REPLAY"
-    # A loop with no replay is never closed by this path.
-    assert rows[4]["verdict"] != "CLOSED_BOUNDED_REPLAY"
+    assert rows[2]["verdict"] == "HARNESS_PROVEN"
+    assert "not CLOSED_LIVE" in rows[2]["blocker"]
+    assert "live_owner_surface_criterion" in rows[2]
+    # A loop with no replay is never harness-proven by this path.
+    assert rows[4]["verdict"] != "HARNESS_PROVEN"

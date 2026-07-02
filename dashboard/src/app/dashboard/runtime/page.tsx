@@ -3,22 +3,50 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Check, RotateCcw, X } from "lucide-react";
 import { ControlPlanePageSummary } from "@/components/dashboard/ControlPlanePageSummary";
 import { ControlPlaneSurfaceGrid } from "@/components/dashboard/ControlPlaneSurfaceGrid";
 import { ControlPlaneStrip } from "@/components/dashboard/ControlPlaneStrip";
-import { API_TRANSPORT_MODE, BASE_URL } from "@/lib/api";
+import {
+  API_TRANSPORT_MODE,
+  BASE_URL,
+  approveRuntimeInterrupt,
+  rejectRuntimeInterrupt,
+  resumeRuntimeInterrupt,
+  runtimeEventsStreamPath,
+} from "@/lib/api";
 import { buildControlPlanePageMeta } from "@/lib/controlPlanePageMeta";
 import {
   buildControlPlaneSyncState,
 } from "@/lib/controlPlaneShell";
+import {
+  buildRuntimeControlActionRequest,
+  runtimeControlActionOptions,
+  type RuntimeControlActionKind,
+} from "@/lib/runtimeControlPlane";
 import { buildRuntimeOperatorHandbook } from "@/lib/runtimeOperatorHandbook";
 import { buildControlPlaneSurfaces } from "@/lib/controlPlaneSurfaces";
 import { colors, glowText } from "@/lib/theme";
 import { useRuntimeControlPlane } from "@/hooks/useRuntimeControlPlane";
-import type { ChatProfileOut } from "@/lib/types";
+import type {
+  ChatProfileOut,
+  RuntimeAssistantsSnapshot,
+  RuntimeBackgroundJobsSnapshot,
+  RuntimeControlActionResult,
+  RuntimeGraphSnapshot,
+  RuntimeInterruptControlEvent,
+  RuntimeInterruptsSnapshot,
+} from "@/lib/types";
 
 const PAGE_META = buildControlPlanePageMeta("runtime");
 const PAGE_ACCENT = colors[PAGE_META.accent];
+
+interface RuntimeControlActionState {
+  eventId: string;
+  action: RuntimeControlActionKind;
+  status: "running" | "ok" | "error";
+  message: string;
+}
 
 function transportLabel(): string {
   if (API_TRANSPORT_MODE === "same-origin") {
@@ -66,11 +94,17 @@ function profileStatusLabel(profile: ChatProfileOut): string {
 
 export default function RuntimePage() {
   const [currentOrigin, setCurrentOrigin] = useState("loading");
+  const [controlActionState, setControlActionState] =
+    useState<RuntimeControlActionState | null>(null);
   const transportMode = API_TRANSPORT_MODE;
   const transportDetail = transportLabel();
   const {
     chatStatus,
     health,
+    runtimeGraph,
+    runtimeInterrupts,
+    runtimeAssistants,
+    runtimeBackgroundJobs,
     error,
     snapshot,
     isLoading,
@@ -97,6 +131,48 @@ export default function RuntimePage() {
       }),
     [chatStatus, snapshot],
   );
+
+  async function handleRuntimeControlAction(
+    event: RuntimeInterruptControlEvent,
+    action: RuntimeControlActionKind,
+  ): Promise<void> {
+    const body = buildRuntimeControlActionRequest(event, action);
+    setControlActionState({
+      eventId: event.event_id,
+      action,
+      status: "running",
+      message: `${action} recording`,
+    });
+
+    const response =
+      action === "approve"
+        ? await approveRuntimeInterrupt(body)
+        : action === "reject"
+          ? await rejectRuntimeInterrupt(body)
+          : await resumeRuntimeInterrupt(body);
+    const result: RuntimeControlActionResult | null =
+      response.status === "ok" ? response.data : null;
+
+    if (result?.status) {
+      setControlActionState({
+        eventId: event.event_id,
+        action,
+        status: "ok",
+        message: result.target_found
+          ? `recorded ${result.status}`
+          : `recorded ${result.status}; target not found`,
+      });
+      void refresh();
+      return;
+    }
+
+    setControlActionState({
+      eventId: event.event_id,
+      action,
+      status: "error",
+      message: response.error || `failed to record ${action}`,
+    });
+  }
 
   return (
     <motion.div
@@ -173,6 +249,23 @@ export default function RuntimePage() {
         <div className="py-12 text-center text-sumi-500">Loading runtime status...</div>
       ) : (
         <>
+          <RuntimeGraphPanel
+            graph={runtimeGraph}
+            interrupts={runtimeInterrupts}
+            assistants={runtimeAssistants}
+            background={runtimeBackgroundJobs}
+            statusLabel={snapshot.runtimeGraphStatusLabel}
+            detail={snapshot.runtimeGraphDetail}
+            controlStatusLabel={snapshot.runtimeInterruptStatusLabel}
+            controlDetail={snapshot.runtimeInterruptDetail}
+            assistantsStatusLabel={snapshot.runtimeAssistantsStatusLabel}
+            assistantsDetail={snapshot.runtimeAssistantsDetail}
+            backgroundStatusLabel={snapshot.runtimeBackgroundStatusLabel}
+            backgroundDetail={snapshot.runtimeBackgroundDetail}
+            controlActionState={controlActionState}
+            onControlAction={handleRuntimeControlAction}
+          />
+
           <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5 shadow-[0_0_0_1px_rgba(80,90,110,0.08)]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -332,6 +425,363 @@ export default function RuntimePage() {
       )}
     </motion.div>
   );
+}
+
+function RuntimeGraphPanel({
+  graph,
+  interrupts,
+  assistants,
+  background,
+  statusLabel,
+  detail,
+  controlStatusLabel,
+  controlDetail,
+  assistantsStatusLabel,
+  assistantsDetail,
+  backgroundStatusLabel,
+  backgroundDetail,
+  controlActionState,
+  onControlAction,
+}: {
+  graph: RuntimeGraphSnapshot | null;
+  interrupts: RuntimeInterruptsSnapshot | null;
+  assistants: RuntimeAssistantsSnapshot | null;
+  background: RuntimeBackgroundJobsSnapshot | null;
+  statusLabel: string;
+  detail: string;
+  controlStatusLabel: string;
+  controlDetail: string;
+  assistantsStatusLabel: string;
+  assistantsDetail: string;
+  backgroundStatusLabel: string;
+  backgroundDetail: string;
+  controlActionState: RuntimeControlActionState | null;
+  onControlAction: (
+    event: RuntimeInterruptControlEvent,
+    action: RuntimeControlActionKind,
+  ) => Promise<void>;
+}) {
+  const topologies = graph?.topology_states.slice(0, 6) ?? [];
+  const receipts = graph?.receipts.slice(0, 6) ?? [];
+  const controlEvents = interrupts?.control_events.slice(0, 6) ?? [];
+  const assistantRows = assistants?.assistants.slice(0, 4) ?? [];
+  const configurationRows = assistants?.configurations.slice(0, 4) ?? [];
+  const cronRows = background?.cron_jobs.slice(0, 4) ?? [];
+  const backgroundRuns = background?.background_runs.slice(0, 4) ?? [];
+  const streamPath = runtimeEventsStreamPath({ ledger_kind: "runtime", limit: 20 });
+
+  return (
+    <section className="rounded-2xl border border-sumi-700/50 bg-sumi-900/60 p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-lg text-sumi-100">Runtime Graph</h2>
+          <p className="text-sm text-sumi-400">{detail}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(graph ? "ok" : "muted")}`}>
+            {statusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(interrupts ? "ok" : "muted")}`}>
+            {controlStatusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(assistants ? "ok" : "muted")}`}>
+            {assistantsStatusLabel}
+          </span>
+          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] ${badgeClasses(background ? "ok" : "muted")}`}>
+            {backgroundStatusLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <MiniStat label="Active Runs" value={String(graph?.summary.active_run_count ?? 0)} />
+        <MiniStat label="Active Agents" value={String(graph?.summary.active_agent_count ?? 0)} />
+        <MiniStat label="Checkpoints" value={String(graph?.summary.checkpoint_count ?? 0)} />
+        <MiniStat label="Receipts" value={String(graph?.summary.receipt_count ?? 0)} />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <MiniStat
+          label="Pending Interrupts"
+          value={String(interrupts?.summary.pending_interrupt_count ?? 0)}
+        />
+        <MiniStat
+          label="Human Approval"
+          value={String(interrupts?.summary.human_approval_required_count ?? 0)}
+        />
+        <MiniStat label="Approved" value={String(interrupts?.summary.approved_count ?? 0)} />
+        <MiniStat label="Resumed" value={String(interrupts?.summary.resumed_count ?? 0)} />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-4">
+        <MiniStat
+          label="Assistants"
+          value={String(assistants?.summary.assistant_count ?? 0)}
+        />
+        <MiniStat
+          label="Configurations"
+          value={String(assistants?.summary.configuration_count ?? 0)}
+        />
+        <MiniStat
+          label="Cron Jobs"
+          value={String(background?.summary.cron_job_count ?? 0)}
+        />
+        <MiniStat
+          label="Background Runs"
+          value={String(background?.summary.background_run_count ?? 0)}
+        />
+      </div>
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-3">
+          {topologies.length === 0 ? (
+            <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4 text-sm text-sumi-500">
+              No topology states in the selected runtime snapshot.
+            </div>
+          ) : (
+            topologies.map((state) => (
+              <div
+                key={state.run_id}
+                className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-sumi-100">
+                      {state.topology}
+                    </div>
+                    <div className="font-mono text-xs text-sumi-500">{state.run_id}</div>
+                  </div>
+                  <span className="rounded-full border border-aozora/30 bg-aozora/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-aozora">
+                    {state.active_agent || "no active agent"}
+                  </span>
+                </div>
+                <div className="grid gap-2 text-xs text-sumi-400 md:grid-cols-3">
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Task</div>
+                    <div className="font-mono text-sumi-300">{state.task_id}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Node</div>
+                    <div className="font-mono text-sumi-300">{state.current_node || "none"}</div>
+                  </div>
+                  <div>
+                    <div className="uppercase tracking-[0.14em] text-sumi-600">Children</div>
+                    <div className="font-mono text-sumi-300">{state.child_run_ids.length}</div>
+                  </div>
+                </div>
+                {state.checkpoint_id ? (
+                  <div className="mt-3 truncate font-mono text-xs text-sumi-500">
+                    {state.checkpoint_id}
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+            <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+              Recent Receipts
+            </div>
+            <div className="space-y-3">
+              {receipts.length === 0 ? (
+                <div className="text-sm text-sumi-500">No runtime receipts in snapshot.</div>
+              ) : (
+                receipts.map((receipt) => (
+                  <div key={receipt.receipt_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                    <div className="text-sm text-sumi-200">{receipt.receipt_type}</div>
+                    <div className="font-mono text-xs text-sumi-500">{receipt.receipt_id}</div>
+                    <div className="mt-1 text-xs text-sumi-500">
+                      {receipt.status} · {receipt.agent_id || "no-agent"}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs uppercase tracking-[0.16em] text-sumi-500">
+                Control Events
+              </div>
+              <div className="max-w-full truncate font-mono text-[11px] text-sumi-600">
+                {streamPath}
+              </div>
+            </div>
+            <p className="mb-3 text-xs text-sumi-500">{controlDetail}</p>
+            <div className="space-y-3">
+              {controlEvents.length === 0 ? (
+                <div className="text-sm text-sumi-500">No interrupts or approvals in snapshot.</div>
+              ) : (
+                controlEvents.map((event) => {
+                  const actionOptions = runtimeControlActionOptions(event);
+                  const activeAction =
+                    controlActionState?.eventId === event.event_id
+                      ? controlActionState
+                      : null;
+                  const actionBusy = activeAction?.status === "running";
+
+                  return (
+                    <div key={event.event_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm text-sumi-200">{event.event_name}</div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(event.status === "pending" ? "warn" : "ok")}`}>
+                        {event.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 font-mono text-xs text-sumi-500">
+                      {event.interrupt_id || event.approval_id || event.event_id}
+                    </div>
+                    <div className="mt-1 text-xs text-sumi-500">
+                      {event.control_type} · {event.agent_id || "no-agent"}
+                    </div>
+                    {actionOptions.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {actionOptions.map((option) => (
+                          <button
+                            key={option.action}
+                            type="button"
+                            aria-label={option.title}
+                            title={option.title}
+                            disabled={actionBusy}
+                            onClick={() => {
+                              void onControlAction(event, option.action);
+                            }}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-sumi-600/60 bg-sumi-900/70 text-sumi-200 transition-colors hover:border-aozora/50 hover:text-aozora disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            <RuntimeControlActionIcon action={option.action} />
+                            <span className="sr-only">{option.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {activeAction ? (
+                      <div
+                        className={`mt-2 text-xs ${
+                          activeAction.status === "error"
+                            ? "text-red-300"
+                            : activeAction.status === "ok"
+                              ? "text-emerald-300"
+                              : "text-sumi-400"
+                        }`}
+                      >
+                        {activeAction.message}
+                      </div>
+                    ) : null}
+                  </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+            Assistants & Configurations
+          </div>
+          <p className="mb-3 text-xs text-sumi-500">{assistantsDetail}</p>
+          <div className="space-y-3">
+            {assistantRows.length === 0 ? (
+              <div className="text-sm text-sumi-500">No assistants in runtime snapshot.</div>
+            ) : (
+              assistantRows.map((assistant) => (
+                <div key={assistant.assistant_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-sumi-200">{assistant.name}</div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(assistant.active_run_count > 0 ? "ok" : "muted")}`}>
+                      {assistant.active_run_count} active
+                    </span>
+                  </div>
+                  <div className="mt-1 font-mono text-xs text-sumi-500">
+                    {assistant.assistant_id}
+                  </div>
+                  <div className="mt-1 text-xs text-sumi-500">
+                    {assistant.configuration_ids.length} configs · {assistant.run_count} runs
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {configurationRows.length > 0 ? (
+            <div className="mt-4 border-t border-sumi-700/40 pt-3">
+              {configurationRows.map((configuration) => (
+                <div key={configuration.configuration_id} className="mb-2 last:mb-0">
+                  <div className="truncate font-mono text-xs text-sumi-400">
+                    {configuration.configuration_id}
+                  </div>
+                  <div className="text-xs text-sumi-600">
+                    {configuration.provider || "provider"} · {configuration.model || "model"} · {configuration.tool_count} tools
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-sumi-700/40 bg-sumi-800/30 p-4">
+          <div className="mb-3 text-xs uppercase tracking-[0.16em] text-sumi-500">
+            Background & Cron
+          </div>
+          <p className="mb-3 text-xs text-sumi-500">{backgroundDetail}</p>
+          <div className="space-y-3">
+            {cronRows.length === 0 ? (
+              <div className="text-sm text-sumi-500">No cron jobs in runtime snapshot.</div>
+            ) : (
+              cronRows.map((job) => (
+                <div key={job.job_id} className="border-b border-sumi-700/40 pb-3 last:border-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm text-sumi-200">{job.name}</div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${badgeClasses(job.enabled ? "ok" : "muted")}`}>
+                      {job.enabled ? "enabled" : "disabled"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-sumi-500">
+                    {job.schedule_display || "unscheduled"} · {job.output_count} outputs
+                  </div>
+                  <div className="mt-1 truncate font-mono text-xs text-sumi-600">
+                    {job.next_run_at || job.job_id}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {backgroundRuns.length > 0 ? (
+            <div className="mt-4 border-t border-sumi-700/40 pt-3">
+              {backgroundRuns.map((run) => (
+                <div key={run.run_id} className="mb-2 last:mb-0">
+                  <div className="truncate font-mono text-xs text-sumi-400">
+                    {run.run_id}
+                  </div>
+                  <div className="text-xs text-sumi-600">
+                    {run.status} · {run.assigned_to || "unassigned"} · {run.cron_job_id || run.run_kind}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RuntimeControlActionIcon({
+  action,
+}: {
+  action: RuntimeControlActionKind;
+}) {
+  if (action === "approve") {
+    return <Check className="h-4 w-4" aria-hidden="true" />;
+  }
+  if (action === "reject") {
+    return <X className="h-4 w-4" aria-hidden="true" />;
+  }
+  return <RotateCcw className="h-4 w-4" aria-hidden="true" />;
 }
 
 function RuntimeCard({

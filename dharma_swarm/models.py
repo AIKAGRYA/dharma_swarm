@@ -101,6 +101,9 @@ class TopologyType(str, Enum):
     FAN_IN = "fan_in"
     PIPELINE = "pipeline"
     BROADCAST = "broadcast"
+    SWARM = "swarm"
+    SUPERVISOR = "supervisor"
+    SUBAGENTS_AS_TOOLS = "subagents_as_tools"
 
 
 class MemoryLayer(str, Enum):
@@ -131,6 +134,7 @@ class ProviderType(str, Enum):
     MISTRAL = "mistral"
     CHUTES = "chutes"
     ZHIPU = "zhipu"
+    KIMI_CODE = "kimi_code"
 
 
 class AutonomyLevel(str, Enum):

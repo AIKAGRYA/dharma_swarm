@@ -16,7 +16,6 @@ Ollama not running, etc.) those slots are simply skipped.
 from __future__ import annotations
 
 import logging
-import os
 import random
 import re
 from dataclasses import dataclass, field
@@ -25,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from dharma_swarm.api_keys import PROVIDER_API_KEY_ENV_KEYS
+from dharma_swarm.api_keys import ENV_ALIASES, PROVIDER_API_KEY_ENV_KEYS, env_has_value
 from dharma_swarm.models import ProviderType
 
 logger = logging.getLogger(__name__)
@@ -376,6 +375,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         256_000,
         "Floor model via NVIDIA NIM hosted catalog (paced secondary route)",
     ),
+    ModelSlot(
+        ProviderType.KIMI_CODE,
+        "kimi-for-coding",
+        "Kimi Code (stable latest)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis"),
+        256_000,
+        "Floor — direct Kimi Code membership API; stable id maps to latest K2.x Code",
+    ),
     # ── NEW floor frontier (>= K2.6) — Ollama-Cloud lanes, keyless ─────
     # The K2.6 floor the roster must SERVE. Live providers first: each rides
     # the Ollama-Cloud keyless route ahead of any paid aggregator.
@@ -432,6 +440,15 @@ EVOLUTION_ROSTER: tuple[ModelSlot, ...] = (
         ("reasoning", "synthesis", "multilingual"),
         256_000,
         "Floor — GLM-5.1 reasoning lane via Ollama Cloud (GLM-zai live)",
+    ),
+    ModelSlot(
+        ProviderType.ZHIPU,
+        "glm-5.2",
+        "GLM 5.2 (Z.ai Coding)",
+        ModelTier.STRONG,
+        ("code", "reasoning", "long_context", "synthesis", "multilingual"),
+        1_000_000,
+        "Floor — direct Z.ai coding-plan GLM-5.2 lane",
     ),
     ModelSlot(
         ProviderType.OLLAMA,
@@ -566,6 +583,8 @@ _ENV_KEYS_FOR_PROVIDER: dict[ProviderType, str] = {
         # SambaNova is a keyed secondary route (DeepSeek-V4-Pro floor fan-out),
         # not a subscription lane — gate it on its API key, not keyless.
         ProviderType.SAMBANOVA,
+        ProviderType.KIMI_CODE,
+        ProviderType.ZHIPU,
     )
 }
 
@@ -574,9 +593,14 @@ def _provider_has_key(provider: ProviderType) -> bool:
     """Check if the env var for a provider is set (non-empty)."""
     env_key = _ENV_KEYS_FOR_PROVIDER.get(provider)
     if env_key is None:
-        # Ollama, Claude Code, Codex don't need API keys
+        # Ollama, Claude Code, Codex don't need API keys.
         return True
-    return bool(os.environ.get(env_key, "").strip())
+    if env_has_value(env_key):
+        return True
+    return any(
+        canonical == env_key and env_has_value(alias)
+        for alias, canonical in ENV_ALIASES.items()
+    )
 
 
 def _ollama_reachable() -> bool:

@@ -14,6 +14,7 @@ from dharma_swarm.providers import (
     CodexProvider,
     FireworksProvider,
     GroqProvider,
+    KimiCodeProvider,
     ModelRouter,
     NVIDIANIMProvider,
     OllamaProvider,
@@ -64,6 +65,34 @@ def test_build_messages():
     result = OpenAIProvider._build_messages(msgs, system="be helpful")
     assert len(result) == 2
     assert result[0]["role"] == "system"
+
+
+@pytest.mark.asyncio
+async def test_kimi_code_stream_forwards_tools():
+    captured: dict[str, object] = {}
+
+    class _Completions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+
+            async def _chunks():
+                yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="ok"))])
+
+            return _chunks()
+
+    provider = KimiCodeProvider(api_key="test-key")
+    provider._client = SimpleNamespace(chat=SimpleNamespace(completions=_Completions()))
+    tools = [{"type": "function", "function": {"name": "lookup", "parameters": {}}}]
+    request = LLMRequest(
+        model="kimi-code",
+        messages=[{"role": "user", "content": "hi"}],
+        tools=tools,
+    )
+
+    chunks = [chunk async for chunk in provider.stream(request)]
+
+    assert chunks == ["ok"]
+    assert captured["tools"] == tools
 
 
 def test_model_router_missing():

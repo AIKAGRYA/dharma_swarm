@@ -13,6 +13,7 @@ from dharma_swarm.runtime_state import (
     RuntimeStateStore,
     SessionState,
     SessionEventRecord,
+    TopologyStateRecord,
     build_session_event_from_ledger_record,
 )
 from dharma_swarm.spine.identity import ExecutionIdentity
@@ -73,8 +74,53 @@ async def test_runtime_state_initializes_wal_and_core_tables(tmp_path) -> None:
         journal_mode = str(db.execute("PRAGMA journal_mode").fetchone()[0]).lower()
 
     assert journal_mode == "wal"
-    assert {"sessions", "task_claims", "delegation_runs", "context_bundles"} <= tables
+    assert {
+        "sessions",
+        "task_claims",
+        "delegation_runs",
+        "context_bundles",
+        "topology_states",
+    } <= tables
     assert "event_log" in tables
+
+
+@pytest.mark.asyncio
+async def test_topology_state_survives_store_restart(tmp_path) -> None:
+    db_path = tmp_path / "runtime.db"
+    store = RuntimeStateStore(db_path, include_memory_plane=False)
+    await store.record_topology_state(
+        TopologyStateRecord(
+            run_id="run-topology",
+            session_id="sess-topology",
+            task_id="task-topology",
+            topology="swarm",
+            active_agent="agent-2",
+            current_node="agent-2",
+            checkpoint_id="task-topology:swarm:checkpoint",
+            child_run_ids=["run-child-1"],
+            allowed_handoffs={"agent-1": ["agent-2"]},
+            handoff_receipts=[
+                {
+                    "status": "accepted",
+                    "from_agent": "agent-1",
+                    "to_agent": "agent-2",
+                }
+            ],
+            state={"mode": "swarm", "status": "claimed"},
+        )
+    )
+
+    restarted = RuntimeStateStore(db_path, include_memory_plane=False)
+    loaded = await restarted.get_topology_state("run-topology")
+    latest = await restarted.get_latest_topology_state_for_task("task-topology")
+
+    assert loaded is not None
+    assert loaded.active_agent == "agent-2"
+    assert loaded.allowed_handoffs == {"agent-1": ["agent-2"]}
+    assert loaded.handoff_receipts[0]["status"] == "accepted"
+    assert loaded.child_run_ids == ["run-child-1"]
+    assert latest is not None
+    assert latest.run_id == "run-topology"
 
 
 @pytest.mark.asyncio

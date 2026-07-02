@@ -1,0 +1,206 @@
+{
+  "act_evidence": {
+    "conductor_mark_count": 1,
+    "executor_tasks": [
+      "Investigate high-activity path: runtime/conductor_signal.py (2 marks in 6h)"
+    ],
+    "latest_witness": {
+      "agent": "conductor_codex",
+      "detail": "Investigate high-activity path: runtime/conductor_signal.py (2 marks in 6h)",
+      "event": "WAKE",
+      "extra": "source=self turns=1 tokens=0 duration=0.0s",
+      "ts": 1782918999.373725
+    },
+    "memory_entries": 2,
+    "surface": "PersistentAgent.wake witness/stigmergy/memory writes",
+    "witness_entries_after": 1,
+    "witness_path": "$TMPDIR/.dharma/witness/conductor_conductor_codex.jsonl"
+  },
+  "adapt_evidence": {
+    "cron_after_wake": {
+      "identity_evolution": {
+        "enabled": true,
+        "interval_s": 3600.0,
+        "run_count": 1
+      },
+      "inbox_check": {
+        "enabled": true,
+        "interval_s": 300.0,
+        "run_count": 1
+      },
+      "memory_consolidation": {
+        "enabled": true,
+        "interval_s": 7200.0,
+        "run_count": 1
+      },
+      "stigmergy_scan": {
+        "enabled": true,
+        "interval_s": 600.0,
+        "run_count": 1
+      }
+    },
+    "cron_before": {
+      "identity_evolution": {
+        "enabled": true,
+        "interval_s": 3600.0,
+        "run_count": 0
+      },
+      "inbox_check": {
+        "enabled": true,
+        "interval_s": 300.0,
+        "run_count": 0
+      },
+      "memory_consolidation": {
+        "enabled": true,
+        "interval_s": 7200.0,
+        "run_count": 0
+      },
+      "stigmergy_scan": {
+        "enabled": true,
+        "interval_s": 600.0,
+        "run_count": 0
+      }
+    },
+    "later_scheduler_read": {
+      "immediate_second_tick_jobs_fired": 0,
+      "queued_tasks_from_cron": 1,
+      "suppressed_by_last_run": true
+    },
+    "surface": "AgentCronScheduler.tick later scheduling decision"
+  },
+  "adapt_proof": {
+    "after": {
+      "identity_evolution": {
+        "enabled": true,
+        "interval_s": 3600.0,
+        "run_count": 1
+      },
+      "inbox_check": {
+        "enabled": true,
+        "interval_s": 300.0,
+        "run_count": 1
+      },
+      "memory_consolidation": {
+        "enabled": true,
+        "interval_s": 7200.0,
+        "run_count": 1
+      },
+      "stigmergy_scan": {
+        "enabled": true,
+        "interval_s": 600.0,
+        "run_count": 1
+      }
+    },
+    "before": {
+      "identity_evolution": {
+        "enabled": true,
+        "interval_s": 3600.0,
+        "run_count": 0
+      },
+      "inbox_check": {
+        "enabled": true,
+        "interval_s": 300.0,
+        "run_count": 0
+      },
+      "memory_consolidation": {
+        "enabled": true,
+        "interval_s": 7200.0,
+        "run_count": 0
+      },
+      "stigmergy_scan": {
+        "enabled": true,
+        "interval_s": 600.0,
+        "run_count": 0
+      }
+    },
+    "fed_forward": true,
+    "field": "PersistentAgent AgentCronScheduler run_count/last_run state",
+    "later_cycle_read": {
+      "immediate_second_tick_jobs_fired": 0,
+      "queued_tasks_from_cron": 1,
+      "suppressed_by_last_run": true
+    }
+  },
+  "constrain_evidence": {
+    "gate_checks": [
+      {
+        "decision": "review",
+        "gate_results": 11,
+        "reason": "Advisory: Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s); Think-point missing (conductor_wake). Pause and reflect before proceeding.; Insufficient epistemological diversity: only 0 frame(s)"
+      }
+    ],
+    "surface": "TelosGatekeeper.check via conductor wake gate"
+  },
+  "cycle_detail": [
+    {
+      "conductor_marks_written": 1,
+      "cycle": 1,
+      "gate_check": {
+        "decision": "review",
+        "gate_results": 11,
+        "reason": "Advisory: Low epistemological diversity: Insufficient epistemological diversity: only 0 frame(s); Think-point missing (conductor_wake). Pause and reflect before proceeding.; Insufficient epistemological diversity: only 0 frame(s)"
+      },
+      "hot_paths": [
+        [
+          "runtime/conductor_signal.py",
+          2
+        ]
+      ],
+      "memory_entries": 2,
+      "phase": "conductor_wake",
+      "salient_marks": 2,
+      "task": "Investigate high-activity path: runtime/conductor_signal.py (2 marks in 6h)",
+      "task_source": "self",
+      "witness_entries_after": 1,
+      "witness_entries_before": 0
+    },
+    {
+      "cycle": 2,
+      "immediate_second_tick_jobs_fired": 0,
+      "phase": "scheduler_later_read",
+      "queued_tasks_from_cron": 1,
+      "suppressed_by_last_run": true
+    }
+  ],
+  "cycles": 2,
+  "interpret_evidence": {
+    "surface": "PersistentAgent._generate_self_task",
+    "task": "Investigate high-activity path: runtime/conductor_signal.py (2 marks in 6h)",
+    "task_source": "self"
+  },
+  "later_cycle_read_evidence": {
+    "immediate_second_tick_jobs_fired": 0,
+    "queued_tasks_from_cron": 1,
+    "suppressed_by_last_run": true
+  },
+  "loop": 9,
+  "loop_id": "conductors",
+  "observed_at": "2026-07-01T15:16:39.380260Z",
+  "provider_truth": {
+    "boundary": "local deterministic executor; no provider truth asserted",
+    "external_provider_called": false,
+    "served_model": null,
+    "served_provider": null
+  },
+  "real_data": true,
+  "sense_evidence": {
+    "hot_paths": [
+      [
+        "runtime/conductor_signal.py",
+        2
+      ]
+    ],
+    "salient_marks": 2,
+    "seeded_signal_path": "runtime/conductor_signal.py",
+    "surface": "StigmergyStore.hot_paths/high_salience"
+  },
+  "state_dir": "$TMPDIR/.dharma",
+  "tick_errors": [],
+  "transitions_receipted": {
+    "act": true,
+    "adapt": true,
+    "constrain": true,
+    "interpret": true,
+    "sense": true
+  }
+}

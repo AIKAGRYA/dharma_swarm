@@ -37,6 +37,8 @@ KNOWN_DIRECT_CREATE_RUNTIME_PROVIDER_FILES: frozenset[str] = frozenset(
         "dharma_swarm/autonomous_agent.py",
         "dharma_swarm/consolidation.py",
         "dharma_swarm/dgm_loop.py",
+        "dharma_swarm/forge_v1/canonical.py",
+        "dharma_swarm/forge_v1/providers.py",
         "dharma_swarm/holon_bridge.py",
         "dharma_swarm/operator_core/living_agent_kernel_provider_worker.py",
         "dharma_swarm/provider_matrix.py",

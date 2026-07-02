@@ -310,8 +310,10 @@ def _register_routers(api_app: FastAPI) -> None:
     from api.routers.model_pool import router as model_pool_router
     from api.routers.operator_coherence import router as operator_coherence_router
     from api.routers.holon import router as holon_router
+    from api.routers.runtime import router as runtime_router
 
     api_app.include_router(holon_router)
+    api_app.include_router(runtime_router)
     api_app.include_router(health_router)
     api_app.include_router(agents_router)
     api_app.include_router(evolution_router)

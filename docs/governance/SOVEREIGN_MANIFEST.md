@@ -66,7 +66,7 @@ status is main's standing declaration and is left to the operator.
 ### Cybernetic Loop Closure — wire all 13 loops with receipted closure checks
 
 **Track id:** `loop-closure-2026-06` · **Status:** ACTIVE · **Owner:** @AmitabhainArunachala
-**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-06-11 (TTL 21 days)
+**Serves spine objective:** `substrate-nativeness` · **Verified at:** 2026-07-01 (TTL 21 days)
 **Relations:** complements: runtime-truth-reconciliation-2026-06
 **Owns surfaces:** reports/loop_closure/**, CYBERNETIC_LOOP_MAP.md
 **Moves vital signs:** quality_gates, eval_coverage
@@ -85,11 +85,17 @@ Invariant that must hold throughout:
   Internal artifacts never touch archive fitness; only countersigned
   external acted receipts above quorum do.
 
+Claim boundary:
+  HARNESS_PROVEN means a bounded replay/regression harness passed. It is
+  not production-live closure. CLOSED_LIVE requires one live owner-surface
+  criterion per loop; those criteria intentionally remain open until the
+  daemon branch that actually runs proves them.
+
 **Next items:**
 
-- [code] (blocker) Phase 1a: provider chain hardening — separate failure state classes, fallback ordering, honest smoke receipts (no real key required).
-- [ops] CORRECTED 2026-06-23: NO operator key is required to close Loop 1. Dispatch is keyless via the claude_code lane (live whenever the claude binary is present; key_oracle.dispatchable_now()). The old 'one real provider key (OPENROUTER recommended)' item was the propagated 'no provider' lie — a key only widens the roster.
-- [code] Phase 1b: Loop 1 closure under orchestrate_live with DHARMA_SPINE_DISPATCH=1, dispatch_dropoff receipted, closure check in make orient.
+- [code] (blocker) Residual: drain or quarantine historical dispatch_dropoff rows before any standing all-history daemon-clean claim.
+- [governance] Future boundary: keep Loops 12/13 blocked until One Wire has N>=5, M>=3, and explicit archive-fitness authority.
+- [governance] (blocker) Promote each HARNESS_PROVEN loop only after its declared live owner-surface criterion passes on the daemon branch that actually runs.
 
 **Non-goals:**
 
@@ -297,9 +303,29 @@ These are the ground-truth metrics. All other documents citing different numbers
 
 | Metric | Value | Verification |
 |--------|-------|-------------|
-| Total Python modules | **807** | find dharma_swarm -name "*.py" -type f |
+| Total Python modules | **816** | find dharma_swarm -name "*.py" -type f |
+| Top-level (flat) modules | **427 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
+| Total Python modules | **840** | find dharma_swarm -name "*.py" -type f |
 | Top-level (flat) modules | **420 (52.0%)** | find dharma_swarm -maxdepth 1 -name "*.py" -type f |
 | Total Python LOC | **326,297** | wc -l across dharma_swarm Python modules |
+| Test files | **788** | find tests -name "*.py" -type f |
+| Test functions | **12,226 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **788** | find tests -name "*.py" -type f |
+| Test functions | **12,226 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **782** | find tests -name "*.py" -type f |
+| Test functions | **12,198 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Test files | **782** | find tests -name "*.py" -type f |
+| Test functions | **12,198 `def test_` occurrences under tests/** | rg "def test_" tests |
+| Tests collected (pytest) | **Needs write-permitted refresh** | not run during this DocOps count pass |
+| Collection errors | **Historical: 16 on 2026-04-04** | refresh before relying on this count |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **265,077** | wc -l across all .md |
+| Markdown files | **1192** | find . -name "*.md" -type f |
+| Markdown total lines | **265,077** | wc -l across all .md |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,083** | wc -l across all .md |
+| Markdown files | **1171** | find . -name "*.md" -type f |
+| Markdown total lines | **260,083** | wc -l across all .md |
 | Test files | **777** | find tests -name "*.py" -type f |
 | Test functions | **12,164 `def test_` occurrences under tests/** | rg "def test_" tests |
 | Test files | **777** | find tests -name "*.py" -type f |
@@ -541,6 +567,17 @@ These are the ground-truth metrics. All other documents citing different numbers
 - Tests: `tests/test_<module_name>.py` mirrors `dharma_swarm/<module_name>.py`
 - Config: environment variables override defaults in `config.py`
 - **Known inconsistency**: "bridge" vs "adapter" vs "connector" all mean "interface between systems". "orchestrator" vs "orchestrate" vs "director" all mean "coordinate work". "routing" vs "router" vs "selector" all mean "choose where to send".
+
+### Forge / Pudgala Naming Boundary
+- **Dharma Forge** names the whole-swarm evolution, benchmark, external-receipt,
+  candidate-control, Hydra, and arena family.
+- **Pudgala Autopoiesis Protostar** names the anti-slop governance mechanism for
+  graded claim/evidence binding, `min_evidence_grade` floors,
+  `VerifiedMachineReceipt` chains, oracle-independence downgrades, and advisory
+  quality gates.
+- Do not use Forge names for anti-slop governance mechanisms. Historical
+  receipts may preserve old branch names, but live docs and tracked surfaces
+  must use the boundary above.
 
 ### Legacy Quarantine Rules
 - Files in `docs/archive/` are dead. Do not reference them as current.

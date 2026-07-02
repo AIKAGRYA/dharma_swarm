@@ -200,7 +200,7 @@ async def test_telemetry_reader_reads_trace_column_and_metadata_fallback(
             "agent_id": "agent-reader",
         },
     )
-    store.record_economic_event_sync(
+    other_event = store.record_economic_event_sync(
         event_kind="revenue",
         amount=999.0,
         metadata={"trace_id": OTHER_TRACE_ID},
@@ -216,7 +216,8 @@ async def test_telemetry_reader_reads_trace_column_and_metadata_fallback(
     assert len(events) == 2
     assert packet.value_summary.economic_amount == 1250.0
     assert packet.economic_event_ids == sorted(packet.economic_event_ids)
-    assert "999" not in packet.to_stable_json()
+    assert other_event.event_id not in packet.economic_event_ids
+    assert OTHER_TRACE_ID not in packet.to_stable_json()
 
 
 @pytest.mark.asyncio

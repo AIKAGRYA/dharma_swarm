@@ -1,0 +1,54 @@
+{
+  "schema_version": "dharma.langgraph_parity.phase7_dashboard_control_actions.v1",
+  "generated_at": "2026-07-01T07:48:10Z",
+  "worktree": "/Users/dhyana/ds_langgraph_parity_20260701",
+  "branch": "codex/langgraph-orchestration-parity-20260701",
+  "score_after_round": 99,
+  "claim": "Phase 7 cockpit action UI improved, but this is not a 100/100 claim. The remaining blocker is still a complete end-to-end cockpit proof over a live running multi-agent graph.",
+  "files_touched": [
+    "dashboard/src/app/dashboard/runtime/page.tsx",
+    "dashboard/src/lib/runtimeControlPlane.ts",
+    "dashboard/src/lib/runtimeControlPlane.test.ts",
+    "reports/langgraph_parity/allnight/ALLNIGHT_LOG.md",
+    "reports/langgraph_parity/allnight/SCOREBOARD.json",
+    "reports/langgraph_parity/allnight/FINAL_100_PARITY_REPORT.md",
+    "reports/langgraph_parity/allnight/runtime_dashboard_control_actions_20260701T074810Z.json"
+  ],
+  "implementation": {
+    "dashboard_action_options": "Added pure runtimeControlActionOptions() helper that exposes approve/reject/resume actions only for pending runtime control events.",
+    "dashboard_action_payload": "Added buildRuntimeControlActionRequest() helper that targets canonical session_id, task_id, run_id, approval_id, interrupt_id, and resume_token identifiers and stamps dashboard.runtime source metadata.",
+    "runtime_panel_ui": "Wired /dashboard/runtime control-event rows to compact lucide icon buttons for approve, reject, and resume, using existing typed API helpers and refreshing the canonical snapshots after a successful action.",
+    "state_boundary": "No dashboard-only control truth store was introduced. The UI posts to the existing RuntimeStateStore-backed API contract."
+  },
+  "verification": [
+    {
+      "command": "node --experimental-strip-types --test src/lib/runtimeControlPlane.test.ts",
+      "cwd": "dashboard",
+      "result": "passed: 14 tests"
+    },
+    {
+      "command": "npm run lint -- --quiet",
+      "cwd": "dashboard",
+      "result": "passed"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "dashboard",
+      "result": "passed; /dashboard/runtime prerendered"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/test_runtime_graph_api.py",
+      "cwd": ".",
+      "result": "passed: 8 tests"
+    }
+  ],
+  "remaining_blockers": [
+    "No final end-to-end cockpit proof has been recorded that observes a live running multi-agent graph in real time from canonical RuntimeStateStore sources through the dashboard.",
+    "PR remains draft and score remains 99/100 until that proof exists and relevant closeout checks pass."
+  ],
+  "next_patch_sequence": [
+    "Produce a complete dashboard/API proof that observes a live running multi-agent graph in real time from RuntimeStateStore.",
+    "Refresh the all-night artifacts and rerun closeout checks.",
+    "Monitor CI for semgrep behavior because local closeout skips semgrep when it is absent on PATH."
+  ]
+}

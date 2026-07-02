@@ -2,10 +2,10 @@
 
 Projection from existing owners. This file owns no facts.
 
-- context_hash: `f5307806652e1b6b4fe9fba68bea419a0c47ee1fc86588388e5df95a433e5a9d`
+- context_hash: `704f3fc0a04c5c22d8dee1474f78c3de733d8cd685e402a45f9601b6703fc758`
 - identity: dharma_swarm is a self-evolving emergent organism (Krishna); its outward action against the world's brokenness (Arjuna) flows from — and is only valid when rooted in — its inward coherence.
 - active_tracks: 4
-- lanes: 51
+- lanes: 54
 - agents: 23
 - receipts_tail: 8
 - loop1_live: True
@@ -42,14 +42,14 @@ Projection from existing owners. This file owns no facts.
 - `warp_fable_weaver` status=missing heartbeat=RED last_seen=2026-06-12T05:03:50.658024+00:00
 
 ## A2A
-- root: `/Users/dhyana/.dharma/a2a_bus`
-- inbox_files: 1798
+- root: `$DHARMA_STATE/a2a_bus`
+- inbox_files: 1831
 - quarantine_files: 35653
-- nats_e2e_receipt: `/Users/dhyana/ds_final_boss_operational_20260701/reports/orientation/nats_e2e_receipt.json`
+- nats_e2e_receipt: `$WORKTREE_ROOT/dw-worktrees/g/reports/orientation/nats_e2e_receipt.json`
 
 ## Body
 - status: `current`
-- worktree: `/Users/dhyana/dharma_swarm_main`
+- worktree: `$HOME/dharma_swarm_main`
 - old_sha: `86418541a9`
 - new_sha: `86418541a9`
 - note: no change

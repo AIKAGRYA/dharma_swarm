@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Iterable
 
 from dharma_swarm.context_compiler_utils import (
     ContextSection,
@@ -12,11 +13,93 @@ from dharma_swarm.context_compiler_utils import (
 from dharma_swarm.memory_kernel import (
     MemoryContextBudget,
     MemoryContextPack,
+    MemoryLane,
     MemoryQuery,
+    MemoryScope,
     TruthState,
 )
 
 logger = logging.getLogger(__name__)
+
+
+_LIVE_TOPOLOGY_MODES = {"swarm", "supervisor", "subagents_as_tools"}
+_LIVE_TOPOLOGY_SCOPES = (
+    MemoryScope.PROJECT,
+    MemoryScope.REPO,
+    MemoryScope.WORKTREE,
+    MemoryScope.SESSION,
+    MemoryScope.AGENT,
+    MemoryScope.SWARM,
+)
+_LIVE_TOPOLOGY_LANES = (
+    MemoryLane.WORKING,
+    MemoryLane.EPISODIC,
+    MemoryLane.SEMANTIC,
+    MemoryLane.PROCEDURAL,
+    MemoryLane.REFLECTION,
+    MemoryLane.PROVENANCE,
+)
+
+
+@dataclass(frozen=True)
+class MemoryKernelIsolationPolicy:
+    applied: bool = False
+    topology: str = ""
+    agent_id: str = ""
+    allowed_agent_ids: tuple[str, ...] = ()
+    allowed_scopes: tuple[MemoryScope, ...] = ()
+    allowed_memory_lanes: tuple[MemoryLane, ...] = ()
+
+    def metadata(self) -> dict[str, Any]:
+        return {
+            "isolation_applied": self.applied,
+            "isolation_topology": self.topology,
+            "isolation_agent_id": self.agent_id,
+            "allowed_agent_ids": list(self.allowed_agent_ids),
+            "allowed_scopes": [item.value for item in self.allowed_scopes],
+            "allowed_memory_lanes": [item.value for item in self.allowed_memory_lanes],
+        }
+
+
+def memory_kernel_isolation_policy_from_metadata(
+    metadata: dict[str, Any] | None,
+) -> MemoryKernelIsolationPolicy:
+    """Derive the MemoryKernel read policy for one live agent context bundle."""
+
+    source = metadata or {}
+    topology = _clean_text(
+        source.get("topology")
+        or source.get("topology_mode")
+        or source.get("mode")
+        or source.get("topology_type")
+    )
+    agent_id = _clean_text(
+        source.get("agent_id")
+        or source.get("active_agent")
+        or source.get("parent_agent_id")
+    )
+    explicit_agent_ids = _string_tuple(source.get("memory_kernel_allowed_agent_ids"))
+    allowed_agent_ids = explicit_agent_ids or ((agent_id,) if agent_id else ())
+    explicit_scopes = _memory_scope_tuple(source.get("memory_kernel_allowed_scopes"))
+    explicit_lanes = _memory_lane_tuple(source.get("memory_kernel_allowed_memory_lanes"))
+
+    should_apply = (
+        topology in _LIVE_TOPOLOGY_MODES
+        or bool(explicit_agent_ids)
+        or bool(explicit_scopes)
+        or bool(explicit_lanes)
+    )
+    if not should_apply:
+        return MemoryKernelIsolationPolicy(topology=topology, agent_id=agent_id)
+
+    return MemoryKernelIsolationPolicy(
+        applied=True,
+        topology=topology,
+        agent_id=agent_id,
+        allowed_agent_ids=allowed_agent_ids,
+        allowed_scopes=explicit_scopes or _LIVE_TOPOLOGY_SCOPES,
+        allowed_memory_lanes=explicit_lanes or _LIVE_TOPOLOGY_LANES,
+    )
 
 
 def build_memory_kernel_default_context(
@@ -24,14 +107,17 @@ def build_memory_kernel_default_context(
     *,
     recall_query: str,
     token_budget: int,
+    isolation_policy: MemoryKernelIsolationPolicy | None = None,
 ) -> tuple[ContextSection | None, dict[str, Any]]:
     if memory_kernel is None:
         return None, {"status": "not_configured"}
 
+    resolved_isolation = isolation_policy or MemoryKernelIsolationPolicy()
     try:
         atom_budget = max(4, min(24, int(token_budget) // 100))
         pack = memory_kernel.preview_memory_pack(
             query=MemoryQuery(
+                text_query=recall_query or None,
                 limit_total=atom_budget,
                 limit_per_surface=atom_budget,
                 include_content=True,
@@ -52,6 +138,13 @@ def build_memory_kernel_default_context(
                 require_context_admissible=False,
                 allow_projections=False,
                 allow_high_risk=False,
+                reject_stale=True,
+                require_source_digest=True,
+                require_source_row_key=True,
+                block_tool_exposure=True,
+                allowed_scopes=resolved_isolation.allowed_scopes,
+                allowed_agent_ids=resolved_isolation.allowed_agent_ids,
+                allowed_memory_lanes=resolved_isolation.allowed_memory_lanes,
                 allowed_truth_states=(
                     TruthState.OBSERVED,
                     TruthState.CLAIMED,
@@ -71,6 +164,8 @@ def build_memory_kernel_default_context(
     metadata = memory_kernel_pack_metadata(pack)
     metadata["status"] = "used"
     metadata["query_present"] = bool(recall_query)
+    metadata["text_query_applied"] = bool(recall_query)
+    metadata.update(resolved_isolation.metadata())
     return (
         ContextSection(
             name="Memory Kernel",
@@ -91,6 +186,29 @@ def memory_kernel_pack_metadata(pack: MemoryContextPack) -> dict[str, Any]:
         "omitted_count": pack.omitted_count,
         "candidate_truncated": pack.candidate_truncated,
         "warnings": list(pack.warnings),
+        "retrieval_telemetry": memory_kernel_retrieval_telemetry(pack),
+    }
+
+
+def memory_kernel_retrieval_telemetry(pack: MemoryContextPack) -> dict[str, Any]:
+    admitted = [item for item in pack.items if item.admitted]
+    omitted = [item for item in pack.items if not item.admitted]
+    return {
+        "candidate_count": pack.candidate_count,
+        "admitted_count": pack.admitted_count,
+        "omitted_count": pack.omitted_count,
+        "candidate_truncated": pack.candidate_truncated,
+        "admitted_surface_ids": _dedupe(item.surface_id for item in admitted),
+        "omitted_surface_ids": _dedupe(item.surface_id for item in omitted),
+        "selection_reason_counts": _count_reasons(
+            reason for item in admitted for reason in item.selection_reasons
+        ),
+        "omission_reason_counts": _count_reasons(
+            reason for item in omitted for reason in item.omission_reasons
+        ),
+        "warning_counts": _count_reasons(
+            warning for item in pack.items for warning in getattr(item, "warnings", ())
+        ),
     }
 
 
@@ -153,3 +271,47 @@ def _inline_context(value: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[: max(0, max_chars - 14)].rstrip() + "...<truncated>"
+
+
+def _count_reasons(values: Iterable[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = str(value).strip()
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _clean_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _string_tuple(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        values = (value,)
+    elif isinstance(value, (list, tuple, set)):
+        values = tuple(str(item) for item in value)
+    else:
+        values = ()
+    return tuple(dict.fromkeys(item.strip() for item in values if item.strip()))
+
+
+def _memory_scope_tuple(value: Any) -> tuple[MemoryScope, ...]:
+    scopes: list[MemoryScope] = []
+    for item in _string_tuple(value):
+        try:
+            scopes.append(MemoryScope(item))
+        except ValueError:
+            logger.debug("Ignoring unknown memory scope in isolation policy: %s", item)
+    return tuple(dict.fromkeys(scopes))
+
+
+def _memory_lane_tuple(value: Any) -> tuple[MemoryLane, ...]:
+    lanes: list[MemoryLane] = []
+    for item in _string_tuple(value):
+        try:
+            lanes.append(MemoryLane(item))
+        except ValueError:
+            logger.debug("Ignoring unknown memory lane in isolation policy: %s", item)
+    return tuple(dict.fromkeys(lanes))
