@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -164,3 +165,169 @@ def test_task_counts_group_by_contamination_state(tmp_path: Path) -> None:
         "possible_pretrain": 1,
         "self_mod_clean": 1,
     }
+
+
+def _write_validation_receipt(path: Path, *, repo: str, task_id: str, status: str, started: str, finished: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    blockers = [] if status == "fail_to_pass_validated" else ["validation_failed"]
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "forge_v2.pr_suite_fail_to_pass_validator.v1",
+                "run_id": f"validation-{task_id}",
+                "repo": repo,
+                "task_hint": task_id,
+                "status": status,
+                "started_at": started,
+                "finished_at": finished,
+                "validated_fail_to_pass": ["tests/test_example.py"] if not blockers else [],
+                "blockers": blockers,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_taskbed_quality_report_measures_per_repo_validation_and_grade_metrics(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    validations = tmp_path / "validations"
+    grades = tmp_path / "grades"
+    v1 = validations / "click-1.json"
+    v2 = validations / "click-2.json"
+    v3 = validations / "werkzeug-1.json"
+    _write_validation_receipt(
+        v1,
+        repo="pallets/click",
+        task_id="pr::pallets/click#1",
+        status="fail_to_pass_validated",
+        started="20260702T010000Z",
+        finished="20260702T010010Z",
+    )
+    _write_validation_receipt(
+        v2,
+        repo="pallets/click",
+        task_id="pr::pallets/click#2",
+        status="blocked",
+        started="20260702T010100Z",
+        finished="20260702T010130Z",
+    )
+    _write_validation_receipt(
+        v3,
+        repo="pallets/werkzeug",
+        task_id="pr::pallets/werkzeug#3",
+        status="fail_to_pass_validated",
+        started="20260702T020000Z",
+        finished="20260702T020006Z",
+    )
+    taskbed_ledger.register_tasks(
+        [
+            {
+                **_task("pr::pallets/click#1"),
+                "repo": "pallets/click",
+                "validation_state": "fail_to_pass_validated",
+                "validation_receipt": str(v1),
+            },
+            {
+                **_task("pr::pallets/click#2"),
+                "repo": "pallets/click",
+                "validation_state": "blocked",
+                "validation_receipt": str(v2),
+            },
+            {
+                **_task("pr::pallets/werkzeug#3"),
+                "repo": "pallets/werkzeug",
+                "validation_state": "fail_to_pass_validated",
+                "validation_receipt": str(v3),
+            },
+        ],
+        db_path=db,
+        source="post_cutoff_pr_suite",
+        taskbed="fresh_pr_suite",
+    )
+    grades.mkdir()
+    (grades / "click-pass.json").write_text(
+        json.dumps(
+            {
+                "task_id": "pr::pallets/click#1",
+                "repo": "pallets/click",
+                "resolved": True,
+                "grade_seconds": 12.5,
+                "grade_error": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (grades / "click-fail.json").write_text(
+        json.dumps(
+            {
+                "task_id": "pr::pallets/click#2",
+                "repo": "pallets/click",
+                "resolved": False,
+                "grade_seconds": 5.0,
+                "grade_error": "test_returncode=1",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = taskbed_ledger.taskbed_quality_report(db_path=db, grade_receipt_roots=[grades])
+    assert report["schema"] == "forge_v2.taskbed_quality_report.v1"
+    assert report["task_count"] == 3
+    assert report["validated_count"] == 2
+    assert report["validation_failure_rate"] == round(1 / 3, 6)
+    assert report["grade_attempt_count"] == 2
+    assert report["grade_resolved_count"] == 1
+    assert report["grade_failure_rate"] == 0.5
+    assert report["source_of_truth_mutated"] is False
+    assert report["official_score_claimed"] is False
+    by_repo = {item["repo"]: item for item in report["per_repo"]}
+    assert by_repo["pallets/click"]["task_count"] == 2
+    assert by_repo["pallets/click"]["validated_count"] == 1
+    assert by_repo["pallets/click"]["validation_failure_rate"] == 0.5
+    assert by_repo["pallets/click"]["validation_runtime"]["median_seconds"] == 20.0
+    assert by_repo["pallets/click"]["grade_attempt_count"] == 2
+    assert by_repo["pallets/click"]["grade_failure_rate"] == 0.5
+    assert by_repo["pallets/click"]["grade_runtime"]["median_seconds"] == 8.8
+    assert by_repo["pallets/click"]["grade_coverage"]["observed_task_rate"] == 1.0
+    assert by_repo["pallets/werkzeug"]["validation_runtime"]["median_seconds"] == 6.0
+    assert by_repo["pallets/werkzeug"]["grade_failure_rate"] is None
+    assert by_repo["pallets/werkzeug"]["grade_coverage"]["observed_task_rate"] == 0.0
+
+
+def test_write_taskbed_quality_report_writes_json_and_markdown(tmp_path: Path) -> None:
+    db = tmp_path / "taskbed.db"
+    validation = tmp_path / "validation.json"
+    _write_validation_receipt(
+        validation,
+        repo="pallets/click",
+        task_id="pr::pallets/click#1",
+        status="fail_to_pass_validated",
+        started="20260702T010000Z",
+        finished="20260702T010003Z",
+    )
+    taskbed_ledger.register_task(
+        {
+            **_task("pr::pallets/click#1"),
+            "repo": "pallets/click",
+            "validation_state": "fail_to_pass_validated",
+            "validation_receipt": str(validation),
+        },
+        db_path=db,
+        source="post_cutoff_pr_suite",
+        taskbed="fresh_pr_suite",
+    )
+
+    result = taskbed_ledger.write_taskbed_quality_report(
+        db_path=db,
+        output_root=tmp_path / "quality",
+        grade_receipt_roots=[],
+        label="unit",
+    )
+
+    json_path = Path(result["json_path"])
+    md_path = Path(result["markdown_path"])
+    assert json_path.exists()
+    assert md_path.exists()
+    report = json.loads(json_path.read_text())
+    assert report["per_repo"][0]["repo"] == "pallets/click"
+    assert "Taskbed quality report" in md_path.read_text()
