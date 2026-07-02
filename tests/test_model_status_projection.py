@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from dharma_swarm import key_oracle
+from dharma_swarm import key_oracle, model_pool
 from dharma_swarm.model_status import (
     LIVE_CALL_MATRIX_PATH_ENV,
     floor_model_status,
@@ -53,7 +53,11 @@ def test_floor_status_projection_uses_dkeys_rows_without_live_calls(
     projection = floor_model_status(profiles_path=tmp_path / "profiles.json")
 
     assert projection.oracle_state == "fresh"
-    assert len(projection.models) == 12
+    expected_floor_ids = {entry.id for entry in model_pool.floor_entries()}
+    projected_ids = {model.id for model in projection.models}
+    assert len(projection.models) == len(expected_floor_ids)
+    assert projected_ids == expected_floor_ids
+    assert {"kimi-for-coding", "glm-5.2"} <= projected_ids
     assert all(model.lane == "floor" for model in projection.models)
     by_id = {model.id: model for model in projection.models}
     assert by_id["claude-opus-4.8"].available is True
