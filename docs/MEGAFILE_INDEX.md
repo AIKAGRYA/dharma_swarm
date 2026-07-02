@@ -107,15 +107,15 @@ The 8 unstubbed slots below get filled by **pointing into the authority stack**,
 **Known gap:** 47% of in-flight branches have no anchor in any plan doc. Strategy is ~10x ahead of code (`dharma_swarm/loomwork/` package does not exist). Roadmap-vs-design contestation between `LOOMWORK_v0_MASTER.md` and `2026-05-07-loomwork-design.md` is logged in `governance/REPO_GOVERNANCE_AUDIT.md` as a separate convergence track and is not blocked by this slot's seeding.
 
 ### Slot 4 — Limbs Atlas
-**Path:** `dharma_swarm/docs/architecture/LIMBS_ATLAS.md` (SEEDED 2026-07-01 — thin index over NAVIGATION.md + ACTIVE_SURFACE_MANIFEST.yaml + capability lenses)
+**Path:** `docs/architecture/LIMBS_ATLAS.md` (SEEDED 2026-07-01 — thin index over NAVIGATION.md + ACTIVE_SURFACE_MANIFEST.yaml + capability lenses)
 **Status:** SEEDED (thin index file created; static module map still stale — see BR-010)
 **Audience:** Engineer, Agent
 **Read for:** the dependency graph, module map, "what calls what," and capability lenses (e.g. the agentic-pattern coverage map).
 **Capability lenses (new 2026-07-01):**
-- `dharma_swarm/docs/architecture/AGENTIC_PATTERNS_ATLAS.md` — Gulli's 21 agentic design patterns mapped to implementing modules (STRONG/PARTIAL/OUT-OF-SCOPE).
+- `docs/architecture/AGENTIC_PATTERNS_ATLAS.md` — Gulli's 21 agentic design patterns mapped to implementing modules (STRONG/PARTIAL/OUT-OF-SCOPE).
 **Substrate (corrected 2026-05-07 18:00):**
-- **`dharma_swarm/docs/architecture/NAVIGATION.md`** — the actual static map file (`CLAUDE.md` pointer patched 2026-05-07; file itself remains stale; BR-010 revised)
-- **`dharma_swarm/ACTIVE_SURFACE_MANIFEST.yaml`** — machine-readable authority for which API routes / dashboard surfaces are active / projection / adapter / research / frozen
+- **`docs/architecture/NAVIGATION.md`** — the actual static map file (`CLAUDE.md` pointer patched 2026-05-07; file itself remains stale; BR-010 revised)
+- **`ACTIVE_SURFACE_MANIFEST.yaml`** — machine-readable authority for which API routes / dashboard surfaces are active / projection / adapter / research / frozen
 - `~/.dharma/audit/system_inventory_2026-05-07.md` (out-of-repo; 330 subsystems, 14 LaunchAgents, 100 skills, 521 test files)
 - `dharma_swarm/CLAUDE.md` Key Abstractions section (9 abstractions; tip-of-iceberg)
 - `~/.claude/cabinet/systems/dharma_swarm.md`, `connections.md`, `repo_map.md` (topical maps)

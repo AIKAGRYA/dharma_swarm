@@ -86,7 +86,13 @@ async def _headless_invoker(
         status, error_source, error_detail = "ok", "none", None
 
     return EvidenceReceipt(
-        trace_id=str(task.get("id", "")),
+        # trace_id is the cross-layer correlation identity (aliased
+        # dharma.correlation_id in to_otel_span) shared by every receipt in
+        # this cycle; task_id below already carries the per-task identity, so
+        # trace_id must be the cycle's context_id, not the per-task id, or
+        # receipts from one deep-sweep cycle can't be joined in telemetry
+        # (Copilot review finding, deep_sweep.py:92).
+        trace_id=context_id,
         context_id=context_id,
         task_id=str(task.get("id", "")),
         agent_id=agent_id,

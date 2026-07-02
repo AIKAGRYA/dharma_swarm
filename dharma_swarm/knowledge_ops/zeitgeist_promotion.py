@@ -188,10 +188,31 @@ def run_zeitgeist_promotion(
         "rows_read": len(rows),
         "proposal_count": queue.promotion_proposal_count,
         "blocked_count": queue.blocked_atom_count,
-        "settled_skipped": len(settled),
+        # Count of THIS batch's rows actually suppressed by a settled decision —
+        # not len(settled), which is every accept/reject ever recorded in the
+        # ledger and inflates once old settled ids scroll out of the inbox
+        # (Greptile finding, zeitgeist_promotion.py:191).
+        "settled_skipped": _count_settled_in_batch(rows, settled),
         "review_json": str(json_path) if write else "",
         "review_md": str(md_path) if write else "",
     }
+
+
+def _count_settled_in_batch(
+    rows: list[dict[str, Any]], settled_atom_ids: frozenset[str]
+) -> int:
+    """How many rows in THIS batch carry an id already settled by the operator.
+
+    Mirrors build_zeitgeist_promotion_queue's own per-row settled check so the
+    reported count matches what the queue actually suppressed this cycle.
+    """
+    if not settled_atom_ids:
+        return 0
+    return sum(
+        1
+        for row in rows
+        if str(row.get("id") or "").strip() in settled_atom_ids
+    )
 
 
 def _proposal_from_signal(row: dict[str, Any]) -> MemoryPromotionProposal | None:

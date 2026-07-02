@@ -189,6 +189,36 @@ def test_run_honors_prior_decisions_across_cycles(tmp_path: Path) -> None:
     assert summary["settled_skipped"] == 1
 
 
+def test_settled_skipped_counts_only_rows_present_in_this_batch(tmp_path: Path) -> None:
+    # Greptile finding: settled_skipped must reflect settled ids actually
+    # present in THIS inbox run, not every accept/reject ever recorded.
+    meta = tmp_path / "meta"
+    (meta / "knowledge_ops").mkdir(parents=True)
+    (meta / "world_zeitgeist_inbox.jsonl").write_text(
+        json.dumps(_signal("world-1")) + "\n" + json.dumps(_signal("world-2")) + "\n",
+        encoding="utf-8",
+    )
+    # Ledger carries decisions for world-1 (still in the inbox) AND for three
+    # ids that have since scrolled out of the inbox entirely.
+    (meta / "knowledge_ops" / "zeitgeist_promotion_decisions.json").write_text(
+        json.dumps(
+            {
+                "decisions": [
+                    _decision("world-1", "reject"),
+                    _decision("stale-a", "accept"),
+                    _decision("stale-b", "reject"),
+                    _decision("stale-c", "accept"),
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary = run_zeitgeist_promotion(tmp_path)
+    assert summary["proposal_count"] == 1  # only world-2 re-proposed
+    # Old buggy behaviour would report 4 (len of the whole settled set).
+    assert summary["settled_skipped"] == 1
+
+
 def test_run_writes_review_artifacts_but_not_memory(tmp_path: Path) -> None:
     meta = tmp_path / "meta"
     meta.mkdir(parents=True)
